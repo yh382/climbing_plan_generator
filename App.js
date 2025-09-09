@@ -3,9 +3,13 @@ import axios from "axios";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Button, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import Markdown from "react-native-markdown-display";
+import Constants from "expo-constants";
 
 // ★ 修改为你的服务地址
-const API_BASE = "http://100.110.185.31:8000/plan";
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE ??
+  (Constants?.expoConfig?.extra?.API_BASE) ??
+  "http://localhost:8000/plan";
 
 export default function App() {
   const [form, setForm] = useState({
