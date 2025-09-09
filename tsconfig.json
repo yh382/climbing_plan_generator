@@ -1,17 +1,44 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "target": "ES2020",
+    "lib": [
+      "ES2020"
+    ],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./*"
+        "app/*"
+      ],
+      "@components/*": [
+        "app/components/*"
+      ],
+      "@contexts/*": [
+        "app/contexts/*"
+      ],
+      "@lib/*": [
+        "app/lib/*"
       ]
-    }
+    },
+    "types": [
+      "react",
+      "react-native",
+      "expo",
+      "expo-router"
+    ]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+    "app",
+    "index.ts",
+    "index.tsx",
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
+  ],
+  "extends": "expo/tsconfig.base"
 }
