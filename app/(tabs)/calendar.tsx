@@ -2,9 +2,24 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, FlatList, SafeAreaView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  AppState,
+  FlatList,
+  SafeAreaView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// ✅ 从 SettingsContext 获取语言（zh/en）
+// ✅ UI 组件（相对路径，不依赖别名）
+import { Card } from "../../components/ui/Card";
+import { ProgressBar } from "../../components/ui/ProgressBar";
+import { Button } from "../../components/ui/Button";
+import { H1, Caption } from "../../components/ui/Text";
+import { tokens } from "../../components/ui/Theme";
+
+// ✅ 从 Settings / i18n 获取语言（zh/en）
 import { I18N, useI18N } from "../lib/i18n";
 
 type PlanItem = { label: I18N; target: I18N };
@@ -188,13 +203,15 @@ export default function CalendarTab() {
   );
 
   // 完成度
-  const dayCompletion = useMemo(() => {
+  const doneCount = useMemo(() => {
     if (!dayData?.items?.length) return 0;
-    const done = progress.slice(0, dayData.items.length).filter(Boolean).length;
-    return Math.round((done / dayData.items.length) * 100);
+    return progress.slice(0, dayData.items.length).filter(Boolean).length;
   }, [dayData?.items, progress]);
 
-  // 顶部简单日期导航
+  const totalCount = dayData?.items?.length || 0;
+  const dayCompletion = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+  // 顶部简单日期导航/周序号
   const weekIndex = useMemo(() => {
     if (!plan?.meta?.start_date) return null;
     const start = parseISO(plan.meta.start_date)!;
@@ -231,6 +248,21 @@ export default function CalendarTab() {
     return () => clearTimeout(t);
   }, [note, selected]);
 
+  // 底部操作
+  const completeAll = useCallback(() => {
+    if (!totalCount) return;
+    const next = Array(totalCount).fill(true);
+    setProgress(next);
+    saveProgressForDate(selected, next);
+  }, [totalCount, saveProgressForDate, selected]);
+
+  const resetToday = useCallback(() => {
+    if (!totalCount) return;
+    const next = Array(totalCount).fill(false);
+    setProgress(next);
+    saveProgressForDate(selected, next);
+  }, [totalCount, saveProgressForDate, selected]);
+
   const renderItem = ({ item, index }: { item: PlanItem; index: number }) => {
     const done = progress[index] ?? false;
     return (
@@ -239,10 +271,11 @@ export default function CalendarTab() {
           paddingVertical: 12,
           paddingHorizontal: 16,
           borderBottomWidth: 1,
-          borderColor: "#eee",
+          borderColor: tokens.color.border,
           flexDirection: "row",
           alignItems: "center",
           gap: 12,
+          backgroundColor: "#fff",
         }}
       >
         {/* 勾选圆圈 */}
@@ -254,13 +287,13 @@ export default function CalendarTab() {
             height: 24,
             borderRadius: 12,
             borderWidth: 2,
-            borderColor: done ? "#16a34a" : "#d1d5db",
-            backgroundColor: done ? "#16a34a" : "white",
+            borderColor: done ? tokens.color.success : "#d1d5db",
+            backgroundColor: done ? tokens.color.success : "white",
           }}
         />
         {/* 文案（注意用 tt() 取当前语言） */}
         <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: "600", marginBottom: 4, color: done ? "#16a34a" : "#111827" }}>
+          <Text style={{ fontWeight: "600", marginBottom: 4, color: done ? tokens.color.success : tokens.color.text }}>
             {tt(item.label)}
           </Text>
           <Text style={{ color: "#374151" }}>{tt(item.target)}</Text>
@@ -270,73 +303,100 @@ export default function CalendarTab() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      {/* 顶部简化：左右切换日期 */}
-      <View
-        style={{
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          borderBottomWidth: 1,
-          borderColor: "#eee",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <TouchableOpacity onPress={() => shiftDay(-1)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: "#f3f4f6" }}>
-          <Text style={{ fontSize: 16 }}>‹</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 16, fontWeight: "700" }}>{headerTitle}</Text>
-        <TouchableOpacity onPress={() => shiftDay(1)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: "#f3f4f6" }}>
-          <Text style={{ fontSize: 16 }}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 完成度 + 进度条 */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.color.bg }}>
+      {/* 顶部信息卡：日期 + 完成度 */}
+      <Card style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <Text style={{ fontWeight: "700" }}>
-            {dayData?.title ? tt(dayData.title) : tr("无训练项目", "No workouts")}
-          </Text>
-          <Text style={{ color: "#4f46e5", fontWeight: "700" }}>
-            {dayData?.items?.length ? tr(`完成度 ${dayCompletion}%`, `Completion ${dayCompletion}%`) : ""}
-          </Text>
-        </View>
-        {dayData?.items?.length ? (
-          <View style={{ height: 10, backgroundColor: "#e5e7eb", borderRadius: 999, overflow: "hidden" }}>
-            <View style={{ height: "100%", width: `${dayCompletion}%`, backgroundColor: "#16a34a" }} />
+          <H1 style={{ flexShrink: 1, paddingRight: 12 }}>{headerTitle}</H1>
+          {/* 左右切日 */}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Button title={isZH ? "前一天" : "Prev"} variant="ghost" onPress={() => shiftDay(-1)} />
+            <Button title={isZH ? "后一天" : "Next"} variant="ghost" onPress={() => shiftDay(1)} />
           </View>
-        ) : null}
-      </View>
-
-      {/* 训练词条列表 */}
-      {dayData?.items && dayData.items.length > 0 ? (
-        <FlatList data={dayData.items} renderItem={renderItem} keyExtractor={(it, idx) => `${idx}-${tt(it.label)}`} extraData={progress} />
-      ) : (
-        <View style={{ padding: 16 }}>
-          <Text style={{ color: "#9ca3af" }}>
-            {tr("今天没有训练项目（休息日或未安排）。", "No workouts today (rest day or not scheduled).")}
-          </Text>
         </View>
-      )}
 
-      {/* 今日备注（可编辑，将自动同步到记录中心） */}
-      <View style={{ padding: 16, borderTopWidth: 1, borderColor: "#eee" }}>
-        <Text style={{ fontWeight: "bold", marginBottom: 6 }}>
-          {tr("今日备注（会同步到记录中心）", "Today's Notes (syncs to Journal)")}
-        </Text>
+        <ProgressBar value={dayCompletion} />
+        <Caption style={{ marginTop: 6 }}>
+          {isZH
+            ? `今日完成度 ${dayCompletion}% · 已完成 ${doneCount}/${totalCount} 项`
+            : `Completion ${dayCompletion}% · ${doneCount}/${totalCount} done`}
+        </Caption>
+      </Card>
+
+      {/* 今日备注 */}
+      <Card style={{ marginHorizontal: 16, marginBottom: 8 }}>
+        <Caption style={{ marginBottom: 6 }}>
+          {isZH ? "今日备注" : "Notes"}
+        </Caption>
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder={tr("写下今天的训练感受、完成情况、身体反馈、疼痛点等…", "Write today's reflections, completion, body feedback, pain points…")}
+          placeholder={isZH ? "输入你的训练感受、状态或临时调整…" : "Write how you feel or any adjustment…"}
           multiline
-          textAlignVertical="top"
-          style={{ minHeight: 100, borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, padding: 12, backgroundColor: "white" }}
+          style={{
+            minHeight: 64,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: tokens.color.border,
+            borderRadius: tokens.radius.md,
+            backgroundColor: "#fff",
+            textAlignVertical: "top",
+          }}
         />
+      </Card>
+
+      {/* 列表 */}
+      <Card style={{ marginHorizontal: 16, marginBottom: 100, padding: 0 /* 让每行自带 padding 生效 */ }}>
+        {dayData?.items?.length ? (
+          <FlatList
+            data={dayData.items}
+            renderItem={renderItem}
+            keyExtractor={(_, i) => `${selected}_${i}`}
+            ItemSeparatorComponent={() => null}
+            scrollEnabled={true}
+          />
+        ) : (
+          <View style={{ padding: 16 }}>
+            <Text style={{ color: tokens.color.muted }}>
+              {isZH ? "今日暂无训练项目" : "No items for today"}
+            </Text>
+          </View>
+        )}
+      </Card>
+
+      {/* 底部吸附操作条 */}
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingBottom: 12,
+          paddingTop: 8,
+          backgroundColor: "transparent",
+        }}
+      >
+        <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Button
+              title={isZH ? "全部完成" : "Mark all done"}
+              onPress={completeAll}
+              variant="primary"
+              style={{ flex: 1 }}
+            />
+            <Button
+              title={isZH ? "重置今日" : "Reset"}
+              onPress={resetToday}
+              variant="ghost"
+              style={{ flex: 1 }}
+            />
+          </View>
+        </Card>
       </View>
     </SafeAreaView>
   );
 }
+
 
 
 

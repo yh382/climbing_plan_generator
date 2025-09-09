@@ -22,6 +22,9 @@ import {
 } from "react-native";
 import { useSettings } from "../contexts/SettingsContext";
 import { I18N, useI18N } from "../lib/i18n";
+import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { tokens } from "../../components/ui/Theme";
 
 const API_JSON = "http://100.110.185.31:8000/plan_json";
 const WD_ORDER: WeekdayKey[] = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -863,7 +866,7 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
   const closeHelp = () => sheetRef.current?.close();
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.color.bg }}>
       {/* 标题（多语言） */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <Text style={{ fontSize: 22, fontWeight: "bold" }}>
@@ -888,73 +891,67 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
       {step < 5 ? (
         <View
           style={{
-            position: "absolute", left: 0, right: 0, bottom: 0,
-            paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "rgba(255,255,255,0.95)",
-            borderTopWidth: 1, borderColor: "#e5e7eb",
-            flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingBottom: 12,
+            paddingTop: 8,
+            backgroundColor: "transparent",
           }}
         >
-          <Pressable
-            onPress={() => setStep((s) => (Math.max(1, (s as number) - 1) as Step))}
-            style={{ paddingVertical: 15, paddingHorizontal: 24, borderRadius: 10, backgroundColor: "#f3f4f6" }}
-          >
-            <Text style={{ color: "#111827" }}>{tr("上一步","Back")}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => { if (canNext) setStep((s) => ((s + 1) as Step)); }}
-            style={{ paddingVertical: 15, paddingHorizontal: 24, borderRadius: 10, backgroundColor: canNext ? "#4f46e5" : "#a5b4fc" }}
-          >
-            <Text style={{ color: "white" }}>{canNext ? tr("下一步","Next") : tr("请先完成选择","Complete required fields")}</Text>
-          </Pressable>
+          <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button
+                title={tr("上一步","Back")}
+                variant="ghost"
+                onPress={() => setStep((s) => (Math.max(1, (s as number) - 1) as Step))}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={canNext ? tr("下一步","Next") : tr("请先完成选择","Complete required fields")}
+                onPress={() => { if (canNext) setStep((s) => ((s + 1) as Step)); }}
+                style={{ flex: 1, opacity: canNext ? 1 : 0.8 }}
+              />
+            </View>
+          </Card>
         </View>
+
       ) : (
         <View
           style={{
-            position: "absolute", left: 0, right: 0, bottom: 0,
-            paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "rgba(255,255,255,0.95)",
-            borderTopWidth: 1, borderColor: "#e5e7eb",
-            flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-            gap: 7,
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingBottom: 12,
+            paddingTop: 8,
+            backgroundColor: "transparent",
           }}
         >
-          <Pressable
-            onPress={() => setStep(4)}
-            disabled={loading}
-            style={{
-              paddingVertical: 15, paddingHorizontal: 24,
-              borderRadius: 10, backgroundColor: "#f3f4f6", opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <Text style={{ color: "#111827" }}>{tr("上一步","Back")}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={requestAndPreview}
-            disabled={loading}
-            style={{
-              paddingVertical: 15, paddingHorizontal: 24,
-              borderRadius: 10, backgroundColor: "#4f46e5",
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <Text style={{ color: "white" }}>
-              {loading ? tr("生成中…","Generating…") : tr("生成训练计划","Generate plan")}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={confirmImport}
-            disabled={!preview || loading}
-            style={{
-              paddingVertical: 15, paddingHorizontal: 24,
-              borderRadius: 10,
-              backgroundColor: !preview || loading ? "#a5b4fc" : "#16a34a",
-            }}
-          >
-            <Text style={{ color: "white" }}>{tr("确认导入到训练日历","Import to calendar")}</Text>
-          </Pressable>
+          <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button
+                title={tr("上一步","Back")}
+                variant="ghost"
+                onPress={() => setStep(4)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={loading ? tr("生成中…","Generating…") : tr("生成训练计划","Generate plan")}
+                onPress={requestAndPreview}
+                style={{ flex: 1, opacity: loading ? 0.7 : 1 }}
+              />
+              <Button
+                title={tr("确认导入到训练日历","Import to calendar")}
+                onPress={confirmImport}
+                variant="secondary"
+                style={{ flex: 1, opacity: !preview || loading ? 0.7 : 1 }}
+              />
+            </View>
+          </Card>
         </View>
+
       )}
 
       {/* 生成中遮罩 */}
