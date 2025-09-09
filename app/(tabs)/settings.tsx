@@ -1,19 +1,16 @@
 // app/(tabs)/settings.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// ⛏️ 移除 Picker（已不用）
-// import { Picker } from "@react-native-picker/picker";
 import React, { useEffect, useState } from "react";
-import {
-  Alert,
-  Linking,
-  SafeAreaView,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, Linking, SafeAreaView, Switch, Text, View } from "react-native";
 import { useSettings } from "../contexts/SettingsContext";
 import { scheduleDailyReminder } from "../lib/notifications";
+
+// ✅ 新 UI 组件
+import { Card } from "@components/ui/Card";
+import { FieldRow } from "@components/ui/FieldRow";
+import { Segmented } from "@components/ui/Segmented";
+import { Caption, H1 } from "@components/ui/Text";
+import { tokens } from "@components/ui/Theme";
 
 type Lang = "zh" | "en";
 type UnitSystem = "imperial" | "metric";
@@ -22,43 +19,11 @@ type RopeScale = "YDS" | "French";
 
 const NOTIF_KEY = "@notif_enabled";
 
-const Chip = ({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    style={{
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: active ? "#4f46e5" : "#e5e7eb",
-      backgroundColor: active ? "#eef2ff" : "white",
-      marginRight: 8,
-    }}
-  >
-    <Text style={{ color: active ? "#4f46e5" : "#111827" }}>{label}</Text>
-  </TouchableOpacity>
-);
-
 export default function Settings() {
-  const {
-    ready,
-    lang, setLang,
-    unit, setUnit,
-    boulderScale, setBoulderScale,
-    ropeScale, setRopeScale
-  } = useSettings();
+  const { ready, lang, setLang, unit, setUnit, boulderScale, setBoulderScale, ropeScale, setRopeScale } = useSettings();
 
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
 
-  // 通知开关仍本地管理
   const [notif, setNotif] = useState<boolean>(false);
   const [busy, setBusy] = useState(false);
 
@@ -95,7 +60,6 @@ export default function Settings() {
     Linking.openURL(mailto).catch(() => {});
   };
 
-  // 若设置尚未加载完，给个轻量占位（避免闪一下默认值）
   if (!ready) {
     return (
       <SafeAreaView style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -104,135 +68,101 @@ export default function Settings() {
     );
   }
 
-  const Row = ({
-    title,
-    subtitle,
-    right,
-  }: {
-    title: string;
-    subtitle?: string;
-    right?: React.ReactNode;
-  }) => (
-    <View
-      style={{
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderColor: "#f3f4f6",
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <View style={{ flex: 1, paddingRight: 10 }}>
-          <Text style={{ fontWeight: "600" }}>{title}</Text>
-          {subtitle ? <Text style={{ color: "#6b7280", marginTop: 2 }}>{subtitle}</Text> : null}
-        </View>
-        {right}
-      </View>
-    </View>
-  );
-
   return (
-    <SafeAreaView style={{ flex: 1, padding: 16 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.color.bg }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+        <H1>{tr("设置", "Settings")}</H1>
+      </View>
+
       {/* 通知 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", marginBottom: 12, overflow: "hidden" }}>
-        <Row
-          title={tr("提示", "Reminder")}
-          subtitle={tr("每日 9:00 查看训练计划提醒", "Daily reminder at 9:00 to check your plan")}
+      <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
+        <FieldRow
+          label={tr("提示", "Reminder")}
           right={<Switch value={notif} onValueChange={onToggleNotif} disabled={busy} />}
         />
-        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-          <Text style={{ color: "#9ca3af", fontSize: 12 }}>
+        <View style={{ paddingTop: 8 }}>
+          <Caption>
             {tr(
-              "开启后将在每日 9:00 本地提醒；如系统未授权，将弹出权限请求。",
-              "A local reminder will trigger at 9:00 daily; system may prompt for permission."
+              "每日 9:00 本地提醒查看训练计划；如系统未授权，将弹出权限请求。",
+              "A local reminder will trigger at 9:00 daily; the system may prompt for permission."
             )}
-          </Text>
+          </Caption>
         </View>
-      </View>
+      </Card>
 
       {/* 语言 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", marginBottom: 12, overflow: "hidden" }}>
-        <Row title={tr("切换语言 / Language", "Language")} />
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row" }}>
-          <Chip label="中文" active={lang === "zh"} onPress={() => setLang("zh")} />
-          <Chip label="English" active={lang === "en"} onPress={() => setLang("en")} />
-        </View>
-      </View>
-
-
-
-      {/* 单位系统 —— 胶囊选择 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", marginBottom: 12, overflow: "hidden" }}>
-        <Row
-          title={tr("单位系统", "Units")}
-          right={<Text style={{ color: "#6b7280" }}>{unit === "metric" ? tr("公制", "Metric") : tr("英制", "Imperial")}</Text>}
-        />
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row" }}>
-          <Chip
-            label={tr("公制（cm, kg）", "Metric (cm, kg)")}
-            active={unit === "metric"}
-            onPress={() => setUnit("metric")}
-          />
-          <Chip
-            label={tr("英制（ft, lbs）", "Imperial (ft, lbs)")}
-            active={unit === "imperial"}
-            onPress={() => setUnit("imperial")}
+      <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
+        <FieldRow label={tr("切换语言 / Language", "Language")} />
+        <View style={{ paddingTop: 10 }}>
+          <Segmented
+            value={lang}
+            onChange={(v) => setLang(v as Lang)}
+            options={[
+              { label: "中文", value: "zh" },
+              { label: "English", value: "en" },
+            ]}
           />
         </View>
-      </View>
+      </Card>
 
-      {/* 等级系统 —— 胶囊选择 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", marginBottom: 12, overflow: "hidden" }}>
-        <Row
-          title={tr("抱石等级系统", "Bouldering Scale")}
-          right={<Text style={{ color: "#6b7280" }}>{boulderScale === "V" ? "V-SCALE" : "FONT.SCALE"}</Text>}
-        />
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row" }}>
-          <Chip
-            label="V-SCALE"
-            active={boulderScale === "V"}
-            onPress={() => setBoulderScale("V")}
+      {/* 单位系统 */}
+      <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
+        <FieldRow label={tr("单位系统", "Units")} right={<Text style={{ color: "#6b7280" }}>
+          {unit === "metric" ? tr("公制", "Metric") : tr("英制", "Imperial")}
+        </Text>} />
+        <View style={{ paddingTop: 10 }}>
+          <Segmented
+            value={unit}
+            onChange={(v) => setUnit(v as UnitSystem)}
+            options={[
+              { label: tr("公制（cm, kg）", "Metric (cm, kg)"), value: "metric" },
+              { label: tr("英制（ft, lbs）", "Imperial (ft, lbs)"), value: "imperial" },
+            ]}
           />
-          <Chip
-            label="FONT.SCALE"
-            active={boulderScale === "Font"}
-            onPress={() => setBoulderScale("Font")}
+        </View>
+      </Card>
+
+      {/* 等级系统 */}
+      <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
+        <FieldRow label={tr("抱石等级体系", "Bouldering scale")} />
+        <View style={{ paddingTop: 10 }}>
+          <Segmented
+            value={boulderScale}
+            onChange={(v) => setBoulderScale(v as BoulderScale)}
+            options={[
+              { label: "V-scale", value: "V" },
+              { label: "Font.", value: "Font" },
+            ]}
           />
         </View>
 
-        <Row
-          title={tr("难度等级系统", "Rope Grade Scale")}
-          right={<Text style={{ color: "#6b7280" }}>{ropeScale}</Text>}
-        />
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row" }}>
-          <Chip
-            label="YDS"
-            active={ropeScale === "YDS"}
-            onPress={() => setRopeScale("YDS")}
-          />
-          <Chip
-            label="French"
-            active={ropeScale === "French"}
-            onPress={() => setRopeScale("French")}
+        <View style={{ height: 12 }} />
+
+        <FieldRow label={tr("攀爬等级体系", "Rope grading")}/>
+        <View style={{ paddingTop: 10 }}>
+          <Segmented
+            value={ropeScale}
+            onChange={(v) => setRopeScale(v as RopeScale)}
+            options={[
+              { label: "YDS", value: "YDS" },
+              { label: "French", value: "French" },
+            ]}
           />
         </View>
-      </View>
+      </Card>
 
       {/* 反馈 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", overflow: "hidden" }}>
-        <Row title={tr("反馈", "Feedback")} />
-        <View style={{ padding: 16 }}>
-          <Text style={{ color: "#374151", marginBottom: 10 }}>
-            {tr("有任何问题或建议？点下面发邮件告诉我们。", "Have questions or suggestions? Tap below to email us.")}
-          </Text>
-          <TouchableOpacity
+      <Card style={{ marginHorizontal: 16, marginBottom: 16 }}>
+        <FieldRow label={tr("意见反馈", "Feedback")} />
+        <View style={{ paddingTop: 8 }}>
+          <Text
             onPress={openFeedback}
-            style={{ alignSelf: "flex-start", backgroundColor: "#4f46e5", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
+            style={{ color: tokens.color.primary, fontWeight: "600" }}
           >
-            <Text style={{ color: "white", fontWeight: "700" }}>{tr("发送反馈邮件", "Send Feedback Email")}</Text>
-          </TouchableOpacity>
+            {tr("发送邮件给我们", "Send us an email")}
+          </Text>
         </View>
-      </View>
+      </Card>
     </SafeAreaView>
   );
 }

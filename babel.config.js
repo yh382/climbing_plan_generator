@@ -9,7 +9,7 @@ module.exports = function (api) {
         root: ['./'],
         alias: {
           '@': './app',          // ← 关键：把 @ 指向 app 目录
-          '@components': './app/components',
+          '@components': './components',
           '@contexts': './app/contexts',
           '@lib': './app/lib',
         },
