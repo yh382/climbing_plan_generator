@@ -7,34 +7,43 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import { useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
+  StyleSheet,
+  useColorScheme,
   ScrollView,
   Text,
   View,
 } from "react-native";
-import { useSettings } from "../contexts/SettingsContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSettings } from "@/contexts/SettingsContext";
 import { I18N, useI18N } from "../lib/i18n";
-import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { tokens } from "../../components/ui/Theme";
+import { API_PLAN_JSON } from "../config";
+// ✅ 用别名，且是默认导入
+import { useLayoutEffect } from "react";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import TopBar from "../../components/TopBar";
+import { Ionicons } from "@expo/vector-icons";
 
-const API_JSON = "http://100.110.185.31:8000/plan_json";
+const API_JSON = "http://172.20.13.241:8000/plan_json";
 const WD_ORDER: WeekdayKey[] = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const WD_CN: Record<WeekdayKey,string> = { Sun:"周日", Mon:"周一", Tue:"周二", Wed:"周三", Thu:"周四", Fri:"周五", Sat:"周六" };
 const WD_EN: Record<WeekdayKey, string> = {
   Sun: "Sun", Mon: "Mon", Tue: "Tue", Wed: "Wed", Thu: "Thu", Fri: "Fri", Sat: "Sat",
 };
 const WEEK_KEYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] as const;
-// === Weakness options: stable keys as values + language labels ===
-// Use stable keys in form state; map to display strings via language context
+
+// === Weakness options ===
 const WEAKNESS_LABELS = {
   zh: {
     fingerStrength: "指力",
@@ -56,14 +65,13 @@ const rangeLabel = (opt: RangeOpt, lang: "zh" | "en") => {
   const [a, b] = opt.replace("次", "").split("-");
   return `${a}–${b}x`;
 };
-// ====== 5 步 ======
-type Step = 1 | 2 | 3 | 4 | 5;
+// ====== 4 步 ======
+type Step = 1 | 2 | 3 | 4;
 
 // ====== 表单类型 ======
 type Gender = "男" | "女";
 type RangeOpt = "1-2次" | "2-3次" | "3-4次" | "4-5次" | "5-6次" | "6-7次";
 type RestDays = 1 | 2 | 3 | 4 | 5 | 6;
-// ✅ 用稳定的 key 作为值，不再用中文作值
 export type WeaknessKey = "fingerStrength" | "power" | "endurance" | "footwork";
 type VScaleOpt =
   | "v1-v2" | "v2-v3" | "v3-v4" | "v4-v5" | "v5-v6"
@@ -76,25 +84,50 @@ type FormState = {
   height: number;     // cm
   weight: number;     // kg
   bodyfat: number;    // 5-45 %
-  freq_per_week: number; // 每周训练天数（1-7）
+  freq_per_week: number; // 每周训练天数（1-7）——兼容字段（由新字段派生）
+  // 基础体能
+  grip_kg: number | null;
+  plank_sec: number | null;
+  sit_and_reach_cm: number | null;
+  hip_mobility_score: 0|1|2|3|4|5;
 
-  // Step 2
-  climb_freq: RangeOpt;
-  train_freq: RangeOpt;
-  rest_days: RestDays;
-  rest_weekdays: WeekdayKey[];
+  // Step 2（保留）
+  climb_freq: RangeOpt;         // ← 兼容：由新字段映射
+  train_freq: RangeOpt;         // ← 兼容：由新字段映射
+  rest_days: RestDays;          // ← 兼容：7 - (climb+gym)
+  rest_weekdays: WeekdayKey[];  // ← 兼容：不再使用，保持空数组
 
-  // Step 3
-  bw_rep_max: number;             // 0-20
-  weighted_pullup_1rm_kg: number; // 0-100
+  // Step 3（旧）
+  bw_rep_max: number;
+  weighted_pullup_1rm_kg: number;
 
-  // Step 4
-  one_arm_hang: number;   // 0-60
-  weaknesses: WeaknessKey[]; // ✅ 存稳定 key
+  // Step 4（旧）
+  one_arm_hang: number;
+  weaknesses: WeaknessKey[];
 
-  // Step 5
+  // Step 5（旧）
   boulder_level: VScaleOpt;
   yds_level: string;
+
+  // Step 2: 攀岩专项（补充）
+  hardest_send?: {
+    type: 'boulder' | 'rope';
+    grade: string;
+    style: 'flash' | 'redpoint';
+  } | null;
+  indoor_outdoor_ratio?: number;
+
+  // Step 3: 恢复与伤病
+  pain_finger_0_3: 0|1|2|3;
+  pain_shoulder_0_3: 0|1|2|3;
+  pain_elbow_0_3: 0|1|2|3;
+  pain_wrist_0_3: 0|1|2|3;
+  stretching_freq_band: '0'|'1-2'|'3-4'|'5-7';
+
+  // ===== 新增（Step 3：时间安排·新）=====
+  climb_days_per_week: number;  // 1..7
+  gym_days_per_week: number;    // 0..7
+  cycle_weeks: number;          // 4..12
 };
 
 type PlanMeta = {
@@ -102,12 +135,9 @@ type PlanMeta = {
   freq_per_week: number;
   start_date?: string;
   progression?: number[];
-  /** 计划来源：规则生成/AI 精修等；可自定义字符串 */
   source?: "rule" | "ai" | string;
-  /** 是否已经过二次精修 */
   refined?: boolean;
 };
-
 
 // ====== 计划结构 ======
 type PlanItem = { label: I18N; target: I18N };
@@ -152,7 +182,7 @@ const vScaleToNumeric = (v: VScaleOpt): string => {
   return v.replace(/^v/i, "");
 };
 
-// —— 单位换算（显示/回写用；底层仍存 cm/kg）——
+// —— 单位换算（显示/回写用）——
 const cmToFtIn = (cm: number) => {
   const totalIn = Math.round(cm / 2.54);
   const ft = Math.floor(totalIn / 12);
@@ -166,28 +196,343 @@ const formatFtIn = (cm: number) => {
 const kgToLb = (kg: number) => Math.round(kg * 2.20462);
 const lbToKg = (lb: number) => Math.round(lb / 2.20462);
 
+// === 兼容：把数值映射为旧的 RangeOpt 档位 ===
+const numToRangeOpt = (n: number): RangeOpt => {
+  if (n <= 2) return "1-2次";
+  if (n === 3 || n === 4) return "3-4次";
+  if (n === 5) return "5-6次";
+  return "6-7次"; // 6 或 7
+};
+
+  // === Typewriter：一行行、一字字打字 ===
+  function TypewriterLines({
+    lines,
+    charInterval = 18,
+    linePause = 260,
+    onDone,
+    textStyle,
+    lineStyle,
+  }: {
+    lines: string[];
+    charInterval?: number;
+    linePause?: number;
+    onDone?: () => void;
+    textStyle?: any;
+    lineStyle?: any;
+  }) {
+    const [doneLines, setDoneLines] = useState<string[]>([]);
+    const [current, setCurrent] = useState<string>("");
+    const [idx, setIdx] = useState(0);
+
+    useEffect(() => {
+      setDoneLines([]);
+      setCurrent("");
+      setIdx(0);
+    }, [JSON.stringify(lines)]);
+
+    useEffect(() => {
+      if (!lines || idx >= lines.length) {
+        onDone?.();
+        return;
+      }
+      const target = lines[idx] ?? "";
+
+      let char = 0;
+      const timer = setInterval(() => {
+        char++;
+        setCurrent(target.slice(0, char));
+        if (char >= target.length) {
+          clearInterval(timer);
+          setTimeout(() => {
+            setDoneLines((prev) => [...prev, target]);
+            setCurrent("");
+            setIdx((n) => n + 1);
+          }, linePause);
+        }
+      }, Math.max(1, charInterval));
+
+      return () => clearInterval(timer);
+    }, [idx, lines, charInterval, linePause, onDone]);
+
+    return (
+      <View>
+        {doneLines.map((ln, i) => (
+          <Text key={`ln-${i}`} style={[{ color: "#374151", lineHeight: 20, marginBottom: 4 }, textStyle, lineStyle]}>
+            {ln}
+          </Text>
+        ))}
+        {idx < lines.length && (
+          <Text style={[{ color: "#374151", lineHeight: 20, marginBottom: 4 }, textStyle, lineStyle]}>
+            {current}
+            <Text style={{ opacity: 0.5 }}>▋</Text>
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+
+// === 将后端 PlanV2（meta + pools）拼成要“逐行打字”的纯文本行 ===
+function buildPreviewLines({
+  preview,
+  form,
+  tr,
+  tt,
+}: any): string[] {
+  // -------- 类型/工具 --------
+  type I18N = { zh: string; en: string };
+  type PlanItem = { label: I18N; target: I18N };
+  type ClimbBlock = { name: "offwall" | "onwall" | "main" | "stretch"; label: I18N; target: I18N };
+  type GymWarmOrStretchBlock = { name: "warmup" | "stretch"; label: I18N; target: I18N };
+  type GymMainItemsBlock = { name: "main_items"; items: PlanItem[] };
+  type ClimbTemplate = { id: string; type: "climb_endurance" | "climb_power"; title: I18N; blocks: ClimbBlock[] };
+  type GymTemplate = { id: string; type: "gym_upper_finger" | "gym_lower_core"; title: I18N; blocks: (GymWarmOrStretchBlock | GymMainItemsBlock)[] };
+  type PlanV2 = {
+    meta?: {
+      cycle_weeks?: number;
+      start_date?: string;
+      weekly_quota?: { climb?: number; gym?: number; rest?: number };
+      progression?: number[];
+    };
+    pools?: { climb?: ClimbTemplate[]; gym?: GymTemplate[] };
+    notes?: I18N[];
+    selection_rules?: I18N;
+  };
+
+  const lines: string[] = [];
+  const isI18N = (x: any): x is I18N => x && typeof x === "object" && typeof x.zh === "string" && typeof x.en === "string";
+  const T = (x: any): string => {
+    try {
+      if (!x) return "";
+      if (typeof x === "string") return x;
+      if (isI18N(x)) return tt ? tt(x) : (x.zh || x.en || "");
+      return String(x?.zh ?? x?.en ?? "");
+    } catch {
+      return typeof x === "string" ? x : "";
+    }
+  };
+
+  const p: PlanV2 = (preview || {}) as PlanV2;
+  if (!p || typeof p !== "object") {
+    return [tr("暂无预览，请点“生成计划”。", "No preview. Tap 'Generate plan'.")];
+    }
+
+  // -------- Meta 摘要 --------
+  const cw = p.meta?.cycle_weeks ?? form?.cycle_weeks ?? "";
+  const sd = p.meta?.start_date ?? "";
+  const quota = p.meta?.weekly_quota || {};
+  const prog = Array.isArray(p.meta?.progression) ? p.meta!.progression! : null;
+
+  lines.push(`${tr("开始日期", "Start")}: ${sd || tr("未提供", "N/A")} · ${tr("周期", "Cycle")}: ${cw}${cw ? tr("周", " wks") : ""}`);
+
+  if (prog && prog.length) {
+    lines.push(
+      `${tr("每周强度：", "Weekly load: ")}${prog
+        .map((p: number, i: number) => `${tr("第", "W")}${i + 1}${tr("周", "")} ${Math.round((p ?? 1) * 100)}%`)
+        .join(" / ")}`
+    );
+  }
+
+  const climbTimes = quota.climb ?? form?.climb_days_per_week ?? 0;
+  const gymTimes = quota.gym ?? form?.gym_days_per_week ?? 0;
+  const restTimes = quota.rest ?? Math.max(0, 7 - (Number(climbTimes) + Number(gymTimes)));
+  lines.push(
+    tr(
+      `每周配额：攀岩 ${climbTimes} 次，健身 ${gymTimes} 次，休息 ${restTimes} 天。`,
+      `Weekly quota: Climb ${climbTimes}x, Gym ${gymTimes}x, Rest ${restTimes}d.`
+    )
+  );
+
+  // -------- 输入摘要（可选） --------
+  if (form) {
+    const pains = [
+      { zh: "手指", en: "Finger", v: form?.pain_finger_0_3 },
+      { zh: "肩部", en: "Shoulder", v: form?.pain_shoulder_0_3 },
+      { zh: "肘部", en: "Elbow", v: form?.pain_elbow_0_3 },
+      { zh: "手腕", en: "Wrist", v: form?.pain_wrist_0_3 },
+    ].filter((x) => (x.v ?? 0) > 0);
+    const painStr = pains.length === 0
+      ? tr("无", "None")
+      : pains.map((p) => `${tr(p.zh, p.en)} ${p.v}`).join(tr("、", ", "));
+    const stretchLabel = (() => {
+      const b = form?.stretching_freq_band;
+      if (!b) return tr("未填写", "Not provided");
+      return b === "0" ? tr("每周 0 次", "0 /wk") : tr(`${b} 次/周`, `${b} /wk`);
+    })();
+    const sleepLabel = form?.sleep_hours_avg ? `${form.sleep_hours_avg} ${tr("小时", "h")}` : tr("未填写", "Not provided");
+
+    lines.push(`— ${tr("本次生成依据（摘要）", "Inputs summary")} —`);
+    lines.push(`• ${tr("疼痛分布（0–3）", "Pain (0–3)")}${tr("：", ": ")}${painStr}`);
+    lines.push(`• ${tr("拉伸/理疗频率", "Stretching/Recovery")}${tr("：", ": ")}${stretchLabel}`);
+  }
+
+  // -------- 模板池：攀岩 --------
+  const climbPool: ClimbTemplate[] = Array.isArray(p.pools?.climb) ? (p.pools!.climb as ClimbTemplate[]) : [];
+  if (climbPool.length) {
+    lines.push(tr("—— 攀岩日模板 ——", "— Climb templates —"));
+    climbPool.forEach((tpl, idx) => {
+      const title = T(tpl.title);
+      const tag = tpl.type === "climb_power" ? tr("（爆发）", " (Power)") : tr("（耐力）", " (Endurance)");
+      lines.push(`${idx + 1}. ${title}${tag}  #${tpl.id}`);
+      // 必须是 4 段：offwall/onwall/main/stretch
+      (tpl.blocks || []).forEach((b) => {
+        if (!b) return;
+        lines.push(`• ${T(b.label)}${tr(":", ":")} ${T(b.target)}`);
+      });
+    });
+  }
+
+  // -------- 模板池：健身 --------
+  const gymPool: GymTemplate[] = Array.isArray(p.pools?.gym) ? (p.pools!.gym as GymTemplate[]) : [];
+  if (gymPool.length) {
+    lines.push(tr("—— 健身日模板 ——", "— Gym templates —"));
+    gymPool.forEach((tpl, idx) => {
+      const title = T(tpl.title);
+      const tag = tpl.type === "gym_upper_finger" ? tr("（上肢+指力）", " (Upper+Fingers)") : tr("（下肢+核心）", " (Lower+Core)");
+      lines.push(`${idx + 1}. ${title}${tag}  #${tpl.id}`);
+      (tpl.blocks || []).forEach((b) => {
+        if (!b) return;
+        if (b.name === "main_items") {
+          const items = (b as GymMainItemsBlock).items || [];
+          items.forEach((it, k) => {
+            lines.push(`   - ${T(it.label)}${tr(":", ":")} ${T(it.target)}`);
+          });
+        } else {
+          const bb = b as GymWarmOrStretchBlock;
+          lines.push(`• ${T(bb.label)}${tr(":", ":")} ${T(bb.target)}`);
+        }
+      });
+    });
+  }
+
+  // -------- 规则 / 备注 --------
+  if (p.selection_rules) {
+    lines.push(tr("选择规则", "Selection rules"));
+    lines.push(`• ${T(p.selection_rules)}`);
+  }
+  if (Array.isArray(p.notes) && p.notes.length) {
+    lines.push(tr("备注", "Notes"));
+    p.notes.forEach((n) => lines.push(`• ${T(n)}`));
+  }
+
+  // 若两个池都为空，给出兜底提示
+  if (!climbPool.length && !gymPool.length) {
+    lines.push(tr("（后端返回缺少 pools.climb/gym 或结构异常）", "(Response missing pools.climb/gym or malformed)"));
+  }
+
+  return lines;
+}
+
+
+
 // ====== 组件 ======
 export default function Generator() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [preview, setPreview] = useState<Plan | null>(null);
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const containerHeight = Dimensions.get("window").height;
+  const slideAnim = useRef(new Animated.Value(containerHeight)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const isClosingRef = useRef(false);
 
-  // 等级系统（你之前已接入）
+  // 等级系统
   const { boulderScale: bScale, ropeScale: rScale } = useSettings();
 
-  // ✅ 语言 & 单位：接入全局 context
-const { unit } = useSettings();            // 这里只负责单位
-const { lang, tt, tr } = useI18N();        // 语言 & 翻译全走 i18n hook
+  // 语言 & 单位
+  const { unit } = useSettings();
+  const { lang, tt, tr } = useI18N();
 
-const heightUnit = unit === "metric" ? "cm" : "ft";
-const weightUnit = unit === "metric" ? "kg" : "lbs";
+  const heightUnit = unit === "metric" ? "cm" : "ft";
+  const weightUnit = unit === "metric" ? "kg" : "lbs";
 
+  const [shouldType, setShouldType] = useState(false);
+  const [typedSig, setTypedSig] = useState<string | null>(null);
 
+  const planSig = (p: Plan | null) =>
+    p ? `${p.meta?.start_date}|${p.meta?.cycle_weeks}|${p.meta?.freq_per_week}|${p.weeks?.length||0}` : "";
 
+  useFocusEffect(
+    useCallback(() => {
+      isClosingRef.current = false;
+      slideAnim.setValue(containerHeight);
+      overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return () => {
+        slideAnim.setValue(containerHeight);
+        overlayOpacity.setValue(0);
+      };
+    }, [containerHeight, slideAnim, overlayOpacity])
+  );
+
+  const exitIndex = useCallback(
+    (target: string = "calendar") => {
+      if (isClosingRef.current) return;
+      isClosingRef.current = true;
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: containerHeight,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigation.navigate(target as never);
+      });
+    },
+    [containerHeight, navigation, overlayOpacity, slideAnim]
+  );
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [savedPreview, savedSig, typed, savedForm] = await Promise.all([
+          AsyncStorage.getItem("@preview_json"),
+          AsyncStorage.getItem("@preview_sig"),
+          AsyncStorage.getItem("@preview_typed"),
+          AsyncStorage.getItem("@profile_form"),
+        ]);
+        if (savedPreview) {
+          const p: Plan = JSON.parse(savedPreview);
+          setPreview(p);
+          setTypedSig(savedSig);
+          setShouldType(typed !== "1");
+        }
+        // 同步表单（如果有）
+        if (savedForm) {
+          const f = JSON.parse(savedForm);
+          setForm((s) => ({ ...s, ...f }));
+        }
+      } catch {}
+    })();
+  }, []);
 
   // Step3 用到的负重单位切换（本地 UI 状态）
   const [wpUnit, setWpUnit] = useState<"kg"|"lb">("kg");
+
+  // —— 新：Step3 时间安排的提示（超过 7 次时提示自动收敛）——
+  const [scheduleTip, setScheduleTip] = useState<string | null>(null);
+  const showScheduleTip = (msg: string) => {
+    setScheduleTip(msg);
+    setTimeout(() => setScheduleTip(null), 2200);
+  };
 
   const [form, setForm] = useState<FormState>({
     // Step1
@@ -195,25 +540,47 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
     height: 175,
     weight: 70,
     bodyfat: 18,
-    freq_per_week: 4,
+    freq_per_week: 4, // 兼容字段，运行时由新字段回填
 
-    // Step2
+    // 基础体能默认值
+    grip_kg: null,
+    plank_sec: 60,
+    sit_and_reach_cm: 0,
+    hip_mobility_score: 3,
+
+    // Step2（兼容）
     climb_freq: "3-4次",
     train_freq: "3-4次",
     rest_days: 2,
     rest_weekdays: [],
 
-    // Step3
+    // Step3（旧）
     bw_rep_max: 8,
     weighted_pullup_1rm_kg: 20,
 
-    // Step4
+    // Step4（旧）
     one_arm_hang: 5,
-    weaknesses: [], // ✅ 使用稳定 key
+    weaknesses: [],
 
-    // Step5
+    // Step5（旧）
     boulder_level: "v4-v5",
     yds_level: "5.11a",
+
+    // Step2 补充
+    hardest_send: null,
+    indoor_outdoor_ratio: 50,
+
+    // 恢复与伤病
+    pain_finger_0_3: 0,
+    pain_shoulder_0_3: 0,
+    pain_elbow_0_3: 0,
+    pain_wrist_0_3: 0,
+    stretching_freq_band: '1-2',
+
+    // —— 新：Step3 时间安排·新 —— //
+    climb_days_per_week: 3,
+    gym_days_per_week: 2,
+    cycle_weeks: 12,
   });
 
   // 用 function 声明，避免 TSX 对箭头泛型解析问题
@@ -225,25 +592,20 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
   const canNext = useMemo(() => {
     switch (step) {
       case 1:
-        return (
-          (form.gender === "男" || form.gender === "女") &&
-          form.height >= 130 && form.height <= 200 &&
-          form.weight >= 30 && form.weight <= 150 &&
-          form.bodyfat >= 5 && form.bodyfat <= 45 &&
-          form.freq_per_week >= 1 && form.freq_per_week <= 7
-        );
       case 2:
-        return !!form.climb_freq && !!form.train_freq && !!form.rest_days &&
-               form.rest_weekdays.length === form.rest_days;
-      case 3:
+        return true;
+      case 3: {
+        const c = form.climb_days_per_week;
+        const g = form.gym_days_per_week;
+        const cyc = form.cycle_weeks;
+        const total = c + g;
         return (
-          form.bw_rep_max >= 0 && form.bw_rep_max <= 20 &&
-          form.weighted_pullup_1rm_kg >= 0 && form.weighted_pullup_1rm_kg <= 100
+          c >= 1 && c <= 7 &&
+          g >= 0 && g <= 7 &&
+          total <= 7 &&
+          cyc >= 4 && cyc <= 12
         );
-      case 4:
-        return form.one_arm_hang >= 0 && form.one_arm_hang <= 60;
-      case 5:
-        return !!form.boulder_level && !!form.yds_level;
+      }
       default:
         return true;
     }
@@ -254,22 +616,30 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
     const todayISO = new Date(
       new Date().getTime() - new Date().getTimezoneOffset() * 60000
     ).toISOString().slice(0, 10);
+
     const meta = plan.meta || {};
-    const cycle_weeks = meta.cycle_weeks || 12;
-    const defaultProg =
-      cycle_weeks === 24
-        ? [0.9,1.0,1.05,1.1,1.15,0.95,1.1,1.15,1.2,1.25,0.95,1.15,
-           1.0,1.05,1.1,1.15,0.95,1.1,1.15,1.2,1.25,0.95,1.15,1.2]
-        : cycle_weeks === 5
-        ? [0.9,1.0,1.1,0.95,1.1]
-        : [0.9,1.0,1.05,1.1,1.15,0.95,1.1,1.15,1.2,1.25,0.95,1.15];
+    const cycle_weeks = form.cycle_weeks || meta.cycle_weeks || 12;
+
+    // 简单的 progression 兜底（长度对齐 cycle_weeks）
+    const makeProg = (len: number): number[] => {
+      const base = [0.9,1.0,1.05,1.1,1.15,0.95,1.1,1.15,1.2,1.25,0.95,1.15];
+      if (len <= base.length) return base.slice(0, len);
+      const out = [...base];
+      while (out.length < len) out.push(1.0);
+      return out;
+    };
+
+    const totalPerWeek = form.climb_days_per_week + form.gym_days_per_week;
+
     return {
       ...plan,
       meta: {
         cycle_weeks,
-        freq_per_week: meta.freq_per_week ?? form.freq_per_week ?? midOfRange(form.train_freq),
+        freq_per_week: totalPerWeek,
         start_date: meta.start_date || todayISO,
-        progression: meta.progression && meta.progression.length ? meta.progression : defaultProg,
+        progression: (meta.progression && meta.progression.length)
+          ? meta.progression
+          : makeProg(cycle_weeks),
         source: meta.source,
         refined: meta.refined,
       },
@@ -287,49 +657,106 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
       if (loading) return;
       setLoading(true);
 
+      // —— 由新字段派生兼容旧字段 —— //
+      const weekly_total = form.climb_days_per_week + form.gym_days_per_week;
+      const compat_climb_freq = numToRangeOpt(form.climb_days_per_week);
+      const compat_train_freq = numToRangeOpt(weekly_total);
+      const compat_rest_days = (7 - weekly_total) as RestDays;
+
       // 将 weaknesses 稳定 key 转换为当前语言展示文案
       const weaknessLabels = form.weaknesses.map((k) => WEAKNESS_LABELS[lang][k]).join("、");
 
+      // 替换这段：const payload = { ... }
       const payload = {
+        // —— 基础体征 —— //
         gender: form.gender,
-        height: form.height,
-        weight: form.weight,
-        bodyfat: form.bodyfat,
+        height: form.height,             // cm
+        weight: form.weight,             // kg
+        bodyfat: form.bodyfat,           // %
 
-        // 优先使用 Step1 选择
-        freq_per_week: form.freq_per_week,
+        // —— 新的时间安排（核心）—— //
+        climb_days_per_week: form.climb_days_per_week,  // 1..7
+        gym_days_per_week: form.gym_days_per_week,      // 0..7
+        weekly_total,                                   // = climb + gym
+        cycle_weeks: form.cycle_weeks,                  // 4..12
+        weekly_template: true,
+        no_weekday_specific: true,
 
-        // 也把这些上下文给后端
-        climb_freq: form.climb_freq,
-        train_freq: form.train_freq,
-        rest_days: form.rest_days,
-        rest_weekdays: form.rest_weekdays,
+        // —— 兼容旧后端字段（后续可删除）—— //
+        freq_per_week: weekly_total,
+        climb_freq: compat_climb_freq,
+        train_freq: compat_train_freq,
+        rest_days: compat_rest_days,
+        rest_weekdays: [],
+        cycle_months: Math.round(form.cycle_weeks / 4),
 
-        // 引体
+        // —— 体能 / 力量 —— //
+        grip_kg: form.grip_kg,                 // 可能为 null
+        plank_sec: form.plank_sec,             // 可能为 null
+        sit_and_reach_cm: form.sit_and_reach_cm,
+        hip_mobility_score: form.hip_mobility_score,
         bw_pullups: `${form.bw_rep_max} 次 × 5 组`,
         weighted_pullups: `${form.weighted_pullup_1rm_kg} kg 1 次 × 3 组`,
         bw_max_reps: form.bw_rep_max,
         w_max_weight_kg: form.weighted_pullup_1rm_kg,
-
-        // 单臂悬挂 + 弱项
         one_arm_hang: form.one_arm_hang,
-        // 人类可读（按当前语言）
-        finger_weakness: weaknessLabels,
-        // 机器可读（稳定 key）
-        weaknesses: form.weaknesses,
 
-        // 攀岩水平
+        // —— 恢复与伤病 —— //
+        pain_finger_0_3: form.pain_finger_0_3,
+        pain_shoulder_0_3: form.pain_shoulder_0_3,
+        pain_elbow_0_3: form.pain_elbow_0_3,
+        pain_wrist_0_3: form.pain_wrist_0_3,
+        stretching_freq_band: form.stretching_freq_band,
+
+        // —— 弱项 —— //
+        finger_weakness: weaknessLabels, // 人类可读
+        weaknesses: form.weaknesses,     // 机器可读 key
+
+        // —— 攀岩水平 —— //
         boulder_level: vScaleToNumeric(form.boulder_level),
         yds_level: form.yds_level,
 
-        cycle_months: 3,
+        // —— 专项补充 —— //
+        hardest_send: form.hardest_send,                // { type, grade, style } | null
+        indoor_outdoor_ratio: form.indoor_outdoor_ratio // 0..100
       };
 
-      const { data } = await axios.post(API_JSON, payload, { timeout: 120000 });
+
+      const { data } = await axios.post(API_PLAN_JSON, payload, { timeout: 120000 });
       const p: Plan = data.plan;
       const withMeta = ensureMeta(p);
+
+      // 把兼容字段也写回 form（保证 Profile 等使用旧字段的页面不崩）
+      setForm((s) => ({
+        ...s,
+        freq_per_week: weekly_total,
+        climb_freq: compat_climb_freq,
+        train_freq: compat_train_freq,
+        rest_days: compat_rest_days,
+        rest_weekdays: [],
+      }));
+
       setPreview(withMeta);
-      setStep(5);
+      setStep(4);
+      const sig = planSig(withMeta);
+      setTypedSig(sig);
+      setShouldType(true);
+
+      await AsyncStorage.multiSet([
+        ["@preview_json", JSON.stringify(withMeta)],
+        ["@preview_sig", sig],
+        ["@preview_typed", "0"],
+        ["@profile_form", JSON.stringify({
+          ...form,
+          // 同步最新的兼容派生
+          freq_per_week: weekly_total,
+          climb_freq: compat_climb_freq,
+          train_freq: compat_train_freq,
+          rest_days: compat_rest_days,
+          rest_weekdays: [],
+        })],
+      ]);
+
     } catch (e: any) {
       console.log("Generate error:", e?.response?.data || e?.message);
       Alert.alert("出错了", e?.response?.data?.detail || e?.message || "请检查后端/网络");
@@ -342,8 +769,8 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
   const confirmImport = async () => {
     if (!preview) return;
     await AsyncStorage.setItem("@plan_json", JSON.stringify(preview));
-    Alert.alert("已导入", "训练计划已导入到训练日历");
-    router.replace("/calendar");
+    await AsyncStorage.setItem("@profile_form", JSON.stringify(form));
+    exitIndex("calendar");
   };
 
   // ---- 可复用 UI ----
@@ -358,31 +785,59 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
     <View style={{ marginBottom: 14 }}>
       <View
         style={{
-          paddingHorizontal: 16, marginBottom: 6,
-          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+          backgroundColor: "#fff",
+          borderRadius: 20,
+          marginHorizontal: 16,
+          borderWidth: 0.6,
+          borderColor: "#e5e7eb",
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 4, // ✅ Android 阴影
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: "bold" }}>{title}</Text>
-        {onHelp && (
-          <Pressable
-            onPress={onHelp}
-            style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#eef2ff" }}
-          >
-            <Text style={{ color: "#4f46e5", fontWeight: "600" }}>{helpLabel}</Text>
-          </Pressable>
-        )}
-      </View>
+        {/* ✅ 标题与 onHelp 移到卡片内部 */}
+        <View
+          style={{
+            paddingTop: 12,
+            paddingHorizontal: 16,
+            paddingBottom: 2,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "bold" }}>
+            {title}
+          </Text>
 
-      <View
-        style={{
-          backgroundColor: "#fff", borderRadius: 12, marginHorizontal: 16,
-          borderWidth: 1, borderColor: "#e5e7eb",
-        }}
-      >
-        {children}
+          {onHelp && (
+            <Pressable
+              onPress={onHelp}
+              hitSlop={8}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: "#eef2ff",
+              }}
+            >
+              <Text style={{ color: "#3B82F6", fontWeight: "600" }}>
+                {helpLabel}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* ✅ 统一内容留白 */}
+        <View style={{ padding: 4, paddingTop: 0 }}>
+          {children}
+        </View>
       </View>
     </View>
   );
+
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <View style={{ flexDirection: "row", alignItems: "center" }}>{children}</View>
@@ -411,17 +866,27 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
     </View>
   );
 
-  const Chip = ({
-    label,
-    active,
-    onPress,
-    disabled = false,
-  }: {
-    label: string;
-    active: boolean;
-    onPress: () => void;
-    disabled?: boolean;
-  }) => (
+// —— 中间代码保持不变 ——
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
+const Chip = ({
+  label,
+  active,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+}) => {
+  // ✅ 统一去掉 label 的前导空格（半角/全角/不换行空格）
+  const displayLabel = label.replace(/^[\s\u00A0\u3000]+/, "");
+
+  return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
@@ -429,21 +894,31 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
         paddingVertical: 6,
         paddingHorizontal: 10,
         borderRadius: 999,
-        borderWidth: 1,
-        borderColor: active ? "#4f46e5" : "#e5e7eb",
-        backgroundColor: active ? "#eef2ff" : "white",
+        borderWidth: 0.3,
+        borderColor: active ? "#111827" : "#e5e7eb",
+        backgroundColor: active ? "#111827" : "#f3f4f6",
         marginRight: 8,
         marginBottom: 8,
         opacity: disabled ? 0.5 : 1,
+        shadowColor: "#000",
+        shadowOpacity: active ? 0.04 : 0.06,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: active ? 3 : 0,  
       }}
     >
-      <Text style={{ color: active ? "#4f46e5" : "#111827" }}>{label}</Text>
+      <Text style={{ color: active ? "#FFFFFF" : tokens.color.text }}>
+        {displayLabel}
+      </Text>
     </Pressable>
   );
+};
+
+
 
   const Progress = () => (
     <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16, marginTop: 12 }}>
-      {[1, 2, 3, 4, 5].map((n) => (
+      {[1, 2, 3, 4].map((n) => (
         <View
           key={n}
           style={{
@@ -458,13 +933,11 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
   // ---- 步骤内容 ----
   const StepContent = () => {
     switch (step) {
-      // Step 1：基础信息（性别 + 身高/体重/体脂）
+      // Step 1：基础信息
       case 1:
         return (
           <>
-            <Section
-              title={tr("基础信息", "Basics")}
-            >
+            <Section title={tr("基础信息", "Basics")}>
               {/* 性别 */}
               <Row>
                 <Col label={tr("性别", "Gender")}>
@@ -526,174 +999,121 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
                 </Col>
               </Row>
             </Section>
-          </>
-        );
 
-      // Step 2：时间安排（多语言）
-      case 2:
-        return (
-          <>
-            <Section title={tr("时间安排", "Scheduling")}>
-              <View style={{ padding: 12 }}>
-                {/* 每周攀岩天数 */}
-                <Text style={{ color: "#6b7280", marginBottom: 6 }}>
-                  {tr("每周攀岩天数", "Climbing days / wk")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  {(
-                    ["1-2次","2-3次","3-4次","4-5次","5-6次","6-7次"] as RangeOpt[]
-                  ).map((opt) => (
-                    <Chip
-                      key={opt}
-                      label={rangeLabel(opt, lang)}
-                      active={form.climb_freq === opt}
-                      onPress={() => set("climb_freq", opt)}
-                    />
-                  ))}
-                </View>
-
-                {/* 每周训练次数 */}
-                <Text style={{ color: "#6b7280", marginBottom: 6, marginTop: 6 }}>
-                  {tr("每周训练次数", "Training sessions / wk")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  {(
-                    ["1-2次","2-3次","3-4次","4-5次","5-6次","6-7次"] as RangeOpt[]
-                  ).map((opt) => (
-                    <Chip
-                      key={opt}
-                      label={rangeLabel(opt, lang)}
-                      active={form.train_freq === opt}
-                      onPress={() => set("train_freq", opt)}
-                    />
-                  ))}
-                </View>
-
-                {/* 每周休息日（数量） */}
-                <Text style={{ color: "#6b7280", marginBottom: 6, marginTop: 6 }}>
-                  {tr("每周休息日（数量）", "Rest days (count)")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  {[1,2,3,4,5,6].map((n) => (
-                    <Chip
-                      key={n}
-                      label={tr(`${n} 天`, `${n} days`)}
-                      active={form.rest_days === n}
-                      onPress={() =>
-                        setForm((s) => {
-                          const nextDays = n as RestDays;
-                          const trimmed = (s.rest_weekdays || []).slice(0, nextDays);
-                          return { ...s, rest_days: nextDays, rest_weekdays: trimmed as WeekdayKey[] };
-                        })
-                      }
-                    />
-                  ))}
-                </View>
-
-                {/* 选择具体休息日（需选满） */}
-                <Text style={{ color: "#6b7280", marginBottom: 6, marginTop: 6 }}>
-                  {tr("选择具体休息日（需选", "Pick exact rest days (")}
-                  {form.rest_days}
-                  {tr("天）", " days)")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  {(WD_ORDER).map((wd) => {
-                    const active = form.rest_weekdays.includes(wd);
-                    const quotaFull = !active && form.rest_weekdays.length >= form.rest_days;
-                    const WD_LABEL = lang === "zh" ? WD_CN : WD_EN;
-                    return (
-                      <Chip
-                        key={wd}
-                        label={WD_LABEL[wd]}
-                        active={active}
-                        disabled={quotaFull}
-                        onPress={() => {
-                          setForm((s) => {
-                            const chosen = new Set<WeekdayKey>(s.rest_weekdays);
-                            if (chosen.has(wd)) chosen.delete(wd);
-                            else if (s.rest_weekdays.length < s.rest_days) chosen.add(wd);
-                            return { ...s, rest_weekdays: Array.from(chosen) as WeekdayKey[] };
-                          });
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-              </View>
-            </Section>
-          </>
-        );
-
-
-      case 3:
-        return (
-          <>
-            <Section title={tr("引体专项能力", "Pull-up Capacity")}>
+            <Section
+              title={tr("力量 & 耐力", "Strength & Endurance")}
+              onHelp={() =>
+                openHelp({
+                  title: tr("如何测试这些数值？", "How to test these metrics?"),
+                  content: tr(
+                    "握力：用握力计，双手各 2–3 次取最高；\n平板支撑：脊柱中立，不塌腰/不过高，到力竭停止计时；\n引体PR：全程标准（起始肘伸直、下巴过杠，摆动最小）。",
+                    "Grip: dynamometer, best of 2–3 tries per hand;\nPlank: neutral spine, no sag/pike, stop at true failure;\nPull-up PR: full ROM (elbows locked at start, chin over bar, minimal kipping)."
+                  ),
+                })
+              }
+            >
+              {/* 行 1：握力 + 平板支撑 */}
               <Row>
-                <Col label={tr("引体向上单组极限（次）", "BW pull-up max reps")}>
+                <Col label={tr("握力（kg）", "Grip strength (kg)")}>
+                  <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+                    <Picker
+                      style={{ flex: 1 }}
+                      selectedValue={form.grip_kg ?? 30}
+                      enabled={form.grip_kg !== null}
+                      onValueChange={(v) => set("grip_kg", Number(v))}
+                    >
+                      {Array.from({ length: 91 }, (_, i) => 10 + i).map((n) => (
+                        <Picker.Item key={n} label={`${n}`} value={n} />
+                      ))}
+                    </Picker>
+                    <Chip
+                      label={tr("未知", "Unknown")}
+                      active={form.grip_kg === null}
+                      onPress={() => set("grip_kg", form.grip_kg === null ? 30 : null)}
+                    />
+                  </View>
+                </Col>
+
+                <Col label={tr("平板支撑（秒）", "Plank (sec)")}>
+                  <Picker
+                    selectedValue={form.plank_sec ?? 60}
+                    enabled={form.plank_sec !== null}
+                    onValueChange={(v) => set("plank_sec", Number(v))}
+                  >
+                    {Array.from({ length: 291 }, (_, i) => 10 + i).map((n) => (
+                      <Picker.Item key={n} label={`${n}`} value={n} />
+                    ))}
+                  </Picker>
+                </Col>
+              </Row>
+
+              {/* 行 3：引体 PR（临时放在 Step1） */}
+              <Row>
+                <Col label={tr("引体向上单组极限（次）", "Pull-up max reps")}>
                   <Picker
                     selectedValue={form.bw_rep_max}
                     onValueChange={(v) => set("bw_rep_max", Number(v))}
                   >
-                    {Array.from({ length: 21 }, (_, i) => i).map((n) => (
-                      <Picker.Item key={n} label={`${n}`} value={n} />
-                    ))}
-                  </Picker>
-                </Col>
-
-                {/* 负重 1RM —— 跟随 settings.unit 展示（kg/lbs），内部统一存 kg */}
-                <Col
-                  label={
-                    `${tr("负重引体单次极限", "Weighted 1RM")}（${
-                      unit === "metric" ? "kg" : "lbs"
-                    }）`
-                  }
-                >
-                  <Picker
-                    selectedValue={
-                      unit === "metric"
-                        ? (form.weighted_pullup_1rm_kg ?? 0)
-                        : kgToLb(form.weighted_pullup_1rm_kg ?? 0)
-                    }
-                    onValueChange={(v) => {
-                      const val = Number(v);
-                      // 始终以 kg 存储
-                      if (unit === "metric") {
-                        set("weighted_pullup_1rm_kg", val);
-                      } else {
-                        set("weighted_pullup_1rm_kg", lbToKg(val));
-                      }
-                    }}
-                  >
-                    {(unit === "metric"
-                      ? Array.from({ length: 101 }, (_, i) => i)      // 0–100 kg
-                      : Array.from({ length: 221 }, (_, i) => i)      // 0–220 lbs
-                    ).map((n) => (
-                      <Picker.Item key={n} label={`${n}`} value={n} />
-                    ))}
-                  </Picker>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col label={tr("单臂悬挂（秒）", "One-arm hang (s)")}>
-                  <Picker
-                    selectedValue={form.one_arm_hang}
-                    onValueChange={(v) => set("one_arm_hang", Number(v))}
-                  >
-                    {Array.from({ length: 61 }, (_, i) => i).map((n) => (
+                    {Array.from({ length: 41 }, (_, i) => i).map((n) => (
                       <Picker.Item key={n} label={`${n}`} value={n} />
                     ))}
                   </Picker>
                 </Col>
               </Row>
             </Section>
+
+            <Section
+              title={tr("柔韧 & 髋灵活", "Flexibility & Hip mobility")}
+              onHelp={() =>
+                openHelp({
+                  title: tr("髋关节灵活度（0–5）如何评分？", "How to rate Hip Mobility (0–5)"),
+                  content: tr(
+                    "0 严重受限（深蹲/盘腿困难且疼痛/代偿明显）\n1 明显受限（开髋、内外旋幅度不足）\n2 轻度受限（日常可做，高脚点吃力）\n3 正常（多数动作可做，偶有紧张）\n4 良好（幅度大，开髋高脚点轻松）\n5 优秀（深蹲贴地、开髋接近劈叉且稳定）\n\n小提示：先热身 3–5 分钟；若两侧不一致，按较差一侧评分。",
+                    "0 Severely limited (pain/compensation in deep squat/cross-leg)\n1 Markedly limited (restricted ER/IR/abduction)\n2 Mildly limited (daily OK, high footholds feel hard)\n3 Typical (most moves OK, occasional tightness)\n4 Good (large ROM, open-hip/high feet are easy)\n5 Excellent (ass-to-grass squat, near-split without compensation)\n\nTips: warm up 3–5 min; if sides differ, rate the worse side."
+                  ),
+                })
+              }
+            >
+              <Row>
+                <Col label={tr("坐姿体前屈（cm）", "Sit & reach (cm)")}>
+                  <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+                    <Picker
+                      style={{ flex: 1 }}
+                      selectedValue={form.sit_and_reach_cm ?? 0}
+                      enabled={form.sit_and_reach_cm !== null}
+                      onValueChange={(v) => set("sit_and_reach_cm", Number(v))}
+                    >
+                      {Array.from({ length: 41 }, (_, i) => i - 20).map((n) => (
+                        <Picker.Item key={n} label={`${n}`} value={n} />
+                      ))}
+                    </Picker>
+                    <Chip
+                      label={tr("未知", "Unknown")}
+                      active={form.sit_and_reach_cm === null}
+                      onPress={() => set("sit_and_reach_cm", form.sit_and_reach_cm === null ? 0 : null)}
+                    />
+                  </View>
+                </Col>
+
+                <Col label={tr("髋关节灵活度（0–5）", "Hip mobility (0–5)")}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, paddingTop: 6 }}>
+                    {[0,1,2,3,4,5].map((n) => (
+                      <Chip
+                        key={`hip-${n}`}
+                        label={String(n)}
+                        active={form.hip_mobility_score === n}
+                        onPress={() => set("hip_mobility_score", n as 0|1|2|3|4|5)}
+                      />
+                    ))}
+                  </View>
+                </Col>
+              </Row>
+            </Section>
           </>
         );
 
-
-      // Step 4：弱项 + 水平评估
-      case 4:
+      // Step 2：弱项 + 水平评估 + 攀岩专项补充
+      case 2:
         return (
           <>
             <Section title={tr("攀岩弱项","Weaknesses")}>
@@ -705,19 +1125,30 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
                     <Pressable
                       key={k}
                       onPress={() => {
-                        set("weaknesses", active
-                          ? form.weaknesses.filter((x) => x !== k)
-                          : [...form.weaknesses, k]
+                        set(
+                          "weaknesses",
+                          active ? form.weaknesses.filter((x) => x !== k) : [...form.weaknesses, k]
                         );
                       }}
                       style={{
-                        paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-                        borderWidth: 1, borderColor: active ? "#4f46e5" : "#e5e7eb",
-                        backgroundColor: active ? "#eef2ff" : "white",
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 999,
+                        borderWidth: 0.6,
+                        borderColor: active ? "#111827" : "#e5e7eb",     // ✅ 选中：黑色描边
+                        backgroundColor: active ? "#111827" : "#f3f4f6",   // ✅ 选中：黑底
+                        shadowColor: "#000",
+                        shadowOpacity: active ? 0.04 : 0.06,
+                        shadowRadius: 6,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: active ? 3 : 0,                       // ✅ Android 阴影
                       }}
                     >
-                      <Text style={{ color: active ? "#4f46e5" : "#111827" }}>{label}</Text>
+                      <Text style={{ color: active ? "#FFFFFF" : "#111827", fontWeight: "600" }}>
+                        {label}
+                      </Text>
                     </Pressable>
+
                   );
                 })}
               </View>
@@ -764,87 +1195,231 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
                 </Col>
               </Row>
             </Section>
+
+            {/* —— 攀岩专项（补充） —— */}
+            <Section
+              title={tr("攀岩专项（补充）", "Climb-specific (extras)")}
+              onHelp={() =>
+                openHelp({
+                  title: tr("补充信息的用途", "What these are used for"),
+                  content: tr(
+                    "「历史最好完成」用于判断你的峰值能力与稳定输出差；「室内/户外占比」会影响动作类型与强度安排。",
+                    "“Hardest send” helps calibrate peak vs. stable output; indoor/outdoor ratio nudges exercise selection and intensity."
+                  ),
+                })
+              }
+            >
+              {(() => {
+                const V_GRADES = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
+                const YDS_LIST = [
+                  "5.6","5.7","5.8","5.9",
+                  "5.10a","5.10b","5.10c","5.10d",
+                  "5.11a","5.11b","5.11c","5.11d",
+                  "5.12a","5.12b","5.12c","5.12d",
+                  "5.13a","5.13b","5.13c","5.13d",
+                  "5.14a","5.14b","5.14c","5.14d",
+                ];
+                return (
+                  <>
+                    <Row>
+                      <Col label={tr("室内/户外占比（室内%）", "Indoor / Outdoor ratio (indoor %)")}>
+                        <Picker
+                          selectedValue={form.indoor_outdoor_ratio ?? 50}
+                          onValueChange={(v) => set("indoor_outdoor_ratio", Number(v))}
+                        >
+                          {Array.from({ length: 11 }, (_, i) => i * 10).map((p) => (
+                            <Picker.Item key={p} value={p} label={`${p}%`} />
+                          ))}
+                        </Picker>
+                      </Col>
+                    </Row>
+                  </>
+                );
+              })()}
+            </Section>
           </>
         );
 
-      // Step 5：预览
-      case 5:
+      case 3:
+        return (
+          <>
+            {/* ============ 新：时间安排（完全替换旧板块） ============ */}
+            <Section title={tr("时间安排", "Scheduling")}>
+              <View style={{ padding: 12 }}>
+                {/* 提示行（超 7 自动收敛） */}
+                {!!scheduleTip && (
+                  <View style={{ paddingVertical: 6, paddingHorizontal: 10, marginBottom: 6, borderRadius: 8, backgroundColor: "#f5f7ff" }}>
+                    <Text style={{ color: "#4f46e5" }}>{scheduleTip}</Text>
+                  </View>
+                )}
+
+                {/* A. 一周几次攀岩？ */}
+                <Text style={{ color: "#6b7280", marginBottom: 6 }}>
+                  {tr("一周几次攀岩？", "Climbing sessions per week")}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  {Array.from({ length: 7 }, (_, i) => i + 1).map((n) => (
+                    <Chip
+                      key={`climb-${n}`}
+                      label={tr(`${n}`, `${n}`)}
+                      active={form.climb_days_per_week === n}
+                      onPress={() => {
+                        const g = form.gym_days_per_week;
+                        const total = n + g;
+                        if (total > 7) {
+                          const newGym = Math.max(0, 7 - n);
+                          setForm((s) => ({ ...s, climb_days_per_week: n, gym_days_per_week: newGym }));
+                          showScheduleTip(tr(`总次数上限为 7，已自动调整健身房次数为 ${7 - n}。`, `Weekly total cannot exceed 7. Gym sessions adjusted to ${7 - n}.`));
+                        } else {
+                          set("climb_days_per_week", n);
+                        }
+                      }}
+                    />
+                  ))}
+                </View>
+
+                {/* B. 一周几次健身房？ */}
+                <Text style={{ color: "#6b7280", marginBottom: 6, marginTop: 6 }}>
+                  {tr("一周几次健身房？", "Gym sessions per week")}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  {Array.from({ length: 8 }, (_, i) => i).map((n) => (
+                    <Chip
+                      key={`gym-${n}`}
+                      label={tr(`${n}`, `${n}`)}
+                      active={form.gym_days_per_week === n}
+                      onPress={() => {
+                        const c = form.climb_days_per_week;
+                        const total = c + n;
+                        if (total > 7) {
+                          const newGym = Math.max(0, 7 - c);
+                          set("gym_days_per_week", newGym);
+                          showScheduleTip(tr(`总次数上限为 7，已自动调整健身房次数为 ${7 - c}。`, `Weekly total cannot exceed 7. Gym sessions adjusted to ${7 - c}.`));
+                        } else {
+                          set("gym_days_per_week", n);
+                        }
+                      }}
+                    />
+                  ))}
+                </View>
+
+                {/* 总览 */}
+                <View style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#f9fafb", flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: "#374151" }}>
+                    {tr("每周总次数", "Weekly total")}: {form.climb_days_per_week + form.gym_days_per_week}
+                  </Text>
+                  <Text style={{ color: "#6b7280" }}>
+                    {tr("休息日", "Rest days")}: {7 - (form.climb_days_per_week + form.gym_days_per_week)}
+                  </Text>
+                </View>
+
+                {/* C. 计划周期时长 */}
+                <Text style={{ color: "#6b7280", marginBottom: 6, marginTop: 12 }}>
+                  {tr("计划周期时长", "Plan cycle length")}
+                </Text>
+
+                {/* 快捷：1/2/3 个月 */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 4 }}>
+                  {[
+                    { m: 1, w: 4 },
+                    { m: 2, w: 8 },
+                    { m: 3, w: 12 },
+                  ].map(({ m, w }) => (
+                    <Chip
+                      key={`m-${m}`}
+                      label={tr(`${m} 个月（${w} 周）`, `${m} month (${w} wks)`)}
+                      active={form.cycle_weeks === w}
+                      onPress={() => set("cycle_weeks", w)}
+                    />
+                  ))}
+                </View>
+              </View>
+            </Section>
+
+            {/* —— 恢复与伤病（保持原样） —— */}
+            <Section
+              title={tr("恢复与伤病", "Recovery & Injury")}
+              onHelp={() =>
+                openHelp({
+                  title: tr("如何使用这组开关", "How to use these fields"),
+                  content: tr(
+                    "疼痛分级：0=无 / 1=轻度 / 2=中度 / 3=重度。等级≥2 时，生成计划会降低相关部位负荷并插入恢复动作；“拉伸频率”用于确定每周恢复条目的占比。",
+                    "Pain scale: 0=None / 1=Mild / 2=Moderate / 3=Severe. If ≥2, the plan will down-regulate loads for that area and add recovery work. Stretching frequency sets weekly recovery allocation."
+                  ),
+                })
+              }
+            >
+              {(() => {
+                const PainChips = ({value, onChange}: {value: 0|1|2|3; onChange: (n:0|1|2|3)=>void}) => (
+                  <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingTop: 6 }}>
+                    {[0,1,2,3].map((n) => (
+                      <Chip key={n} label={String(n)} active={value === n} onPress={() => onChange(n as 0|1|2|3)} />
+                    ))}
+                  </View>
+                );
+                return (
+                  <>
+                    <Row>
+                      <Col label={tr("手指疼痛（0–3）", "Finger pain (0–3)")}>
+                        <PainChips
+                          value={form.pain_finger_0_3}
+                          onChange={(n)=>set("pain_finger_0_3", n)}
+                        />
+                      </Col>
+                      <Col label={tr("肩部疼痛（0–3）", "Shoulder pain (0–3)")}>
+                        <PainChips
+                          value={form.pain_shoulder_0_3}
+                          onChange={(n)=>set("pain_shoulder_0_3", n)}
+                        />
+                      </Col>
+                    </Row>
+
+                    <Row>
+                      <Col label={tr("肘部疼痛（0–3）", "Elbow pain (0–3)")}>
+                        <PainChips
+                          value={form.pain_elbow_0_3}
+                          onChange={(n)=>set("pain_elbow_0_3", n)}
+                        />
+                      </Col>
+                      <Col label={tr("手腕疼痛（0–3）", "Wrist pain (0–3)")}>
+                        <PainChips
+                          value={form.pain_wrist_0_3}
+                          onChange={(n)=>set("pain_wrist_0_3", n)}
+                        />
+                      </Col>
+                    </Row>
+                  </>
+                );
+              })()}
+            </Section>
+          </>
+        );
+
+      // Step 4：训练计划预览
+      case 4:
         return (
           <>
             <Section title={tr("训练计划预览","Plan Preview")}>
-              <ScrollView style={{ maxHeight: 420, padding: 12 }}>
+              <ScrollView style={{ maxHeight: 540, padding: 12 }}>
                 {preview ? (
-                  <View>
-                    <Text style={{ marginBottom: 8 }}>
-                      {tr("开始日期","Start")}:{preview.meta?.start_date} · {tr("周期","Cycle")}:{preview.meta?.cycle_weeks}{tr("周"," wks")}
-                    </Text>
-                    {!!preview.meta?.source && (
-                      <Text style={{ marginBottom: 8, color: "#6b7280" }}>
-                        {tr("计划来源：","Source: ")}{preview.meta?.source === "ai" ? tr("AI 精修版","AI-refined") : tr("规则生成","Rule-based")}
-                      </Text>
-                    )}
-                    {!!preview.meta?.progression && (
-                      <Text style={{ marginBottom: 8 }}>
-                        {tr("每周强度：","Weekly load: ")}
-                        {preview.meta.progression
-                          .map((p, i) => `${tr("第","W")}${i + 1}${tr("周","")} ${Math.round(p * 100)}%`)
-                          .join(" / ")}
-                      </Text>
-                    )}
-
-                    {preview.weeks?.length ? (
-                      <View style={{ marginBottom: 10 }}>
-                        <Text style={{ fontWeight: "bold", marginBottom: 6 }}>
-                          {tr("第 1 周（示例）","Week 1 (sample)")}
-                        </Text>
-
-                        {WEEK_KEYS.map((wkey) => {
-                          const d = preview.weeks![0].days[wkey as keyof Plan["days"]];
-                          if (!d) return null;
-                          return (
-                            <View key={wkey} style={{ marginBottom: 10 }}>
-                              <Text style={{ fontWeight: "bold", marginBottom: 4 }}>
-                                {wkey} · {tt(d.title)}
-                              </Text>
-
-                              {d.items.map((it, idx) => (
-                                <Text key={idx} style={{ color: "#374151", marginLeft: 8 }}>
-                                  {"• " + tt(it.label) + tr(":", ":") + tt(it.target)}
-                                </Text>
-                              ))}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    ) : (
-                      WEEK_KEYS.map((wkey) => {
-                        const d = preview.days[wkey];
-                        if (!d) return null;
-                        return (
-                          <View key={wkey} style={{ marginBottom: 10 }}>
-                            <Text style={{ fontWeight: "bold", marginBottom: 4 }}>
-                              {wkey} · {tt(d.title)}
-                            </Text>
-
-                            {d.items.map((it, idx) => (
-                              <Text key={idx} style={{ color: "#374151", marginLeft: 8 }}>
-                                {"• " + tt(it.label) + tr(":", ":") + tt(it.target)}
-                              </Text>
-                            ))}
-                          </View>
-                        );
-                      })
-                    )}
-
-                    {!!preview.notes?.length && (
-                      <View style={{ marginTop: 8 }}>
-                        <Text style={{ fontWeight: "bold" }}>{tr("备注","Notes")}</Text>
-                        {preview.notes!.map((n, i) => (
-                          <Text key={i} style={{ color: "#6b7280" }}>• {tt(n)}</Text>
-                        ))}
-                      </View>
-                    )}
-                  </View>
+                  shouldType ? (
+                    <TypewriterLines
+                      key={(typedSig || "no-sig") + "-typing"}
+                      lines={buildPreviewLines({ preview, form, tr, tt, rScale, YDS_TO_FRENCH })}
+                      charInterval={18}
+                      linePause={220}
+                      onDone={async () => {
+                        setShouldType(false);
+                        await AsyncStorage.setItem("@preview_typed", "1");
+                      }}
+                    />
+                  ) : (
+                    <View key={(typedSig || "no-sig") + "-static"}>
+                      {buildPreviewLines({ preview, form, tr, tt, rScale, YDS_TO_FRENCH }).map((ln, i) => (
+                        <Text key={i} style={{ color: "#374151", lineHeight: 20, marginBottom: 4 }}>{ln}</Text>
+                      ))}
+                    </View>
+                  )
                 ) : (
                   <Text style={{ color: "#9ca3af" }}>{tr("暂无预览，请点“生成预览”。","No preview. Tap 'Generate plan'.")}</Text>
                 )}
@@ -855,7 +1430,6 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
     }
   };
 
-  // ---- 帮助抽屉 ----
   const sheetRef = useRef<BottomSheet>(null);
   const [help, setHelp] = useState<{ title: string; content: string } | null>(null);
   const snapPoints = useMemo(() => ["45%", "85%"], []);
@@ -866,15 +1440,55 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
   const closeHelp = () => sheetRef.current?.close();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.color.bg }}>
-      {/* 标题（多语言） */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 22, fontWeight: "bold" }}>
-          {tr("攀岩训练计划生成器", "Climbing Training Plan Generator")}
-        </Text>
-      </View>
-
-      <Progress />
+    <Animated.View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", opacity: overlayOpacity }}>
+      <Animated.View
+        style={{
+          flex: 1,
+          backgroundColor: "#FFFFFF",
+          paddingTop: 0,
+          transform: [{ translateY: slideAnim }],
+        }}
+      >
+        <TopBar
+          routeName="index"
+          titleZH="计划生成"
+          titleEN="Plan Generator"
+          rightControls={{
+            mode: "stepper",
+            step,
+            total: 4,
+            canPrevStep: step > 1,
+            canNextStep: step < 4 && (step < 3 || (step === 3 && canNext)),
+            onPrevStep: () => setStep((s) => Math.max(1, (s as number) - 1) as Step),
+            onNextStep: () => {
+              if (step === 4) return;
+              if (step === 3 && !canNext) {
+                Alert.alert(tr("请先完成选择", "Complete required fields"));
+                return;
+              }
+              setStep((s) => Math.min(4, (s as number) + 1) as Step);
+            },
+            maxWidthRatio: 0.6,
+          }}
+        />
+      {/* step=4 在顶部栏下方显示操作胶囊 */}
+      {step === 4 && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Button
+              title={loading ? tr("生成中…","Generating…") : tr("生成训练计划","Generate plan")}
+              onPress={requestAndPreview}
+              style={{ flex: 1, opacity: loading ? 0.7 : 1 }}
+            />
+            <Button
+              title={tr("导入到训练日历","Import to calendar")}
+              onPress={confirmImport}
+              variant="secondary"
+              style={{ flex: 1, opacity: !preview || loading ? 0.7 : 1 }}
+            />
+          </View>
+        </View>
+      )}
 
       {/* 内容区 */}
       <KeyboardAvoidingView
@@ -882,77 +1496,10 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        <ScrollView style={{ flex: 1, paddingTop: 8, paddingBottom: 72 }} contentContainerStyle={{ paddingBottom: 80 }}>
+        <ScrollView style={{ flex: 1, paddingTop: 10, paddingBottom: 72 }} contentContainerStyle={{ paddingBottom: 80 }}>
           <StepContent />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* 底部操作栏 */}
-      {step < 5 ? (
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingBottom: 12,
-            paddingTop: 8,
-            backgroundColor: "transparent",
-          }}
-        >
-          <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button
-                title={tr("上一步","Back")}
-                variant="ghost"
-                onPress={() => setStep((s) => (Math.max(1, (s as number) - 1) as Step))}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title={canNext ? tr("下一步","Next") : tr("请先完成选择","Complete required fields")}
-                onPress={() => { if (canNext) setStep((s) => ((s + 1) as Step)); }}
-                style={{ flex: 1, opacity: canNext ? 1 : 0.8 }}
-              />
-            </View>
-          </Card>
-        </View>
-
-      ) : (
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingBottom: 12,
-            paddingTop: 8,
-            backgroundColor: "transparent",
-          }}
-        >
-          <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button
-                title={tr("上一步","Back")}
-                variant="ghost"
-                onPress={() => setStep(4)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title={loading ? tr("生成中…","Generating…") : tr("生成训练计划","Generate plan")}
-                onPress={requestAndPreview}
-                style={{ flex: 1, opacity: loading ? 0.7 : 1 }}
-              />
-              <Button
-                title={tr("确认导入到训练日历","Import to calendar")}
-                onPress={confirmImport}
-                variant="secondary"
-                style={{ flex: 1, opacity: !preview || loading ? 0.7 : 1 }}
-              />
-            </View>
-          </Card>
-        </View>
-
-      )}
 
       {/* 生成中遮罩 */}
       <Modal visible={loading} transparent animationType="fade">
@@ -972,7 +1519,7 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
         enablePanDownToClose
         backdropComponent={(props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />}
       >
-        <BottomSheetScrollView contentContainerStyle={{ padding: 16 }}>
+        <BottomSheetScrollView contentContainerStyle={{ padding: 16 , borderRadius: 20}}>
           {!!help && (
             <>
               <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>{help.title}</Text>
@@ -981,7 +1528,29 @@ const weightUnit = unit === "metric" ? "kg" : "lbs";
           )}
         </BottomSheetScrollView>
       </BottomSheet>
-    </SafeAreaView>
+        <Pressable
+          accessibilityLabel={tr("关闭生成器", "Close generator")}
+          onPress={() => exitIndex("calendar")}
+          style={{
+            position: "absolute",
+            bottom: Math.max(insets.bottom + 24, 32),
+            right: 24,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: "#111827",
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "#000",
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+          }}
+        >
+          <Ionicons name="close" size={20} color="#FFFFFF" />
+        </Pressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
-

@@ -1,20 +1,21 @@
-// babel.config.js
-module.exports = function (api) {
+module.exports = function(api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
+    presets: ["babel-preset-expo"],
     plugins: [
-      'expo-router/babel',      // ← Expo Router 的 babel 插件要保留
-      ['module-resolver', {
-        root: ['./'],
-        alias: {
-          '@': './app',          // ← 关键：把 @ 指向 app 目录
-          '@components': './components',
-          '@contexts': './app/contexts',
-          '@lib': './app/lib',
+      [
+        "module-resolver",
+        {
+          root: ["."],
+          alias: {
+            "@": "./app", // 关键：@ 指向 app 目录
+          },
+          extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
+          
         },
-        extensions: ['.tsx', '.ts', '.js', '.json'],
-      }],
+        "react-native-reanimated/plugin",
+      ],
     ],
   };
 };
+
