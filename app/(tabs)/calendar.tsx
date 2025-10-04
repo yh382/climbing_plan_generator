@@ -21,6 +21,14 @@ import { tokens } from "../../components/ui/Theme";
 
 // ✅ 从 Settings / i18n 获取语言（zh/en）
 import { I18N, useI18N } from "../lib/i18n";
+import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
+import useLogsStore from "../store/useLogsStore";
+// 顶部 import 区域加入
+import { useColorScheme } from "react-native";
+import TopBar from "../../components/TopBar";
+import { useLayoutEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+
 
 type PlanItem = { label: I18N; target: I18N };
 type PlanDay = { title: I18N; items: PlanItem[] };
@@ -75,6 +83,8 @@ export default function CalendarTab() {
   // 备注数据：整库 + 当前日期文本
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   const [note, setNote] = useState<string>("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   const loadPlan = useCallback(async () => {
     try {
@@ -111,6 +121,10 @@ export default function CalendarTab() {
     }, [loadPlan, loadNotesMap])
   );
 
+  // 读取全局 store 的两个选择器
+  const countByDateType = useLogsStore((s) => s.countByDateType);
+  const scheme = useColorScheme();
+  const pageBg = scheme === "dark" ? "#0B1220" : "#FFFFFF";
   // 当前选中日期的数据
   const dayData = useMemo(() => {
     if (!plan) return null;
@@ -235,7 +249,19 @@ export default function CalendarTab() {
   const headerTitle = isZH
     ? `${selected}（${weekdayDisplay[selectedDateObj.getDay()]}）${weekIndex ? ` · 第 ${weekIndex} 周` : ""}`
     : `${selected} (${weekdayDisplay[selectedDateObj.getDay()]})${weekIndex ? ` · Week ${weekIndex}` : ""}`;
-
+    const dayKey = toDateString(selectedDateObj);
+    const climbCount = React.useMemo(
+    () => countByDateType(dayKey, "boulder") + countByDateType(dayKey, "yds"),
+    [dayKey, countByDateType]
+  );
+    // ✅ 仅月日 + 星期（不显示年份）；周次用紧凑 "Wn"
+  const dateObjForBar = parseISO(selected) ?? new Date();
+  const mm = pad(dateObjForBar.getMonth() + 1);
+  const dd = pad(dateObjForBar.getDate());
+  const weekdayShort = (isZH ? weekdayCN : weekdayEN)[dateObjForBar.getDay()];
+  const barDateLabel = isZH ? `${mm}/${dd} · ${weekdayShort}` : `${weekdayShort}, ${mm}/${dd}`;
+  const barWeekCompact = weekIndex ? `W${weekIndex}` : undefined;
+  const weekLabel = isZH ? `第 ${weekIndex} 周` : `W${weekIndex}`;
   // 备注保存（轻量防抖）
   useEffect(() => {
     const t = setTimeout(() => {
@@ -263,21 +289,64 @@ export default function CalendarTab() {
     saveProgressForDate(selected, next);
   }, [totalCount, saveProgressForDate, selected]);
 
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      header: () => (
+        <TopBar
+          routeName="calendar"
+          titleZH="训练日历"
+          titleEN="Calendar"
+          rightControls={{
+            mode: "date",
+            dateLabel: barDateLabel,         // 你已在文件里算好的“仅月日+星期”
+            onPrevDate: () => shiftDay(-1),
+            onNextDate: () => shiftDay(1),
+            onOpenPicker: () => setCalendarOpen((v) => !v),
+            maxWidthRatio: 0.60,
+          }}
+        />
+      ),
+    });
+  }, [
+    barDateLabel,         // 依赖：日期变化时刷新头部
+    barWeekCompact,
+    shiftDay,
+    setCalendarOpen,
+    navigation,
+  ]);
+
   const renderItem = ({ item, index }: { item: PlanItem; index: number }) => {
     const done = progress[index] ?? false;
     return (
-      <View
-        style={{
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderBottomWidth: 1,
-          borderColor: tokens.color.border,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          backgroundColor: "#fff",
-        }}
-      >
+        <TouchableOpacity
+          onPress={() => toggleProgress(index)}
+          activeOpacity={0.9}
+          style={{
+            // 卡片外观
+            marginHorizontal: 16,
+            marginBottom: 12,
+            paddingVertical: 16,
+            paddingHorizontal: 16,
+            backgroundColor: "#FFFFFF",
+            borderRadius: 20,
+            borderWidth: 0.6,
+            borderColor: "#E5E7EB",
+
+            // 阴影
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 4,
+
+            // 行内布局
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
         {/* 勾选圆圈 */}
         <TouchableOpacity
           onPress={() => toggleProgress(index)}
@@ -286,45 +355,57 @@ export default function CalendarTab() {
             width: 24,
             height: 24,
             borderRadius: 12,
-            borderWidth: 2,
-            borderColor: done ? tokens.color.success : "#d1d5db",
-            backgroundColor: done ? tokens.color.success : "white",
+            borderWidth: 1,
+            borderColor: done ? "#A5D23D" : "#d1d5db",
+            backgroundColor: done ? "#A5D23D" : "#FFFFFF",
           }}
         />
         {/* 文案（注意用 tt() 取当前语言） */}
         <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: "600", marginBottom: 4, color: done ? tokens.color.success : tokens.color.text }}>
+          <Text style={{ fontWeight: "600", marginBottom: 4, color: tokens.color.text }}>
             {tt(item.label)}
           </Text>
-          <Text style={{ color: "#374151" }}>{tt(item.target)}</Text>
+          <Text style={{ color: tokens.color.text }}>{tt(item.target)}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.color.bg }}>
-      {/* 顶部信息卡：日期 + 完成度 */}
-      <Card style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 8 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <H1 style={{ flexShrink: 1, paddingRight: 12 }}>{headerTitle}</H1>
-          {/* 左右切日 */}
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button title={isZH ? "前一天" : "Prev"} variant="ghost" onPress={() => shiftDay(-1)} />
-            <Button title={isZH ? "后一天" : "Next"} variant="ghost" onPress={() => shiftDay(1)} />
-          </View>
-        </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: pageBg }}>
 
+
+      <CollapsibleCalendarOverlay
+        visible={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+        date={selectedDateObj}
+        onSelect={(d) => {
+          setSelected(toDateString(d));
+          setCalendarOpen(false);
+        }}
+        lang={isZH ? "zh" : "en"}
+        firstDay={1}
+        topOffset={56}
+      />
+
+
+      {/* 完成度卡片（仅进度与说明） */}
+      <Card style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 8, borderWidth: 0.6 }}>
         <ProgressBar value={dayCompletion} />
         <Caption style={{ marginTop: 6 }}>
           {isZH
-            ? `今日完成度 ${dayCompletion}% · 已完成 ${doneCount}/${totalCount} 项`
-            : `Completion ${dayCompletion}% · ${doneCount}/${totalCount} done`}
+            ? `今日完成度 ${dayCompletion}% · 已完成 ${doneCount}/${totalCount} 项${weekLabel ? ` · ${weekLabel}` : ""}`
+            : `Completion ${dayCompletion}% · ${doneCount}/${totalCount} done${weekLabel ? ` · ${weekLabel}` : ""}`}
         </Caption>
+        <Caption style={{ marginTop: 2 }}>
+          {isZH ? `今日记录 ${climbCount} 次` : `Today's logs: ${climbCount}`}
+        </Caption>
+
       </Card>
 
+
       {/* 今日备注 */}
-      <Card style={{ marginHorizontal: 16, marginBottom: 8 }}>
+      <Card style={{ marginHorizontal: 16, marginBottom: 8, borderWidth: 0.6 }}>
         <Caption style={{ marginBottom: 6 }}>
           {isZH ? "今日备注" : "Notes"}
         </Caption>
@@ -346,7 +427,6 @@ export default function CalendarTab() {
       </Card>
 
       {/* 列表 */}
-      <Card style={{ marginHorizontal: 16, marginBottom: 100, padding: 0 /* 让每行自带 padding 生效 */ }}>
         {dayData?.items?.length ? (
           <FlatList
             data={dayData.items}
@@ -354,6 +434,7 @@ export default function CalendarTab() {
             keyExtractor={(_, i) => `${selected}_${i}`}
             ItemSeparatorComponent={() => null}
             scrollEnabled={true}
+            contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
           />
         ) : (
           <View style={{ padding: 16 }}>
@@ -362,42 +443,7 @@ export default function CalendarTab() {
             </Text>
           </View>
         )}
-      </Card>
 
-      {/* 底部吸附操作条 */}
-      <View
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: 12,
-          paddingTop: 8,
-          backgroundColor: "transparent",
-        }}
-      >
-        <Card style={{ marginHorizontal: 16, paddingVertical: 10 }}>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Button
-              title={isZH ? "全部完成" : "Mark all done"}
-              onPress={completeAll}
-              variant="primary"
-              style={{ flex: 1 }}
-            />
-            <Button
-              title={isZH ? "重置今日" : "Reset"}
-              onPress={resetToday}
-              variant="ghost"
-              style={{ flex: 1 }}
-            />
-          </View>
-        </Card>
-      </View>
     </SafeAreaView>
   );
 }
-
-
-
-
-

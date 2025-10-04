@@ -9,7 +9,7 @@ import Constants from "expo-constants";
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE ??
   (Constants?.expoConfig?.extra?.API_BASE) ??
-  "http://localhost:8000/plan";
+  "http://172.20.13.241:8000/plan";
 
 export default function App() {
   const [form, setForm] = useState({

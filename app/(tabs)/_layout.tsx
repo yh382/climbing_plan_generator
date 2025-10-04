@@ -1,75 +1,53 @@
-// app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { Platform } from "react-native";
-import { SettingsProvider, useSettings } from "../contexts/SettingsContext";
-import { HapticTab } from "@components/HapticTab";
-import BlurTabBarBackground from "@components/ui/TabBarBackground.ios";
+import FloatingTabBar from "../../components/FloatingTabBar";
+import TopBar from "../../components/TopBar";
+import { useColorScheme, View } from "react-native";
 
-function TabInner() {
-  const { lang } = useSettings();
-  const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
 
+// ✅ 片段1：保持上面的 import 不变
+
+export default function TabsLayout() {
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
   return (
+  <View style={{ flex: 1, backgroundColor: isDark ? "#0B1220" : "#FFFFFF" }}>
     <Tabs
       screenOptions={{
-        tabBarButton: (props) => <HapticTab {...props} />,
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? <BlurTabBarBackground /> : null,
-        tabBarActiveTintColor: "#3B82F6",
-        tabBarInactiveTintColor: "#94A3B8",
+        // 全局默认：有 TopBar
+        header: ({ route }) => <TopBar routeName={route.name} />,
       }}
+      tabBar={(props) => <FloatingTabBar {...props} />}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: tr("生成器", "Generator"),
-          tabBarLabel: tr("生成器", "Generator"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="create-outline" color={color} size={size} />
-          ),
-        }}
-      />
+      {/* 中区三项 */}
       <Tabs.Screen
         name="calendar"
         options={{
-          title: tr("训练日历", "Calendar"),
-          tabBarLabel: tr("训练日历", "Calendar"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" color={color} size={size} />
-          ),
+          title: "日历",
         }}
       />
       <Tabs.Screen
         name="journal"
         options={{
-          title: tr("记录中心", "Journal"),
-          tabBarLabel: tr("记录中心", "Journal"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book-outline" color={color} size={size} />
-          ),
+          title: "日志",
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: tr("设置", "Settings"),
-          tabBarLabel: tr("设置", "Settings"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
-          ),
+          title: "个人资料",
+        }}
+      />
+
+      {/* 生成器对应 index.tsx */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "生成器",
         }}
       />
     </Tabs>
+  </View>
   );
 }
 
-export default function TabsLayout() {
-  // 在 (tabs) 层包裹 Provider，所有子页都能读到设置
-  return (
-    <SettingsProvider>
-      <TabInner />
-    </SettingsProvider>
-  );
-}
 

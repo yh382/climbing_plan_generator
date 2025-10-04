@@ -1,6 +1,6 @@
 // app/contexts/SettingsContext.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState} from "react";
 
 type Lang = "zh" | "en";
 type UnitSystem = "imperial" | "metric";
@@ -18,12 +18,16 @@ type SettingsState = {
   boulderScale: BoulderScale;
   ropeScale: RopeScale;
   // setters（会自动持久化到 AsyncStorage）
-  setLang: (v: Lang) => void;
-  setUnit: (v: UnitSystem) => void;
-  setBoulderScale: (v: BoulderScale) => void;
-  setRopeScale: (v: RopeScale) => void;
+  setLang: (v: Lang) => Promise<void>;
+  setUnit: (v: UnitSystem) => Promise<void>;
+  setBoulderScale: (v: BoulderScale) => Promise<void>;
+  setRopeScale: (v: RopeScale) => Promise<void>;
   // 初始化完成标记（避免闪烁）
   ready: boolean;
+  // 在 SettingsState 内任意合适位置新增两行
+  isZH: boolean;
+  tr: (zh: string, en: string) => string;
+
 };
 const SettingsCtx = createContext<SettingsState | null>(null);
 
@@ -59,9 +63,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setUnit = async (v: UnitSystem) => { _setUnit(v); await AsyncStorage.setItem(UNIT_KEY, v); };
   const setBoulderScale = async (v: BoulderScale) => { _setBoulderScale(v); await AsyncStorage.setItem(BOULDER_KEY, v); };
   const setRopeScale = async (v: RopeScale) => { _setRopeScale(v); await AsyncStorage.setItem(ROPE_KEY, v); };
+  // 放在 useMemo 之前
 
   const value = useMemo<SettingsState>(() => ({
-    lang, unit, boulderScale, ropeScale, setLang, setUnit, setBoulderScale, setRopeScale, ready
+    lang, unit, boulderScale, ropeScale, setLang, setUnit, setBoulderScale, setRopeScale, ready,isZH: lang === "zh",tr: (zh: string, en: string) => (lang === "zh" ? zh : en),
   }), [lang, unit, boulderScale, ropeScale, ready]);
 
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;

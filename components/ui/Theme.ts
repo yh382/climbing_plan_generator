@@ -2,7 +2,6 @@
 export const tokens = {
   color: {
     primary: "#3B82F6",
-    accent: "#FF8A00",
     success: "#16A34A",
     warn: "#F59E0B",
     error: "#EF4444",
@@ -11,6 +10,8 @@ export const tokens = {
     bg: "#F8FAFC",
     card: "#FFFFFF",
     border: "#E5E7EB",
+    accent: "#3B82F6",      // 选中态主色 —— 蓝色
+    accentBg: "#e5eefeff",    // 选中态背景 —— 很浅的灰（提升可读性）
   },
   radius: { sm: 8, md: 12, lg: 16, xl: 20 },
   space: (n: number) => n * 4,
@@ -24,3 +25,4 @@ export const tokens = {
     },
   },
 };
+export type Tokens = typeof tokens;

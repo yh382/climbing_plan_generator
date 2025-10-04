@@ -1,9 +1,24 @@
 // app/(tabs)/journal.tsx
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import Svg, { Circle, G } from "react-native-svg";
-import { useSettings } from "../contexts/SettingsContext";
+import { useSettings } from "@/contexts/SettingsContext";
+import TopDateHeader from "../../components/TopDateHeader";
+import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
+import SingleRing from "../../components/SingleRing";
+import { useRouter } from "expo-router"; // 若已导入可忽略
+import useLogsStore, { useSegmentsByDate } from "../store/useLogsStore"; // 从 app/(tabs) 到 app/store
+import { Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { colorForBoulder, colorForYDS, getColorForGrade, COLOR, ringStrokeColor } from "../lib/gradeColors";
+import { useLayoutEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+import TopBar from "../../components/TopBar";
+
+
+
+
+
 
 type GradeLog = {
   id: string;
@@ -14,8 +29,14 @@ type GradeLog = {
 };
 
 const LOGS_KEY = "@climb_logs";
-
-const V_GRADES = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
+const formatBarLabel = (d: Date, isZH: boolean) => {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const wCN = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
+  const wEN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+  return isZH ? `${mm}/${dd} · ${wCN}` : `${wEN}, ${mm}/${dd}`;
+};
+const V_GRADES = ["VB", "V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
 const YDS_GRADES = [
   "5.6","5.7","5.8","5.9",
   "5.10a","5.10b","5.10c","5.10d",
@@ -35,7 +56,7 @@ const YDS_TO_FRENCH: Record<string, string> = {
 };
 
 const V_TO_FONT: Record<string, string> = {
-  V0:"4", V1:"5", V2:"5+", V3:"6A", V4:"6B",
+  VB:"3", V0:"4", V1:"5", V2:"5+", V3:"6A", V4:"6B",
   V5:"6C", V6:"7A", V7:"7A+", V8:"7B", V9:"7C", V10:"7C+",
 };
 
@@ -48,162 +69,78 @@ function inSameWeek(dateStr: string, base = new Date()) {
   const end = new Date(start); end.setDate(start.getDate()+7);
   return d >= start && d < end;
 }
-
-const COLOR = {
-  lightgreen: "#86efac",
-  green: "#16a34a",
-  yellow: "#f59e0b",
-  orange: "#f97316",
-  red: "#ef4444",
-  purple: "#a855f7",
-  blue: "#3b82f6",
-  gray: "#6b7280",
-  black: "#111827",
-};
-const colorForBoulder = (grade: string) => {
-  const g = grade.toUpperCase();
-  if (g === "V0") return COLOR.lightgreen;
-  if (g === "V1") return COLOR.green;
-  if (g === "V2") return COLOR.yellow;
-  if (g === "V3") return COLOR.orange;
-  if (g === "V4") return COLOR.red;
-  if (g === "V5") return COLOR.purple;
-  if (g === "V6") return COLOR.blue;
-  if (g === "V7") return COLOR.gray;
-  return COLOR.black;
-};
-const colorForYDS = (grade: string) => {
-  const g = grade.toLowerCase();
-  if (g === "5.6") return COLOR.lightgreen;
-  if (g === "5.7") return COLOR.green;
-  if (g === "5.8") return COLOR.yellow;
-  if (g === "5.9") return COLOR.orange;
-  if (g.startsWith("5.10")) return COLOR.red;
-  if (g.startsWith("5.11")) return COLOR.purple;
-  if (g.startsWith("5.12")) return COLOR.blue;
-  if (g.startsWith("5.13")) return COLOR.gray;
-  return COLOR.black;
-};
-
-
-const DonutRing = ({
-  total,
-  parts,
-  colorOf,
-  size = 140,
-  stroke = 14,
-}: {
-  total: number;
-  parts: { grade: string; count: number }[];
-  colorOf: (g: string) => string;
-  size?: number;
-  stroke?: number;
-}) => {
-  const r = (size - stroke) / 2;
-  const C = 2 * Math.PI * r;
-
-  // 只画 count>0 的段
-  const segs = parts.filter(p => p.count > 0);
-  const n = segs.length;
-  let acc = 0;                 // 已累计的周长
-  const EPS = 1e-4;
-
-  return (
-    <Svg width={size} height={size}>
-      {/* ⚠️ 没有数据才显示底环；有数据时不画底色，避免透出 */}
-      {total === 0 && (
-        <Circle cx={size/2} cy={size/2} r={r} stroke="#e5e7eb" strokeWidth={stroke} fill="none" />
-      )}
-
-      {/* 先把坐标系：旋到 12 点起始，再水平镜像 → 逆时针绘制 */}
-      <G transform={`rotate(-90 ${size/2} ${size/2}) scale(-1,1) translate(-${size},0)`}>
-        {total > 0 && segs.map((p, i) => {
-          // 该段理论长度
-          const raw = (p.count / total) * C;
-          // 让最后一段吞掉剩余，确保正好闭环在 12 点
-          const len = (i === n - 1) ? Math.max(EPS, C - acc) : Math.min(raw, Math.max(EPS, C - acc));
-          const gap = Math.max(EPS, C - len);
-          const offset = acc;   // 从 12 点起逆时针累加
-
-          acc += len;
-
-          return (
-            <Circle
-              key={`donut-${p.grade}`}
-              cx={size/2}
-              cy={size/2}
-              r={r}
-              stroke={colorOf(p.grade)}
-              strokeWidth={stroke}
-              strokeLinecap="butt"   // butt/square 都可；避免圆帽造成缝
-              fill="none"
-              strokeDasharray={`${len} ${gap}`}
-              strokeDashoffset={offset}
-            />
-          );
-        })}
-      </G>
-    </Svg>
-  );
-};
-
-
+function dateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const da = pad(d.getDate());
+  return `${y}-${m}-${da}`;
+}
+function shiftDay(d: Date, delta: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + delta);
+  return x;
+}
+function formatDateLabel(d: Date, lang: "zh" | "en") {
+  const w = ["周日","周一","周二","周三","周四","周五","周六"];
+  const base = dateStr(d);
+  return lang === "zh" ? `${base}（${w[d.getDay()] }）` : base;
+}
+// 统计“某周7天”的每日次数（按你当前 mode 过滤）
+function getWeekCounts(anchor: Date, logs: GradeLog[], mode: "boulder" | "yds") {
+  const ws = startOfWeek(anchor);
+  const result: Record<string, number> = {};
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(ws);
+    dt.setDate(ws.getDate() + i);
+    const key = dateStr(dt);
+    // 如果你的日志结构是 logs: { date: "YYYY-MM-DD", type: "boulder"|"rope", ... }
+    result[key] = logs.filter(l => l.date === key && l.type === mode).length;
+  }
+  return result;
+}
 
 export default function Journal() {
   const { boulderScale, ropeScale, lang } = useSettings();
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
-
   const [mode, setMode] = useState<"boulder" | "yds">("boulder");
-  const [logs, setLogs] = useState<GradeLog[]>([]);
   const [action, setAction] = useState<"add" | "sub">("add"); // 顶部动作切换
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const router = useRouter();
+  const modeLabel = mode === "boulder" ? "抱石" : "绳索";
+  const upsertCount     = useLogsStore((s) => s.upsertCount);
+  const countByDateType = useLogsStore((s) => s.countByDateType);
+  const logType = mode === "boulder" ? "boulder" : "yds"; // 你的 rope 用 yds 表示
+  const todayKey = React.useMemo(() => dateStr(selectedDate), [selectedDate]);
+  const todayTotal = React.useMemo(
+  () => countByDateType(todayKey, logType),
+  [todayKey, logType, countByDateType]
+  );
+  // 当日等级分布 → 用于 SingleRing 分段
 
-  // 读取日志
-  useEffect(() => {
-    (async () => {
-      try {
-        const rawLogs = await AsyncStorage.getItem(LOGS_KEY);
-        setLogs(rawLogs ? JSON.parse(rawLogs) : []);
-      } catch {
-        setLogs([]);
-      }
-    })();
-  }, []);
-
-  const save = async (next: GradeLog[]) => {
-    setLogs(next);
-    await AsyncStorage.setItem(LOGS_KEY, JSON.stringify(next));
-  };
 
   // +1：直接在当天追加一条
-  const addOne = async (grade: string) => {
-    const entry: GradeLog = {
-      id: `${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
-      date: todayStr(),
-      type: mode,
+  // +1
+  const addOne = (grade: string) => {
+    upsertCount({
+      date: todayKey,
+      type: logType,
       grade,
-      count: 1,
-    };
-    await save([entry, ...logs]);
+      delta: 1,
+    });
   };
 
-  // -1：从最近到最早，按 mode+grade 扣减 1；遇到 0 删条
-  const subOne = async (grade: string) => {
-    let remain = 1;
-    const next = [...logs];
-    for (let i = 0; i < next.length && remain > 0; i++) {
-      const l = next[i];
-      if (l.type !== mode || l.grade !== grade) continue;
-      if (l.count <= remain) {
-        remain -= l.count;
-        next.splice(i, 1);
-        i--;
-      } else {
-        l.count -= remain;
-        remain = 0;
-      }
-    }
-    await save(next);
+  // -1（如果你有减一逻辑）
+  const subOne = (grade: string) => {
+    upsertCount({
+      date: todayKey,
+      type: logType,
+      grade,
+      delta: -1,
+    });
   };
+
 
   // 胶囊点击动作（根据当前 action 切换）
   const onCapsulePress = (g: string) => {
@@ -211,55 +148,77 @@ export default function Journal() {
     else subOne(g);
   };
 
-  const todayTotal = useMemo(() => {
-    return logs
-      .filter(l => l.date === todayStr() && l.type === mode)
-      .reduce((sum, l) => sum + l.count, 0);
-  }, [logs, mode]);
-
 
   // 本周统计
+  const logs = useLogsStore((s) => s.logs);
+  const logsByMode = useMemo(() => logs.filter((l) => l.type === mode), [logs, mode]);
+  const segmentsToday = useSegmentsByDate(todayKey, logType);
+
+  // 本周统计（按当前模式 & 所选日期所在周）
   const weekStats = useMemo(() => {
-    const base = new Date();
+    const base = selectedDate;
     const curList = mode === "boulder" ? V_GRADES : YDS_GRADES;
     const curMap: Record<string, number> = {};
     let total = 0;
-    logs.forEach((l) => {
+
+    logsByMode.forEach((l) => {
       if (!inSameWeek(l.date, base)) return;
-      if (l.type !== mode) return;
       curMap[l.grade] = (curMap[l.grade] || 0) + l.count;
       total += l.count;
     });
-    const list = curList.map((g) => ({ grade: g, count: curMap[g] || 0 })).filter((x) => x.count > 0);
-    return { total, list };
-  }, [logs, mode]);
 
-  // 总计
+    const list = curList
+      .map((g) => ({ grade: g, count: curMap[g] || 0 }))
+      .filter((x) => x.count > 0);
+
+    return { total, list };
+  }, [logsByMode, mode, selectedDate]);
+
+  // 当日等级分布 → 用于 SingleRing 分段
+  const dayParts = useMemo(() => {
+    const total = segmentsToday.reduce((sum, seg) => sum + seg.count, 0);
+    return { total, parts: segmentsToday };
+  }, [segmentsToday]);
+
+
+  // 总计（按当前模式，所有时间）
   const totalStats = useMemo(() => {
     const curList = mode === "boulder" ? V_GRADES : YDS_GRADES;
     const curMap: Record<string, number> = {};
     let all = 0;
-    logs.forEach((l) => {
-      if (l.type !== mode) return;
+
+    logsByMode.forEach((l) => {
       curMap[l.grade] = (curMap[l.grade] || 0) + l.count;
       all += l.count;
     });
-    const list = curList.map((g) => ({ grade: g, count: curMap[g] || 0 })).filter((x) => x.count > 0);
+
+    const list = curList
+      .map((g) => ({ grade: g, count: curMap[g] || 0 }))
+      .filter((x) => x.count > 0);
+
     return { all, list };
-  }, [logs, mode]);
+  }, [logsByMode, mode]);
+
 
   const ModeSwitch = () => (
-    <View style={{ marginTop: 10, marginBottom: 12, flexDirection: "row", alignItems: "center" }}>
+    <View style={{ marginTop: 8, marginBottom: 8, flexDirection: "row", alignItems: "center" }}>
       <View style={{ flex: 1, alignItems: "center" }}>
         <TouchableOpacity
           onPress={() => setMode("boulder")}
           style={{
             paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-            backgroundColor: mode === "boulder" ? "#4f46e5" : "#f3f4f6",
+            backgroundColor: mode === "boulder" ? "#000000ff" : "#f3f4f6",
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 3, // Android 阴影
+            borderWidth: 0.3,           // 建议加一条细边框，阴影更干净
+            borderColor: "#E5E7EB",
           }}
         >
-          <Text style={{ color: mode === "boulder" ? "white" : "#111827", fontWeight: "700" }}>
-            {tr("记录抱石等级", "Log bouldering grades")}
+          <Text style={{ fontSize: 13, color: mode === "boulder" ? "white" : "#111827", fontWeight: "700" }}>
+            {tr("抱石记录", "Bouldering Logs")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -268,11 +227,18 @@ export default function Journal() {
           onPress={() => setMode("yds")}
           style={{
             paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-            backgroundColor: mode === "yds" ? "#4f46e5" : "#f3f4f6",
+            backgroundColor: mode === "yds" ? "#000000ff" : "#f3f4f6",
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 3, // Android 阴影
+            borderWidth: 0.3,   
+            borderColor: "#E5E7EB",
           }}
         >
-          <Text style={{ color: mode === "yds" ? "white" : "#111827", fontWeight: "700" }}>
-            {tr("记录难度等级", "Log rope grades")}
+          <Text style={{ fontSize: 13, color: mode === "yds" ? "white" : "#111827", fontWeight: "700" }}>
+            {tr("难度记录", "Rope Logs")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -280,26 +246,62 @@ export default function Journal() {
   );
 
   const ActionSwitch = () => (
-    <View style={{ flexDirection: "row", alignSelf: "center", gap: 8, marginBottom: 8 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignSelf: "center",
+        marginBottom: 10,
+        padding: 4,
+        borderRadius: 999,
+        backgroundColor: "#F5F6F8",
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: "#E2E8F0",
+        gap: 6,
+      }}
+    >
       <TouchableOpacity
         onPress={() => setAction("add")}
+        activeOpacity={0.9}
         style={{
-          paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999,
-          backgroundColor: action === "add" ? "#16a34a" : "#f3f4f6",
+          flex: 1,
+          paddingVertical: 10,
+          borderRadius: 999,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: action === "add" ? "#16A34A" : "#F5F6F8",
+          borderWidth: action === "add" ? 0 : 0,
+          borderColor: "transparent",
+          shadowColor: action === "add" ? "#16A34A" : "transparent",
+          shadowOpacity: action === "add" ? 0.2 : 0,
+          shadowRadius: action === "add" ? 8 : 0,
+          shadowOffset: action === "add" ? { width: 0, height: 4 } : { width: 0, height: 0 },
+          elevation: action === "add" ? 4 : 0,
         }}
       >
-        <Text style={{ color: action === "add" ? "white" : "#111827", fontWeight: "700" }}>
-          {tr("添加 +", "Add +")}
-        </Text>
+          <Text style={{ color: action === "add" ? "#FFFFFF" : "#334155", fontWeight: "700", fontSize: 13 }}>
+            {tr("添加 +", "Add +")}
+          </Text>
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => setAction("sub")}
+        activeOpacity={0.9}
         style={{
-          paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999,
-          backgroundColor: action === "sub" ? "#ef4444" : "#f3f4f6",
+          flex: 1,
+          paddingVertical: 10,
+          borderRadius: 999,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: action === "sub" ? "#EF4444" : "#F5F6F8",
+          borderWidth: action === "sub" ? 0 : 0,
+          borderColor: "transparent",
+          shadowColor: action === "sub" ? "#EF4444" : "transparent",
+          shadowOpacity: action === "sub" ? 0.18 : 0,
+          shadowRadius: action === "sub" ? 8 : 0,
+          shadowOffset: action === "sub" ? { width: 0, height: 4 } : { width: 0, height: 0 },
+          elevation: action === "sub" ? 4 : 0,
         }}
       >
-        <Text style={{ color: action === "sub" ? "white" : "#111827", fontWeight: "700" }}>
+        <Text style={{ color: action === "sub" ? "#FFFFFF" : "#334155", fontWeight: "700", fontSize: 13 }}>
           {tr("删减 -", "Delete -")}
         </Text>
       </TouchableOpacity>
@@ -321,7 +323,7 @@ export default function Journal() {
             onPress={() => onCapsulePress(g)}
             style={{
               paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999,
-              borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f9fafb",
+              borderWidth: 0.6, borderColor: "#e5e7eb", backgroundColor: "#f9fafb",
             }}
           >
             <Text style={{ fontWeight: "700", color: "#111827" }}>{labelOf(g)}</Text>
@@ -331,11 +333,39 @@ export default function Journal() {
     );
   };
 
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      header: () => (
+        <TopBar
+          routeName="journal"
+          titleZH="训练日志"
+          titleEN="Journal"
+          rightControls={{
+            mode: "date",
+            dateLabel: formatBarLabel(selectedDate, lang === "zh"),
+            onPrevDate: () => setSelectedDate((d) => shiftDay(d, -1)),
+            onNextDate: () => setSelectedDate((d) => shiftDay(d, +1)),
+            onOpenPicker: () => setCalendarOpen((v) => !v),
+            maxWidthRatio: 0.60,
+          }}
+        />
+      ),
+    });
+  }, [
+    selectedDate,
+    lang,
+    setSelectedDate,
+    setCalendarOpen,
+    navigation,
+  ]);
+
   const Pill = ({ text }: { text: string }) => (
     <View
       style={{
         paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8,
-        borderWidth: 1, borderColor: "#e5e7eb", marginRight: 8, marginBottom: 8, backgroundColor: "#f9fafb",
+        borderWidth: 0.6, borderColor: "#e5e7eb", marginRight: 8, marginBottom: 8, backgroundColor: "#f9fafb",
       }}
     >
       <Text style={{ color: "#111827" }}>{text}</Text>
@@ -343,29 +373,162 @@ export default function Journal() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, padding: 16 }}>
+    <SafeAreaView style={{flex: 1, padding: 12, backgroundColor: "#FFFFFF" }}>
+      <View style={{ zIndex: 2 }}>
+        <TopDateHeader
+          dateLabel={formatDateLabel(selectedDate, lang)}
+          onPrev={() => setSelectedDate(d => shiftDay(d, -1))}
+          onNext={() => setSelectedDate(d => shiftDay(d, +1))}
+          onPressCenter={() => setCalendarOpen(v => !v)}
+        />
+      </View>
+
+      <ScrollView style={{ flex: 1, }} contentContainerStyle={{ paddingHorizontal:16,paddingBottom: 72 }}>
+    <CollapsibleCalendarOverlay
+        visible={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+        date={selectedDate}
+        onSelect={(d) => {
+          setSelectedDate(d);
+          setCalendarOpen(false);
+        }}
+        lang={lang === "zh" ? "zh" : "en"}
+        firstDay={1}
+        topOffset={56}
+      />
+
+
+
+
       <ModeSwitch />
 
+      {/* 训练环卡片（整卡可点进入详情） */}
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync();
+          router.push({
+            pathname: "/journal-ring",
+            params: { mode, date: dateStr(selectedDate) },
+          });
+        }}
+        style={({ pressed }) => [
+          {
+            borderWidth: 0.6,
+            borderColor: "#f0ececff",
+            borderRadius: 20,
+            backgroundColor: "white",
+            marginBottom: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 12,
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 4,
+          },
+          pressed && { opacity: 0.9 },
+        ]}
+      >
+        {/* 顶部标题行 + 右侧小箭头 */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", flex: 1 }}>
+            {lang === "zh" ? "今日攀爬记录" : "Today's climbs"}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+        </View>
+
+        {/* 细分割线 */}
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: "#e5e7eb",
+            marginTop: 8,
+            marginBottom: 12,
+          }}
+        />
+
+        {/* 内容：左分段环（无中心文字） + 右侧等级×数量 */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <SingleRing
+            count={todayTotal}
+            modeLabel={modeLabel}
+            diameter={140}
+            thickness={20}
+            total={dayParts.total}
+            parts={dayParts.parts}
+            colorOf={mode === "boulder" ? colorForBoulder : colorForYDS}
+            hideCenter
+            // 不再给 onPress；整卡片已可点
+          />
+
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            {dayParts.parts.length > 0 ? (
+              dayParts.parts.map((p) => {
+                const label =
+                  mode === "boulder"
+                    ? (boulderScale === "Font" ? (V_TO_FONT[p.grade] ?? p.grade) : p.grade)
+                    : (ropeScale === "French" ? (YDS_TO_FRENCH[p.grade] ?? p.grade) : p.grade);
+
+                return (
+                  <View
+                    key={`today-${p.grade}`}
+                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 20,
+                        backgroundColor: (mode === "boulder" ? colorForBoulder : colorForYDS)(p.grade),
+                        marginRight: 6,
+                      }}
+                    />
+                    <Text style={{ fontSize: 14, fontWeight: "600" }}>{label}</Text>
+                    <Text style={{ marginLeft: "auto", fontSize: 14, color: "#6B7280" }}>{p.count}</Text>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={{ fontSize: 13, color: "#9CA3AF" }}>
+                {lang === "zh" ? "今日暂无记录" : "No logs today"}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Pressable>
+
+
+
+
       {/* 记录卡片：上方动作切换 + 等级胶囊 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", marginBottom: 12, padding: 12 }}>
-        <Text style={{ fontWeight: "700", marginBottom: 6 }}>
-          {(mode === "boulder" ? tr("抱石等级", "Bouldering") : tr("难度等级", "Rope"))}
-          {" · "}
-          {tr("今天", "Today")}（{todayStr()}）
-        </Text>
+      <View
+        style={{
+          borderWidth: 0.6,
+          borderColor: "#e5e7eb",
+          borderRadius: 20,
+          backgroundColor: "white",
+          marginBottom: 12,
+          padding: 12,
+
+          // ✅ 新增阴影
+          shadowColor: "#000",
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
+        }}
+      >
 
 
 
         <ActionSwitch />
 
         {/* 等级胶囊（点击即 +1 / -1） */}
-        <ScrollView
-          horizontal={false}
-          contentContainerStyle={{ paddingTop: 4 }}
-          showsVerticalScrollIndicator={false}
+        <View
+
         >
           <GradeCapsules />
-        </ScrollView>
+        </View>
 
         <Text style={{ marginTop: 8, color: "#6b7280" }}>
           {action === "add"
@@ -374,70 +537,43 @@ export default function Journal() {
         </Text>
       </View>
 
-      {/* 今日总数徽标 */}
-      <View style={{ alignItems: "center", marginBottom: 8 }}>
-        <View
-          style={{
-            minWidth: 40,
-            paddingHorizontal: 12,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: "#4f46e5",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontWeight: "700" }}>
-            {tr("今日总数", "Today")} · {todayTotal}
-          </Text>
-        </View>
-      </View>
-
-
-      {/* 数据可视化 */}
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 12, borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, backgroundColor: "white", padding: 12 }}>
-        <View style={{ width: 160, alignItems: "center", justifyContent: "center" }}>
-          <DonutRing
-            total={weekStats.total}
-            parts={weekStats.list}
-            colorOf={mode === "boulder" ? colorForBoulder : colorForYDS}
-          />
-          <Text style={{ marginTop: 8, fontWeight: "700" }}>
-            {(mode === "boulder" ? tr("抱石", "Boulder") : tr("难度", "Rope"))}
-            {" · "}
-            {tr("本周", "This week")} {weekStats.total}
-          </Text>
-        </View>
-
-        <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start" }}>
-          {weekStats.list.length === 0 ? (
-            <Text style={{ color: "#9ca3af" }}>{tr("暂无本周记录", "No records this week")}</Text>
-          ) : (
-            weekStats.list.map((it) => (
-              <Pill key={`week-${it.grade}`} text={`${it.grade} × ${it.count}`} />
-            ))
-          )}
-        </View>
-      </View>
-
       {/* 底部总计 */}
-      <View style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 12, backgroundColor: "white" }}>
-        <Text style={{ fontWeight: "700", marginBottom: 8 }}>
-          {(mode === "boulder" ? tr("抱石", "Boulder") : tr("难度", "Rope"))}
-          {" · "}
+      <View
+        style={{
+          borderWidth: 0.6,
+          borderColor: "#e5e7eb",
+          borderRadius: 20,
+          padding: 12,
+          backgroundColor: "white",
+
+          // ✅ 新增阴影
+          shadowColor: "#000",
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
+        }}
+      >
+ 
+        <Text style={{ fontWeight: "700", marginBottom: 72 }}>
           {tr("总条数", "Total")}（{totalStats.all}）
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
           {totalStats.list.length === 0 ? (
             <Text style={{ color: "#9ca3af" }}>{tr("暂无记录", "No records")}</Text>
           ) : (
-            totalStats.list.map((it) => <Pill key={`total-${it.grade}`} text={`${it.grade} × ${it.count}`} />)
+            totalStats.list.map((it) => {
+              const label =
+                mode === "boulder"
+                  ? (boulderScale === "Font" ? (V_TO_FONT[it.grade] ?? it.grade) : it.grade)
+                  : (ropeScale === "French" ? (YDS_TO_FRENCH[it.grade] ?? it.grade) : it.grade);
+
+              return <Pill key={`total-${it.grade}`} text={`${label} × ${it.count}`} />;
+            })
           )}
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
-
-
-
