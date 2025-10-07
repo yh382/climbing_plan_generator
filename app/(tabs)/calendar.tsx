@@ -20,7 +20,7 @@ import { H1, Caption } from "../../components/ui/Text";
 import { tokens } from "../../components/ui/Theme";
 
 // ✅ 从 Settings / i18n 获取语言（zh/en）
-import { I18N, useI18N } from "../lib/i18n";
+import { I18N, useI18N } from "../../lib/i18n";
 import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
 import useLogsStore from "../store/useLogsStore";
 // 顶部 import 区域加入

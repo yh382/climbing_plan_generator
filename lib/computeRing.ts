@@ -1,5 +1,5 @@
 // app/lib/computeRing.ts
-import { getColorForGrade } from "@/lib/gradeColors";
+import { getColorForGrade } from "./gradeColors";
 
 export type GradeCount = { grade: string; count: number };
 export type Arc = { start: number; sweep: number; color: string };

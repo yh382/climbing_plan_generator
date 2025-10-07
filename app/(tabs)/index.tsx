@@ -25,7 +25,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "@/contexts/SettingsContext";
-import { I18N, useI18N } from "../lib/i18n";
+import { I18N, useI18N } from "../../lib/i18n";
 import { Button } from "../../components/ui/Button";
 import { tokens } from "../../components/ui/Theme";
 import { API_PLAN_JSON } from "../config";
@@ -940,7 +940,7 @@ const Chip = ({
             <Section title={tr("基础信息", "Basics")}>
               {/* 性别 */}
               <Row>
-                <Col label={tr("性别", "Gender")}>
+                <Col label={tr("性别", "Sex")}>
                   <Picker
                     selectedValue={form.gender}
                     onValueChange={(v) => set("gender", v as "男" | "女")}

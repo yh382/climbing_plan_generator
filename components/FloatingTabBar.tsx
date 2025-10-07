@@ -18,6 +18,7 @@ const ICONS: Record<
   calendar: { active: "calendar", inactive: "calendar-outline", label: "Calendar" },
   journal: { active: "document-text", inactive: "document-text-outline", label: "Journal" },
   profile: { active: "person", inactive: "person-outline", label: "Profile" },
+  gyms: { active: "map", inactive: "map-outline", label: "Gyms" },
 };
 
 const PARENT_TAB_OF: Record<string, "calendar" | "journal" | "profile" | "index"> = {
@@ -172,7 +173,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           </Text>
         </Pressable>
 
-        {["calendar", "journal", "profile"].map((name) => {
+        {["calendar", "gyms", "journal", "profile"].map((name) => {
           const icon = ICONS[name];
           const focused = isFocused(name);
           return (

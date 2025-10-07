@@ -1,5 +1,5 @@
 // app/lib/i18n.ts
-import { useSettings } from "../contexts/SettingsContext";
+import { useSettings } from "../app/contexts/SettingsContext";
 
 export type I18N = string | { zh: string; en: string };
 
