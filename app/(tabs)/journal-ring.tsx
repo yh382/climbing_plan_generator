@@ -28,7 +28,7 @@ import useLogsStore, { useSegmentsByDate } from "../store/useLogsStore";
 import { useSettings } from "../contexts/SettingsContext";
 
 // —— 颜色映射 —— //
-import { colorForBoulder, colorForYDS } from "../lib/gradeColors";
+import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 
 // —— 日期小工具 —— //
 const pad = (n: number) => String(n).padStart(2, "0");

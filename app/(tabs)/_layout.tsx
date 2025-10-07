@@ -45,6 +45,14 @@ export default function TabsLayout() {
           title: "生成器",
         }}
       />
+
+      <Tabs.Screen
+      name="gyms"
+      options={{
+        title: "Gyms",
+        headerShown: true,
+      }}
+    />
     </Tabs>
   </View>
   );
