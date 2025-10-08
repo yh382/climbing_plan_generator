@@ -10,7 +10,7 @@ import useLogsStore, { useSegmentsByDate } from "../store/useLogsStore"; // 从 
 import { Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { colorForBoulder, colorForYDS, getColorForGrade, COLOR, ringStrokeColor } from "../lib/gradeColors";
+import { colorForBoulder, colorForYDS, getColorForGrade, COLOR, ringStrokeColor } from "../../lib/gradeColors";
 import { useLayoutEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import TopBar from "../../components/TopBar";

@@ -23,7 +23,7 @@
         "app/contexts/*"
       ],
       "@lib/*": [
-        "app/lib/*"
+        "lib/*"
       ]
     },
     "types": [
@@ -38,7 +38,9 @@
     "index.ts",
     "index.tsx",
     "expo-env.d.ts",
-    ".expo/types/**/*.ts"
+    ".expo/types/**/*.ts",
+    "lib",                             // ← 加上
+    "components"
   ],
-  "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base.json"
 }

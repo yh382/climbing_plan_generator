@@ -11,6 +11,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo/config-types": "^54.0.8",
     "@expo/vector-icons": "^14.1.0",
     "@gorhom/bottom-sheet": "^5.2.4",
     "@react-native-async-storage/async-storage": "2.1.2",
@@ -22,8 +23,9 @@
     "@rnmapbox/maps": "^10.1.45",
     "@types/react": "~19.0.10",
     "axios": "^1.11.0",
-    "expo": "~53.0.22",
+    "expo": "54.0.12",
     "expo-blur": "~14.1.5",
+    "expo-build-properties": "~1.0.9",
     "expo-clipboard": "^7.1.5",
     "expo-constants": "~17.1.7",
     "expo-dev-client": "~5.2.4",

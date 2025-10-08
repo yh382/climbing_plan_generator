@@ -2,8 +2,8 @@
 import React, { useMemo } from "react";
 import { View, Pressable, StyleSheet, useColorScheme } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
-import { computeRingArcs, GradeCount } from "../app/lib/computeRing";
-import { ringStrokeColor } from "../app/lib/gradeColors";
+import { computeRingArcs, GradeCount } from "../lib/computeRing";
+import { ringStrokeColor } from "../lib/gradeColors";
 
 type MiniRingProps = {
   segments: GradeCount[];
