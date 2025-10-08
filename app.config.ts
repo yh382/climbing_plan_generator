@@ -10,7 +10,7 @@ const config: ExpoConfig = {
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.1185679154.climbingapp",
+    bundleIdentifier: "com.yh382.climmate",
     config: {
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
     },
@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   },
 
   android: {
-    package: "com.1185679154.climbingapp",
+    package: "com.yh382.climmate",
     config: {
       googleMaps: {
         apiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
