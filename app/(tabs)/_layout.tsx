@@ -47,15 +47,14 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-      name="gyms"
-      options={{
-        title: "Gyms",
-        headerShown: true,
-      }}
-    />
+        name="gyms"
+        options={{
+          title: "Gyms",
+          headerShown: false,
+        }}
+      />
     </Tabs>
   </View>
   );
 }
-
 

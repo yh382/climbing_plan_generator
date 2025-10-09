@@ -5,10 +5,25 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSettings } from "@/contexts/SettingsContext";
+import {
+  FLOATING_TAB_BAR_BOTTOM_GAP,
+  FLOATING_TAB_BAR_GYMS_SIDE_MARGIN,
+  FLOATING_TAB_BAR_ICON_BUTTON_SIZE,
+  FLOATING_TAB_BAR_PRIMARY_HEIGHT,
+  FLOATING_TAB_BAR_SIDE_MARGIN,
+  FLOATING_TAB_BAR_VERTICAL_PADDING,
+} from "./FloatingTabBar.constants";
 
-const PRIMARY_HEIGHT = 46;
-const ICON_BUTTON = 38;
-const BOTTOM_GAP = 12;
+export {
+  FLOATING_TAB_BAR_BOTTOM_GAP,
+  FLOATING_TAB_BAR_GYMS_SIDE_MARGIN,
+  FLOATING_TAB_BAR_ICON_BUTTON_SIZE,
+  FLOATING_TAB_BAR_PRIMARY_HEIGHT,
+  FLOATING_TAB_BAR_SIDE_MARGIN,
+  FLOATING_TAB_BAR_STACK_SPACING,
+  FLOATING_TAB_BAR_TOTAL_HEIGHT,
+  FLOATING_TAB_BAR_VERTICAL_PADDING,
+} from "./FloatingTabBar.constants";
 
 const ICONS: Record<
   string,
@@ -37,6 +52,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
   const isFocused = (name: string) => state.routes[state.index]?.name === name;
   const onIndexScreen = isFocused("index");
   const onJournalRing = last === "journal-ring";
+  const onGyms = isFocused("gyms");
 
   const colors = useMemo(() => {
     const isDark = scheme === "dark";
@@ -75,7 +91,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
     return (
       <View
         pointerEvents="box-none"
-        style={[styles.root, { paddingBottom: (insets.bottom || 0) + BOTTOM_GAP }]}
+        style={[styles.root, { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP }]}
       >
         <Pressable
           accessibilityLabel="返回"
@@ -90,7 +106,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           style={({ pressed }) => [
             styles.backButton,
             {
-              bottom: (insets.bottom || 0) + BOTTOM_GAP,
+              bottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP,
               backgroundColor: colors.backBg,
               opacity: pressed ? 0.85 : 1,
               left: '50%',
@@ -111,7 +127,10 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.root, { paddingBottom: (insets.bottom || 0) + BOTTOM_GAP }] }>
+    <View
+      pointerEvents="box-none"
+      style={[styles.root, { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP }]}
+    >
       {showBack ? (
         <Pressable
           accessibilityLabel="返回"
@@ -126,7 +145,8 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           style={({ pressed }) => [
             styles.backButton,
             {
-              bottom: (insets.bottom || 0) + BOTTOM_GAP + PRIMARY_HEIGHT + 18,
+              bottom:
+                (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP + FLOATING_TAB_BAR_PRIMARY_HEIGHT + 18,
               backgroundColor: colors.backBg,
               opacity: pressed ? 0.82 : 1,
             },
@@ -142,8 +162,14 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           {
             backgroundColor: colors.shellBg,
             borderColor: colors.shellBorder,
-            marginHorizontal: 32,
+            marginHorizontal: onGyms
+              ? FLOATING_TAB_BAR_GYMS_SIDE_MARGIN
+              : FLOATING_TAB_BAR_SIDE_MARGIN,
             ...(colors.shadow || {}),
+            // ✅ gyms 页：上边缘无圆角，并与搜索栏贴齐
+            borderTopLeftRadius: onGyms ? 0 : 24,
+            borderTopRightRadius: onGyms ? 0 : 24,
+            marginTop: onGyms ? -1 : 0, // 盖住发丝缝
           },
         ]}
       >
@@ -211,10 +237,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   shell: {
+    alignSelf: "stretch", 
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
-    paddingVertical: 11,
+    paddingVertical: FLOATING_TAB_BAR_VERTICAL_PADDING,
     borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 10,
@@ -224,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
-    height: PRIMARY_HEIGHT,
+    height: FLOATING_TAB_BAR_PRIMARY_HEIGHT,
     borderRadius: 24,
     gap: 10,
     flex: 1,
@@ -239,12 +266,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(148,163,184,0.4)",
   },
   iconButton: {
-    width: ICON_BUTTON,
-    height: ICON_BUTTON,
-    borderRadius: ICON_BUTTON / 2,
+    width: FLOATING_TAB_BAR_ICON_BUTTON_SIZE,
+    height: FLOATING_TAB_BAR_ICON_BUTTON_SIZE,
+    borderRadius: FLOATING_TAB_BAR_ICON_BUTTON_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 3,
+    marginHorizontal: 2,
   },
   backButton: {
     position: "absolute",
