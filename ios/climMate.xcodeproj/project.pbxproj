@@ -8,25 +8,25 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		3A43B8C64E117F8ED28C6601 /* Pods_climMate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD716A0C7863E8F6A276271 /* Pods_climMate.framework */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		5F632DE4C5C9BDB7577F687A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395AF4E7920FF7321E85F739 /* ExpoModulesProvider.swift */; };
+		539D9E4E5FAA9CA63D1981D7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9A4B3B46AB7AF0B59FDC41C2 /* PrivacyInfo.xcprivacy */; };
+		85AFA20FB4D948B3629AD2BB /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C4500DBCEBD87D0B43F34E /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		E25139C7C36BEE0574F43D9D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3680FB9EFD7B8958419B35E1 /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F1284F8D0F20237A009CAC87 /* Pods_climMate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E1E23E245FBC9FE83A9DF4A /* Pods_climMate.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* climMate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = climMate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = climMate/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = climMate/Info.plist; sourceTree = "<group>"; };
-		22B99C74B36AF1B92744C212 /* Pods-climMate.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-climMate.release.xcconfig"; path = "Target Support Files/Pods-climMate/Pods-climMate.release.xcconfig"; sourceTree = "<group>"; };
-		3680FB9EFD7B8958419B35E1 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = climMate/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		395AF4E7920FF7321E85F739 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-climMate/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		4E1E23E245FBC9FE83A9DF4A /* Pods_climMate.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_climMate.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		83908317FA1EAD3919941145 /* Pods-climMate.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-climMate.debug.xcconfig"; path = "Target Support Files/Pods-climMate/Pods-climMate.debug.xcconfig"; sourceTree = "<group>"; };
+		148A1704A854E3690572E1FF /* Pods-climMate.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-climMate.release.xcconfig"; path = "Target Support Files/Pods-climMate/Pods-climMate.release.xcconfig"; sourceTree = "<group>"; };
+		37242FE2B4F178513C2B3104 /* Pods-climMate.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-climMate.debug.xcconfig"; path = "Target Support Files/Pods-climMate/Pods-climMate.debug.xcconfig"; sourceTree = "<group>"; };
+		68C4500DBCEBD87D0B43F34E /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-climMate/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		9A4B3B46AB7AF0B59FDC41C2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = climMate/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = climMate/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		CDD716A0C7863E8F6A276271 /* Pods_climMate.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_climMate.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = climMate/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* climMate-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "climMate-Bridging-Header.h"; path = "climMate/climMate-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -37,21 +37,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F1284F8D0F20237A009CAC87 /* Pods_climMate.framework in Frameworks */,
+				3A43B8C64E117F8ED28C6601 /* Pods_climMate.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		08A3B20C318DA8E65EE38F0F /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				8F3800B19252339B159B491D /* climMate */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		13B07FAE1A68108700A75B9A /* climMate */ = {
 			isa = PBXGroup;
 			children = (
@@ -61,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				3680FB9EFD7B8958419B35E1 /* PrivacyInfo.xcprivacy */,
+				9A4B3B46AB7AF0B59FDC41C2 /* PrivacyInfo.xcprivacy */,
 			);
 			name = climMate;
 			sourceTree = "<group>";
@@ -70,9 +62,17 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4E1E23E245FBC9FE83A9DF4A /* Pods_climMate.framework */,
+				CDD716A0C7863E8F6A276271 /* Pods_climMate.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		3E2C05D31E551FD1C0DBB3AC /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				F7E3A03EB7E5BD3A1F9CB56E /* climMate */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -89,8 +89,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				883190934CF15659973AE343 /* Pods */,
-				08A3B20C318DA8E65EE38F0F /* ExpoModulesProviders */,
+				97CDC3E20C7B5704D8955261 /* Pods */,
+				3E2C05D31E551FD1C0DBB3AC /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,22 +105,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		883190934CF15659973AE343 /* Pods */ = {
+		97CDC3E20C7B5704D8955261 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				83908317FA1EAD3919941145 /* Pods-climMate.debug.xcconfig */,
-				22B99C74B36AF1B92744C212 /* Pods-climMate.release.xcconfig */,
+				37242FE2B4F178513C2B3104 /* Pods-climMate.debug.xcconfig */,
+				148A1704A854E3690572E1FF /* Pods-climMate.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		8F3800B19252339B159B491D /* climMate */ = {
-			isa = PBXGroup;
-			children = (
-				395AF4E7920FF7321E85F739 /* ExpoModulesProvider.swift */,
-			);
-			name = climMate;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -132,6 +124,14 @@
 			path = climMate/Supporting;
 			sourceTree = "<group>";
 		};
+		F7E3A03EB7E5BD3A1F9CB56E /* climMate */ = {
+			isa = PBXGroup;
+			children = (
+				68C4500DBCEBD87D0B43F34E /* ExpoModulesProvider.swift */,
+			);
+			name = climMate;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "climMate" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				143E07E89BAFE117DBA54ECC /* [Expo] Configure project */,
+				243A87E1604918F860E34351 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				6706CD005F6B9661EB2A1BE5 /* [CP] Embed Pods Frameworks */,
+				C15153DFE185D60F0C7921B3 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				E25139C7C36BEE0574F43D9D /* PrivacyInfo.xcprivacy in Resources */,
+				539D9E4E5FAA9CA63D1981D7 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,7 +242,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		143E07E89BAFE117DBA54ECC /* [Expo] Configure project */ = {
+		243A87E1604918F860E34351 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -265,34 +265,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-climMate/expo-configure-project.sh\"\n";
-		};
-		6706CD005F6B9661EB2A1BE5 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-climMate/Pods-climMate-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxCommon/MapboxCommon.framework/MapboxCommon",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxCoreMaps/MapboxCoreMaps.framework/MapboxCoreMaps",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxMobileEvents/MapboxMobileEvents.framework/MapboxMobileEvents",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxCommon.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxCoreMaps.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxMobileEvents.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-climMate/Pods-climMate-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -340,6 +312,34 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-climMate/Pods-climMate-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		C15153DFE185D60F0C7921B3 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-climMate/Pods-climMate-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxCommon/MapboxCommon.framework/MapboxCommon",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxCoreMaps/MapboxCoreMaps.framework/MapboxCoreMaps",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/MapboxMobileEvents/MapboxMobileEvents.framework/MapboxMobileEvents",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxCommon.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxCoreMaps.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MapboxMobileEvents.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-climMate/Pods-climMate-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -348,7 +348,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				5F632DE4C5C9BDB7577F687A /* ExpoModulesProvider.swift in Sources */,
+				85AFA20FB4D948B3629AD2BB /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,7 +357,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 83908317FA1EAD3919941145 /* Pods-climMate.debug.xcconfig */;
+			baseConfigurationReference = 37242FE2B4F178513C2B3104 /* Pods-climMate.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -393,7 +393,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 22B99C74B36AF1B92744C212 /* Pods-climMate.release.xcconfig */;
+			baseConfigurationReference = 148A1704A854E3690572E1FF /* Pods-climMate.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
