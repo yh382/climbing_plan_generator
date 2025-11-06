@@ -6,10 +6,9 @@ import Markdown from "react-native-markdown-display";
 import Constants from "expo-constants";
 
 // ★ 修改为你的服务地址
-const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE ??
-  (Constants?.expoConfig?.extra?.API_BASE) ??
-  "http://172.20.13.241:8000/plan";
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const PLAN_URL = `${API_BASE}/plan`;
+console.log("API_BASE =>", process.env.EXPO_PUBLIC_API_BASE);
 
 export default function App() {
   const [form, setForm] = useState({
@@ -40,7 +39,7 @@ export default function App() {
         finger_weakness: form.finger_weakness,
         grade: form.grade,
       };
-      const { data } = await axios.post(API_BASE, payload, { timeout: 60000 });
+      const { data } = await axios.post(PLAN_URL, payload, { timeout: 60000 });
       setPlan(data.plan);
       await AsyncStorage.setItem("@last_plan", JSON.stringify({ at: Date.now(), payload, plan: data.plan }));
     } catch (e) {

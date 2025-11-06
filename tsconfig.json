@@ -6,7 +6,7 @@
     ],
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -30,7 +30,8 @@
       "react",
       "react-native",
       "expo",
-      "expo-router"
+      "expo-router",
+      "node"
     ]
   },
   "include": [
@@ -39,6 +40,7 @@
     "index.tsx",
     "expo-env.d.ts",
     ".expo/types/**/*.ts",
+    "app.config.ts",
     "lib",                             // ← 加上
     "components"
   ],

@@ -14,6 +14,8 @@ import { colorForBoulder, colorForYDS, getColorForGrade, COLOR, ringStrokeColor 
 import { useLayoutEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import TopBar from "../../components/TopBar";
+import DualMiniRings from "../../components/DualMiniRings";
+import { usePlanStore, toDateString } from "../store/usePlanStore";
 
 
 
@@ -106,7 +108,6 @@ export default function Journal() {
   const [action, setAction] = useState<"add" | "sub">("add"); // 顶部动作切换
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const router = useRouter();
   const modeLabel = mode === "boulder" ? "抱石" : "绳索";
   const upsertCount     = useLogsStore((s) => s.upsertCount);
@@ -307,6 +308,46 @@ export default function Journal() {
       </TouchableOpacity>
     </View>
   );
+  
+  const { monthMap, buildMonthMap } = usePlanStore();
+
+
+  // ==== 训练计划进度（外环）所需：plan、工具函数、月度 map ====
+
+  // 1) 读取 plan
+  const plan = typeof usePlanStore === "function" ? usePlanStore((s) => s.plan) : null;
+
+  const [overlayMonthAnchor, setOverlayMonthAnchor] = useState<Date | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+
+
+  // 只要打开 overlay / 切月 / plan 变更，就重建本月外环 map
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const anchor = overlayMonthAnchor ?? selectedDate;  // selectedDate 是 Date 对象
+    buildMonthMap(anchor);
+  }, [calendarOpen, overlayMonthAnchor, selectedDate, buildMonthMap]);
+
+
+  const renderDayExtra = (d: Date) => {
+    const k = toDateString(d);
+    const outer = monthMap[k] ?? 0;
+
+    return (
+      <DualMiniRings
+        size={28}                 // 跟 Calendar 一样
+        outerValue={outer}        // 外层绿色训练进度
+        innerKind="journal"       // 内层=journal 彩色小环
+        dateKey={k}               // 让小环按当天分段
+        journalType={mode === "boulder" ? "boulder" : "yds"}
+        outerThickness={2.4}
+        innerThickness={2}
+        gap={1.5}
+      />
+    );
+  };
+  
 
   // 等级胶囊（根据模式动态生成，自动应用 Font/French 文案）
   const GradeCapsules = () => {
@@ -395,6 +436,10 @@ export default function Journal() {
         lang={lang === "zh" ? "zh" : "en"}
         firstDay={1}
         topOffset={56}
+        // ✅ 新增：小环渲染器（外层训练进度 + 内层彩色分段）
+        renderDayExtra={renderDayExtra}
+        // ✅ 新增：切换月份时，通知我们重建外环 map
+        onMonthChange={(anyDayInMonth: Date) => setOverlayMonthAnchor(anyDayInMonth)}
       />
 
 

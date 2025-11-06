@@ -28,14 +28,14 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { I18N, useI18N } from "../../lib/i18n";
 import { Button } from "../../components/ui/Button";
 import { tokens } from "../../components/ui/Theme";
-import { API_PLAN_JSON } from "../config";
-// ✅ 用别名，且是默认导入
 import { useLayoutEffect } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import TopBar from "../../components/TopBar";
 import { Ionicons } from "@expo/vector-icons";
 
-const API_JSON = "http://172.20.13.241:8000/plan_json";
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE as string;
+const PLAN_JSON_URL = `${API_BASE}/plan_json`;
+console.log("API_BASE =>", process.env.EXPO_PUBLIC_API_BASE);
 const WD_ORDER: WeekdayKey[] = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const WD_CN: Record<WeekdayKey,string> = { Sun:"周日", Mon:"周一", Tue:"周二", Wed:"周三", Thu:"周四", Fri:"周五", Sat:"周六" };
 const WD_EN: Record<WeekdayKey, string> = {
@@ -722,7 +722,7 @@ export default function Generator() {
       };
 
 
-      const { data } = await axios.post(API_PLAN_JSON, payload, { timeout: 120000 });
+      const { data } = await axios.post(PLAN_JSON_URL, payload, { timeout: 120000 });
       const p: Plan = data.plan;
       const withMeta = ensureMeta(p);
 
@@ -775,7 +775,7 @@ export default function Generator() {
 
   // ---- 可复用 UI ----
   const Section = ({
-    title, children, onHelp, helpLabel = "？帮助",
+    title, children, onHelp, helpLabel = tr("帮助", "Help")
   }: {
     title: string;
     children: React.ReactNode;
@@ -820,10 +820,10 @@ export default function Generator() {
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 borderRadius: 999,
-                backgroundColor: "#eef2ff",
+                backgroundColor: "#e5f5f0",
               }}
             >
-              <Text style={{ color: "#3B82F6", fontWeight: "600" }}>
+              <Text style={{ color: "#245556", fontWeight: "600" }}>
                 {helpLabel}
               </Text>
             </Pressable>
@@ -1534,7 +1534,8 @@ const Chip = ({
           style={{
             position: "absolute",
             bottom: Math.max(insets.bottom + 24, 32),
-            right: 24,
+            left: "50%", // ✅ 从右侧改成居中
+            transform: [{ translateX: -24 }], // ✅ 按钮宽度一半，向左平移实现真正居中
             width: 48,
             height: 48,
             borderRadius: 24,

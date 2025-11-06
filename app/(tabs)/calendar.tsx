@@ -28,6 +28,9 @@ import { useColorScheme } from "react-native";
 import TopBar from "../../components/TopBar";
 import { useLayoutEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
+import DualMiniRings from "../../components/DualMiniRings";
+import { usePlanStore, toDateString } from "../store/usePlanStore"; // ← 路径按你的实际层级改
+
 
 
 type PlanItem = { label: I18N; target: I18N };
@@ -57,9 +60,7 @@ const NOTES_KEY = "@daily_notes"; // 各日期备注 { [date]: string }
 function pad(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
 }
-function toDateString(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+
 function parseISO(s?: string) {
   if (!s) return null;
   const [y, m, dd] = s.split("-");
@@ -85,7 +86,7 @@ export default function CalendarTab() {
   const [note, setNote] = useState<string>("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-
+  const { monthMap, buildMonthMap, toggleProgressAt, setProgressAt } = usePlanStore();
   const loadPlan = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem("@plan_json");
@@ -210,6 +211,9 @@ export default function CalendarTab() {
         const next = [...prev];
         next[idx] = !next[idx];
         saveProgressForDate(selected, next);
+        // ✅ 让全局 monthMap 即时刷新“当日外环”
+        const selectedDateObj = parseISO(selected) ?? new Date();
+        toggleProgressAt(selectedDateObj, idx);
         return next;
       });
     },
@@ -273,6 +277,35 @@ export default function CalendarTab() {
     }, 400);
     return () => clearTimeout(t);
   }, [note, selected]);
+
+  // —— 状态 —— 
+  const [overlayMonthAnchor, setOverlayMonthAnchor] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const anchor = overlayMonthAnchor ?? selectedDateObj;
+    buildMonthMap(anchor);
+  }, [calendarOpen, overlayMonthAnchor, selected, buildMonthMap]);
+
+
+  // —— 每日叠加渲染器：右上角画双层环 —— 
+  const renderDayExtra = (d: Date) => {
+    const k = toDateString(d);
+    const outer = monthMap[k] ?? 0;
+
+    return (
+      <DualMiniRings
+        size={28}                 // 更大
+        outerValue={outer}        // 外环=训练完成度（绿色）
+        innerKind="journal"       // 内环=journal 彩色分段
+        dateKey={k}               // 传入日期 key
+        journalType="boulder"     // 如需切换 rope/yds，改这里
+        outerThickness={2.4}
+        innerThickness={2}
+        gap={1.5}
+      />
+    );
+  };
 
   // 底部操作
   const completeAll = useCallback(() => {
@@ -386,6 +419,8 @@ export default function CalendarTab() {
         lang={isZH ? "zh" : "en"}
         firstDay={1}
         topOffset={56}
+        renderDayExtra={renderDayExtra}
+        onMonthChange={(anyDayInMonth: Date) => setOverlayMonthAnchor(anyDayInMonth)}
       />
 
 
