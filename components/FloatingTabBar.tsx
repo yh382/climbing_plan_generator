@@ -1,10 +1,19 @@
+// src/components/FloatingTabBar.tsx
 import React, { useMemo } from "react";
-import { View, StyleSheet, Pressable, Platform, useColorScheme, Text } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  Platform,
+  useColorScheme,
+  Text,
+} from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "src/contexts/SettingsContext";
+import { TabActions } from "@react-navigation/native";
 import {
   FLOATING_TAB_BAR_BOTTOM_GAP,
   FLOATING_TAB_BAR_GYMS_SIDE_MARGIN,
@@ -13,6 +22,9 @@ import {
   FLOATING_TAB_BAR_SIDE_MARGIN,
   FLOATING_TAB_BAR_VERTICAL_PADDING,
 } from "./FloatingTabBar.constants";
+
+// ⬇️ 新增：毛玻璃
+import { BlurView } from "expo-blur";
 
 export {
   FLOATING_TAB_BAR_BOTTOM_GAP,
@@ -57,8 +69,9 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
   const colors = useMemo(() => {
     const isDark = scheme === "dark";
     return {
-      shellBg: isDark ? "rgba(15,23,42,0.94)" : "rgba(255,255,255,0.97)",
-      shellBorder: isDark ? "rgba(255,255,255,0.1)" : "rgba(15,23,42,0.06)",
+      // ⬇️ 调整为更玻璃一点的透明度
+      shellBg: isDark ? "rgba(15,23,42,0.40)" : "rgba(255,255,255,0.60)",
+      shellBorder: isDark ? "rgba(148,163,184,0.85)" : "rgba(148,163,184,0.30)",
       primaryBg: "#306E6F",
       primaryActive: "#245556",
       primaryText: "#FFFFFF",
@@ -72,14 +85,15 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
         Platform.OS === "ios"
           ? {
               shadowColor: "#000",
-              shadowOpacity: 0.12,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.18,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 10 },
             }
           : {
               elevation: 12,
               shadowColor: "#000",
             },
+      isDark,
     };
   }, [scheme]);
 
@@ -91,7 +105,10 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
     return (
       <View
         pointerEvents="box-none"
-        style={[styles.root, { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP }]}
+        style={[
+          styles.root,
+          { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP },
+        ]}
       >
         <Pressable
           accessibilityLabel="返回"
@@ -109,7 +126,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
               bottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP,
               backgroundColor: colors.backBg,
               opacity: pressed ? 0.85 : 1,
-              left: '50%',
+              left: "50%",
               marginLeft: -23,
               right: undefined,
             },
@@ -123,13 +140,27 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
 
   const goRoute = (name: string) => {
     if (!state.routes.some((r) => r.name === name)) return;
-    navigation.navigate(name as never);
+
+    if (name === "profile") {
+      navigation.dispatch(TabActions.jumpTo(name, { resetProfile: true }));
+    } else {
+      navigation.dispatch(TabActions.jumpTo(name));
+    }
   };
 
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.root, { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP }]}
+      style={[
+        styles.root,
+        { paddingBottom: (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP },
+              {
+        shadowColor: "#FFFFFF",
+        shadowOpacity: 0.20,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: -2 },
+      },
+      ]}
     >
       {showBack ? (
         <Pressable
@@ -146,7 +177,10 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
             styles.backButton,
             {
               bottom:
-                (insets.bottom || 0) + FLOATING_TAB_BAR_BOTTOM_GAP + FLOATING_TAB_BAR_PRIMARY_HEIGHT + 18,
+                (insets.bottom || 0) +
+                FLOATING_TAB_BAR_BOTTOM_GAP +
+                FLOATING_TAB_BAR_PRIMARY_HEIGHT +
+                18,
               backgroundColor: colors.backBg,
               opacity: pressed ? 0.82 : 1,
             },
@@ -156,7 +190,10 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
         </Pressable>
       ) : null}
 
-      <View
+      {/* 🔹 毛玻璃 TabBar 壳体 */}
+      <BlurView
+        tint={colors.isDark ? "dark" : "light"}
+        intensity={25}
         style={[
           styles.shell,
           {
@@ -166,10 +203,10 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
               ? FLOATING_TAB_BAR_GYMS_SIDE_MARGIN
               : FLOATING_TAB_BAR_SIDE_MARGIN,
             ...(colors.shadow || {}),
-            // ✅ gyms 页：上边缘无圆角，并与搜索栏贴齐
             borderTopLeftRadius: onGyms ? 0 : 24,
             borderTopRightRadius: onGyms ? 0 : 24,
-            marginTop: onGyms ? -1 : 0, // 盖住发丝缝
+            marginTop: onGyms ? -1 : 0, // ✅ gyms 页：保持原有特殊处理
+            overflow: "hidden",
           },
         ]}
       >
@@ -179,7 +216,9 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           style={({ pressed }) => [
             styles.primary,
             {
-              backgroundColor: isFocused("index") ? colors.primaryActive : colors.primaryBg,
+              backgroundColor: isFocused("index")
+                ? colors.primaryActive
+                : colors.primaryBg,
               transform: [{ translateY: pressed ? 1 : 0 }],
               shadowColor: "#000",
               shadowOpacity: Platform.OS === "ios" ? 0.15 : 0.2,
@@ -190,7 +229,9 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           ]}
         >
           <Ionicons
-            name={isFocused("index") ? ICONS.index.active : ICONS.index.inactive}
+            name={
+              isFocused("index") ? ICONS.index.active : ICONS.index.inactive
+            }
             size={26}
             color={colors.primaryText}
           />
@@ -210,7 +251,9 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
               style={({ pressed }) => [
                 styles.iconButton,
                 {
-                  backgroundColor: focused ? colors.iconBgActive : colors.iconBg,
+                  backgroundColor: focused
+                    ? colors.iconBgActive
+                    : colors.iconBg,
                   transform: [{ translateY: pressed ? 1 : 0 }],
                 },
               ]}
@@ -223,7 +266,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
             </Pressable>
           );
         })}
-      </View>
+      </BlurView>
     </View>
   );
 }
@@ -237,12 +280,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   shell: {
-    alignSelf: "stretch", 
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: FLOATING_TAB_BAR_VERTICAL_PADDING,
-    borderRadius: 24,
+    borderRadius: 40,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 10,
   },
@@ -252,7 +295,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
     height: FLOATING_TAB_BAR_PRIMARY_HEIGHT,
-    borderRadius: 24,
+    borderRadius: 40,
     gap: 10,
     flex: 1,
   },

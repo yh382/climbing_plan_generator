@@ -24,13 +24,14 @@ import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ 雾化渐变
 import { Ionicons } from "@expo/vector-icons";
 import { Keyboard, InteractionManager, LayoutAnimation, UIManager, Alert, Linking, ActionSheetIOS   } from "react-native";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "src/contexts/SettingsContext";
 import { useSharedValue, useDerivedValue } from "react-native-reanimated";
 import type{ BottomSheetFlatListMethods } from "@gorhom/bottom-sheet";
 import {
   FLOATING_TAB_BAR_GYMS_SIDE_MARGIN,
   FLOATING_TAB_BAR_STACK_SPACING,
 } from "@components/FloatingTabBar.constants";
+import { BlurView } from "expo-blur";
 
 type LatLng = { lat: number; lng: number };
 
@@ -105,9 +106,17 @@ const brightThreshold = expandedPx * 0.65;
     const isDark = scheme === "dark";
     const shellBorder = isDark ? "rgba(255,255,255,0.1)" : "rgba(15,23,42,0.06)";
     const shellBg = isDark ? "rgba(15,23,42,0.94)" : "rgba(255,255,255,0.97)";
+    const shellBG = isDark
+    ? "rgba(15,23,42,0.40)"
+    : "rgba(255,255,255,0.60)";
+    const shellBORDER = isDark
+    ? "rgba(148,163,184,0.85)"
+    : "rgba(148,163,184,0.30)";
     return {
       shellBg: shellBg,
+      shellBG: shellBG,
       shellBorder: shellBorder,
+      shellBORDER: shellBORDER,
       iconActive: "#306E6F",
       iconInactive: isDark ? "rgba(226,232,240,0.8)" : "#94A3B8",
       iconLabel: isDark ? "rgba(226,232,240,0.95)" : "#1E293B",
@@ -430,13 +439,16 @@ const brightThreshold = expandedPx * 0.65;
         bottomInset={bottomInset}
       >
       <BottomSheetView style={styles.sheetInner}>
-        <View
+        <BlurView
+          tint={scheme === "dark" ? "dark" : "light"}
+          intensity={40}  // 想更模糊可以调大，想更玻璃可以再调小
           style={[
             styles.sheetCard,
-            { backgroundColor: panelBg, borderColor: isBright ? cardBdr : colors.shellBorder },
+            { backgroundColor: colors.shellBG, borderColor: isBright ? cardBdr : colors.shellBORDER },
             colors.shellShadow,
           ]}
         >
+          <View style={{ flex: 1 }}>
           <View style={styles.handleBar} />
 
         <View style={styles.searchWrap}>
@@ -605,8 +617,8 @@ const brightThreshold = expandedPx * 0.65;
             />
           </View>
         </View>
-
         </View>
+        </BlurView>
       </BottomSheetView>
 
       </BottomSheet>

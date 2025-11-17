@@ -22,14 +22,14 @@ import { tokens } from "../../components/ui/Theme";
 // ✅ 从 Settings / i18n 获取语言（zh/en）
 import { I18N, useI18N } from "../../lib/i18n";
 import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
-import useLogsStore from "../store/useLogsStore";
+import useLogsStore from "../../src/store/useLogsStore";
 // 顶部 import 区域加入
 import { useColorScheme } from "react-native";
 import TopBar from "../../components/TopBar";
 import { useLayoutEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import DualMiniRings from "../../components/DualMiniRings";
-import { usePlanStore, toDateString } from "../store/usePlanStore"; // ← 路径按你的实际层级改
+import { usePlanStore, toDateString } from "../../src/store/usePlanStore"; // ← 路径按你的实际层级改
 
 
 

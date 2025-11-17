@@ -1,12 +1,12 @@
 // app/(tabs)/journal.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "src/contexts/SettingsContext";
 import TopDateHeader from "../../components/TopDateHeader";
 import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
 import SingleRing from "../../components/SingleRing";
 import { useRouter } from "expo-router"; // 若已导入可忽略
-import useLogsStore, { useSegmentsByDate } from "../store/useLogsStore"; // 从 app/(tabs) 到 app/store
+import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore"; // 从 app/(tabs) 到 app/store
 import { Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -15,7 +15,7 @@ import { useLayoutEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import TopBar from "../../components/TopBar";
 import DualMiniRings from "../../components/DualMiniRings";
-import { usePlanStore, toDateString } from "../store/usePlanStore";
+import { usePlanStore, toDateString } from "../../src/store/usePlanStore";
 
 
 

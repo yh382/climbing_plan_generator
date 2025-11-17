@@ -20,11 +20,16 @@
         "components/*"
       ],
       "@contexts/*": [
-        "app/contexts/*"
+        "src/contexts/*"
       ],
       "@lib/*": [
         "lib/*"
-      ]
+      ],
+      "@/features/*": ["src/features/*"],
+      "@/components/*": ["src/features/profile/components/*"],
+      "@/store/*": ["src/store/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/assets/*": ["app/assets/*"]
     },
     "types": [
       "react",
@@ -43,6 +48,6 @@
     "app.config.ts",
     "lib",                             // ← 加上
     "components"
-  ],
+, "src/features", "src/store", "src/lib", "src/contexts"  ],
   "extends": "expo/tsconfig.base.json"
 }

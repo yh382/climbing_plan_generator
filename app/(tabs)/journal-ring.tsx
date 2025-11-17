@@ -24,8 +24,8 @@ import TopRightControls from "../../components/TopRightControls"; // 右侧日�
 import { DateMiniRing } from "../../components/DateMiniRing";
 
 // —— Store / Context —— //
-import useLogsStore, { useSegmentsByDate } from "../store/useLogsStore";
-import { useSettings } from "../contexts/SettingsContext";
+import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore";
+import { useSettings } from "../../src/contexts/SettingsContext";
 
 // —— 颜色映射 —— //
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";

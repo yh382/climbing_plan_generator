@@ -24,7 +24,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "src/contexts/SettingsContext";
 import { I18N, useI18N } from "../../lib/i18n";
 import { Button } from "../../components/ui/Button";
 import { tokens } from "../../components/ui/Theme";

@@ -2,7 +2,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState } from "react";
 import { Alert, Linking, SafeAreaView, Switch, Text, View,  } from "react-native";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "src/contexts/SettingsContext";
 import { scheduleDailyReminder } from "../../lib/notifications";
 
 // ✅ 新 UI 组件
