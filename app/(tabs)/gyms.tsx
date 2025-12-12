@@ -32,6 +32,8 @@ import {
   FLOATING_TAB_BAR_STACK_SPACING,
 } from "@components/FloatingTabBar.constants";
 import { BlurView } from "expo-blur";
+import { useRoute } from "@react-navigation/native";
+
 
 type LatLng = { lat: number; lng: number };
 
@@ -61,6 +63,9 @@ export default function GymsScreen() {
   const { height: screenH } = useWindowDimensions();
   const [selectedGym, setSelectedGym] = useState<GymPlace | null>(null);
   const listRef = useRef<BottomSheetFlatListMethods>(null);
+  const route = useRoute<any>();
+  const openFromTabBar = route.params?.openFromTabBar;
+
 
   const collapsedHeight = 118;
   const bottomInset = useMemo(

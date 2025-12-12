@@ -32,9 +32,13 @@ import { useLayoutEffect } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import TopBar from "../../components/TopBar";
 import { Ionicons } from "@expo/vector-icons";
+import { PlanV3, PlanV3Session } from "../../src/types/plan";
+
+// [新增] 引入 Profile Store 用于同步数据
+import { useProfileStore } from "../../src/features/profile/store/useProfileStore";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE as string;
-const PLAN_JSON_URL = `${API_BASE}/plan_json`;
+const PLAN_JSON_URL = `${API_BASE}/plans/build`;
 console.log("API_BASE =>", process.env.EXPO_PUBLIC_API_BASE);
 const WD_ORDER: WeekdayKey[] = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const WD_CN: Record<WeekdayKey,string> = { Sun:"周日", Mon:"周一", Tue:"周二", Wed:"周三", Thu:"周四", Fri:"周五", Sat:"周六" };
@@ -423,7 +427,52 @@ function buildPreviewLines({
   return lines;
 }
 
+const adapterV3ToPreview = (v3: PlanV3): Plan => {
+  const previewDays: any = {};
+  const daysKey = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  
+  // 把攀岩和训练的 Session 混合在一起展示
+  const allSessions = [
+    ...v3.session_bank.train_sessions.map(s => ({ ...s, title: "训练 (Train)" })),
+    ...v3.session_bank.climb_sessions.map(s => ({ ...s, title: "攀岩 (Climb)" }))
+  ];
 
+  daysKey.forEach((d, idx) => {
+    if (idx < allSessions.length) {
+      const sess = allSessions[idx];
+      const items: any[] = [];
+      
+      sess.blocks.forEach(b => {
+        b.items.forEach(it => {
+          const name = it.name_override?.zh || it.action_id;
+          let detail = "";
+          if (it.sets) detail += `${it.sets}组`;
+          if (it.reps) detail += `×${it.reps}`;
+          else if (it.seconds) detail += `×${it.seconds}s`;
+          if (it.notes?.zh) detail += ` | ${it.notes.zh}`;
+
+          items.push({
+            label: { zh: name, en: name },
+            target: { zh: detail, en: detail }
+          });
+        });
+      });
+
+      previewDays[d] = { 
+        title: { zh: `${sess.title} #${idx+1}`, en: sess.title }, 
+        items 
+      };
+    } else {
+      previewDays[d] = { title: { zh: "待定", en: "TBD" }, items: [] };
+    }
+  });
+
+  return {
+    meta: v3.meta,
+    days: previewDays,
+    notes: [{ zh: "此预览仅展示生成的训练模块，具体日期请在日历中安排。", en: "Preview modules only. Schedule freely in Calendar." }]
+  };
+};
 
 // ====== 组件 ======
 export default function Generator() {
@@ -437,6 +486,7 @@ export default function Generator() {
   const slideAnim = useRef(new Animated.Value(containerHeight)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const isClosingRef = useRef(false);
+  const [rawV3Data, setRawV3Data] = useState<PlanV3 | null>(null);
 
   // 等级系统
   const { boulderScale: bScale, ropeScale: rScale } = useSettings();
@@ -666,65 +716,65 @@ export default function Generator() {
       // 将 weaknesses 稳定 key 转换为当前语言展示文案
       const weaknessLabels = form.weaknesses.map((k) => WEAKNESS_LABELS[lang][k]).join("、");
 
-      // 替换这段：const payload = { ... }
+      // [修改] 构造符合后端 PlanV3 Schema 的 Payload
+      // 1. 准备 Performance 数据 (对应后端 schemas.py/Performance)
+      const performance = {
+        // 映射引体向上
+        pullup_max_reps: { value: form.bw_rep_max },
+        // 映射平板支撑
+        plank_sec: { value: form.plank_sec || 0 },
+        // 映射抱石等级
+        boulder_grade: { value: vScaleToNumeric(form.boulder_level) },
+        // 映射难度等级
+        lead_grade: { value: form.yds_level },
+        // 映射最大悬挂 (如果有对应字段，这里暂时用 grip_kg 或 one_arm_hang 映射，或者给个默认值)
+        // 这里的 hang_2h_30mm_sec 是触发 Calculator 负重建议的关键
+        // 如果表单里没有直接对应的，我们可以暂时传个空，或者模拟一个
+        hang_2h_30mm_sec: { value: 0 } 
+      };
+
+      // 2. 组装最终 Payload (对应后端 schemas.py/PlanBuildRequest)
       const payload = {
-        // —— 基础体征 —— //
-        gender: form.gender,
-        height: form.height,             // cm
-        weight: form.weight,             // kg
-        bodyfat: form.bodyfat,           // %
-
-        // —— 新的时间安排（核心）—— //
-        climb_days_per_week: form.climb_days_per_week,  // 1..7
-        gym_days_per_week: form.gym_days_per_week,      // 0..7
-        weekly_total,                                   // = climb + gym
-        cycle_weeks: form.cycle_weeks,                  // 4..12
-        weekly_template: true,
-        no_weekday_specific: true,
-
-        // —— 兼容旧后端字段（后续可删除）—— //
-        freq_per_week: weekly_total,
-        climb_freq: compat_climb_freq,
-        train_freq: compat_train_freq,
-        rest_days: compat_rest_days,
-        rest_weekdays: [],
-        cycle_months: Math.round(form.cycle_weeks / 4),
-
-        // —— 体能 / 力量 —— //
-        grip_kg: form.grip_kg,                 // 可能为 null
-        plank_sec: form.plank_sec,             // 可能为 null
-        sit_and_reach_cm: form.sit_and_reach_cm,
-        hip_mobility_score: form.hip_mobility_score,
-        bw_pullups: `${form.bw_rep_max} 次 × 5 组`,
-        weighted_pullups: `${form.weighted_pullup_1rm_kg} kg 1 次 × 3 组`,
-        bw_max_reps: form.bw_rep_max,
-        w_max_weight_kg: form.weighted_pullup_1rm_kg,
-        one_arm_hang: form.one_arm_hang,
-
-        // —— 恢复与伤病 —— //
-        pain_finger_0_3: form.pain_finger_0_3,
-        pain_shoulder_0_3: form.pain_shoulder_0_3,
-        pain_elbow_0_3: form.pain_elbow_0_3,
-        pain_wrist_0_3: form.pain_wrist_0_3,
-        stretching_freq_band: form.stretching_freq_band,
-
-        // —— 弱项 —— //
-        finger_weakness: weaknessLabels, // 人类可读
-        weaknesses: form.weaknesses,     // 机器可读 key
-
-        // —— 攀岩水平 —— //
-        boulder_level: vScaleToNumeric(form.boulder_level),
-        yds_level: form.yds_level,
-
-        // —— 专项补充 —— //
-        hardest_send: form.hardest_send,                // { type, grade, style } | null
-        indoor_outdoor_ratio: form.indoor_outdoor_ratio // 0..100
+        // 必填字段：开始日期
+        start_date: new Date().toISOString().split('T')[0], 
+        // 必填字段：用户ID
+        user_id: "local_user_v1",
+        
+        // 嵌套的 Profile 对象
+        profile: {
+          user_id: "local_user_v1",
+          experience: "intermediate", // 可以根据 boulder_level 动态算，暂时写死
+          
+          // 映射时间安排
+          weekly_pref: {
+            climb_target: form.climb_days_per_week,
+            train_target: form.gym_days_per_week,
+            min_rest: 7 - (form.climb_days_per_week + form.gym_days_per_week)
+          },
+          
+          // 映射体能数据
+          performance: performance,
+          
+          // 映射伤病历史 (从 pain_xxx 字段转换)
+          injuries: [
+            form.pain_finger_0_3 > 1 ? "finger" : "",
+            form.pain_shoulder_0_3 > 1 ? "shoulder" : "",
+            form.pain_elbow_0_3 > 1 ? "elbow" : "",
+            form.pain_wrist_0_3 > 1 ? "wrist" : ""
+          ].filter(Boolean)
+        }
       };
 
 
       const { data } = await axios.post(PLAN_JSON_URL, payload, { timeout: 120000 });
-      const p: Plan = data.plan;
-      const withMeta = ensureMeta(p);
+      // [修改开始] ----------------------------
+      const v3Plan = data as PlanV3; // 强制类型转换
+      setRawV3Data(v3Plan); // 1. 保存原始数据备用
+
+      // 2. 使用适配器生成预览数据
+      const previewPlan = adapterV3ToPreview(v3Plan);
+      const withMeta = ensureMeta(previewPlan);
+      // [修改结束] ----------------------------
 
       // 把兼容字段也写回 form（保证 Profile 等使用旧字段的页面不崩）
       setForm((s) => ({
@@ -765,13 +815,66 @@ export default function Generator() {
     }
   };
 
-  // ✅ 导入到训练日历
+// ✅ [修改] 导入到训练日历 + 同步用户画像
   const confirmImport = async () => {
-    if (!preview) return;
-    await AsyncStorage.setItem("@plan_json", JSON.stringify(preview));
-    await AsyncStorage.setItem("@profile_form", JSON.stringify(form));
-    exitIndex("calendar");
+    if (!rawV3Data && !preview) return;
+
+    try {
+        setLoading(true);
+
+        // 1. 保存计划库 (供日历读取)
+        if (rawV3Data) {
+          await AsyncStorage.setItem("@current_plan_v3", JSON.stringify(rawV3Data));
+        }
+        
+        // 2. 保存表单状态 (本地回显用)
+        await AsyncStorage.setItem("@profile_form", JSON.stringify(form));
+        
+        // 3. [修改] 构造并同步用户画像到后端
+        // 修复：将 null 转换为 undefined (对于可选字段) 或 0 (对于必填数值)
+        const updatePayload = {
+            anthropometrics: {
+                height: form.height,
+                weight: form.weight,
+                // Fix: 只有 null 时转 undefined，保留 0 (因为坐姿体前屈可以是 0)
+                sit_and_reach_cm: form.sit_and_reach_cm === null ? undefined : form.sit_and_reach_cm,
+            },
+            performance: {
+                pullup_max_reps: { value: form.bw_rep_max },
+                // Fix: 平板支撑如果未填 (null)，默认传 0
+                plank_sec: { value: form.plank_sec ?? 0 },
+                boulder_grade: { value: vScaleToNumeric(form.boulder_level) },
+                lead_grade: { value: form.yds_level },
+            },
+            recovery: {
+                pain: {
+                    finger: form.pain_finger_0_3,
+                    shoulder: form.pain_shoulder_0_3,
+                    elbow: form.pain_elbow_0_3,
+                    wrist: form.pain_wrist_0_3
+                }
+            },
+            weekly_pref: {
+                climb_target: form.climb_days_per_week,
+                train_target: form.gym_days_per_week,
+            }
+        };
+
+        // 调用 Store 更新
+        await useProfileStore.getState().updateMe(updatePayload);
+
+        // 4. 退出
+        exitIndex("calendar");
+        
+    } catch (e) {
+        console.error("Import failed", e);
+        Alert.alert(tr("保存失败", "Save failed"), tr("用户数据同步失败，但计划已保存。", "Profile sync failed, but plan saved locally."));
+        exitIndex("calendar"); 
+    } finally {
+        setLoading(false);
+    }
   };
+
 
   // ---- 可复用 UI ----
   const Section = ({

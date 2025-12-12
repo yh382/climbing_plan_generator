@@ -57,10 +57,11 @@ export default function TabsLayout() {
         }}
         tabBar={(props) => <FloatingTabBar {...props} />}
       >
+        <Tabs.Screen name="home" options={{ title: "首页" }} />
         <Tabs.Screen name="calendar" options={{ title: "日历" }} />
         <Tabs.Screen name="journal"  options={{ title: "日志" }} />
         <Tabs.Screen name="profile"  options={{ title: "个人资料" }} />
-        <Tabs.Screen name="index"    options={{ title: "生成器" }} />
+        <Tabs.Screen name="index"    options={{ title: "生成器", href:null, }} />
         <Tabs.Screen name="gyms"     options={{ title: "Gyms", headerShown: false }} />
       </Tabs>
     </View>

@@ -1,215 +1,185 @@
-import React from "react";
-import { View, Text } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useProfileStore } from "../../store/useProfileStore"; 
+import AbilityRadar from "../AbilityRadar"; 
+import { tokens } from "../../../../../components/ui/Theme"; 
 
-import { useProfileStore } from "@/features/profile/store/useProfileStore";
-import { useUserStore } from "@/store/useUserStore";
-import { kgToLb, cmToIn } from "@lib/units";
+// --- 辅助组件 ---
+const RatingDots = ({ score, max = 5, activeColor = "#306E6F" }: { score: number, max?: number, activeColor?: string }) => (
+  <View style={{ flexDirection: 'row', gap: 2 }}>
+    {Array.from({ length: max }).map((_, i) => (
+      <View 
+        key={i} 
+        style={{
+          width: 8, height: 8, borderRadius: 4,
+          backgroundColor: i < score ? activeColor : "#E5E7EB"
+        }} 
+      />
+    ))}
+  </View>
+);
+
+const StatRow = ({ label, value, sub, icon }: any) => (
+  <View style={styles.statRow}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {icon && <Ionicons name={icon} size={14} color="#9CA3AF" />}
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+    <View style={{ alignItems: 'flex-end' }}>
+      <Text style={styles.statValue}>{value}</Text>
+      {sub && <Text style={styles.statSub}>{sub}</Text>}
+    </View>
+  </View>
+);
+
+const HealthTag = ({ label, level }: { label: string, level: number }) => {
+  if (level === 0) return null;
+  const color = level === 1 ? "#F59E0B" : "#EF4444"; 
+  const bg = level === 1 ? "#FEF3C7" : "#FEE2E2";
+  return (
+    <View style={[styles.healthTag, { backgroundColor: bg, borderColor: color }]}>
+      <Text style={[styles.healthTagText, { color }]}>{label} Lv.{level}</Text>
+    </View>
+  );
+};
 
 export function UserPersonaSection() {
   const { profile } = useProfileStore();
-  const { user } = useUserStore();
+  
+  // 1. 获取后端计算好的雷达图数据
+  const abilityScores = useMemo(() => {
+    return profile?.ability_scores || { finger: 30, pull: 30, core: 30, flex: 30, sta: 30 };
+  }, [profile]);
 
-  const isImperial = user?.units === "imperial";
-
-  const strength = profile?.strength ?? {};
-  const mobility = profile?.mobility ?? {};
-  const recovery = profile?.recovery ?? {};
-  const pain = recovery?.pain ?? {};
-  const anthropometrics = profile?.anthropometrics ?? {};
-
-  // === 力量 / 能力：以引体 PR 作为主数字，其他做小统计 ===
-  const pullupsReps = strength.pullups?.max_reps ?? 0;
-  const weighted1rmKg = strength.weighted_pullup_1rm_kg ?? 0;
-  const weighted1rmText = isImperial
-    ? `${Math.round(kgToLb(weighted1rmKg))} lb`
-    : `${weighted1rmKg} kg`;
-  const oneArmHangSeconds = strength.one_arm_hang_s ?? 0;
-  const oneArmHangText = `${oneArmHangSeconds}s`;
-
-  // === 机动性：整体髋部评分作为主数字 ===
-  const sitReachVal = mobility.sit_and_reach_cm ?? 0;
-  const sitReachText = `${sitReachVal} cm`;
-  const hipScoreVal = mobility.hip_mobility_score ?? 0;
-  const shoulderFlexText = mobility.shoulder_flex ?? "未评估";
-
-  // === 基础信息：等级作为主数字（可以是 V5 / 5.12 等） ===
-  const heightCm = anthropometrics.height_cm ?? 0;
-  const heightText = isImperial
-    ? `${Math.round(cmToIn(heightCm))} in`
-    : `${heightCm} cm`;
-  const weightKg = anthropometrics.weight_kg ?? 0;
-  const weightText = isImperial
-    ? `${Math.round(kgToLb(weightKg))} lb`
-    : `${weightKg} kg`;
-  const levelText = anthropometrics.level ?? "未设置";
-
-  // === 受伤与恢复：平均睡眠作为主数字 ===
-  const sleepVal = recovery.sleep_hours_avg ?? 0;
-  const sleepText = `${sleepVal} h / night`;
-  const stretchFreqText = recovery.stretching_freq_band ?? "未设置";
-
-  const painFinger = pain?.finger ?? 0;
-  const painShoulder = pain?.shoulder ?? 0;
-  const painElbow = pain?.elbow ?? 0;
-  const painWrist = pain?.wrist ?? 0;
-  const painScore = painFinger + painShoulder + painElbow + painWrist;
-  const painText = `${painScore} pts`;
+  // 2. 提取其他展示数据
+  const p = profile || {};
+  const perf = p.performance || {};
+  
+  // 使用类型断言或 any 来访问可能的属性名变体
+  const anthro = (p.anthropometrics || {}) as any;
+  
+  // [修复] 兼容读取：同时尝试读取 height/weight 和 height_cm/weight_kg
+  const height = anthro.height ?? anthro.height_cm ?? 0;
+  const weight = anthro.weight ?? anthro.weight_kg ?? 0;
+  const apeIndex = anthro.ape_index ?? 0;
 
   return (
-    <View style={{ marginTop: 24 }}>
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "700",
-          marginBottom: 12,
-          color: "#111827",
-        }}
-      >
-        用户画像
-      </Text>
+    <View style={{ paddingBottom: 40 }}>
+      
+      {/* === 1. 能力雷达图 === */}
+      <AbilityRadar data={abilityScores} />
 
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-        }}
-      >
-        {/* 力量 / 能力 */}
-        <PersonaMiniCard title="力量 / 能力">
-          <BigStat
-            value={pullupsReps.toString()}
-            suffix="x"
-            label="引体 PR"
-          />
-          <SmallStat value={weighted1rmText} label="负重引体 1RM" />
-          <SmallStat value={oneArmHangText} label="单手悬挂" />
-        </PersonaMiniCard>
-
-        {/* 机动性 */}
-        <PersonaMiniCard title="机动性">
-          <BigStat
-            value={hipScoreVal.toString()}
-            suffix="/10"
-            label="整体机动性评分"
-          />
-          <SmallStat value={sitReachText} label="坐姿体前屈" />
-          <SmallStat value={shoulderFlexText} label="肩关节灵活度" />
-        </PersonaMiniCard>
-
-        {/* 基础信息 */}
-        <PersonaMiniCard title="基础信息">
-          <BigStat value={levelText} label="当前水平" />
-          <SmallStat value={heightText} label="身高" />
-          <SmallStat value={weightText} label="体重" />
-        </PersonaMiniCard>
-
-        {/* 受伤 & 恢复 */}
-        <PersonaMiniCard title="受伤与恢复">
-          <BigStat
-            value={sleepVal.toString()}
-            suffix="h"
-            label="平均睡眠"
-          />
-          <SmallStat value={stretchFreqText} label="拉伸频率" />
-          <SmallStat value={painText} label="疼痛总分" />
-        </PersonaMiniCard>
-      </View>
-    </View>
-  );
-}
-
-function PersonaMiniCard(props: { title: string; children: React.ReactNode }) {
-  return (
-    <View
-      style={{
-        width: "48%",
-        backgroundColor: "#f4f4f5",
-        borderRadius: 18,
-        paddingVertical: 16,
-        paddingHorizontal: 14,
-        marginBottom: 14,
-      }}
-    >
-      {/* 头部：左标题 + 右箭头 */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "600",
-            color: "#111827",
-          }}
-        >
-          {props.title}
-        </Text>
-        <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-      </View>
-
-      {props.children}
-    </View>
-  );
-}
-
-function BigStat(props: { value: string; suffix?: string; label: string }) {
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: "700",
-            color: "#6366f1",
-          }}
-        >
-          {props.value}
-        </Text>
-        {props.suffix ? (
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "600",
-              color: "#6366f1",
-              marginLeft: 2,
-              marginBottom: 2,
-            }}
-          >
-            {props.suffix}
+      {/* === 2. 身体参数 === */}
+      <View style={styles.bodyStatsContainer}>
+        <View style={styles.bodyStatItem}>
+          <Text style={styles.bodyStatLabel}>Height</Text>
+          <Text style={styles.bodyStatValue}>{height} <Text style={styles.unit}>cm</Text></Text>
+        </View>
+        <View style={styles.vertDivider} />
+        <View style={styles.bodyStatItem}>
+          <Text style={styles.bodyStatLabel}>Weight</Text>
+          <Text style={styles.bodyStatValue}>{weight} <Text style={styles.unit}>kg</Text></Text>
+        </View>
+        <View style={styles.vertDivider} />
+        <View style={styles.bodyStatItem}>
+          <Text style={styles.bodyStatLabel}>Ape Index</Text>
+          <Text style={[styles.bodyStatValue, { color: apeIndex >= 0 ? '#10B981' : '#EF4444' }]}>
+            {apeIndex > 0 ? "+" : ""}{apeIndex} <Text style={styles.unit}>cm</Text>
           </Text>
-        ) : null}
+        </View>
       </View>
-      <Text
-        style={{
-          marginTop: 2,
-          fontSize: 12,
-          color: "#6b7280",
-        }}
-      >
-        {props.label}
-      </Text>
+
+      {/* === 3. 详细数据网格 === */}
+      <View style={styles.gridContainer}>
+        {/* 左列 */}
+        <View style={styles.gridCol}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="barbell" size={18} color="#306E6F" />
+              <Text style={styles.cardTitle}>Strength</Text>
+            </View>
+            <StatRow 
+              label="Max Pull-ups" 
+              value={perf.pullup_max_reps?.value || "-"} 
+              sub="reps"
+            />
+            <View style={styles.divider} />
+            <StatRow 
+              label="Max Hang" 
+              value={perf.hang_2h_30mm_sec?.value || "-"} 
+              sub="sec (20mm)"
+            />
+          </View>
+          
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="flash" size={18} color="#F59E0B" />
+              <Text style={styles.cardTitle}>Core</Text>
+            </View>
+            <StatRow 
+              label="Plank" 
+              value={perf.plank_sec?.value || "-"} 
+              sub="sec"
+            />
+          </View>
+        </View>
+
+        {/* 右列 */}
+        <View style={styles.gridCol}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="body" size={18} color="#8B5CF6" />
+              <Text style={styles.cardTitle}>Mobility</Text>
+            </View>
+            <StatRow 
+              label="Sit & Reach" 
+              value={`${anthro.sit_and_reach_cm || 0}`} 
+              sub="cm"
+            />
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="medkit" size={18} color="#EF4444" />
+              <Text style={styles.cardTitle}>Recovery</Text>
+            </View>
+            <View style={styles.tagsContainer}>
+              {(p.recovery?.pain?.finger ?? 0) > 0 && <HealthTag label="Finger" level={p.recovery!.pain!.finger!} />}
+              {(p.recovery?.pain?.shoulder ?? 0) > 0 && <HealthTag label="Shoulder" level={p.recovery!.pain!.shoulder!} />}
+              
+              {/* 全健康状态 */}
+              {!(p.recovery?.pain?.finger || p.recovery?.pain?.shoulder || p.recovery?.pain?.elbow || p.recovery?.pain?.wrist) && (
+                <View style={[styles.healthTag, { backgroundColor: '#ECFDF5', borderColor: '#10B981' }]}>
+                  <Text style={[styles.healthTagText, { color: '#10B981' }]}>All Good ✨</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
 
-function SmallStat(props: { value: string; label: string }) {
-  return (
-    <View style={{ marginTop: 4 }}>
-      <Text
-        style={{
-          fontSize: 13,
-          color: "#4b5563",
-        }}
-      >
-        {props.value} {props.label}
-      </Text>
-    </View>
-  );
-}
-
+const styles = StyleSheet.create({
+  bodyStatsContainer: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16, paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, borderWidth: 0.5, borderColor: '#E5E7EB', shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  bodyStatItem: { alignItems: 'center' },
+  bodyStatLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
+  bodyStatValue: { fontSize: 18, fontWeight: '800', color: '#111' },
+  unit: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  vertDivider: { width: 1, height: '100%', backgroundColor: '#F3F4F6' },
+  gridContainer: { flexDirection: 'row', paddingHorizontal: 16, marginTop: 16, gap: 12 },
+  gridCol: { flex: 1, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 0.5, borderColor: '#E5E7EB', shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 },
+  statLabel: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
+  statValue: { fontSize: 15, fontWeight: '700', color: '#111' },
+  statSub: { fontSize: 10, color: '#9CA3AF' },
+  divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 8 },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  healthTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  healthTagText: { fontSize: 11, fontWeight: '700' }
+});

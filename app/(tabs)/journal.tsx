@@ -1,52 +1,37 @@
 // app/(tabs)/journal.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { useSettings } from "src/contexts/SettingsContext";
-import TopDateHeader from "../../components/TopDateHeader";
-import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
-import SingleRing from "../../components/SingleRing";
-import { useRouter } from "expo-router"; // 若已导入可忽略
-import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore"; // 从 app/(tabs) 到 app/store
-import { Pressable, StyleSheet } from "react-native";
+import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect } from "react";
+import { SafeAreaView, ScrollView, Text, TouchableOpacity, View, Pressable, StyleSheet, Dimensions } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { colorForBoulder, colorForYDS, getColorForGrade, COLOR, ringStrokeColor } from "../../lib/gradeColors";
-import { useLayoutEffect } from "react";
-import { useNavigation } from "@react-navigation/native";
-import TopBar from "../../components/TopBar";
-import DualMiniRings from "../../components/DualMiniRings";
+
+// Store
+import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore";
 import { usePlanStore, toDateString } from "../../src/store/usePlanStore";
+import { useSettings } from "src/contexts/SettingsContext";
 
+// Components
+import TopDateHeader from "../../components/TopDateHeader";
+import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
+import TopBar from "../../components/TopBar";
+import DualActivityRing from "../../src/features/journal/DualActivityRing";
+import DualMiniRings from "../../components/DualMiniRings";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// Utils & Colors
+import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 
-
-
-
-type GradeLog = {
-  id: string;
-  date: string;
-  type: "boulder" | "yds";
-  grade: string;   // 内部统一用 V* 或 5.* 作为键
-  count: number;
-};
-
-const LOGS_KEY = "@climb_logs";
-const formatBarLabel = (d: Date, isZH: boolean) => {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const wCN = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
-  const wEN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
-  return isZH ? `${mm}/${dd} · ${wCN}` : `${wEN}, ${mm}/${dd}`;
-};
 const V_GRADES = ["VB", "V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
-const YDS_GRADES = [
-  "5.6","5.7","5.8","5.9",
-  "5.10a","5.10b","5.10c","5.10d",
-  "5.11a","5.11b","5.11c","5.11d",
-  "5.12a","5.12b","5.12c","5.12d",
-  "5.13a","5.13b","5.13c","5.13d",
-  "5.14a","5.14b","5.14c","5.14d",
-];
+
+const YDS_GROUPS = {
+  "Beginner": ["5.6","5.7","5.8","5.9"],
+  "5.10": ["5.10a","5.10b","5.10c","5.10d"],
+  "5.11": ["5.11a","5.11b","5.11c","5.11d"],
+  "5.12": ["5.12a","5.12b","5.12c","5.12d"],
+  "Elite": ["5.13a","5.13b","5.13c","5.13d","5.14a"],
+};
+type YdsGroupKey = keyof typeof YDS_GROUPS;
 
 const YDS_TO_FRENCH: Record<string, string> = {
   "5.6":"5a","5.7":"5b","5.8":"5c","5.9":"6a",
@@ -63,14 +48,6 @@ const V_TO_FONT: Record<string, string> = {
 };
 
 function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
-function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function startOfWeek(d = new Date()) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - x.getDay()); return x; }
-function inSameWeek(dateStr: string, base = new Date()) {
-  const d = new Date(dateStr + "T00:00:00");
-  const start = startOfWeek(base);
-  const end = new Date(start); end.setDate(start.getDate()+7);
-  return d >= start && d < end;
-}
 function dateStr(d: Date) {
   const y = d.getFullYear();
   const m = pad(d.getMonth() + 1);
@@ -82,303 +59,239 @@ function shiftDay(d: Date, delta: number) {
   x.setDate(x.getDate() + delta);
   return x;
 }
+const formatBarLabel = (d: Date, isZH: boolean) => {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const wCN = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
+  const wEN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+  return isZH ? `${mm}/${dd} · ${wCN}` : `${wEN}, ${mm}/${dd}`;
+};
 function formatDateLabel(d: Date, lang: "zh" | "en") {
   const w = ["周日","周一","周二","周三","周四","周五","周六"];
   const base = dateStr(d);
   return lang === "zh" ? `${base}（${w[d.getDay()] }）` : base;
 }
-// 统计“某周7天”的每日次数（按你当前 mode 过滤）
-function getWeekCounts(anchor: Date, logs: GradeLog[], mode: "boulder" | "yds") {
-  const ws = startOfWeek(anchor);
-  const result: Record<string, number> = {};
-  for (let i = 0; i < 7; i++) {
-    const dt = new Date(ws);
-    dt.setDate(ws.getDate() + i);
-    const key = dateStr(dt);
-    // 如果你的日志结构是 logs: { date: "YYYY-MM-DD", type: "boulder"|"rope", ... }
-    result[key] = logs.filter(l => l.date === key && l.type === mode).length;
-  }
-  return result;
-}
 
 export default function Journal() {
   const { boulderScale, ropeScale, lang } = useSettings();
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
-  const [mode, setMode] = useState<"boulder" | "yds">("boulder");
-  const [action, setAction] = useState<"add" | "sub">("add"); // 顶部动作切换
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showPicker, setShowPicker] = useState(false);
   const router = useRouter();
-  const modeLabel = mode === "boulder" ? "抱石" : "绳索";
-  const upsertCount     = useLogsStore((s) => s.upsertCount);
-  const countByDateType = useLogsStore((s) => s.countByDateType);
-  const logType = mode === "boulder" ? "boulder" : "yds"; // 你的 rope 用 yds 表示
-  const todayKey = React.useMemo(() => dateStr(selectedDate), [selectedDate]);
-  const todayTotal = React.useMemo(
-  () => countByDateType(todayKey, logType),
-  [todayKey, logType, countByDateType]
+  const navigation = useNavigation();
+  
+  const [mode, setMode] = useState<"boulder" | "yds">("boulder");
+  const [action, setAction] = useState<"add" | "sub">("add");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [overlayMonthAnchor, setOverlayMonthAnchor] = useState<Date | null>(null);
+  const [ydsGroup, setYdsGroup] = useState<YdsGroupKey>("5.10");
+
+  // Store
+  const { logs, upsertCount } = useLogsStore(); 
+  const { percentForDate, monthMap, buildMonthMap } = usePlanStore();
+
+  const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
+  const logType = mode === "boulder" ? "boulder" : "yds";
+
+  const todayTotal = useMemo(() => {
+    return logs
+      .filter(l => l.date === todayKey && l.type === logType)
+      .reduce((acc, cur) => acc + cur.count, 0);
+  }, [logs, todayKey, logType]);
+
+  const daySegments = useSegmentsByDate(todayKey, logType);
+  
+  const dayParts = useMemo(() => {
+    const total = daySegments.reduce((sum, seg) => sum + seg.count, 0);
+    return { total, parts: daySegments };
+  }, [daySegments]); 
+
+  const ringParts = useMemo(() => {
+    return dayParts.parts.map((p) => ({
+      grade: p.grade,
+      count: p.count,
+      color: (mode === "boulder" ? colorForBoulder : colorForYDS)(p.grade),
+    }));
+  }, [dayParts.parts, mode]);
+
+  // --- Plan 进度 (外环) ---
+  const [trainingPct, setTrainingPct] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      percentForDate(selectedDate).then((p) => {
+        if (active) setTrainingPct(p);
+      });
+      return () => { active = false; };
+    }, [selectedDate, percentForDate]) 
   );
-  // 当日等级分布 → 用于 SingleRing 分段
 
-
-  // +1：直接在当天追加一条
-  // +1
   const addOne = (grade: string) => {
-    upsertCount({
-      date: todayKey,
-      type: logType,
-      grade,
-      delta: 1,
-    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    upsertCount({ date: todayKey, type: logType, grade, delta: 1 });
   };
 
-  // -1（如果你有减一逻辑）
   const subOne = (grade: string) => {
-    upsertCount({
-      date: todayKey,
-      type: logType,
-      grade,
-      delta: -1,
-    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    upsertCount({ date: todayKey, type: logType, grade, delta: -1 });
   };
 
-
-  // 胶囊点击动作（根据当前 action 切换）
   const onCapsulePress = (g: string) => {
     if (action === "add") addOne(g);
     else subOne(g);
   };
 
+  const insets = useSafeAreaInsets();
+  // TopDateHeader 默认高度约 40-44，加上 padding 大概 50 左右
+  // 这里我们给它一个固定容器高度，比如 54 (加上刘海)
+  const headerContentHeight = 54; 
+  const totalHeaderHeight = insets.top + headerContentHeight;
+  // [修改] 渲染日历格子的小环 (与 Calendar 页面保持一致)
+  const renderDayExtra = (d: Date) => {
+    const k = toDateString(d);
+    
+    // 1. 外环 (Plan Completion)
+    const outerPct = (monthMap[k] ?? 0) / 100;
 
-  // 本周统计
-  const logs = useLogsStore((s) => s.logs);
-  const logsByMode = useMemo(() => logs.filter((l) => l.type === mode), [logs, mode]);
-  const segmentsToday = useSegmentsByDate(todayKey, logType);
+    // 2. 内环 (Log Count)
+    // 注意：这里直接用 logs 算，确保实时性
+    const dayLogsCount = logs.filter(l => l.date === k).reduce((s, l) => s + l.count, 0);
+    const climbGoal = 10; // 保持一致
+    const innerVal = dayLogsCount / climbGoal;
 
-  // 本周统计（按当前模式 & 所选日期所在周）
-  const weekStats = useMemo(() => {
-    const base = selectedDate;
-    const curList = mode === "boulder" ? V_GRADES : YDS_GRADES;
-    const curMap: Record<string, number> = {};
-    let total = 0;
+    if (outerPct === 0 && dayLogsCount === 0) return null;
 
-    logsByMode.forEach((l) => {
-      if (!inSameWeek(l.date, base)) return;
-      curMap[l.grade] = (curMap[l.grade] || 0) + l.count;
-      total += l.count;
-    });
+    return (
+      <View style={{ 
+        position: 'absolute',
+        top: 40,       // 向上微调，不挡数字
+        left: 0, 
+        right: 0,
+        alignItems: 'center', // 水平居中
+        justifyContent: 'flex-start'
+      }}>
+        <DualMiniRings
+          size={34}                  
+          outerValue={outerPct}     
+          innerValue={innerVal}     
+          outerColor="#A5D23D"
+          innerColor="#3B82F6"
+          outerThickness={3}
+          innerThickness={3}
+          gap={2}
+        />
+      </View>
+    );
+  };
 
-    const list = curList
-      .map((g) => ({ grade: g, count: curMap[g] || 0 }))
-      .filter((x) => x.count > 0);
-
-    return { total, list };
-  }, [logsByMode, mode, selectedDate]);
-
-  // 当日等级分布 → 用于 SingleRing 分段
-  const dayParts = useMemo(() => {
-    const total = segmentsToday.reduce((sum, seg) => sum + seg.count, 0);
-    return { total, parts: segmentsToday };
-  }, [segmentsToday]);
-
-
-  // 总计（按当前模式，所有时间）
-  const totalStats = useMemo(() => {
-    const curList = mode === "boulder" ? V_GRADES : YDS_GRADES;
-    const curMap: Record<string, number> = {};
-    let all = 0;
-
-    logsByMode.forEach((l) => {
-      curMap[l.grade] = (curMap[l.grade] || 0) + l.count;
-      all += l.count;
-    });
-
-    const list = curList
-      .map((g) => ({ grade: g, count: curMap[g] || 0 }))
-      .filter((x) => x.count > 0);
-
-    return { all, list };
-  }, [logsByMode, mode]);
-
+  // --- UI 组件 ---
 
   const ModeSwitch = () => (
-    <View style={{ marginTop: 8, marginBottom: 8, flexDirection: "row", alignItems: "center" }}>
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <TouchableOpacity
-          onPress={() => setMode("boulder")}
-          style={{
-            paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-            backgroundColor: mode === "boulder" ? "#000000ff" : "#f3f4f6",
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3, // Android 阴影
-            borderWidth: 0.3,           // 建议加一条细边框，阴影更干净
-            borderColor: "#E5E7EB",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: mode === "boulder" ? "white" : "#111827", fontWeight: "700" }}>
-            {tr("抱石记录", "Bouldering Logs")}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <TouchableOpacity
-          onPress={() => setMode("yds")}
-          style={{
-            paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-            backgroundColor: mode === "yds" ? "#000000ff" : "#f3f4f6",
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3, // Android 阴影
-            borderWidth: 0.3,   
-            borderColor: "#E5E7EB",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: mode === "yds" ? "white" : "#111827", fontWeight: "700" }}>
-            {tr("难度记录", "Rope Logs")}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <View style={{ flexDirection: "row", marginTop: 12, marginBottom: 16, backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+      <TouchableOpacity onPress={() => setMode("boulder")} style={[styles.modeBtn, mode === "boulder" && styles.modeBtnActive]}>
+        <Text style={[styles.modeText, mode === "boulder" && styles.modeTextActive]}>{tr("抱石", "Bouldering")}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setMode("yds")} style={[styles.modeBtn, mode === "yds" && styles.modeBtnActive]}>
+        <Text style={[styles.modeText, mode === "yds" && styles.modeTextActive]}>{tr("绳索", "Rope")}</Text>
+      </TouchableOpacity>
     </View>
   );
 
+// [修改] ActionSwitch: 去掉 marginBottom，优化按钮尺寸逻辑
   const ActionSwitch = () => (
-    <View
-      style={{
-        flexDirection: "row",
-        alignSelf: "center",
-        marginBottom: 10,
-        padding: 4,
-        borderRadius: 999,
-        backgroundColor: "#F5F6F8",
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: "#E2E8F0",
-        gap: 6,
-      }}
-    >
+    <View style={{ flexDirection: "row", gap: 8 }}>
       <TouchableOpacity
         onPress={() => setAction("add")}
-        activeOpacity={0.9}
-        style={{
-          flex: 1,
-          paddingVertical: 10,
-          borderRadius: 999,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: action === "add" ? "#16A34A" : "#F5F6F8",
-          borderWidth: action === "add" ? 0 : 0,
-          borderColor: "transparent",
-          shadowColor: action === "add" ? "#16A34A" : "transparent",
-          shadowOpacity: action === "add" ? 0.2 : 0,
-          shadowRadius: action === "add" ? 8 : 0,
-          shadowOffset: action === "add" ? { width: 0, height: 4 } : { width: 0, height: 0 },
-          elevation: action === "add" ? 4 : 0,
-        }}
+        style={[
+          styles.actionBtn, 
+          action === "add" ? styles.actionBtnAdd : styles.actionBtnInactive
+        ]}
       >
-          <Text style={{ color: action === "add" ? "#FFFFFF" : "#334155", fontWeight: "700", fontSize: 13 }}>
-            {tr("添加 +", "Add +")}
-          </Text>
+        <Ionicons name="add" size={16} color={action === "add" ? "#fff" : "#6B7280"} />
+        <Text style={[styles.actionText, action === "add" && {color:"#fff"}]}>
+          {tr("添加", "Add")}
+        </Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         onPress={() => setAction("sub")}
-        activeOpacity={0.9}
-        style={{
-          flex: 1,
-          paddingVertical: 10,
-          borderRadius: 999,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: action === "sub" ? "#EF4444" : "#F5F6F8",
-          borderWidth: action === "sub" ? 0 : 0,
-          borderColor: "transparent",
-          shadowColor: action === "sub" ? "#EF4444" : "transparent",
-          shadowOpacity: action === "sub" ? 0.18 : 0,
-          shadowRadius: action === "sub" ? 8 : 0,
-          shadowOffset: action === "sub" ? { width: 0, height: 4 } : { width: 0, height: 0 },
-          elevation: action === "sub" ? 4 : 0,
-        }}
+        style={[
+          styles.actionBtn, 
+          action === "sub" ? styles.actionBtnSub : styles.actionBtnInactive
+        ]}
       >
-        <Text style={{ color: action === "sub" ? "#FFFFFF" : "#334155", fontWeight: "700", fontSize: 13 }}>
-          {tr("删减 -", "Delete -")}
+        <Ionicons name="remove" size={16} color={action === "sub" ? "#fff" : "#6B7280"} />
+        <Text style={[styles.actionText, action === "sub" && {color:"#fff"}]}>
+          {tr("删除", "Delete")}
         </Text>
       </TouchableOpacity>
     </View>
   );
-  
-  const { monthMap, buildMonthMap } = usePlanStore();
-
-
-  // ==== 训练计划进度（外环）所需：plan、工具函数、月度 map ====
-
-  // 1) 读取 plan
-  const plan = typeof usePlanStore === "function" ? usePlanStore((s) => s.plan) : null;
-
-  const [overlayMonthAnchor, setOverlayMonthAnchor] = useState<Date | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-
-
-
-  // 只要打开 overlay / 切月 / plan 变更，就重建本月外环 map
-  useEffect(() => {
-    if (!calendarOpen) return;
-    const anchor = overlayMonthAnchor ?? selectedDate;  // selectedDate 是 Date 对象
-    buildMonthMap(anchor);
-  }, [calendarOpen, overlayMonthAnchor, selectedDate, buildMonthMap]);
-
-
-  const renderDayExtra = (d: Date) => {
-    const k = toDateString(d);
-    const outer = monthMap[k] ?? 0;
-
-    return (
-      <DualMiniRings
-        size={28}                 // 跟 Calendar 一样
-        outerValue={outer}        // 外层绿色训练进度
-        innerKind="journal"       // 内层=journal 彩色小环
-        dateKey={k}               // 让小环按当天分段
-        journalType={mode === "boulder" ? "boulder" : "yds"}
-        outerThickness={2.4}
-        innerThickness={2}
-        gap={1.5}
-      />
-    );
-  };
-  
-
-  // 等级胶囊（根据模式动态生成，自动应用 Font/French 文案）
-  const GradeCapsules = () => {
-    const grades = mode === "boulder" ? V_GRADES : YDS_GRADES;
+  // 解决 Issue 4: 6列布局 + 居中
+  const GradePicker = () => {
     const labelOf = (g: string) => {
-      if (mode === "boulder") return (boulderScale === "Font" ? (V_TO_FONT[g] || g) : g);
-      return (ropeScale === "French" ? (YDS_TO_FRENCH[g] || g) : g);
+        if (mode === "boulder") return (boulderScale === "Font" ? (V_TO_FONT[g] || g) : g);
+        return (ropeScale === "French" ? (YDS_TO_FRENCH[g] || g) : g);
     };
-    return (
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {grades.map((g) => (
-          <TouchableOpacity
-            key={`cap-${mode}-${g}`}
-            onPress={() => onCapsulePress(g)}
-            style={{
-              paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999,
-              borderWidth: 0.6, borderColor: "#e5e7eb", backgroundColor: "#f9fafb",
-            }}
-          >
-            <Text style={{ fontWeight: "700", color: "#111827" }}>{labelOf(g)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
 
-  const navigation = useNavigation();
+    if (mode === "boulder") {
+      return (
+        <View style={styles.gridContainer}>
+          {V_GRADES.map((g) => (
+            <TouchableOpacity key={g} onPress={() => onCapsulePress(g)} style={styles.gridItem}>
+              <Text style={styles.gridText}>{labelOf(g)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      );
+    } else {
+      // Rope 保持分组逻辑
+      return (
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12 }}>
+            {(Object.keys(YDS_GROUPS) as YdsGroupKey[]).map(group => {
+                const isActive = ydsGroup === group;
+                return (
+                    <TouchableOpacity key={group} onPress={() => setYdsGroup(group)} style={[styles.groupTab, isActive && styles.groupTabActive]}>
+                        <Text style={[styles.groupText, isActive && {color: "#fff"}]}>{group}</Text>
+                    </TouchableOpacity>
+                )
+            })}
+          </ScrollView>
+          <View style={styles.gridContainer}>
+            {YDS_GROUPS[ydsGroup].map((g) => (
+              <TouchableOpacity key={g} onPress={() => onCapsulePress(g)} style={styles.gridItem}>
+                <Text style={styles.gridText}>{labelOf(g)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      );
+    }
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      header: () => (
+      headerShown: false, // [核心修改] 关掉系统 Header，防止双重显示
+    });
+  }, [selectedDate, lang, setCalendarOpen, navigation]);
+
+  // 计算 Header 高度
+  const headerHeight = insets.top + 48; 
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+      
+      {/* 1. 固定在顶部的 Header (使用 TopBar 而不是 TopDateHeader) */}
+      <View style={{ 
+        position: 'absolute', 
+        top: 0, left: 0, right: 0, 
+        zIndex: 100, 
+        backgroundColor: "#FFFFFF",
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#E5E7EB',
+      }}>
+        {/* ✅ 使用 TopBar，这样才有 "Journal" 标题 */}
         <TopBar
           routeName="journal"
           titleZH="训练日志"
@@ -386,239 +299,169 @@ export default function Journal() {
           rightControls={{
             mode: "date",
             dateLabel: formatBarLabel(selectedDate, lang === "zh"),
-            onPrevDate: () => setSelectedDate((d) => shiftDay(d, -1)),
-            onNextDate: () => setSelectedDate((d) => shiftDay(d, +1)),
+            onPrevDate: () => setSelectedDate(d => shiftDay(d, -1)),
+            onNextDate: () => setSelectedDate(d => shiftDay(d, +1)),
             onOpenPicker: () => setCalendarOpen((v) => !v),
             maxWidthRatio: 0.60,
           }}
         />
-      ),
-    });
-  }, [
-    selectedDate,
-    lang,
-    setSelectedDate,
-    setCalendarOpen,
-    navigation,
-  ]);
-
-  const Pill = ({ text }: { text: string }) => (
-    <View
-      style={{
-        paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8,
-        borderWidth: 0.6, borderColor: "#e5e7eb", marginRight: 8, marginBottom: 8, backgroundColor: "#f9fafb",
-      }}
-    >
-      <Text style={{ color: "#111827" }}>{text}</Text>
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={{flex: 1, padding: 12, backgroundColor: "#FFFFFF" }}>
-      <View style={{ zIndex: 2 }}>
-        <TopDateHeader
-          dateLabel={formatDateLabel(selectedDate, lang)}
-          onPrev={() => setSelectedDate(d => shiftDay(d, -1))}
-          onNext={() => setSelectedDate(d => shiftDay(d, +1))}
-          onPressCenter={() => setCalendarOpen(v => !v)}
-        />
       </View>
 
-      <ScrollView style={{ flex: 1, }} contentContainerStyle={{ paddingHorizontal:16,paddingBottom: 72 }}>
-    <CollapsibleCalendarOverlay
+      {/* 2. 日历遮罩层 (紧贴 TopBar) */}
+      <CollapsibleCalendarOverlay
         visible={calendarOpen}
         onClose={() => setCalendarOpen(false)}
         date={selectedDate}
-        onSelect={(d) => {
-          setSelectedDate(d);
-          setCalendarOpen(false);
-        }}
+        onSelect={(d) => { setSelectedDate(d); setCalendarOpen(false); }}
         lang={lang === "zh" ? "zh" : "en"}
         firstDay={1}
-        topOffset={56}
-        // ✅ 新增：小环渲染器（外层训练进度 + 内层彩色分段）
+        topOffset={headerHeight} // ✅ 完美贴合
         renderDayExtra={renderDayExtra}
-        // ✅ 新增：切换月份时，通知我们重建外环 map
-        onMonthChange={(anyDayInMonth: Date) => setOverlayMonthAnchor(anyDayInMonth)}
+        onMonthChange={(d) => setOverlayMonthAnchor(d)}
       />
 
-
-
-
-      <ModeSwitch />
-
-      {/* 训练环卡片（整卡可点进入详情） */}
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync();
-          router.push({
-            pathname: "/journal-ring",
-            params: { mode, date: dateStr(selectedDate) },
-          });
-        }}
-        style={({ pressed }) => [
-          {
-            borderWidth: 0.6,
-            borderColor: "#f0ececff",
-            borderRadius: 20,
-            backgroundColor: "white",
-            marginBottom: 16,
-            paddingVertical: 12,
-            paddingHorizontal: 12,
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 4,
-          },
-          pressed && { opacity: 0.9 },
-        ]}
-      >
-        {/* 顶部标题行 + 右侧小箭头 */}
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", flex: 1 }}>
-            {lang === "zh" ? "今日攀爬记录" : "Today's climbs"}
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-        </View>
-
-        {/* 细分割线 */}
-        <View
-          style={{
-            height: StyleSheet.hairlineWidth,
-            backgroundColor: "#e5e7eb",
-            marginTop: 8,
-            marginBottom: 12,
-          }}
-        />
-
-        {/* 内容：左分段环（无中心文字） + 右侧等级×数量 */}
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <SingleRing
-            count={todayTotal}
-            modeLabel={modeLabel}
-            diameter={140}
-            thickness={20}
-            total={dayParts.total}
-            parts={dayParts.parts}
-            colorOf={mode === "boulder" ? colorForBoulder : colorForYDS}
-            hideCenter
-            // 不再给 onPress；整卡片已可点
-          />
-
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            {dayParts.parts.length > 0 ? (
-              dayParts.parts.map((p) => {
-                const label =
-                  mode === "boulder"
-                    ? (boulderScale === "Font" ? (V_TO_FONT[p.grade] ?? p.grade) : p.grade)
-                    : (ropeScale === "French" ? (YDS_TO_FRENCH[p.grade] ?? p.grade) : p.grade);
-
-                return (
-                  <View
-                    key={`today-${p.grade}`}
-                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}
-                  >
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 20,
-                        backgroundColor: (mode === "boulder" ? colorForBoulder : colorForYDS)(p.grade),
-                        marginRight: 6,
-                      }}
-                    />
-                    <Text style={{ fontSize: 14, fontWeight: "600" }}>{label}</Text>
-                    <Text style={{ marginLeft: "auto", fontSize: 14, color: "#6B7280" }}>{p.count}</Text>
-                  </View>
-                );
-              })
-            ) : (
-              <Text style={{ fontSize: 13, color: "#9CA3AF" }}>
-                {lang === "zh" ? "今日暂无记录" : "No logs today"}
-              </Text>
-            )}
-          </View>
-        </View>
-      </Pressable>
-
-
-
-
-      {/* 记录卡片：上方动作切换 + 等级胶囊 */}
-      <View
-        style={{
-          borderWidth: 0.6,
-          borderColor: "#e5e7eb",
-          borderRadius: 20,
-          backgroundColor: "white",
-          marginBottom: 12,
-          padding: 12,
-
-          // ✅ 新增阴影
-          shadowColor: "#000",
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 4,
+      {/* 3. 可滚动的内容区域 */}
+      <ScrollView 
+        contentContainerStyle={{ 
+          paddingHorizontal: 16, 
+          paddingBottom: 80,
+          // ✅ 给顶部留出 Header 的空间
+          paddingTop: headerHeight + 16 
         }}
       >
-
-
-
-        <ActionSwitch />
-
-        {/* 等级胶囊（点击即 +1 / -1） */}
-        <View
-
+        {/* ... 下面的 DualActivityRing 等内容保持不变 ... */}
+        <Pressable
+            onPress={() => router.push({ pathname: "/journal-ring", params: { mode, date: dateStr(selectedDate) } })}
+            style={styles.ringCard}
         >
-          <GradeCapsules />
+            <DualActivityRing
+                size={160}
+                thickness={14}
+                trainingPct={trainingPct}
+                climbCount={todayTotal}
+                parts={ringParts}
+                climbGoal={10}
+                outerColor="#A5D23D"
+                innerColor="#3B82F6"
+            />
+        </Pressable>
+
+        <ModeSwitch />
+
+        {/* ... Quick Log 和 List ... */}
+        <View style={styles.controlCard}>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
+                <Text style={styles.cardTitle}>{lang === "zh" ? "快速录入" : "Quick Log"}</Text>
+                <ActionSwitch />
+            </View>
+            <GradePicker />
         </View>
 
-        <Text style={{ marginTop: 8, color: "#6b7280" }}>
-          {action === "add"
-            ? tr("点对应胶囊即可添加 1 条记录", "Tap a capsule to add 1 route")
-            : tr("点对应胶囊即可删减 1 条记录（从最近记录回退）", "Tap a capsule to subtract 1 (removes from most recent)")}
-        </Text>
-      </View>
+        <View style={{ marginTop: 8 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <Text style={styles.sectionTitle}>
+                    {lang === "zh" ? "今日记录明细" : "Today's Details"}
+                </Text>
+                <Text style={{color: '#9CA3AF', fontSize: 12}}>{todayTotal} sends</Text>
+            </View>
 
-      {/* 底部总计 */}
-      <View
-        style={{
-          borderWidth: 0.6,
-          borderColor: "#e5e7eb",
-          borderRadius: 20,
-          padding: 12,
-          backgroundColor: "white",
-
-          // ✅ 新增阴影
-          shadowColor: "#000",
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 4,
-        }}
-      >
- 
-        <Text style={{ fontWeight: "700", marginBottom: 72 }}>
-          {tr("总条数", "Total")}（{totalStats.all}）
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-          {totalStats.list.length === 0 ? (
-            <Text style={{ color: "#9ca3af" }}>{tr("暂无记录", "No records")}</Text>
-          ) : (
-            totalStats.list.map((it) => {
-              const label =
-                mode === "boulder"
-                  ? (boulderScale === "Font" ? (V_TO_FONT[it.grade] ?? it.grade) : it.grade)
-                  : (ropeScale === "French" ? (YDS_TO_FRENCH[it.grade] ?? it.grade) : it.grade);
-
-              return <Pill key={`total-${it.grade}`} text={`${label} × ${it.count}`} />;
-            })
-          )}
+            {dayParts.parts.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {dayParts.parts.map((p) => {
+                    const label = mode === "boulder" 
+                        ? (boulderScale === "Font" ? (V_TO_FONT[p.grade] ?? p.grade) : p.grade)
+                        : (ropeScale === "French" ? (YDS_TO_FRENCH[p.grade] ?? p.grade) : p.grade);
+                    
+                    return (
+                        <View key={`item-${p.grade}`} style={styles.listItem}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (mode==="boulder"?colorForBoulder:colorForYDS)(p.grade), marginRight: 6 }} />
+                                <Text style={{ fontWeight: "600", fontSize: 13 }}>{label}</Text>
+                            </View>
+                            <Text style={{ color: "#6B7280", fontWeight: "500", fontSize: 13 }}>×{p.count}</Text>
+                        </View>
+                    );
+                })}
+              </View>
+            ) : (
+              <View style={{ padding: 20, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12 }}>
+                 <Text style={{ color: "#9CA3AF" }}>{lang === "zh" ? "暂无记录" : "No climbs yet"}</Text>
+              </View>
+            )}
         </View>
-      </View>
+
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  ringCard: { alignItems: 'center', paddingVertical: 20, backgroundColor: '#fff', borderRadius: 24, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2, borderWidth: 0.5, borderColor: '#F3F4F6' },
+  controlCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2, borderWidth: 0.5, borderColor: '#F3F4F6' },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  
+  // Mode Switch
+  modeBtn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 10, backgroundColor: "transparent" },
+  modeBtnActive: { backgroundColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: {width:0, height:2}, elevation: 2 },
+  modeText: { fontWeight: "600", color: "#9CA3AF" },
+  modeTextActive: { color: "#111" },
+
+  // Action Switch (Add/Delete)
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12,minWidth: 80, },
+  actionBtnAdd: { backgroundColor: "#16A34A" },
+  actionBtnSub: { backgroundColor: "#EF4444" },
+  actionBtnInactive: { backgroundColor: "#F3F4F6" },
+  actionText: { marginLeft: 4, fontWeight: "700", color: "#6B7280", fontSize: 14 },
+
+  // Grid (6 cols)
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+// 列表项 (Grid) -> 改为仿 Capsule 样式
+  gridItem: { 
+    // 1. 宽度依然保持 14.5% (适配 6 列)
+    width: '14.5%', 
+    
+    // 2. 【核心改变】去掉 aspectRatio，改用 padding 撑开高度
+    // aspectRatio: 1, // <--- 删除这行
+    paddingVertical: 10, // <--- 加这行，上下留白相等，自然居中
+    
+    // 3. 保持居中对齐配置
+    alignItems: 'center',
+    justifyContent: 'center',
+    
+    // 4. 外观
+    backgroundColor: "#F9FAFB", 
+    borderWidth: 1, 
+    borderColor: "#E5E7EB", 
+    borderRadius: 12, // 圆角可以稍微小一点适应扁长形状，或者保持 12
+  },
+  
+  gridText: { 
+    fontWeight: "700", 
+    color: "#111827", 
+    fontSize: 13,
+    
+    // 仍然建议加上这个，消除 Android 字体自带的怪异边距
+    includeFontPadding: false, 
+    
+    // 这里的 textAlign 此时其实不起决定性作用了，因为容器宽度是固定的
+    textAlign: 'center',
+  },
+  // Group Tabs (Rope)
+  groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F3F4F6" },
+  groupTabActive: { backgroundColor: "#111827" },
+  groupText: { fontWeight: "600", color: "#6B7280", fontSize: 13,
+    
+    // [新增] 强制文字居中，防止某些字体偏移
+    textAlign: 'center',
+    includeFontPadding: false, // Android 修正
+    lineHeight: 18, // 给一个固定行高 
+  },
+  // List Item (3 cols)
+  listItem: {
+    width: '31%', // 3列
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 8, paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 0.5, borderColor: '#E5E7EB',
+  },
+});

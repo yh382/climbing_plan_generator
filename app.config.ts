@@ -60,4 +60,25 @@ const config: ExpoConfig = {
   owner: "1185679154",
 };
 
+const region = process.env.EXPO_PUBLIC_REGION ?? "global";
+const isCN = region === "cn";
+
+if (isCN) {
+  // 国内版的应用名称（你可以根据喜好改成完全中文）
+  config.name = "岩友";
+  config.slug = "climMate-cn";
+  config.scheme = "climMatecn";
+
+  // iOS：给国内版预留一个单独的 bundleIdentifier（记得以后上架前在 Apple 开发者后台也要用这个）
+  config.ios = {
+    ...config.ios,
+    bundleIdentifier: "com.yh382.climmate.cn",
+  };
+
+  // Android：同理，给国内版预留一个独立 package 名称
+  config.android = {
+    ...(config.android ?? {}),
+    package: "com.yh382.climmate.cn",
+  };
+}
 export default config;

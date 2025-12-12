@@ -16,13 +16,13 @@ import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
-
+import { usePlanStore } from "../../src/store/usePlanStore"; // [新增] 确保引入
 // —— 组件 —— //
 import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
 import SingleRing from "../../components/SingleRing";
 import TopRightControls from "../../components/TopRightControls"; // 右侧日期胶囊（内部是 TopDateHeader）
 import { DateMiniRing } from "../../components/DateMiniRing";
-
+import DualActivityRing from "../../src/features/journal/DualActivityRing";
 // —— Store / Context —— //
 import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore";
 import { useSettings } from "../../src/contexts/SettingsContext";
@@ -176,6 +176,21 @@ export default function JournalRingDetail() {
     [mode, boulderScale, ropeScale]
   );
 
+  const { percentForDate } = usePlanStore();
+  const [trainingPct, setTrainingPct] = useState(0);
+
+  useEffect(() => {
+    percentForDate(selectedDate).then(setTrainingPct);
+  }, [selectedDate, percentForDate]);
+
+  // [新增] 准备堆叠条数据
+  const ringParts = useMemo(() => {
+    return dayParts.parts.map((p) => ({
+      grade: p.grade,
+      count: p.count,
+      color: (mode === "boulder" ? colorForBoulder : colorForYDS)(p.grade),
+    }));
+  }, [dayParts.parts, mode]);
   // —— 顶部交互 —— //
   const goPrevDate = useCallback(async () => {
     await Haptics.selectionAsync();
@@ -330,27 +345,25 @@ useLayoutEffect(() => {
         topOffset={56}
       />
 
-      {/* 居中大环 */}
+      {/* 居中大环区域 */}
       <Animated.View
         collapsable={false}
         style={[
-          {
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 16,
-            backgroundColor: "#FFFFFF",
-          },
+          { alignItems: "center", justifyContent: "center", paddingVertical: 32 }, // 增加垂直间距
           ringAnimStyle,
         ]}
       >
-        <SingleRing
-          count={count}
-          modeLabel={modeLabel}
-          diameter={240}
-          thickness={20}
-          total={dayParts.total}
-          parts={dayParts.parts}
-          colorOf={mode === "boulder" ? colorForBoulder : colorForYDS}
+        <DualActivityRing
+          size={260}             // 详情页用超大尺寸
+          thickness={20}         // 环更粗
+          
+          trainingPct={trainingPct}
+          climbCount={dayParts.total}
+          parts={ringParts}      // 堆叠条也会相应变宽
+          climbGoal={10}
+          
+          outerColor="#A5D23D"
+          innerColor="#3B82F6"
         />
       </Animated.View>
 

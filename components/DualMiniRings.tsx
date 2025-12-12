@@ -1,93 +1,115 @@
-// components/DualMiniRings.tsx
+// src/components/DualMiniRings.tsx
 import React from "react";
 import { View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
-// ✅ 直接在 DualMiniRings 内部使用 journal 的小环组件
-import { DateMiniRing } from "./DateMiniRing"; // 如果小环导出位置不同，改成你的实际导出路径/名字
 
 type Props = {
-  size?: number;            // 整体外径
-  outerValue: number;       // 训练完成度 0..100（外环，绿色）
-  innerValue?: number;      // 仅当 innerKind="percent" 时使用（0..100）
-  outerColor?: string;
-  innerColor?: string;
-  track?: string;
+  size?: number;           
+  outerValue: number;      // 训练完成度 0.0 - 1.0
+  innerValue?: number;     // 攀爬进度 (例如 1.4)
+  
+  outerColor?: string;     
+  innerColor?: string;     
+  trackColor?: string;     // 默认底轨颜色
+  
   outerThickness?: number;
   innerThickness?: number;
   gap?: number;
-
-  // 🔹 新增：内环渲染模式
-  innerKind?: "percent" | "journal";     // "journal"=彩色分段小环
-  dateKey?: string;                       // innerKind="journal" 时需要
-  journalType?: "boulder" | "yds";        // journal 小环的类型，默认 boulder
 };
 
 export default function DualMiniRings({
-  size = 28,
-  outerValue,
-  innerValue = 0,
-  outerColor = "#22C55E",
-  innerColor = "#0EA5E9",
-  track = "rgba(0,0,0,0.12)",
-  outerThickness = 2.4,
-  innerThickness = 2,
+  size = 32,
+  outerValue = 0,
+  innerValue = 0, 
+  outerColor = "#A5D23D", 
+  innerColor = "#3B82F6", 
+  trackColor = "#E5E7EB",    
+  outerThickness = 2.5,
+  innerThickness = 2.5,
   gap = 1.5,
-  innerKind = "percent",
-  dateKey,
-  journalType = "boulder",
 }: Props) {
-  const clamp01 = (x: number) => Math.max(0, Math.min(100, x)) / 100;
+  const center = size / 2;
 
-  const mkRing = (r: number, t: number, v01: number, color: string) => {
-    const c = 2 * Math.PI * r, dash = c * v01, rest = c - dash;
-    return (
-      <>
-        {/* 轨道：即使 0% 也画，避免看起来“没有环” */}
-        <Circle cx={size/2} cy={size/2} r={r} stroke={track} strokeWidth={t} fill="none" />
-        {v01 > 0 && (
-          <G originX={size/2} originY={size/2} rotation={-90} scaleX={-1}>
-            {/* 正上方起点 + 逆时针 */}
-            <Circle
-              cx={size/2} cy={size/2} r={r}
-              stroke={color} strokeWidth={t} fill="none"
-              strokeDasharray={`${dash} ${rest}`} strokeLinecap="round"
-            />
-          </G>
-        )}
-      </>
-    );
-  };
-
+  // --- 1. 外环数据计算 ---
   const rOuter = (size - outerThickness) / 2;
-  const rInner = rOuter - outerThickness / 2 - gap - innerThickness / 2;
+  const cOuter = 2 * Math.PI * rOuter;
+  // 限制在 0-1 之间
+  const vOuter = Math.min(1, Math.max(0, outerValue));
+  const dashOuter = cOuter * vOuter;
 
-  const ov01 = clamp01(outerValue);
-  const iv01 = clamp01(innerValue);
+  // --- 2. 内环数据计算 ---
+  const rInner = rOuter - outerThickness - gap;
+  const cInner = 2 * Math.PI * rInner;
+  
+  const fullLoops = Math.floor(innerValue); 
+  const progress = innerValue % 1;
+  
+  // 颜色逻辑 (无底洞覆盖效果)
+  let currentTrackColor = trackColor;
+  let currentTrackOpacity = 0.5; // 默认轨道的透明度
+  let currentProgress = progress;
+
+  if (fullLoops > 0) {
+      // 第二圈开始：底轨变蓝且半透明
+      currentTrackColor = innerColor;
+      currentTrackOpacity = 0.25; 
+      
+      // 如果刚好整圈，显示满圈
+      if (progress === 0 && innerValue > 0) currentProgress = 1;
+  } else {
+      // 第一圈：如果刚好整圈，显示满圈
+      if (progress === 0 && innerValue > 0) currentProgress = 1;
+  }
+
+  const dashInner = cInner * currentProgress;
 
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      {/* [关键修复]
+         1. 移除 Svg 标签上的 rotation="-90" (这种方式有时不稳定)
+         2. 在 G 标签上添加 rotation="-90"
+         3. 明确指定旋转中心点 originX 和 originY 为画布中心
+      */}
       <Svg width={size} height={size}>
-        {/* 外环：训练完成度（绿色），0% 也有轨道 */}
-        {mkRing(rOuter, outerThickness, ov01, outerColor)}
-        {/* 内环：两种模式 */}
-        {innerKind === "percent"
-          ? mkRing(rInner, innerThickness, iv01, innerColor)
-          : null}
-      </Svg>
-
-      {innerKind === "journal" && !!dateKey && (
-        // ✅ 在中心叠放 journal 的彩色小环，尺寸略小于外环
-        <View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
-          <DateMiniRing
-            dateKey={dateKey}
-            type={journalType}
-            size={18}
-            thickness={2}
-            selected={false}
-            onPress={() => {}}
+        <G rotation="-90" originX={center} originY={center}>
+          
+          {/* === 外环 (Training) === */}
+          {/* 轨道 */}
+          <Circle
+            cx={center} cy={center} r={rOuter}
+            stroke={trackColor} strokeWidth={outerThickness} fill="none" 
+            strokeOpacity={0.5} // 轨道半透明
           />
-        </View>
-      )}
+          {/* 进度 */}
+          {outerValue > 0 && (
+            <Circle
+              cx={center} cy={center} r={rOuter}
+              stroke={outerColor} strokeWidth={outerThickness} fill="none"
+              // 使用 strokeDasharray 实现进度条：实线长度 + 空白长度
+              strokeDasharray={`${dashOuter} ${cOuter}`}
+              strokeLinecap="round" // 圆角端点
+            />
+          )}
+
+          {/* === 内环 (Log) === */}
+          {/* 轨道 (颜色会变) */}
+          <Circle
+            cx={center} cy={center} r={rInner}
+            stroke={currentTrackColor} 
+            strokeOpacity={currentTrackOpacity}
+            strokeWidth={innerThickness} fill="none" 
+          />
+          {/* 进度 */}
+          {innerValue > 0 && (
+            <Circle
+              cx={center} cy={center} r={rInner}
+              stroke={innerColor} strokeWidth={innerThickness} fill="none"
+              strokeDasharray={`${dashInner} ${cInner}`}
+              strokeLinecap="round"
+            />
+          )}
+        </G>
+      </Svg>
     </View>
   );
 }
