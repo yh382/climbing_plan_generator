@@ -20,10 +20,17 @@ export type PlanV3Block = {
 
 export type PlanV3Session = {
   id: string;
+  // [新增] 加上这个字段，解决报错
+  session_id: string; 
   type: "climb" | "train";
   intensity?: string;
-  est_duration_min?: number; // 后端其实有这个字段
+  est_duration_min?: number; 
   blocks: PlanV3Block[];
+  
+  // [可选] 为了防止 mock 数据里写了 name/day_index 报错，可以把它们设为可选
+  // 如果后端确定不返回这两个字段，就不要加，但为了前端 mock 方便，建议加上
+  name?: string;
+  day_index?: number;
 };
 
 export type PlanV3 = {

@@ -1,4 +1,5 @@
-// TopBar.tsx
+// components/TopBar.tsx
+
 import React, { useMemo } from "react";
 import {
   View,
@@ -15,13 +16,9 @@ import TopRightControls, {
   TopRightControlsProps,
   TopRightMode,
 } from "./TopRightControls";
-
-// ⬇️ 新增：毛玻璃
-import { BlurView } from "expo-blur";
-
-// ⬇️ 仅用于 Profile 右上角按钮 & 返回
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, TabActions } from "@react-navigation/native";
+import { TabActions } from "@react-navigation/native";
+import { useNavigation, useRouter } from "expo-router";
 import { useUserStore } from "@/store/useUserStore";
 import GlassIconButton from "@components/GlassIconButton";
 
@@ -30,22 +27,20 @@ type Props = {
   title?: string;
   titleZH?: string;
   titleEN?: string;
-  // 只新增这个布尔值，不改其余 props
   profileSettingsOpen?: boolean;
+  leftControls?: {
+    mode: "back" | "custom";
+    onBack?: () => void;
+  };
   rightControls?: TopRightControlsProps;
   rightAccessory?: React.ReactNode;
+  leftAccessory?: React.ReactNode; 
+  centerControl?: React.ReactNode;
   defaultStepper?: {
     step?: number;
     total?: number;
   };
-};
-
-// 小胶囊按钮：里面放图标，外面一层 BlurView
-type GlassIconButtonProps = {
-  isDark: boolean;
-  onPress: () => void;
-  accessibilityLabel?: string;
-  children: React.ReactNode;
+  useSafeArea?: boolean;
 };
 
 export default function TopBar({
@@ -54,20 +49,22 @@ export default function TopBar({
   titleZH,
   titleEN,
   profileSettingsOpen = false,
+  leftControls,
   rightControls,
   rightAccessory,
+  leftAccessory,
+  centerControl,
   defaultStepper,
+  useSafeArea = true,
 }: Props) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const { tr } = useSettings();
-
-  // 仅在本文件内使用，不影响外部
   const navigation = useNavigation();
+  const router = useRouter();
   const { user } = useUserStore();
 
-  // —— 保持 TopRightControls 的原有逻辑不变 —— //
   const defaultMode: TopRightMode =
     routeName?.toLowerCase?.() === "index"
       ? "stepper"
@@ -88,7 +85,7 @@ export default function TopBar({
       dateLabel: tr("09/27 · 周六", "Sat, Sep 27"),
       weekCompact: "W3",
     };
-  }, [rightControls, defaultMode, tr, defaultStepper?.step, defaultStepper?.total]);
+  }, [rightControls, defaultMode, tr, defaultStepper]);
 
   const resolvedTitle =
     titleZH || titleEN
@@ -97,86 +94,111 @@ export default function TopBar({
 
   const isProfile = routeName?.toLowerCase?.() === "profile";
 
-  // 左侧：settings 打开时显示返回箭头
-  const renderLeft = () =>
-    isProfile && profileSettingsOpen ? (
-      <Pressable
-        accessibilityLabel={tr("返回个人资料", "Back to Profile")}
-        onPress={() =>
-          navigation.dispatch(
-            TabActions.jumpTo("profile", { resetProfile: true })
-          )
-        }
-        style={({ pressed }) => ({
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: pressed ? 0.6 : 1,
-        })}
-      >
-        <Ionicons
-          name="chevron-back"
-          size={22}
-          color={isDark ? "#F8FAFC" : "#111827"}
-        />
-      </Pressable>
-    ) : null;
+  const renderLeft = () => {
+    if (leftAccessory) {
+      return leftAccessory;
+    }
 
-  // 右侧：优先 TopRightControls；否则在 Profile&未开设置时给出 分享+三条杠（毛玻璃胶囊）；否则回退到外部传入的 rightAccessory
-  const renderRight = () => {
-  if (resolvedRight) return <TopRightControls {...resolvedRight} />;
-
-  if (isProfile && !profileSettingsOpen) {
-    return (
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        {/* 分享 */}
-        <GlassIconButton
-          onPress={async () => {
-            const username = (user as any)?.username || "user";
-            const url = `https://climmate.app/u/${username}`;
-            try {
-              await Share.share(
-                Platform.select({
-                  ios: { message: url },
-                  android: {
-                    title: tr("分享个人主页", "Share profile"),
-                    message: url,
-                  },
-                  default: { message: url } as any,
-                })
-              );
-            } catch {}
-          }}
-          accessibilityLabel={tr("分享个人页面", "Share profile")}
+    if (leftControls?.mode === "back") {
+      return (
+        <Pressable
+          onPress={leftControls.onBack || (() => router.back())}
+          style={({ pressed }) => ({
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
           <Ionicons
-            name="share-outline"
-            size={18}
+            name="chevron-back"
+            size={24}
             color={isDark ? "#F8FAFC" : "#111827"}
           />
-        </GlassIconButton>
+        </Pressable>
+      );
+    }
 
-        {/* 设置（三条杠） */}
-        <GlassIconButton
+    if (isProfile && profileSettingsOpen) {
+      return (
+        <Pressable
+          accessibilityLabel={tr("返回个人资料", "Back to Profile")}
           onPress={() =>
             navigation.dispatch(
-              TabActions.jumpTo("profile", { openSettings: true })
+              TabActions.jumpTo("profile", { resetProfile: true })
             )
           }
-          accessibilityLabel={tr("打开设置", "Open settings")}
+          style={({ pressed }) => ({
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
           <Ionicons
-            name="menu-outline"
+            name="chevron-back"
             size={22}
             color={isDark ? "#F8FAFC" : "#111827"}
           />
-        </GlassIconButton>
-      </View>
-    );
-  }
+        </Pressable>
+      );
+    }
+    return null;
+  };
 
+  const renderRight = () => {
+    if (resolvedRight) return <TopRightControls {...resolvedRight} />;
+
+    if (isProfile && !profileSettingsOpen) {
+      return (
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <GlassIconButton
+            onPress={async () => {
+              const username = (user as any)?.username || "user";
+              const url = `https://climmate.app/u/${username}`;
+              try {
+                await Share.share(
+                  Platform.select({
+                    ios: { message: url },
+                    android: {
+                      title: tr("分享个人主页", "Share profile"),
+                      message: url,
+                    },
+                    default: { message: url } as any,
+                  })
+                );
+              } catch {}
+            }}
+            accessibilityLabel={tr("分享个人页面", "Share profile")}
+          >
+            <Ionicons
+              name="share-outline"
+              size={18}
+              color={isDark ? "#F8FAFC" : "#111827"}
+            />
+          </GlassIconButton>
+
+          <GlassIconButton
+            onPress={() =>
+              navigation.dispatch(
+                TabActions.jumpTo("profile", { openSettings: true })
+              )
+            }
+            accessibilityLabel={tr("打开设置", "Open settings")}
+          >
+            <Ionicons
+              name="menu-outline"
+              size={22}
+              color={isDark ? "#F8FAFC" : "#111827"}
+            />
+          </GlassIconButton>
+        </View>
+      );
+    }
 
     return rightAccessory ?? null;
   };
@@ -186,25 +208,33 @@ export default function TopBar({
       style={[
         styles.wrap,
         {
-          paddingTop: insets.top,
-          backgroundColor: isDark ? "#0B1220" : "#fafafaff",
+          paddingTop: useSafeArea ? insets.top : 0,
+          // [核心修改] 浅色模式下改为纯白 "#FFFFFF"
+          backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
         },
       ]}
     >
       <View style={styles.bar}>
-        {/* 左侧（仅在 Profile 且 settings 开启时） */}
-        {renderLeft()}
+        <View style={styles.leftContainer}>
+          {renderLeft()}
+        </View>
 
-        {/* 标题 —— 保持你的原始布局，不强制居中 */}
-        <Text
-          numberOfLines={1}
-          style={[styles.title, { color: isDark ? "#F8FAFC" : "#111827" }]}
-        >
-          {resolvedTitle}
-        </Text>
+        <View style={styles.centerContainer}>
+          {centerControl ? (
+            centerControl
+          ) : (
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: isDark ? "#F8FAFC" : "#111827" }]}
+            >
+              {resolvedTitle}
+            </Text>
+          )}
+        </View>
 
-        {/* 右侧：TopRightControls > Profile 的分享/设置 > 外部 rightAccessory */}
-        {renderRight()}
+        <View style={styles.rightContainer}>
+          {renderRight()}
+        </View>
       </View>
     </View>
   );
@@ -218,6 +248,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  leftContainer: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  centerContainer: {
+    flex: 2,
+    alignItems: "center",
+    justifyContent: "center", 
+  },
+  rightContainer: {
+    flex: 1,
+    alignItems: "flex-end",
   },
   title: { fontSize: 18, fontWeight: "700" },
 });

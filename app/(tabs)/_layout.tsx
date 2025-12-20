@@ -1,68 +1,67 @@
+// app/(tabs)/_layout.tsx
+
 import { Tabs } from "expo-router";
-import FloatingTabBar from "../../components/FloatingTabBar";
-import TopBar from "../../components/TopBar";
+import FloatingTabBar from "../../components/FloatingTabBar"; // 确保路径正确
+import TopBar from "../../components/TopBar"; // 确保路径正确
 import React from "react";
 import { useColorScheme, View } from "react-native";
-import { useUserStore } from "@/store/useUserStore";
-
-// 🔧 小组件：在 effect 里清理 params，再渲染 TopBar（避免在渲染期 setParams）
-function HeaderBridge({
-  route,
-  navigation,
-  username,
-}: {
-  route: any;
-  navigation: any;
-  username: string | undefined;
-}) {
-  React.useEffect(() => {
-    const p = route?.params;
-    // 清理旧版本可能遗留的 ReactNode，避免 “cyclical structure in JSON object”
-    if (p && (p.rightAccessory || p.leftAccessory)) {
-      navigation.setParams?.({
-        rightAccessory: undefined,
-        leftAccessory: undefined,
-      });
-    }
-  }, [route?.key, navigation]);
-
-  return (
-    <TopBar
-      routeName={route.name}
-      title={route.name === "profile" ? username : undefined}
-      // 只传可序列化布尔值，驱动 TopBar 的返回箭头/右侧按钮
-      profileSettingsOpen={Boolean(route?.params?.profileSettingsOpen)}
-    />
-  );
-}
+import { useUserStore } from "../../src/store/useUserStore";
 
 export default function TabsLayout() {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
-
   const { user } = useUserStore();
-  const username = user?.username ?? "个人资料";
+  const username = user?.username ?? "Profile";
 
   return (
     <View style={{ flex: 1, backgroundColor: isDark ? "#0B1220" : "#FFFFFF" }}>
       <Tabs
-        screenOptions={{
-          header: ({ route, navigation }) => (
-            <HeaderBridge
-              route={route}
-              navigation={navigation}
-              username={username}
-            />
-          ),
-        }}
         tabBar={(props) => <FloatingTabBar {...props} />}
+        screenOptions={{
+          headerShown: true, 
+          // 统一控制 TopBar 的显示逻辑
+          header: ({ route }) => {
+             // 1. Profile 页显示用户名
+             const title = route.name === 'profile' ? username : undefined;
+             
+             // 2. 不需要原生 Header 的页面列表
+             // 'index' (即 Home), 'community', 'calendar', 'action', 'plan_generator'
+             const hideHeaderRoutes = ['index', 'home', 'community', 'calendar', 'action', 'plan_generator', 'gyms', 'journal'];
+             
+             if (hideHeaderRoutes.includes(route.name)) {
+                 return null;
+             }
+             
+             // 3. 其他页面显示默认 TopBar
+             return <TopBar routeName={route.name} title={title} />;
+          }
+        }}
       >
-        <Tabs.Screen name="home" options={{ title: "首页" }} />
-        <Tabs.Screen name="calendar" options={{ title: "日历" }} />
-        <Tabs.Screen name="journal"  options={{ title: "日志" }} />
-        <Tabs.Screen name="profile"  options={{ title: "个人资料" }} />
-        <Tabs.Screen name="index"    options={{ title: "生成器", href:null, }} />
-        <Tabs.Screen name="gyms"     options={{ title: "Gyms", headerShown: false }} />
+        {/* --- 主 Tab 页面 --- */}
+        
+        {/* 1. 首页 (原 home.tsx 现为 index.tsx) */}
+        <Tabs.Screen name="index" options={{ title: "Home" }} />
+        
+        {/* 2. 日历 */}
+        <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
+        
+        {/* 3. Action (+) 占位 */}
+        <Tabs.Screen name="action" options={{ title: "Post" }} />
+        
+        {/* 4. 社区 */}
+        <Tabs.Screen name="community" options={{ title: "Community" }} />
+        
+        {/* 5. 个人资料 */}
+        <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+
+        {/* --- 隐藏/辅助路由 --- */}
+        
+        {/* 计划生成器 (原 index.tsx) */}
+        <Tabs.Screen name="plan_generator" options={{ href: null }} />
+        
+        <Tabs.Screen name="journal" options={{ href: null }} />
+        <Tabs.Screen name="gyms" options={{ href: null }} />
+        {/* 如果不再有 home.tsx，可以不写 name="home" 的 Screen，或者保留以防缓存 */}
       </Tabs>
     </View>
   );

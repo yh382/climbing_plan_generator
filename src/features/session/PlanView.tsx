@@ -1,13 +1,23 @@
-import React, { useMemo, useCallback } from "react";
-import { View, FlatList, Text, TouchableOpacity, StyleSheet } from "react-native";
+// src/features/session/PlanView.tsx
+
+import React, { useCallback, useEffect, useMemo } from "react";
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ScrollView,
+  Alert
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Components
-import { Button } from "../../../components/ui/Button";
-import { tokens } from "../../../components/ui/Theme";
+// Store
+import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
 
-// Types
-import { PlanV3, PlanV3Session, PlanV3SessionItem } from "../../types/plan";
+// Components & Types
+import { tokens } from "../../../components/ui/Theme"; 
+import { PlanV3Session, PlanV3SessionItem } from "../../types/plan";
 
 // --- 常量定义 ---
 const READINESS_MAP: Record<number, { icon: string; en: string; zh: string }> = {
@@ -18,25 +28,37 @@ const READINESS_MAP: Record<number, { icon: string; en: string; zh: string }> = 
   5: { icon: "🔥", en: "Peak", zh: "极佳" },
 };
 
-// --- 子组件：Header ---
-interface PlanHeaderProps {
-  currentReadiness?: number;
-  onOpenStatus: () => void;
-  dayCompletion?: number;
-  isZH: boolean;
-  paddingTop: number; 
-}
-
-const PlanHeader = React.memo((props: PlanHeaderProps) => {
-  const { currentReadiness = 3, onOpenStatus, dayCompletion = 0, isZH, paddingTop } = props;
+// --- Header 组件 (完整版) ---
+const PlanHeader = React.memo(({ 
+  currentReadiness = 3, 
+  onOpenStatus, 
+  dayCompletion = 0, 
+  isZH, 
+  paddingTop,
+  onMinimize, 
+  timerValue 
+}: any) => {
   const status = READINESS_MAP[currentReadiness] || READINESS_MAP[3];
   const percent = Math.round((isNaN(dayCompletion) ? 0 : dayCompletion) * 100);
 
   return (
-    <View>
-      <View style={{ height: paddingTop + 16 }} />
-      
+    <View style={{ backgroundColor: '#FFF', paddingBottom: 16, paddingTop: paddingTop }}>
+      {/* 1. TopBar: 收起 + 标题 + 计时 */}
+      <View style={styles.topBarContainer}>
+         <TouchableOpacity onPress={onMinimize} style={styles.backBtn}>
+            <Ionicons name="chevron-down" size={28} color="#111" />
+         </TouchableOpacity>
+         
+         <Text style={styles.headerTitle}>Active Workout</Text>
+         
+         <View style={styles.timerPill}>
+            <Text style={styles.timerText}>{timerValue}</Text>
+         </View>
+      </View>
+
+      {/* 2. Dashboard: Status + Progress (这里补全了代码) */}
       <View style={styles.dashboardContainer}>
+        {/* 左侧状态 */}
         <TouchableOpacity onPress={onOpenStatus} style={styles.statusButton} activeOpacity={0.7}>
           <Text style={{ fontSize: 24 }}>{status.icon}</Text>
           <View style={{ marginLeft: 8 }}>
@@ -45,6 +67,7 @@ const PlanHeader = React.memo((props: PlanHeaderProps) => {
           </View>
         </TouchableOpacity>
 
+        {/* 右侧进度条 */}
         <View style={styles.progressContainer}>
            <View style={styles.progressTextRow}>
               <Text style={styles.progressLabel}>{isZH ? "完成进度" : "Progress"}</Text>
@@ -59,156 +82,183 @@ const PlanHeader = React.memo((props: PlanHeaderProps) => {
   );
 });
 
-// --- 主组件 Props ---
+// --- 动作卡片 ---
+const ExerciseCard = ({ 
+  item, index, tt, isCompleted, onToggleComplete, onOpenDetail 
+}: any) => {
+  const label = tt(item.label);
+  const raw = item.raw || {};
+  
+  // 构建一行小字信息
+  const parts = [];
+  if (raw.sets) parts.push(`${raw.sets} sets`);
+  if (raw.reps) parts.push(`${raw.reps} reps`);
+  if (raw.seconds) parts.push(`${raw.seconds}s`);
+  const subInfo = parts.join(" × ");
+
+  return (
+    <TouchableOpacity 
+      style={[styles.simpleCard, isCompleted && styles.simpleCardCompleted]}
+      onPress={() => onOpenDetail(item.raw)}
+      activeOpacity={0.7}
+    >
+      <TouchableOpacity 
+        style={[styles.checkCircle, isCompleted && styles.checkCircleActive]}
+        onPress={() => onToggleComplete(index)}
+      >
+        {isCompleted && <Ionicons name="checkmark" size={16} color="#FFF" />}
+      </TouchableOpacity>
+      <View style={styles.cardContent}>
+        <Text style={[styles.cardTitle, isCompleted && styles.textCompleted]}>{label}</Text>
+        <Text style={styles.cardSub}>{subInfo}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#E5E7EB" />
+    </TouchableOpacity>
+  );
+};
+
+// --- 主页面 ---
 type Props = {
-  planV3: PlanV3 | null;
   todaySession: PlanV3Session | null;
   selectedDate: string;
-  progress: boolean[];
-  toggleProgress: (index: number) => void;
-  headerHeight?: number;
-  onOpenPicker: () => void;
+  onMinimize: () => void;
+  onFinishWorkout: (data: any) => void;
   onOpenDetail: (item: PlanV3SessionItem) => void;
-  onGenerate: () => void;
+  // Status Callbacks (需要加上)
   currentReadiness: number;
   onOpenStatus: () => void;
-  dayCompletion: number;
   
-  // [新增] 从父组件接收 i18n 能力
   isZH: boolean;
   tt: (v: any) => string;
 };
 
 export default function PlanView(props: Props) {
-  // 1. 解构 Props
   const {
-    planV3, todaySession, selectedDate, progress = [], toggleProgress,
-    headerHeight = 0, onOpenPicker, onOpenDetail, onGenerate,
-    currentReadiness, onOpenStatus, dayCompletion,
-    isZH, tt // 使用传入的 helper
+    todaySession, selectedDate, 
+    onMinimize, onFinishWorkout, onOpenDetail, 
+    currentReadiness, onOpenStatus, // 接收状态 Props
+    isZH, tt 
   } = props;
 
-  const safePadding = (typeof headerHeight === 'number' && !isNaN(headerHeight)) ? headerHeight : 0;
+  const insets = useSafeAreaInsets();
+  
+  // 连接 Store
+  const { 
+    seconds, isPaused, pauseWorkout, resumeWorkout, 
+    sessionData, updateSessionData 
+  } = useActiveWorkoutStore();
 
-    // 2. 数据处理
-    // 3. 数据处理 (核心修复：正确分离中英文)
-    const displayItems = useMemo(() => {
-    if (!todaySession?.blocks) return [];
-    
-    const items: any[] = [];
-    todaySession.blocks.forEach(b => {
-      if (!b.items) return;
-      b.items.forEach(it => {
-        // [修复] 分别获取中英文名字
-        // 如果后端没传 name_override，回退显示 action_id
-        const nameZH = it.name_override?.zh || it.action_id;
-        const nameEN = it.name_override?.en || it.action_id;
-        
-        // [修复] 分别构建中英文的“目标”描述 (Sets/Reps)
-        let detailZH = "";
-        let detailEN = "";
-        
-        if (it.sets) {
-            detailZH += `${it.sets}组`;
-            detailEN += `${it.sets} sets`;
-        }
-        
-        if (it.reps) {
-            detailZH += ` × ${it.reps}次`;
-            detailEN += ` × ${it.reps} reps`;
-        } else if (it.seconds) {
-            detailZH += ` × ${it.seconds}秒`;
-            detailEN += ` × ${it.seconds}s`;
-        }
-        
-        // 追加备注 (Notes)
-        if (it.notes?.zh) detailZH += ` | ${it.notes.zh}`;
-        if (it.notes?.en) detailEN += ` | ${it.notes.en}`;
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+  };
 
-        // 构造符合 renderItem 预期的 I18N 对象
-        items.push({
-            label: { zh: nameZH, en: nameEN }, // ✅ 中英分离
-            target: { zh: detailZH, en: detailEN }, // ✅ 中英分离
-            raw: it
+  // 初始化数据
+  useEffect(() => {
+    if (sessionData.length === 0 && todaySession?.blocks) {
+        const items: any[] = [];
+        todaySession.blocks.forEach(b => {
+             b.items?.forEach(it => {
+                 items.push({
+                     label: it.name_override || { en: it.action_id, zh: it.action_id }, 
+                     raw: it,
+                     completed: false
+                 });
+             });
         });
-      });
-    });
-    
-    return items;
+        updateSessionData(items);
+    }
   }, [todaySession]);
 
-  // 3. Render Item
-  const renderItem = useCallback(({ item, index }: { item: any; index: number }) => {
-    const done = !!progress[index];
-    
-    return (
-      <View style={styles.card}>
-        <TouchableOpacity onPress={() => toggleProgress(index)} style={{ padding: 8 }}>
-          <View style={[styles.checkbox, done ? styles.checkboxChecked : styles.checkboxUnchecked]} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.cardContent} onPress={() => onOpenDetail(item.raw)}>
-          <Text style={styles.cardTitle}>{tt(item.label)}</Text>
-          <Text style={styles.cardSubtitle}>{tt(item.target)}</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity onPress={() => onOpenDetail(item.raw)} style={{ padding: 8 }}>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-        </TouchableOpacity>
-      </View>
+  const toggleComplete = useCallback((index: number) => {
+    const newData = [...sessionData];
+    newData[index].completed = !newData[index].completed;
+    updateSessionData(newData);
+  }, [sessionData, updateSessionData]);
+
+  // 计算进度传给 Header
+  const completedCount = sessionData.filter((i:any) => i.completed).length;
+  const progress = sessionData.length > 0 ? completedCount / sessionData.length : 0;
+
+  const togglePause = () => {
+    if (isPaused) resumeWorkout();
+    else pauseWorkout();
+  };
+
+  const handleFinishPress = () => {
+    Alert.alert(
+      isZH ? "完成训练?" : "Finish Workout?",
+      isZH ? "确认结束并保存记录吗？" : "Are you sure you want to finish?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Finish", onPress: () => onFinishWorkout(sessionData) }
+      ]
     );
-  }, [progress, toggleProgress, onOpenDetail, tt]);
+  };
 
-  // 4. Header 渲染
-  const ListHeader = useCallback(() => (
-    <PlanHeader 
-      currentReadiness={currentReadiness}
-      onOpenStatus={onOpenStatus}
-      dayCompletion={dayCompletion}
-      isZH={isZH}
-      paddingTop={safePadding}
-    />
-  ), [currentReadiness, onOpenStatus, dayCompletion, isZH, safePadding]);
+  if (!todaySession) return null;
 
-  // --- 空状态 ---
-  if (!todaySession) {
-    return (
-      <View style={[styles.emptyContainer, { paddingTop: safePadding + 16 }]}>
-         {planV3 ? (
-           <>
-             <Text style={styles.mutedText}>{isZH ? "今日暂无训练计划" : "No session planned today"}</Text>
-             <TouchableOpacity onPress={onOpenPicker} style={styles.addButton}>
-                <Ionicons name="add" size={32} color="#fff" />
-                <Text style={styles.addButtonText}>{isZH ? "添加训练" : "Add Session"}</Text>
-             </TouchableOpacity>
-           </>
-         ) : (
-           <View style={{ alignItems: 'center' }}>
-              <Text style={styles.mutedText}>{isZH ? "还没有生成训练计划" : "No active plan found"}</Text>
-              <Button title={isZH ? "去生成" : "Generate Plan"} onPress={onGenerate} variant="secondary" />
-           </View>
-         )}
-      </View>
-    );
-  }
-
-  // --- 列表 ---
   return (
-    <FlatList
-      data={displayItems}
-      renderItem={renderItem}
-      keyExtractor={(item, i) => `${selectedDate}_${i}`}
-      contentContainerStyle={styles.listContent}
-      ListHeaderComponent={ListHeader}
-      removeClippedSubviews={false}
-    />
+    <View style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        <PlanHeader 
+          paddingTop={insets.top}
+          onMinimize={onMinimize}
+          timerValue={formatTime(seconds)}
+          // 传递状态数据
+          currentReadiness={currentReadiness}
+          onOpenStatus={onOpenStatus}
+          dayCompletion={progress}
+          isZH={isZH}
+        />
+
+        <View style={{ paddingHorizontal: 16 }}>
+            {sessionData.map((item: any, index: number) => (
+                <ExerciseCard 
+                    key={`${selectedDate}_${index}`}
+                    index={index}
+                    item={item}
+                    tt={tt}
+                    isCompleted={item.completed}
+                    onToggleComplete={toggleComplete}
+                    onOpenDetail={onOpenDetail} 
+                />
+            ))}
+        </View>
+      </ScrollView>
+
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 20 }]}>
+          <TouchableOpacity 
+            style={[styles.pauseBtn, isPaused && styles.resumeBtn]} 
+            onPress={togglePause}
+          >
+              <Ionicons name={isPaused ? "play" : "pause"} size={24} color={isPaused ? "#FFF" : "#F59E0B"} />
+              <Text style={[styles.pauseText, isPaused && {color: '#FFF'}]}>
+                 {isPaused ? (isZH ? "继续" : "RESUME") : (isZH ? "暂停" : "PAUSE")}
+              </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.finishBtn} onPress={handleFinishPress}>
+              <Text style={styles.finishText}>{isZH ? "完成训练" : "FINISH"}</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+          </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  listContent: { paddingBottom: 80 },
-  dashboardContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 20, gap: 12 },
-  statusButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', padding: 8, paddingRight: 16, borderRadius: 20, minWidth: 110, borderWidth: 0.5, borderColor: '#E5E7EB' },
+  // Header
+  topBarContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12, height: 44 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
+  headerTitle: { fontSize: 17, fontWeight: '600', color: '#111', flex: 1, textAlign: 'center' },
+  timerPill: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  timerText: { color: '#111', fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: 14 },
+  
+  // Dashboard (Status & Progress) - 找回的样式
+  dashboardContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12 },
+  statusButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 8, paddingRight: 16, borderRadius: 16, minWidth: 110, borderWidth: 1, borderColor: '#F3F4F6' },
   statusLabelTitle: { fontSize: 9, color: '#6B7280', fontWeight: '700', textTransform: 'uppercase' },
   statusLabelValue: { fontSize: 13, fontWeight: '600', color: '#111' },
   progressContainer: { flex: 1, justifyContent: 'center' },
@@ -217,15 +267,22 @@ const styles = StyleSheet.create({
   progressValue: { fontSize: 12, fontWeight: '700', color: '#306E6F' },
   progressBarTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: '#A5D23D', borderRadius: 4 },
-  card: { marginHorizontal: 16, marginBottom: 12, flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 20, borderWidth: 0.6, borderColor: "#E5E7EB", padding: 12 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 1 },
-  checkboxChecked: { borderColor: "#A5D23D", backgroundColor: "#A5D23D" },
-  checkboxUnchecked: { borderColor: "#d1d5db", backgroundColor: "#FFFFFF" },
-  cardContent: { flex: 1, paddingLeft: 8, paddingVertical: 8 },
-  cardTitle: { fontWeight: "600", marginBottom: 4, color: tokens.color.text },
-  cardSubtitle: { color: tokens.color.text },
-  emptyContainer: { flex: 1, padding: 20, alignItems: "center", justifyContent: "center", paddingBottom: 100 },
-  mutedText: { fontSize: 16, color: tokens.color.muted, marginBottom: 24 },
-  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#306E6F', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 30, elevation: 6, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  addButtonText: { color: "#fff", fontSize: 18, fontWeight: "600", marginLeft: 8 },
+
+  // Cards
+  simpleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', marginBottom: 12, borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: '#E5E7EB', shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: {width:0, height:2} },
+  simpleCardCompleted: { opacity: 0.6, backgroundColor: '#F9FAFB' },
+  checkCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  checkCircleActive: { borderColor: '#10B981', backgroundColor: '#10B981', borderWidth: 0 },
+  cardContent: { flex: 1 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 4 },
+  cardSub: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  textCompleted: { textDecorationLine: 'line-through', color: '#9CA3AF' },
+
+  // Bottom Bar
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 16, flexDirection: 'row', gap: 12 },
+  pauseBtn: { flex: 1, height: 56, borderRadius: 28, backgroundColor: '#FFF9E6', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: '#F59E0B' },
+  resumeBtn: { backgroundColor: '#F59E0B', borderColor: '#F59E0B' },
+  pauseText: { color: '#F59E0B', fontSize: 15, fontWeight: '700' },
+  finishBtn: { flex: 2, height: 56, borderRadius: 28, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10 },
+  finishText: { color: '#FFF', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 }
 });

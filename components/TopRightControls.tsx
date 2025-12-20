@@ -1,15 +1,13 @@
 import React, { useMemo } from "react";
-import { View, StyleSheet, ViewStyle, useColorScheme } from "react-native";
-import TopDateHeader from "./TopDateHeader";
+import { View, StyleSheet, ViewStyle, useColorScheme, Text, Pressable } from "react-native";
 import TopStepper from "./TopStepper";
-
 
 export type TopRightMode = "date" | "stepper" | "none";
 
 type DateModeProps = {
   mode: "date";
-  dateLabel: string;       // '09/27 · 周六' 或 'Sat, Sep 27'
-  weekCompact?: string;    // 'W3'
+  dateLabel: string;
+  weekCompact?: string;
   onPrevDate?: () => void;
   onNextDate?: () => void;
   onOpenPicker?: () => void;
@@ -19,7 +17,7 @@ type DateModeProps = {
 
 type StepperModeProps = {
   mode: "stepper";
-  step: number;            // 1..total
+  step: number;
   total?: number;
   onPrevStep?: () => void;
   onNextStep?: () => void;
@@ -58,31 +56,38 @@ export default function TopRightControls(props: TopRightControlsProps) {
 
   if (!props || props.mode === "none" || !props.mode) return null;
 
-  const maxWidthRatio = (props as any).maxWidthRatio ?? 0.6; // 更宽的默认占比
+  const maxWidthRatio = (props as any).maxWidthRatio ?? 0.6; 
 
+  // --- 1. 日期模式 (无箭头版) ---
   if (props.mode === "date") {
-    const {
-      dateLabel, weekCompact, onPrevDate, onNextDate, onOpenPicker, canPrevDate, canNextDate,
-    } = props;
+    const { dateLabel, weekCompact, onOpenPicker } = props;
+    const textColor = isDark ? "#F8FAFC" : "#111827";
 
     return (
-      <View pointerEvents="box-none" style={{ width: `${maxWidthRatio * 100}%`, flexShrink: 1 }}>
+      // 外层容器：负责定位和穿透点击
+      <View pointerEvents="box-none" style={{ flexShrink: 1 }}>
+        {/* 胶囊容器：必须是 View，因为它带有 pointerEvents="auto" 用于拦截点击区域 */}
         <View pointerEvents="auto" style={capsuleStyle}>
-          <TopDateHeader
-            embedded
-            dateLabel={weekCompact ? `${dateLabel} · ${weekCompact}` : dateLabel}
-            onPrev={onPrevDate}
-            onNext={onNextDate}
-            canPrev={canPrevDate}
-            canNext={canNextDate}
-            onPressCenter={onOpenPicker}
-            style={styles.inner}
-          />
+          
+          {/* 点击区域：使用 Pressable 撑满父容器 */}
+          <Pressable 
+            onPress={onOpenPicker}
+            style={styles.dateTouchArea}
+            // 移除 activeOpacity，Pressable 使用 style 回调来实现按压态（如果需要）
+          >
+            <Text 
+              numberOfLines={1} 
+              style={[styles.dateText, { color: textColor }]}
+            >
+              {weekCompact ? `${dateLabel} · ${weekCompact}` : dateLabel}
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
   }
 
+  // --- 2. 步进器模式 (保持不变) ---
   const { step, total, onPrevStep, onNextStep, canPrevStep, canNextStep } = props as StepperModeProps;
 
   return (
@@ -105,12 +110,24 @@ export default function TopRightControls(props: TopRightControlsProps) {
 
 const styles = StyleSheet.create({
   capsule: {
-    height: 40,           // 更高一些
+    height: 40,
     borderRadius: 999,
-    paddingHorizontal: 12, // 更宽一些
     justifyContent: "center",
+    overflow: 'hidden', // 确保 Pressable 的点击效果不溢出圆角
   },
   inner: {
-    minWidth: 140,        // 增大最小宽度，避免拥挤
+    minWidth: 140,
   },
+  dateTouchArea: {
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  dateText: {
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: 'center',
+  }
 });

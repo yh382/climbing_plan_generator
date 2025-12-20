@@ -1,273 +1,190 @@
-// 文件名：src/features/profile/profile.tsx
-import React from "react";
+// app/(tabs)/profile.tsx
+import React, { useState } from "react";
 import {
-  FlatList,
+  ScrollView,
   View,
   RefreshControl,
   Text,
-  Platform,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
 } from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import { useUserStore } from "@/store/useUserStore";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import { useCareerStore } from "@/features/profile/store/useCareerStore";
-import { useClimbsStore } from "@/features/profile/store/useClimbsStore";
 
-import { ProfileHeader, QuickStats } from "@/features/profile";
+import { ProfileHeader } from "@/features/profile";
+import { UserPersonaSection } from "@/features/profile/components/Persona/UserPersonaSection";
 import SlidePage from "@components/slide/SlidePage";
-import ProfileTabs from "@/features/profile/components/ProfileTabs";
-// 之前是 ProfileSectionSlide，这里不再需要
-// import ProfileSectionSlide from "@/features/profile/components/ProfileSectionSlide";
-import NearbyGymsSheet from "@/features/profile/components/NearbyGymsSheet";
-import { useRoute, useNavigation } from "@react-navigation/native";
 import Settings from "./settings";
 
-// 新增：用户画像 + 偏好卡片
-import { UserPersonaSection } from "@/features/profile/components/Persona/UserPersonaSection";
-import { PreferencesCard } from "@/features/profile/components/Persona/PreferencesCard";
-
-function ClimbListItem({
-  item,
-}: {
-  item: import("@/features/profile/store/useClimbsStore").ClimbItem;
-}) {
-  return (
-    <View
-      style={{
-        backgroundColor: "#fafafaff",
-        borderRadius: 12,
-        padding: 12,
-        marginHorizontal: 16,
-      }}
-    >
-      <Text style={{ fontWeight: "700" }}>
-        {item.route_name ?? "(未命名路线)"} · {item.grade_value}
-      </Text>
-      <Text style={{ color: "#6b7280", marginTop: 4 }}>
-        {item.date} · {item.location_type}/{item.discipline} · 尝试 {item.attempts} · 完成{" "}
-        {item.sends}
-      </Text>
-      {!!item.notes && <Text style={{ marginTop: 4 }}>{item.notes}</Text>}
-    </View>
-  );
-}
-
-// 右滑入的“附近岩馆”面板（先占位，等你提供数据源后再接入）
-function NearbyGymsPanel({ onClose }: { onClose: () => void }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: "#fff", padding: 16 }}>
-      <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 12 }}>附近岩馆</Text>
-      <Text style={{ color: "#6b7280" }}>
-        按距离从近到远排序显示（待接入数据源与定位）。点击条目后设置为 Home Gym 并关闭面板。
-      </Text>
-    </View>
-  );
-}
+// 定义 Tabs
+const TABS = [
+  { key: "persona", label: "用户画像" },
+  { key: "analysis", label: "分析" },
+  { key: "posts", label: "动态" },
+  { key: "badges", label: "勋章" },
+];
 
 export default function ProfileScreen() {
   const { user, loading: userLoading, fetchMe: fetchUser } = useUserStore();
   const { profile, loading: profileLoading, fetchMe: fetchProfile } = useProfileStore();
   const { summary, loading: summaryLoading, fetchSummary } = useCareerStore();
-  const { items, nextCursor, loading: climbsLoading, fetchList, loadMore } = useClimbsStore();
-
-  const [showSettings, setShowSettings] = React.useState(false);
-  const [showNearbyGyms, setShowNearbyGyms] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState(0);
-
-  // 吸顶所需
-  const [tabsOffsetY, setTabsOffsetY] = React.useState(0);
-  const [tabsHeight, setTabsHeight] = React.useState(0);
-  const [sticky, setSticky] = React.useState(false);
-  const TOPBAR_OFFSET = 0;
-
-  const navigation = useNavigation();
-  const route = useRoute();
+  
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState("persona");
+  const router = useRouter();
 
   React.useEffect(() => {
     fetchUser();
     fetchProfile();
-    // 这里用 "all" 以符合“累计/最佳”的需求
     fetchSummary({ range: "all", type: "all", scope: "all" });
-    fetchList({ type: "all", scope: "all" });
   }, []);
 
-  const headerSummary = React.useMemo(
-    () => ({
+  const onRefresh = React.useCallback(async () => {
+    await Promise.all([fetchUser(), fetchProfile(), fetchSummary({ range: "all" })]);
+  }, []);
+
+  const headerSummary = React.useMemo(() => ({
       level: profile?.anthropometrics?.level,
-      home_gym_name: undefined,
+      home_gym_name: (profile as any)?.preferences?.home_gym_name,
       primary_outdoor_area: profile?.preferences?.primary_outdoor_area,
       bio_from_profile: (profile as any)?.bio ?? null,
       count_total: summary?.count_total ?? 0,
       best_grade_label: summary?.best_grade_label ?? null,
-    }),
-    [profile, summary]
-  );
+  }), [profile, summary]);
 
-  const onRefresh = React.useCallback(async () => {
-    await Promise.all([
-      fetchUser(),
-      fetchProfile(),
-      fetchSummary({ range: "all" }),
-      fetchList({ type: "all", scope: "all" }),
-    ]);
-  }, []);
-
-  React.useEffect(() => {
-    // 设置 & 附近岩馆 只要有一个打开，就让 TopBar 认为 profileSettingsOpen = true
-    // @ts-ignore
-    navigation.setParams?.({ profileSettingsOpen: showSettings || showNearbyGyms });
-  }, [showSettings, showNearbyGyms, navigation]);
-
-  React.useEffect(() => {
-    const p: any = (route as any).params;
-    if (!p) return;
-
-    if (p.openSettings) {
-      setShowSettings(true);
-      // @ts-ignore
-      navigation.setParams?.({ openSettings: undefined, profileSettingsOpen: true });
-    }
-
-    if (p.resetProfile) {
-      setShowSettings(false);
-      setShowNearbyGyms(false);
-      // @ts-ignore
-      navigation.setParams?.({ resetProfile: undefined, profileSettingsOpen: false });
-    }
-  }, [route?.params, navigation]);
-
-  // ✅ 底部四大板块合并为：用户画像 + 偏好
-  const tabs = ["用户画像", "偏好"];
-
-  const handleListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const shouldStick = y + TOPBAR_OFFSET >= tabsOffsetY;
-    if (shouldStick !== sticky) setSticky(shouldStick);
-  };
-
-  // QuickStats 的 Home Gym 文案：优先 name，再退回 id
-  const homeGymText =
-    (profile as any)?.preferences?.home_gym_name ??
-    (profile as any)?.preferences?.home_gym_id ??
-    null;
-
-  return (
-    <View style={{ flex: 1, backgroundColor: "#fafafaff" }}>
-      <FlatList
-        data={items}
-        keyExtractor={(it) => it.id}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}
-        ListHeaderComponent={
-          <View>
-            <ProfileHeader
-              user={user}
-              summary={headerSummary}
-              loading={userLoading || profileLoading}
-              onEditAvatar={() => {}}
-              onEditUsername={() => {}}
-            />
-
-            {/* 新版 QuickStats：仅累计/最佳 + Home Gym 行 */}
-            <QuickStats
-              data={
-                summary
-                  ? {
-                      count_total: summary.count_total,
-                      best_grade_label: summary.best_grade_label,
-                    }
-                  : undefined
-              }
-              loading={summaryLoading}
-              homeGymName={homeGymText}
-              onPressHomeGym={() => setShowNearbyGyms(true)}
-            />
-
-            {/* Tabs（吸顶占位逻辑不变） */}
-            <View
-              onLayout={(e) => {
-                const { y, height } = e.nativeEvent.layout;
-                setTabsOffsetY(y);
-                setTabsHeight(height);
-              }}
-            >
-              {!sticky ? (
-                <ProfileTabs tabs={tabs} activeIndex={activeTab} onTabPress={setActiveTab} />
-              ) : (
-                <View style={{ height: tabsHeight }} />
-              )}
-            </View>
-
-            {/* ✅ 用 activeTab 手动切换：0 = 用户画像，1 = 偏好 */}
-            {activeTab === 0 && (
-              <View style={{ paddingHorizontal: 16 }}>
-                <UserPersonaSection />
-              </View>
-            )}
-
-            {activeTab === 1 && (
-              <PreferencesCard />
-            )}
-
-            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
-              <Text style={{ fontSize: 16, fontWeight: "700" }}>最近记录</Text>
+  // --- 各板块内容组件 ---
+  const renderContent = () => {
+    switch (activeTab) {
+      case "persona":
+        return (
+          <View style={styles.tabContent}>
+            <UserPersonaSection />
+          </View>
+        );
+      
+      case "analysis":
+        return (
+          <View style={styles.tabContent}>
+            {/* 分析入口卡片 */}
+            <TouchableOpacity style={styles.analysisCard} onPress={() => router.push("/analysis")}>
+               <View style={{flex: 1}}>
+                  <Text style={styles.cardTitle}>Load & Injury</Text>
+                  <Text style={styles.cardSub}>点击查看详细负荷与伤病数据</Text>
+               </View>
+               <View style={styles.chartPlaceholder}>
+                  <Ionicons name="stats-chart" size={28} color="#4F46E5" />
+               </View>
+            </TouchableOpacity>
+            
+            {/* 可以在这里放一些简略的小数据，比如“本周负荷：高” */}
+            <View style={{marginTop: 12, padding: 16, backgroundColor: '#FFF', borderRadius: 12}}>
+                <Text style={{color: '#6B7280'}}>更多深度分析正在开发中...</Text>
             </View>
           </View>
-        }
-        renderItem={({ item }) => <ClimbListItem item={item} />}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        ListFooterComponent={
-          climbsLoading ? (
-            <Text style={{ textAlign: "center", padding: 12, color: "#6b7280" }}>
-              加载中...
-            </Text>
-          ) : null
-        }
-        onEndReached={() => nextCursor && loadMore()}
-        onEndReachedThreshold={0.4}
-        contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
-        onScroll={handleListScroll}
-        scrollEventThrottle={16}
-      />
+        );
 
-      {/* Tabs 吸顶覆盖层 */}
-      {sticky && (
-        <View
-          style={{
-            position: "absolute",
-            top: TOPBAR_OFFSET,
-            left: 0,
-            right: 0,
-            backgroundColor: "#fff",
-            zIndex: 10,
-            borderBottomWidth: 1,
-            borderBottomColor: "#e5e7eb",
-          }}
-          pointerEvents="auto"
-        >
-          <ProfileTabs tabs={tabs} activeIndex={activeTab} onTabPress={setActiveTab} />
+      case "posts":
+        return (
+          <View style={[styles.tabContent, styles.emptyState]}>
+             <Ionicons name="images-outline" size={48} color="#D1D5DB" />
+             <Text style={styles.emptyText}>暂无动态</Text>
+             <TouchableOpacity style={styles.smallBtn}>
+                <Text style={styles.smallBtnText}>去发布</Text>
+             </TouchableOpacity>
+          </View>
+        );
+
+      case "badges":
+        return (
+          <View style={styles.tabContent}>
+             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                <View style={styles.badgeItem}><Text style={{fontSize: 28}}>🧗</Text><Text style={styles.badgeName}>首攀</Text></View>
+                <View style={[styles.badgeItem, {opacity: 0.5}]}><Text style={{fontSize: 28}}>🔒</Text><Text style={styles.badgeName}>百次</Text></View>
+                <View style={[styles.badgeItem, {opacity: 0.5}]}><Text style={{fontSize: 28}}>🔒</Text><Text style={styles.badgeName}>V8</Text></View>
+             </View>
+          </View>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        stickyHeaderIndices={[1]} // [关键] 索引 1 (TabBar) 将会吸顶
+      >
+        {/* Index 0: 头部 */}
+        <ProfileHeader
+          user={user}
+          summary={headerSummary}
+          loading={userLoading || profileLoading}
+          onEditAvatar={() => setShowSettings(true)}
+          onEditUsername={() => setShowSettings(true)}
+        />
+
+        {/* Index 1: 吸顶 Tab 栏 */}
+        <View style={styles.stickyTabBarContainer}>
+          <View style={styles.tabBar}>
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <TouchableOpacity 
+                  key={tab.key} 
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[styles.tabItem, isActive && styles.tabItemActive]}
+                >
+                  <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                    {tab.label}
+                  </Text>
+                  {isActive && <View style={styles.activeLine} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      )}
 
-      {/* 附近岩馆：从右向左滑入 */}
-      <SlidePage
-        visible={showNearbyGyms}
-        onClose={() => setShowNearbyGyms(false)}
-        direction="left"
-      >
-        <NearbyGymsPanel onClose={() => setShowNearbyGyms(false)} />
-      </SlidePage>
+        {/* Index 2: 内容区 */}
+        {renderContent()}
 
-      {/* 设置页保持不变 */}
-      <SlidePage
-        visible={showSettings}
-        onClose={() => setShowSettings(false)}
-        direction="left"
-      >
+      </ScrollView>
+
+      <SlidePage visible={showSettings} onClose={() => setShowSettings(false)} direction="left">
         <Settings />
       </SlidePage>
     </View>
   );
 }
 
+const styles = StyleSheet.create({
+  stickyTabBarContainer: { backgroundColor: '#FAFAFA', paddingBottom: 8 },
+  tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', marginHorizontal: 16, borderRadius: 12, padding: 4, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8 },
+  tabItemActive: { backgroundColor: '#F3F4F6' },
+  tabText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+  tabTextActive: { color: '#111827' },
+  activeLine: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#111827', position: 'absolute', bottom: 4 },
+  
+  tabContent: { marginTop: 12, paddingHorizontal: 16 },
+  
+  analysisCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 0.5, borderColor: '#E5E7EB', shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
+  cardSub: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
+  chartPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  emptyText: { color: '#9CA3AF', marginTop: 8, marginBottom: 16 },
+  smallBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#111827', borderRadius: 20 },
+  smallBtnText: { fontSize: 12, color: '#FFF', fontWeight: '600' },
+  
+  badgeItem: { alignItems: 'center', gap: 4 },
+  badgeName: { fontSize: 12, color: '#4B5563', fontWeight: '600' }
+});
