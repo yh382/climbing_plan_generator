@@ -14,11 +14,22 @@ const config: ExpoConfig = {
     config: {
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
     },
-    infoPlist: {
-      NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
-      ITSAppUsesNonExemptEncryption: false,
-      NSAppTransportSecurity: { NSAllowsArbitraryLoads: true },
+  infoPlist: {
+    NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
+
+    // ✅ 选相册（Choose from library）
+    NSPhotoLibraryUsageDescription: "ClimMate 需要访问你的相册，以便选择头像。",
+
+    // ✅ 拍照（Take photo）
+    NSCameraUsageDescription: "ClimMate 需要访问你的相机，以便拍摄头像。",
+
+    // （可选）只有你要“保存图片到相册”才需要
+    NSPhotoLibraryAddUsageDescription: "ClimMate 需要权限将图片保存到你的相册。",
+
+    ITSAppUsesNonExemptEncryption: false,
+    NSAppTransportSecurity: { NSAllowsArbitraryLoads: true },
     },
+
   },
 
   android: {
@@ -47,6 +58,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-location",
+    "expo-secure-store",
     ["expo-build-properties", { ios: { useFrameworks: "static" } }],
   ],
 

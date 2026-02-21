@@ -1,12 +1,17 @@
-// app/(tabs)/journal.tsx
-import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect } from "react";
-import { ScrollView, Text, TouchableOpacity, View, Pressable, StyleSheet, Alert } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo,useRef, useState } from "react";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
+} from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { format } from "date-fns";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Store
 import useLogsStore, { useSegmentsByDate } from "../../src/store/useLogsStore";
@@ -15,34 +20,45 @@ import { useSettings } from "src/contexts/SettingsContext";
 
 // Components
 import CollapsibleCalendarOverlay from "../../components/CollapsibleCalendarOverlay";
-import TopBar from "../../components/TopBar";
-import DualActivityRing from "../../src/features/journal/DualActivityRing";
 import DualMiniRings from "../../components/DualMiniRings";
+import CollapsibleLargeHeader from "../../src/components/CollapsibleLargeHeader";
+import LogSendModal, { LogSendDraft } from "../../src/features/journal/LogSendModal";
+import QuickLogCard from "../../src/features/journal/QuickLogCard";
+import { TodayDetailsList } from "../../src/features/journal/loglist";
+import type { LocalDayLogItem } from "../../src/features/journal/loglist/types";
+import { enqueueLogEvent } from "../../src/features/journal/sync/logsOutbox";
+import { flushLogsOutbox } from "../../src/features/journal/sync/logsOutbox";
+import { readAllServerIds, setServerId } from "../../src/features/journal/sync/serverIdMap";
+import { useAuthStore } from "../../src/store/useAuthStore";
 
-// Utils & Colors
+// Utils
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 
-const V_GRADES = ["VB", "V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
+
+// ... (省略 YDS_GROUPS, Mappings, pad, dateStr 等辅助函数，保持不变) ...
+
 const YDS_GROUPS = {
-  "Beginner": ["5.6","5.7","5.8","5.9"],
-  "5.10": ["5.10a","5.10b","5.10c","5.10d"],
-  "5.11": ["5.11a","5.11b","5.11c","5.11d"],
-  "5.12": ["5.12a","5.12b","5.12c","5.12d"],
-  "Elite": ["5.13a","5.13b","5.13c","5.13d","5.14a"],
+  Beginner: ["5.6", "5.7", "5.8", "5.9"],
+  "5.10": ["5.10a", "5.10b", "5.10c", "5.10d"],
+  "5.11": ["5.11a", "5.11b", "5.11c", "5.11d"],
+  "5.12": ["5.12a", "5.12b", "5.12c", "5.12d"],
+  Elite: ["5.13a", "5.13b", "5.13c", "5.13d", "5.14a"],
 };
 type YdsGroupKey = keyof typeof YDS_GROUPS;
 
 const YDS_TO_FRENCH: Record<string, string> = {
-  "5.6":"5a","5.7":"5b","5.8":"5c","5.9":"6a",
-  "5.10a":"6a+","5.10b":"6a+","5.10c":"6b","5.10d":"6b+",
-  "5.11a":"6c","5.11b":"6c+","5.11c":"7a","5.11d":"7a+",
-  "5.12a":"7b","5.12b":"7b+","5.12c":"7c","5.12d":"7c+",
-  "5.13a":"7c+","5.13b":"8a","5.13c":"8a+","5.13d":"8b",
-  "5.14a":"8b+","5.14b":"8c","5.14c":"8c+","5.14d":"9a",
+  "5.6": "5a", "5.7": "5b", "5.8": "5c", "5.9": "6a", "5.10a": "6a+",
+  "5.10b": "6a+", "5.10c": "6b", "5.10d": "6b+", "5.11a": "6c",
+  "5.11b": "6c+", "5.11c": "7a", "5.11d": "7a+", "5.12a": "7b",
+  "5.12b": "7b+", "5.12c": "7c", "5.12d": "7c+", "5.13a": "7c+",
+  "5.13b": "8a", "5.13c": "8a+", "5.13d": "8b", "5.14a": "8b+",
+  "5.14b": "8c", "5.14c": "8c+", "5.14d": "9a",
 };
+
 const V_TO_FONT: Record<string, string> = {
-  VB:"3", V0:"4", V1:"5", V2:"5+", V3:"6A", V4:"6B",
-  V5:"6C", V6:"7A", V7:"7A+", V8:"7B", V9:"7C", V10:"7C+",
+  VB: "3", V0: "4", V1: "5", V2: "5+", V3: "6A", V4: "6B", V5: "6C",
+  V6: "7A", V7: "7A+", V8: "7B", V9: "7C", V10: "7C+", V11: "8A",
+  V12: "8A+", V13: "8B", V14: "8B+", V15: "8C", V16: "8C+", V17: "9A",
 };
 
 function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
@@ -52,48 +68,68 @@ function dateStr(d: Date) {
   const da = pad(d.getDate());
   return `${y}-${m}-${da}`;
 }
-function shiftDay(d: Date, delta: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + delta);
-  return x;
-}
 const formatBarLabel = (d: Date, isZH: boolean) => {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const wCN = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
-  const wEN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+  const wCN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d.getDay()];
+  const wEN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
   return isZH ? `${mm}/${dd} · ${wCN}` : `${wEN}, ${mm}/${dd}`;
 };
+
+const VISUAL = {
+  bg: "#F8FAFC",
+  card: "#FFFFFF",
+  primary: "#0B1220",
+  secondary: "#64748B",
+  border: "#E2E8F0",
+  shadow: {
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  shadowSmall: {
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  }
+};
+
+// ✅ 本地 note key（与 LogSendModal 保持一致）
+const NOTE_BY_ROUTE_KEY = (routeName: string) => `logsend_note_by_route_${routeName}`;
+
+type Feel = "soft" | "solid" | "hard";
+const isFeel = (x: any): x is Feel => x === "soft" || x === "solid" || x === "hard";
 
 export default function Journal() {
   const { boulderScale, ropeScale, lang } = useSettings();
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
-  
-  // State
+  const [pendingAppend, setPendingAppend] = useState<LocalDayLogItem | null>(null);
+
+  const lastSubmitAtRef = useRef<number>(0);
+  const submitSeqRef = useRef<number>(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [mode, setMode] = useState<"boulder" | "yds">("boulder");
-  const [action, setAction] = useState<"add" | "sub">("add");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [overlayMonthAnchor, setOverlayMonthAnchor] = useState<Date | null>(null);
-  const [ydsGroup, setYdsGroup] = useState<YdsGroupKey>("5.10");
 
-  // Store
-  const { logs, upsertCount, activeSession, endSession } = useLogsStore(); 
-  const { percentForDate, monthMap } = usePlanStore();
+  const [sessionDetailCount, setSessionDetailCount] = useState(0);
 
-  // 计时状态
-  const [sessionDuration, setSessionDuration] = useState("00:00:00");
   
-  // [修复] 定义 headerHeight
-  const headerHeight = insets.top + 48;
+  const { logs, upsertCount, activeSession, endSession } = useLogsStore();
+  const { monthMap } = usePlanStore();
 
+  // timer
+  const [sessionDuration, setSessionDuration] = useState("00:00:00");
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: NodeJS.Timeout | undefined;
     if (activeSession) {
-      setSelectedDate(new Date()); 
       interval = setInterval(() => {
         const now = Date.now();
         const diff = now - activeSession.startTime;
@@ -101,305 +137,532 @@ export default function Journal() {
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
         setSessionDuration(
-            `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+          `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
         );
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => interval && clearInterval(interval);
   }, [activeSession]);
 
-  const handleEndSession = () => {
-    Alert.alert(
-      tr("结束训练?", "End Session?"),
-      tr("这就结束今天的训练了吗？", "Are you done climbing for today?"),
-      [
-        { text: tr("取消", "Cancel"), style: "cancel" },
-        { 
-          text: tr("结束并保存", "End & Save"), 
-          style: "destructive",
-          onPress: async () => {
-             const newSession = await endSession();
-             if (newSession) {
-                 router.replace({ 
-                    pathname: "/library/log-detail",
-                    params: { date: newSession.date }
-                 });
-             }
-          }
-        }
-      ]
-    );
-  };
+  useFocusEffect(
+    useCallback(() => {
+      // @ts-ignore
+      navigation.getParent?.()?.setOptions?.({ tabBarStyle: { display: "none" } });
+      return () => {
+        // @ts-ignore
+        navigation.getParent?.()?.setOptions?.({ tabBarStyle: undefined });
+      };
+    }, [navigation])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      // 每次回到 Journal（从 detail back）都触发一次
+      setRefreshNonce((n) => n + 1);
+    }, [])
+  );
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
   const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
   const logType = mode === "boulder" ? "boulder" : "yds";
 
+  // 仍保留 segments 用于上方 ring/统计等逻辑（不动）
+  const daySegments = useSegmentsByDate(todayKey, logType);
+
   const todayTotal = useMemo(() => {
     return logs
-      .filter(l => l.date === todayKey && l.type === logType)
-      .reduce((acc, cur) => acc + cur.count, 0);
+      .filter((l: any) => l.date === todayKey && l.type === logType)
+      .reduce((acc: number, cur: any) => acc + cur.count, 0);
   }, [logs, todayKey, logType]);
 
-  const daySegments = useSegmentsByDate(todayKey, logType);
-  
-  const dayParts = useMemo(() => {
-    const total = daySegments.reduce((sum, seg) => sum + seg.count, 0);
-    return { total, parts: daySegments };
-  }, [daySegments]); 
+  // ✅ 用于 Today's Details：拿当天「单条 log」列表
+  const todayLogs = useMemo(() => {
+    // 如果你 store 里并没有 type 字段，也不会崩：我们做兼容
+    return logs.filter((l: any) => l?.date === todayKey && (l?.type ? l.type === logType : true));
+  }, [logs, todayKey, logType]);
 
-  const ringParts = useMemo(() => {
-    return dayParts.parts.map((p) => ({
-      grade: p.grade,
-      count: p.count,
-      color: (mode === "boulder" ? colorForBoulder : colorForYDS)(p.grade),
-    }));
-  }, [dayParts.parts, mode]);
+  // ✅ 本地 note：按 routeName 批量读取（优先显示本地）
+  const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
 
-  const [trainingPct, setTrainingPct] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      percentForDate(selectedDate).then((p) => {
-        if (active) setTrainingPct(p);
-      });
-      return () => { active = false; };
-    }, [selectedDate, percentForDate]) 
-  );
+    const load = async () => {
+      const names = Array.from(
+        new Set(
+          todayLogs
+            .map((x: any) => (x?.name || x?.routeName || x?.route || "").trim())
+            .filter(Boolean)
+        )
+      );
 
-  const addOne = (grade: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    upsertCount({ date: todayKey, type: logType, grade, delta: 1 });
-  };
+      if (names.length === 0) {
+        if (!cancelled) setLocalNotes({});
+        return;
+      }
 
-  const subOne = (grade: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    upsertCount({ date: todayKey, type: logType, grade, delta: -1 });
-  };
+      const pairs = await Promise.all(
+        names.map(async (n) => {
+          try {
+            const v = await AsyncStorage.getItem(NOTE_BY_ROUTE_KEY(n));
+            return [n, (v || "").trim()] as const;
+          } catch {
+            return [n, ""] as const;
+          }
+        })
+      );
 
-  const onCapsulePress = (g: string) => {
-    if (action === "add") addOne(g);
-    else subOne(g);
-  };
+      if (cancelled) return;
+
+      const map: Record<string, string> = {};
+      for (const [n, v] of pairs) {
+        if (v) map[n] = v;
+      }
+      setLocalNotes(map);
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [todayLogs]);
 
   const renderDayExtra = (d: Date) => {
     const k = toDateString(d);
     const outerPct = (monthMap[k] ?? 0) / 100;
-    const dayLogsCount = logs.filter(l => l.date === k).reduce((s, l) => s + l.count, 0);
+    const dayLogsCount = logs.filter((l: any) => l.date === k).reduce((s: number, l: any) => s + l.count, 0);
     const climbGoal = 10;
     const innerVal = dayLogsCount / climbGoal;
     if (outerPct === 0 && dayLogsCount === 0) return null;
     return (
-      <View style={{ position: 'absolute', top: 40, left: 0, right: 0, alignItems: 'center', justifyContent: 'flex-start' }}>
-        <DualMiniRings size={34} outerValue={outerPct} innerValue={innerVal} outerColor="#A5D23D" innerColor="#3B82F6" outerThickness={3} innerThickness={3} gap={2} />
+      <View style={{ position: "absolute", top: 40, left: 0, right: 0, alignItems: "center" }}>
+        <DualMiniRings
+          size={34}
+          outerValue={outerPct}
+          innerValue={innerVal}
+          outerColor="#A5D23D"
+          innerColor="#3B82F6"
+          outerThickness={3}
+          innerThickness={3}
+          gap={2}
+        />
       </View>
     );
   };
 
-  useLayoutEffect(() => { navigation.setOptions({ headerShown: false }); }, [navigation]);
+  // ===== modal state =====
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [pendingGrade, setPendingGrade] = useState<string | null>(null);
 
-  const ModeSwitch = () => (
-    <View style={{ flexDirection: "row", marginTop: 12, marginBottom: 16, backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
-      <TouchableOpacity onPress={() => setMode("boulder")} style={[styles.modeBtn, mode === "boulder" && styles.modeBtnActive]}>
-        <Text style={[styles.modeText, mode === "boulder" && styles.modeTextActive]}>{tr("抱石", "Bouldering")}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setMode("yds")} style={[styles.modeBtn, mode === "yds" && styles.modeBtnActive]}>
-        <Text style={[styles.modeText, mode === "yds" && styles.modeTextActive]}>{tr("绳索", "Rope")}</Text>
-      </TouchableOpacity>
+  const labelOf = (g: string) => {
+    if (mode === "boulder") return boulderScale === "Font" ? V_TO_FONT[g] || g : g;
+    return ropeScale === "French" ? YDS_TO_FRENCH[g] || g : g;
+  };
+
+  const openForGrade = (g: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPendingGrade(g);
+    setSendModalOpen(true);
+  };
+
+  const titleGym = useMemo(() => {
+    if (activeSession?.gymName) return `${activeSession.gymName}`;
+    return tr("未选择岩馆", "No gym selected");
+  }, [activeSession?.gymName, tr]);
+
+  const handleBack = () => router.back();
+
+  const handleEndSession = () => {
+    Alert.alert(tr("结束训练?", "End Session?"), tr("这就结束今天的训练了吗？", "Are you done climbing for today?"), [
+      { text: tr("取消", "Cancel"), style: "cancel" },
+      {
+        text: tr("结束并保存", "End & Save"),
+        style: "destructive",
+          onPress: async () => {
+            // 1) 先把 Journal 页面的“追加态”清掉，避免残留
+            setPendingAppend(null);
+
+            // 2) 触发 TodayDetailsList 重新 load（你现在已经把 refreshKey 用起来了）
+            setRefreshNonce((n) => n + 1);
+
+            // （可选但更强）如果你有 activeSession 的本地展示状态，也在这里清理
+            // setActiveSession(null);
+
+            // 3) 再真正结束 session（写入 storage / 后端）
+            const newSession = await endSession();
+
+            if (newSession) {
+              router.replace({
+                pathname: "/library/log-detail",
+                params: {
+                  date: newSession.date,
+                  origin: "end_log",
+                  gymName: newSession.gymName ?? activeSession?.gymName ?? "",
+                },
+              });
+            }
+          }
+
+      },
+    ]);
+  };
+
+  const LeftBackBtn = () => (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={handleBack}
+      style={styles.leftCapsuleIconOnly}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <Ionicons name="chevron-back" size={20} color={VISUAL.primary} />
+    </TouchableOpacity>
+  );
+
+  const CenterTimer = () => (
+    <View style={styles.timerRow}>
+      {activeSession ? (
+        <>
+          <View style={styles.liveDot} />
+          <Text style={styles.timerText}>{sessionDuration}</Text>
+        </>
+      ) : (
+        <Text style={styles.dateText}>
+          {formatBarLabel(selectedDate, lang === "zh")}
+        </Text>
+      )}
     </View>
   );
 
-  const ActionSwitch = () => (
-    <View style={{ flexDirection: "row", gap: 8 }}>
-      <TouchableOpacity onPress={() => setAction("add")} style={[styles.actionBtn, action === "add" ? styles.actionBtnAdd : styles.actionBtnInactive]}>
-        <Ionicons name="add" size={16} color={action === "add" ? "#fff" : "#6B7280"} />
-        <Text style={[styles.actionText, action === "add" && {color:"#fff"}]}>{tr("添加", "Add")}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setAction("sub")} style={[styles.actionBtn, action === "sub" ? styles.actionBtnSub : styles.actionBtnInactive]}>
-        <Ionicons name="remove" size={16} color={action === "sub" ? "#fff" : "#6B7280"} />
-        <Text style={[styles.actionText, action === "sub" && {color:"#fff"}]}>{tr("删除", "Delete")}</Text>
-      </TouchableOpacity>
-    </View>
+  const RightEnd = () => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={activeSession ? handleEndSession : () => setCalendarOpen(true)}
+      style={[styles.endBtn, !activeSession && styles.endBtnSecondary]}
+    >
+      <Text style={[styles.endText, !activeSession && styles.endTextSecondary]}>
+        {activeSession ? tr("结束", "End") : tr("日期", "Date")}
+      </Text>
+    </TouchableOpacity>
   );
 
-  const GradePicker = () => {
-    const labelOf = (g: string) => {
-        if (mode === "boulder") return (boulderScale === "Font" ? (V_TO_FONT[g] || g) : g);
-        return (ropeScale === "French" ? (YDS_TO_FRENCH[g] || g) : g);
-    };
+  const sessionKey = useMemo(
+    () => (activeSession ? String(activeSession.startTime) : "nosession"),
+    [activeSession]
+  );
 
-    if (mode === "boulder") {
-      return (
-        <View style={styles.gridContainer}>
-          {V_GRADES.map((g) => (
-            <TouchableOpacity key={g} onPress={() => onCapsulePress(g)} style={styles.gridItem}>
-              <Text style={styles.gridText}>{labelOf(g)}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      );
-    } else {
-      return (
-        <View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12 }}>
-            {(Object.keys(YDS_GROUPS) as YdsGroupKey[]).map(group => {
-                const isActive = ydsGroup === group;
-                return (
-                    <TouchableOpacity key={group} onPress={() => setYdsGroup(group)} style={[styles.groupTab, isActive && styles.groupTabActive]}>
-                        <Text style={[styles.groupText, isActive && {color: "#fff"}]}>{group}</Text>
-                    </TouchableOpacity>
-                )
-            })}
-          </ScrollView>
-          <View style={styles.gridContainer}>
-            {YDS_GROUPS[ydsGroup].map((g) => (
-              <TouchableOpacity key={g} onPress={() => onCapsulePress(g)} style={styles.gridItem}>
-                <Text style={styles.gridText}>{labelOf(g)}</Text>
-              </TouchableOpacity>
-            ))}
+  const feelPill = (feelRaw: any) => {
+    if (!isFeel(feelRaw)) return null;
+    if (feelRaw === "solid") return null;
+    const text = feelRaw === "soft" ? "SOFT" : "HARD";
+    const bg = feelRaw === "soft" ? "#EEF2FF" : "#FEF2F2";
+    const fg = feelRaw === "soft" ? "#3730A3" : "#991B1B";
+    return (
+      <View style={[styles.feelPill, { backgroundColor: bg }]}>
+        <Text style={[styles.feelPillText, { color: fg }]}>{text}</Text>
+      </View>
+    );
+  };
+
+  const renderTodayCard = (item: any, idx: number) => {
+    const routeName = (item?.name || item?.routeName || item?.route || "").trim() || tr("未命名路线", "Unnamed Route");
+    const note = (localNotes[routeName] || item?.note || item?.notes || "").trim();
+    const feel = isFeel(item?.feel) ? item.feel : (isFeel(item?.difficultyFeel) ? item.difficultyFeel : undefined);
+
+    return (
+      <View key={`${item?.id ?? "today"}_${idx}`} style={{ paddingHorizontal: 16 }}>
+        <View style={styles.detailCard}>
+          <View style={styles.detailImageWrap}>
+            {item?.image ? (
+              <Image source={{ uri: item.image }} style={styles.detailImage} resizeMode="cover" />
+            ) : (
+              <View style={[styles.detailImage, styles.noImage]}>
+                <Text style={styles.noImageText}>{item?.grade ? labelOf(item.grade) : "—"}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.detailInfo}>
+            <View style={styles.detailTopRow}>
+              <Text style={styles.routeName} numberOfLines={2}>
+                {routeName}
+              </Text>
+              {feelPill(feel)}
+            </View>
+
+            {/* 你如果想在这里顺手显示 grade / attempts 也很方便，但按你要求先不加 */}
           </View>
         </View>
-      );
-    }
+
+        {note ? (
+          <View style={styles.noteBubble}>
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#64748B" />
+            <Text style={styles.noteText} numberOfLines={2}>
+              {note}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      
-      {/* 1. Header (TopBar + 计时条) */}
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, backgroundColor: "#FFFFFF" }}>
-        {activeSession ? (
-            <View style={[styles.timerBar, { paddingTop: insets.top }]}>
-                <View style={styles.timerContent}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.timerText}>{sessionDuration}</Text>
-                    <Text style={styles.gymText}>@ {activeSession.gymName}</Text>
-                </View>
-            </View>
-        ) : (
-             <TopBar
-                routeName="journal"
-                titleZH="训练日志"
-                titleEN="Journal"
-                rightControls={{
-                    mode: "date",
-                    dateLabel: formatBarLabel(selectedDate, lang === "zh"),
-                    onPrevDate: () => setSelectedDate(d => shiftDay(d, -1)),
-                    onNextDate: () => setSelectedDate(d => shiftDay(d, +1)),
-                    onOpenPicker: () => setCalendarOpen((v) => !v),
-                    maxWidthRatio: 0.60,
-                }}
-            />
-        )}
-      </View>
-
+    <View style={{ flex: 1, backgroundColor: VISUAL.bg }}>
       <CollapsibleCalendarOverlay
         visible={calendarOpen}
         onClose={() => setCalendarOpen(false)}
         date={selectedDate}
-        onSelect={(d) => { setSelectedDate(d); setCalendarOpen(false); }}
+        onSelect={(d) => {
+          setSelectedDate(d);
+          setCalendarOpen(false);
+        }}
         lang={lang === "zh" ? "zh" : "en"}
         firstDay={1}
-        topOffset={headerHeight} // [修复] 现在 headerHeight 已定义
+        topOffset={0}
         renderDayExtra={renderDayExtra}
-        onMonthChange={(d) => setOverlayMonthAnchor(d)}
+        onMonthChange={() => {}}
       />
 
-      {/* 2. Scroll Content */}
-      <ScrollView 
-        contentContainerStyle={{ 
-          paddingHorizontal: 16, 
-          paddingBottom: 100,
-          paddingTop: headerHeight + 16 // [修复] 现在 headerHeight 已定义
-        }}
+      <CollapsibleLargeHeader
+        backgroundColor={VISUAL.bg}
+        headerHeight={40}
+        threshold={42}
+        leftActions={<LeftBackBtn />}
+        rightActions={<RightEnd />}
+        leftSlotWidth={80}
+        rightSlotWidth={80}
+        smallTitle={<CenterTimer />}
+        disableSnapEffect={true}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
+        largeTitle={
+          <Text style={styles.largeTitle} numberOfLines={2} ellipsizeMode="tail">
+            {titleGym}
+          </Text>
+        }
       >
-        <Pressable onPress={() => router.push({ pathname: "/journal-ring", params: { mode, date: dateStr(selectedDate) } })} style={styles.ringCard}>
-            <DualActivityRing size={160} thickness={14} trainingPct={trainingPct} climbCount={todayTotal} parts={ringParts} climbGoal={10} outerColor="#A5D23D" innerColor="#3B82F6" />
-        </Pressable>
-
-        <ModeSwitch />
-
-        <View style={styles.controlCard}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
-                <Text style={styles.cardTitle}>{lang === "zh" ? "快速录入" : "Quick Log"}</Text>
-                <ActionSwitch />
-            </View>
-            <GradePicker />
+        <View style={{ marginTop: 12 }}>
+          <View style={styles.quickLogWrapper}>
+            <QuickLogCard
+              mode={mode}
+              onChangeMode={setMode}
+              tr={tr}
+              labelOf={labelOf}
+              onPickGrade={openForGrade}
+              cardPadding={16}
+            />
+          </View>
         </View>
 
-        <View style={{ marginTop: 8 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <Text style={styles.sectionTitle}>{lang === "zh" ? "今日记录明细" : "Today's Details"}</Text>
-                <Text style={{color: '#9CA3AF', fontSize: 12}}>{todayTotal} sends</Text>
+        {/* Today's Details */}
+        <View style={{ marginTop: 24 }}>
+          {/* header row: title + badge */}
+          <View style={styles.detailsRow}>
+            <Text style={styles.sectionTitle}>{tr("今日明细", "Today's Details")}</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.detailsCount}>{(activeSession ? sessionDetailCount : 0)} sends</Text>
             </View>
-            {dayParts.parts.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {dayParts.parts.map((p) => {
-                    const label = mode === "boulder" ? (boulderScale === "Font" ? (V_TO_FONT[p.grade] ?? p.grade) : p.grade) : (ropeScale === "French" ? (YDS_TO_FRENCH[p.grade] ?? p.grade) : p.grade);
-                    return (
-                        <View key={`item-${p.grade}`} style={styles.listItem}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (mode==="boulder"?colorForBoulder:colorForYDS)(p.grade), marginRight: 6 }} />
-                                <Text style={{ fontWeight: "600", fontSize: 13 }}>{label}</Text>
-                            </View>
-                            <Text style={{ color: "#6B7280", fontWeight: "500", fontSize: 13 }}>×{p.count}</Text>
-                        </View>
-                    );
-                })}
-              </View>
-            ) : (
-              <View style={{ padding: 20, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12 }}>
-                 <Text style={{ color: "#9CA3AF" }}>{lang === "zh" ? "暂无记录" : "No climbs yet"}</Text>
-              </View>
-            )}
+          </View>
+
+          {/* list below */}
+          {activeSession ? (
+            <View style={{ marginTop: 12, width: "100%" }}>
+              <TodayDetailsList
+                key={`${todayKey}_${logType}_${sessionKey}_${refreshNonce}`}
+                sessionKey={sessionKey}
+                date={todayKey}
+                logType={logType}
+                labelOf={labelOf}
+                tr={tr}
+                pendingAppend={pendingAppend}
+                onAppended={() => setPendingAppend(null)}
+                refreshKey={refreshNonce}
+                onCountChange={setSessionDetailCount}
+              />
+            </View>
+          ) : (
+            <View style={[styles.emptyBox, { marginTop: 12 }]}>{/* 你原来的 empty UI */}</View>
+          )}
         </View>
-      </ScrollView>
 
-      {/* 3. 悬浮结束按钮 */}
-      {activeSession && (
-        <TouchableOpacity 
-            style={[styles.endBtn, { bottom: insets.bottom + 24 }]}
-            onPress={handleEndSession}
-        >
-            <View style={styles.stopIcon} />
-            <Text style={styles.endBtnText}>{tr("结束训练", "End Session")}</Text>
-        </TouchableOpacity>
-      )}
+      </CollapsibleLargeHeader>
 
+      <LogSendModal
+        visible={sendModalOpen}
+        title={pendingGrade ? `${tr("记录", "Log")} ${labelOf(pendingGrade)}` : tr("记录", "Log")}
+        tr={tr}
+        onClose={() => {
+          setSendModalOpen(false);
+          setPendingGrade(null);
+        }}
+        onDone={(draft: LogSendDraft) => {
+          if (!pendingGrade) return;
+
+          // Prevent accidental rapid double-submit from inserting the same item twice
+          const now = Date.now();
+          if (now - lastSubmitAtRef.current < 500) return;
+          lastSubmitAtRef.current = now;
+          submitSeqRef.current += 1;
+
+          // ✅ 这里仍然不动你的计数逻辑（保持现状）
+          upsertCount({ date: todayKey, type: logType, grade: pendingGrade, delta: 1 });
+
+          // Prefer crypto.randomUUID when available; fallback to time + random + seq.
+          // @ts-ignore
+          const uuid = (globalThis as any)?.crypto?.randomUUID?.() as string | undefined;
+
+          const item: LocalDayLogItem = {
+            id: uuid ?? `${now}_${Math.random().toString(16).slice(2)}_${submitSeqRef.current}`,
+            date: todayKey,
+            type: logType,
+            grade: pendingGrade,
+            name: (draft?.name || "").trim() || labelOf(pendingGrade),
+
+            style: draft.style,
+            attempts: draft.attempts ?? 1,
+            feel: draft.feel,
+            sendCount:
+              draft.style === "redpoint" || draft.style === "flash" || draft.style === "onsight" ? 1 : 0,
+
+            attemptsTotal: draft.attempts ?? 1,
+            note: (draft.note || "").trim(),
+            createdAt: now,
+          };
+
+          setPendingAppend(item);
+
+          setSendModalOpen(false);
+          setPendingGrade(null);
+
+          const routeName = (draft?.name || "").trim();
+          const note = (draft?.note || "").trim();
+          if (routeName && note) {
+            setLocalNotes((prev) => ({ ...prev, [routeName]: note }));
+          }
+        }}
+
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Timer Bar
-  timerBar: { backgroundColor: '#111827', paddingBottom: 12, paddingHorizontal: 16 },
-  timerContent: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
-  timerText: { color: '#FFF', fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  gymText: { color: '#9CA3AF', fontSize: 14, marginLeft: 'auto' },
+  leftCapsuleIconOnly: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    ...VISUAL.shadowSmall,
+    shadowOpacity: 0.04,
+  },
 
-  // Floating End Button
-  endBtn: { position: 'absolute', alignSelf: 'center', backgroundColor: '#111827', paddingHorizontal: 24, paddingVertical: 16, borderRadius: 32, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 10, elevation: 8 },
-  stopIcon: { width: 14, height: 14, backgroundColor: '#EF4444', borderRadius: 2 },
-  endBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  timerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" },
+  timerText: { fontSize: 16, fontWeight: "700", color: VISUAL.primary, fontVariant: ["tabular-nums"] },
+  dateText: { fontSize: 16, fontWeight: "700", color: VISUAL.primary },
 
-  ringCard: { alignItems: 'center', paddingVertical: 20, backgroundColor: '#fff', borderRadius: 24, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2, borderWidth: 0.5, borderColor: '#F3F4F6' },
-  controlCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2, borderWidth: 0.5, borderColor: '#F3F4F6' },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: '#374151' },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  modeBtn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 10, backgroundColor: "transparent" },
-  modeBtnActive: { backgroundColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: {width:0, height:2}, elevation: 2 },
-  modeText: { fontWeight: "600", color: "#9CA3AF" },
-  modeTextActive: { color: "#111" },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12,minWidth: 80, },
-  actionBtnAdd: { backgroundColor: "#16A34A" },
-  actionBtnSub: { backgroundColor: "#EF4444" },
-  actionBtnInactive: { backgroundColor: "#F3F4F6" },
-  actionText: { marginLeft: 4, fontWeight: "700", color: "#6B7280", fontSize: 14 },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  gridItem: { width: '14.5%', paddingVertical: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 12 },
-  gridText: { fontWeight: "700", color: "#111827", fontSize: 13, includeFontPadding: false, textAlign: 'center' },
-  groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F3F4F6" },
-  groupTabActive: { backgroundColor: "#111827" },
-  groupText: { fontWeight: "600", color: "#6B7280", fontSize: 13, textAlign: 'center', includeFontPadding: false, lineHeight: 18 },
-  listItem: { width: '31%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 0.5, borderColor: '#E5E7EB' },
+  endBtn: {
+    height: 38,
+    paddingHorizontal: 18,
+    borderRadius: 19,
+    backgroundColor: "#0F172A",
+    alignItems: "center",
+    justifyContent: "center",
+    ...VISUAL.shadowSmall,
+  },
+  endBtnSecondary: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  endText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  endTextSecondary: { color: "#64748B" },
+
+  largeTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: VISUAL.primary,
+    letterSpacing: -0.5,
+  },
+  quickLogWrapper: {},
+
+  detailsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 2,
+    marginBottom: 14
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: VISUAL.primary, letterSpacing: -0.5 },
+  countBadge: {
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  detailsCount: { color: "#475569", fontSize: 12, fontWeight: "700" },
+
+  // ✅ 新：Today's Details card（对齐 log-detail 风格）
+  detailCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    flexDirection: "row",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  detailImageWrap: { width: 96, height: 96 },
+  detailImage: { width: "100%", height: "100%" },
+  noImage: { backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
+  noImageText: { fontSize: 16, fontWeight: "900", color: "#E5E7EB" },
+
+  detailInfo: { flex: 1, padding: 12, justifyContent: "center" },
+  detailTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
+  routeName: { flex: 1, fontSize: 15, fontWeight: "900", color: "#111", letterSpacing: -0.2 },
+
+  feelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+  feelPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+
+  noteBubble: {
+    marginTop: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  noteText: {
+    flex: 1,
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  emptyBox: {
+    padding: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderStyle: "dashed",
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.5)"
+  },
 });

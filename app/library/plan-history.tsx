@@ -5,35 +5,41 @@ import { View, StyleSheet, FlatList, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import TopBar from "../../components/TopBar"; 
-import PlanCard, { PlanProps } from "../../components/PlanCard";
+import TopBar from "../../components/TopBar";
+
+import { TrainingPlanCard, TrainingPlan } from "../../src/components/plancard";
 
 // Mock Data: 历史计划（已完成）
-const HISTORY_PLANS: PlanProps[] = [
-  { 
-    id: 'h1', 
-    title: 'Beginner Core', 
-    author: 'ClimMate', 
-    level: 'V0-V2', 
-    duration: 'Completed', // 显示状态
-    users: 8500, 
-    type: 'Core', 
-    rating: 4.2, 
-    color: '#DB2777', 
-    image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?auto=format&fit=crop&w=800&q=80' 
+// 说明：HistoryPlanCard 会优先读取 plan.progress.lastTrainedAt 来显示 “Finished on …”
+const HISTORY_PLANS: TrainingPlan[] = [
+  {
+    id: "h1",
+    title: "Beginner Core",
+    source: "official",
+    visibility: "private",
+    status: "completed",
+    trainingType: "technique", // 没有 core 类型时先用 technique/mixed/recovery 之一（后续你可扩展 TrainingType）
+    durationWeeks: 4,
+    author: { authorName: "ClimMate" },
+    market: { ratingAvg: 4.2, followerCount: 8500 },
+    progress: {
+      lastTrainedAt: "2025-10-24T00:00:00Z", // 完成日期占位
+    },
   },
-  { 
-    id: 'h2', 
-    title: 'Finger Rehab', 
-    author: 'Hooper\'s Beta', 
-    level: 'All', 
-    duration: 'Completed', 
-    users: 2100, 
-    type: 'Recovery', 
-    rating: 4.9, 
-    color: '#D97706', 
-    image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80' 
-  }
+  {
+    id: "h2",
+    title: "Finger Rehab",
+    source: "official",
+    visibility: "private",
+    status: "completed",
+    trainingType: "recovery",
+    durationWeeks: 4,
+    author: { authorName: "Hooper's Beta" },
+    market: { ratingAvg: 4.9, followerCount: 2100 },
+    progress: {
+      lastTrainedAt: "2025-10-24T00:00:00Z",
+    },
+  },
 ];
 
 export default function PlanHistoryScreen() {
@@ -41,42 +47,44 @@ export default function PlanHistoryScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFF' }}>
+    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
       <View style={{ paddingTop: insets.top }}>
-        <TopBar 
-            routeName="plan_history" 
-            title="Plan History" 
-            useSafeArea={false}
-            leftControls={{ mode: "back", onBack: () => router.back() }} 
+        <TopBar
+          routeName="plan_history"
+          title="Plan History"
+          useSafeArea={false}
+          leftControls={{ mode: "back", onBack: () => router.back() }}
         />
       </View>
 
       <FlatList
         data={HISTORY_PLANS}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-            <View style={{ marginBottom: 16 }}>
-                {/* 复用 PlanCard，点击也可以进入详情查看当时的数据 */}
-                <PlanCard 
-                    item={item} 
-                    onPress={() => router.push({
-                        pathname: "/library/plan-overview",
-                        params: { planId: item.id, source: 'history' } // source='history' 也不显示添加按钮
-                    })} 
-                />
-                {/* 可选：在卡片下方增加完成时间等额外信息 */}
-                <View style={styles.historyMeta}>
-                    <Ionicons name="checkmark-done-circle" size={14} color="#10B981" />
-                    <Text style={styles.historyText}>Finished on Oct 24, 2025</Text>
-                </View>
-            </View>
+          <TrainingPlanCard
+            plan={item}
+            variant="history"
+            context="personal"
+            handlers={{
+              onPress: () =>
+                router.push({
+                  pathname: "/library/plan-overview",
+                  params: { planId: item.id, source: "history" },
+                }),
+            }}
+            display={{
+              // History 场景一般不需要 source；你想显示也可设 true
+              showSourceBadge: false,
+              showAuthor: true,
+            }}
+          />
         )}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ paddingBottom: 28 }}
         ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-                <Ionicons name="time-outline" size={48} color="#E5E7EB" />
-                <Text style={styles.emptyText}>No completed plans yet.</Text>
-            </View>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="time-outline" size={48} color="#E5E7EB" />
+            <Text style={styles.emptyText}>No completed plans yet.</Text>
+          </View>
         }
       />
     </View>
@@ -84,8 +92,6 @@ export default function PlanHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-    historyMeta: { flexDirection: 'row', alignItems: 'center', marginTop: -8, marginBottom: 8, paddingHorizontal: 4, gap: 4 },
-    historyText: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
-    emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-    emptyText: { marginTop: 12, color: '#9CA3AF', fontSize: 14 }
+  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 100 },
+  emptyText: { marginTop: 12, color: "#9CA3AF", fontSize: 14, fontWeight: "600" },
 });

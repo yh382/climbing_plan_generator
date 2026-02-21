@@ -10,15 +10,15 @@ export function AnthropometricsCard() {
   const a = profile?.anthropometrics ?? {};
   const isImperial = user?.units === "imperial";
 
-  const [height, setHeight] = useState<string>(isImperial ? Math.round(cmToIn(a.height_cm || 0)).toString() : (a.height_cm ?? "").toString());
-  const [weight, setWeight] = useState<string>(isImperial ? Math.round(kgToLb(a.weight_kg || 0)).toString() : (a.weight_kg ?? "").toString());
+  const [height, setHeight] = useState<string>(isImperial ? Math.round(cmToIn(a.height || 0)).toString() : (a.height ?? "").toString());
+  const [weight, setWeight] = useState<string>(isImperial ? Math.round(kgToLb(a.weight || 0)).toString() : (a.weight ?? "").toString());
   const [level, setLevel]   = useState<string>(a.level ?? "");
 
   const onSave = async () => {
     const partial: Partial<Profile> = {
       anthropometrics: {
-        height_cm: isImperial ? inToCm(Number(height)) : Number(height),
-        weight_kg: isImperial ? lbToKg(Number(weight)) : Number(weight),
+        height: isImperial ? inToCm(Number(height)) : Number(height),
+        weight: isImperial ? lbToKg(Number(weight)) : Number(weight),
         level,
       },
     };

@@ -32,6 +32,7 @@ import {
   FLOATING_TAB_BAR_STACK_SPACING,
 } from "@components/FloatingTabBar.constants";
 import { BlurView } from "expo-blur";
+import { GlassView } from "expo-glass-effect";
 import { useRoute } from "@react-navigation/native";
 
 
@@ -444,14 +445,7 @@ const brightThreshold = expandedPx * 0.65;
         bottomInset={bottomInset}
       >
       <BottomSheetView style={styles.sheetInner}>
-        <BlurView
-          tint={scheme === "dark" ? "dark" : "light"}
-          intensity={40}  // 想更模糊可以调大，想更玻璃可以再调小
-          style={[
-            styles.sheetCard,
-            { backgroundColor: colors.shellBG, borderColor: isBright ? cardBdr : colors.shellBORDER },
-            colors.shellShadow,
-          ]}
+        <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill}
         >
           <View style={{ flex: 1 }}>
           <View style={styles.handleBar} />
@@ -623,7 +617,7 @@ const brightThreshold = expandedPx * 0.65;
           </View>
         </View>
         </View>
-        </BlurView>
+        </GlassView>
       </BottomSheetView>
 
       </BottomSheet>

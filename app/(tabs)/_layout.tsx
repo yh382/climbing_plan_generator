@@ -1,32 +1,52 @@
 // app/(tabs)/_layout.tsx
 
 import { Tabs } from "expo-router";
-import FloatingTabBar from "../../components/FloatingTabBar"; // 确保路径正确
+import SplitFloatingTabBar from "../../src/components/tabbar/SplitFloatingTabBar";
+
 import TopBar from "../../components/TopBar"; // 确保路径正确
 import React from "react";
 import { useColorScheme, View } from "react-native";
 import { useUserStore } from "../../src/store/useUserStore";
+import { useEffect, useRef } from "react";
+import { useRouter } from "expo-router";
+import { setOnAuthExpired } from "@/lib/authEvents";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function TabsLayout() {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const { user } = useUserStore();
   const username = user?.username ?? "Profile";
+  const router = useRouter();
+  const logout = useAuthStore((s) => s.logout);
+  const handledRef = useRef(false);
+
+  useEffect(() => {
+    setOnAuthExpired(() => {
+      // 防止多个请求同时 401，导致多次跳转
+      if (handledRef.current) return;
+      handledRef.current = true;
+
+      logout().finally(() => {
+        router.replace("/login");
+      });
+    });
+  }, [logout, router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: isDark ? "#0B1220" : "#FFFFFF" }}>
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
+        tabBar={(props) => <SplitFloatingTabBar {...props} />}
         screenOptions={{
           headerShown: true, 
           // 统一控制 TopBar 的显示逻辑
           header: ({ route }) => {
              // 1. Profile 页显示用户名
-             const title = route.name === 'profile' ? username : undefined;
+             const title = route.name
              
              // 2. 不需要原生 Header 的页面列表
              // 'index' (即 Home), 'community', 'calendar', 'action', 'plan_generator'
-             const hideHeaderRoutes = ['index', 'home', 'community', 'calendar', 'action', 'plan_generator', 'gyms', 'journal'];
+             const hideHeaderRoutes = ['index', 'home', 'community', 'calendar', 'action', 'plan_generator', 'gyms', 'journal', "profile", "settings", "coach"];
              
              if (hideHeaderRoutes.includes(route.name)) {
                  return null;
@@ -44,9 +64,9 @@ export default function TabsLayout() {
         
         {/* 2. 日历 */}
         <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
-        
-        {/* 3. Action (+) 占位 */}
-        <Tabs.Screen name="action" options={{ title: "Post" }} />
+
+        {/* 3. Coach */}
+        <Tabs.Screen name="coach" options={{ title: "coach" }} />
         
         {/* 4. 社区 */}
         <Tabs.Screen name="community" options={{ title: "Community" }} />
@@ -59,7 +79,8 @@ export default function TabsLayout() {
         {/* 计划生成器 (原 index.tsx) */}
         <Tabs.Screen name="plan_generator" options={{ href: null }} />
         
-        <Tabs.Screen name="journal" options={{ href: null }} />
+        <Tabs.Screen name="journal" options={{  href: null,  tabBarStyle: { display: "none" },  }}  />
+
         <Tabs.Screen name="gyms" options={{ href: null }} />
         {/* 如果不再有 home.tsx，可以不写 name="home" 的 Screen，或者保留以防缓存 */}
       </Tabs>

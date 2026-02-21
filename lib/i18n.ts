@@ -15,6 +15,23 @@ export type I18N =
   | undefined;
 
 /**
+ * ✅ TabBar 文案（集中放在 i18n 里，供 UI 统一引用）
+ * 用法：
+ * - const { tt } = useI18N();
+ * - tt(TABS.home)
+ */
+export const TABS: Record<
+  "home" | "calendar" | "community" | "profile" | "coach",
+  { zh: string; en: string }
+> = {
+  home: { zh: "主页", en: "Home" },
+  calendar: { zh: "日历", en: "Calendar" },
+  community: { zh: "社区", en: "Community" },
+  profile: { zh: "个人", en: "Profile" },
+  coach: { zh: "教练", en: "Coach" },
+};
+
+/**
  * 安全的文案选择函数：
  * - 不会对 undefined / null 做属性访问
  * - 不会因为类型不对而抛异常

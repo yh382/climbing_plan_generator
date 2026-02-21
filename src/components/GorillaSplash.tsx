@@ -1,91 +1,87 @@
 // src/components/GorillaSplash.tsx
 
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, StyleSheet, Image, Dimensions } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
-  withSpring, 
-  withDelay, 
-  withSequence,
-  withTiming,
-  runOnJS 
+  withTiming, 
+  withDelay,
+  Easing
 } from 'react-native-reanimated';
 
-const { width, height } = Dimensions.get('window');
+// 引用图片 (保持 require 写法)
+const gorillaHeadImg = require('../../assets/images/gorilla_head.png');
+const climbMateTextImg = require('../../assets/images/climb_mate_text.png');
 
 interface Props {
   onAnimationFinish: () => void;
 }
 
 export default function GorillaSplash({ onAnimationFinish }: Props) {
-  // 1. 猩猩的位置 (初始在屏幕下方看不见的位置)
-  const gorillaTranslateY = useSharedValue(200); 
+  // 1. 猩猩动画状态
+  const gorillaOpacity = useSharedValue(0); 
+  const gorillaTranslateY = useSharedValue(20); 
   
-  // 2. 气泡的透明度 (初始隐藏)
-  const bubbleOpacity = useSharedValue(0);
-  const bubbleScale = useSharedValue(0);
+  // 2. 文字动画状态
+  const textOpacity = useSharedValue(0);
+  const textTranslateY = useSharedValue(10); 
 
   useEffect(() => {
-    // --- 动画编排 ---
-    
-    // 步骤 1: 猩猩头冒出来 (Spring 弹簧效果)
-    gorillaTranslateY.value = withSpring(0, {
-      damping: 12, // 阻尼，越小越弹
-      stiffness: 100,
+    // 动作 1: 猩猩慢慢浮现
+    gorillaOpacity.value = withTiming(1, { duration: 1200 });
+    gorillaTranslateY.value = withTiming(0, { 
+      duration: 1200, 
+      easing: Easing.out(Easing.exp)
     });
 
-    // 步骤 2: 延迟 600ms 后，气泡弹出
-    bubbleOpacity.value = withDelay(600, withTiming(1, { duration: 300 }));
-    bubbleScale.value = withDelay(600, withSpring(1));
+    // 动作 2: 文字延迟浮现
+    textOpacity.value = withDelay(500, withTiming(1, { duration: 1000 }));
+    textTranslateY.value = withDelay(500, withTiming(0, { duration: 1000 }));
 
-    // 步骤 3: 停留 2秒 后，通知父组件动画结束 (进入 App)
-    setTimeout(() => {
+    // 动作 3: 结束
+    const timer = setTimeout(() => {
       onAnimationFinish();
-    }, 2800); // 总时长约 3秒 (0.6 + 0.3 + 停留时间)
+    }, 3000);
 
+    return () => clearTimeout(timer);
   }, []);
 
-  // 猩猩样式
-  const gorillaStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: gorillaTranslateY.value }],
-    };
-  });
+  const gorillaStyle = useAnimatedStyle(() => ({
+    opacity: gorillaOpacity.value,
+    transform: [{ translateY: gorillaTranslateY.value }],
+  }));
 
-  // 气泡样式
-  const bubbleStyle = useAnimatedStyle(() => {
-    return {
-      opacity: bubbleOpacity.value,
-      transform: [
-        { scale: bubbleScale.value },
-        { translateY: -10 } // 稍微往上浮一点
-      ],
-    };
-  });
+  const textStyle = useAnimatedStyle(() => ({
+    opacity: textOpacity.value,
+    transform: [{ translateY: textTranslateY.value }],
+  }));
 
   return (
     <View style={styles.container}>
-      
-      {/* 气泡区域 */}
-      <Animated.View style={[styles.bubbleContainer, bubbleStyle]}>
-        <View style={styles.bubble}>
-            <Text style={styles.bubbleText}>Climb, Mate?</Text>
-            {/* 气泡的小尾巴 */}
-            <View style={styles.bubbleTail} />
-        </View>
-      </Animated.View>
-
-      {/* 猩猩图片区域 (Mask View 遮罩，确保猩猩是从"边缘"冒出来的感觉) */}
-      <View style={styles.maskContainer}>
-          <Animated.Image 
-            // 请替换为您的猩猩图片
-            source={{ uri: 'https://img.icons8.com/color/400/gorilla.png' }} 
-            style={[styles.gorilla, gorillaStyle]}
-            resizeMode="contain"
+      {/* 主内容容器 
+         - width: 限制内容宽度，确保文字和猩猩不会离得太远
+         - marginTop: 整体往下移 (调整这个值控制垂直位置)
+      */}
+      <View style={styles.mainContent}>
+        
+        {/* 文字区域：利用 Flex 自身对齐放到左边 */}
+        <Animated.View style={[styles.textWrapper, textStyle]}>
+          <Image 
+              source={climbMateTextImg} 
+              style={styles.textImage}
+              resizeMode="contain" 
           />
-      </View>
+        </Animated.View>
 
+        {/* 猩猩区域：利用 Margin 把它挤到右边去 */}
+        <Animated.Image 
+          source={gorillaHeadImg} 
+          style={[styles.gorillaImage, gorillaStyle]}
+          resizeMode="contain"
+        />
+        
+      </View>
     </View>
   );
 }
@@ -93,48 +89,37 @@ export default function GorillaSplash({ onAnimationFinish }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // 背景色
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center', 
+    justifyContent: 'center', 
     zIndex: 9999,
   },
-  maskContainer: {
-    overflow: 'hidden', // 关键：如果需要猩猩从某个线条后冒出来，可以调整这个容器的高度
-    paddingTop: 20,     // 给弹簧动画留点空间
-    alignItems: 'center',
+  mainContent: {
+    // [关键修改]
+    width: 300,      // 固定宽度，形成一个"舞台"，保证内部相对位置稳定
+    marginTop: -80,   // 正值 = 整体往下移；负值 = 整体往上移。觉得不够下就加大这个数
+    
+    // 这里的 padding 可以微调内部间距
+    paddingHorizontal: 20, 
   },
-  gorilla: {
-    width: 180,
-    height: 180,
+  
+  textWrapper: {
+    // [关键修改] 不再用 absolute
+    alignSelf: 'flex-start', // 让文字靠容器的左边
+    marginBottom: -20,       // 负 Margin 让文字和下面的猩猩稍微重叠一点点，更紧凑
+    zIndex: 10,              // 保证文字在猩猩上面
+    marginLeft: -100,          // 稍微往里缩一点，不要贴死左边
   },
-  bubbleContainer: {
-    marginBottom: 10, // 气泡在猩猩头顶
-    alignItems: 'center',
+  textImage: {
+    width: 300, 
+    height: 140, 
   },
-  bubble: {
-    backgroundColor: '#111',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    position: 'relative',
-  },
-  bubbleText: {
-    color: '#FFF',
-    fontWeight: '800',
-    fontSize: 18,
-  },
-  bubbleTail: {
-    position: 'absolute',
-    bottom: -8,
-    left: '50%',
-    marginLeft: -8,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#111', // 跟气泡背景色一致
+
+  gorillaImage: {
+    // [关键修改] 
+    alignSelf: 'center',     // 猩猩居中（或者用 flex-end 靠右）
+    width: 220,
+    height: 220,
+    marginLeft: 60,          // 利用左边距把它往右边挤，形成"偏右"的效果
   },
 });
