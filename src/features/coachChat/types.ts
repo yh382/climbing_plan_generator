@@ -1,5 +1,5 @@
 // src/features/coachChat/types.ts
-export type CoachStep = 1 | 2 | 3 | 4 | 5;
+export type CoachPhase = "collect" | "draft" | "match" | "schedule";
 
 export type ChatRole = "user" | "assistant";
 
@@ -18,9 +18,22 @@ export type DraftPlan = {
   bullets: string[];
 };
 
+export type CoachConversation = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  phase: CoachPhase;
+  messages: ChatMessage[];
+  draftPlan: DraftPlan | null;
+};
+
 export type CoachState = {
-  step: CoachStep;
+  phase: CoachPhase;
   messages: ChatMessage[];
   draftPlan: DraftPlan | null;
   isBusy: boolean;
+  conversations: CoachConversation[];
+  currentConversationId: string | null;
+  overlayOpen: boolean;
 };
