@@ -2,16 +2,19 @@
 
 import type { ActionSummary, BlockInventorySummary } from "./types";
 
-export type BigCat = "endurance" | "power_endurance" | "strength_power" | "conditioning";
+export type BigCat = "essentials" | "endurance" | "power_endurance" | "strength_power" | "conditioning";
 
 export type SubCatKey =
-  | "aerobic_capacity"
+  | "warmup"
+  | "tests"
+  | "outdoor"
+  | "base_endurance"
   | "regeneration"
-  | "aerobic_power"
-  | "anaerobic_capacity"
-  | "bouldering"
+  | "sustained_power"
+  | "high_intensity"
+  | "climbing_strength"
   | "finger_strength"
-  | "power_campus"
+  | "explosive_power"
   | "antagonist_lower"
   | "core"
   | "flexibility"
@@ -22,35 +25,56 @@ export type LocaleKey = "zh" | "en";
 export type UserSection = {
   key: SubCatKey;
   title: { en: string; zh: string };
-  // 哪些编排 block 会被加载（仍然用于后端 block listing 拉取）
   blocksToLoad: string[];
-  // 用于从动作 action.user_tags 推断属于哪个小类
   userTagsAny?: string[];
 };
 
 export type BigCategory = {
   key: BigCat;
   title: { en: string; zh: string };
-  // Home 卡片的小字预览（固定顺序）
   homePreview: { en: string[]; zh: string[] };
-  // 页面顶部 tabs（固定顺序）
   sections: UserSection[];
-  // 该大类需要加载的 blocks（是 sections.blocksToLoad 的合集）
   blocksToLoad: string[];
 };
 
-// 只隐藏 test block，不给用户展示
-export const HIDDEN_BLOCKS = new Set<string>(["test"]);
+export const HIDDEN_BLOCKS = new Set<string>([]);
 
 export const USER_TAXONOMY: BigCategory[] = [
   {
-    key: "endurance",
-    title: { en: "Endurance", zh: "耐力" },
-    homePreview: { en: ["Aerobic Capacity", "Regeneration"], zh: ["有氧能力", "恢复"] },
+    key: "essentials",
+    title: { en: "Essentials", zh: "基础必备" },
+    homePreview: { en: ["Warm-up", "Tests", "Outdoor"], zh: ["热身", "测试", "户外"] },
     sections: [
       {
-        key: "aerobic_capacity",
-        title: { en: "Aerobic Capacity", zh: "有氧能力" },
+        key: "warmup",
+        title: { en: "Warm-up", zh: "热身" },
+        blocksToLoad: ["warmup_general", "warmup_specific"],
+        userTagsAny: ["warmup"],
+      },
+      {
+        key: "tests",
+        title: { en: "Tests", zh: "测试" },
+        blocksToLoad: ["test"],
+        userTagsAny: ["tests", "test_protocol"],
+      },
+      {
+        key: "outdoor",
+        title: { en: "Outdoor", zh: "户外" },
+        blocksToLoad: ["main_strength"],
+        userTagsAny: ["outdoor"],
+      },
+    ],
+    blocksToLoad: ["warmup_general", "warmup_specific", "test", "main_strength"],
+  },
+
+  {
+    key: "endurance",
+    title: { en: "Endurance", zh: "耐力" },
+    homePreview: { en: ["Base Endurance", "Regeneration"], zh: ["基础耐力", "恢复"] },
+    sections: [
+      {
+        key: "base_endurance",
+        title: { en: "Base Endurance", zh: "基础耐力" },
         blocksToLoad: ["main_endurance"],
         userTagsAny: ["aerobic_capacity", "endurance", "capacity"],
       },
@@ -67,17 +91,17 @@ export const USER_TAXONOMY: BigCategory[] = [
   {
     key: "power_endurance",
     title: { en: "Power Endurance", zh: "力量耐力" },
-    homePreview: { en: ["Aerobic Power", "Anaerobic Capacity"], zh: ["有氧力量", "无氧能力"] },
+    homePreview: { en: ["Sustained Power", "High-Intensity Capacity"], zh: ["持续输出", "高强度容量"] },
     sections: [
       {
-        key: "aerobic_power",
-        title: { en: "Aerobic Power", zh: "有氧力量" },
+        key: "sustained_power",
+        title: { en: "Sustained Power", zh: "持续输出" },
         blocksToLoad: ["main_power_endurance"],
         userTagsAny: ["aerobic_power"],
       },
       {
-        key: "anaerobic_capacity",
-        title: { en: "Anaerobic Capacity", zh: "无氧能力" },
+        key: "high_intensity",
+        title: { en: "High-Intensity Capacity", zh: "高强度容量" },
         blocksToLoad: ["main_power_endurance"],
         userTagsAny: ["anaerobic_capacity"],
       },
@@ -88,11 +112,11 @@ export const USER_TAXONOMY: BigCategory[] = [
   {
     key: "strength_power",
     title: { en: "Strength & Power", zh: "力量 & 爆发" },
-    homePreview: { en: ["Bouldering", "Finger Strength", "Power & Campus"], zh: ["抱石", "指力", "爆发 & 校园板"] },
+    homePreview: { en: ["Climbing Strength", "Finger Strength", "Explosive Power"], zh: ["攀爬力量", "指力", "爆发力"] },
     sections: [
       {
-        key: "bouldering",
-        title: { en: "Bouldering", zh: "抱石" },
+        key: "climbing_strength",
+        title: { en: "Climbing Strength", zh: "攀爬力量" },
         blocksToLoad: ["main_strength"],
         userTagsAny: ["bouldering", "board", "routes_boulder", "boulder"],
       },
@@ -103,8 +127,8 @@ export const USER_TAXONOMY: BigCategory[] = [
         userTagsAny: ["finger_strength", "fingerboard", "max_hang", "density_hangs", "no_hang"],
       },
       {
-        key: "power_campus",
-        title: { en: "Power & Campus", zh: "爆发 & 校园板" },
+        key: "explosive_power",
+        title: { en: "Explosive Power", zh: "爆发力" },
         blocksToLoad: ["main_strength"],
         userTagsAny: ["power", "campus", "explosive", "dyno"],
       },
@@ -164,32 +188,36 @@ export function assignSubcategoryByUserTags(big: BigCat, action: ActionSummary):
   const cfg = getCategory(big);
   if (!cfg) return null;
 
-  const ut = (action as any).user_tags as string[] | undefined;
+  const ut = action.user_tags;
   const userTags = Array.isArray(ut) ? ut : [];
 
-  // 1) 优先用 user_tags 匹配
+  // 1) user_tags match first
   for (const sec of cfg.sections) {
     const any = sec.userTagsAny || [];
     if (any.length && userTags.some((t) => any.includes(t))) return sec.key;
   }
 
-  // 2) fallback：如果后端还没补 user_tags，则根据 goal/block_tags 粗略推断
+  // 2) fallback by block_tags
   const bt = action.block_tags || [];
   if (big === "endurance") {
-    if (bt.includes("main_endurance")) return "aerobic_capacity";
+    if (bt.includes("main_endurance")) return "base_endurance";
     if (bt.includes("regen") || bt.includes("cooldown")) return "regeneration";
   }
   if (big === "power_endurance") {
-    if (bt.includes("main_power_endurance")) return "aerobic_power";
+    if (bt.includes("main_power_endurance")) return "sustained_power";
   }
   if (big === "strength_power") {
     if (bt.includes("main_finger_strength") || bt.includes("finger_strength")) return "finger_strength";
-    if (bt.includes("main_strength")) return "bouldering";
+    if (bt.includes("main_strength")) return "climbing_strength";
   }
   if (big === "conditioning") {
     if (bt.includes("accessory_core")) return "core";
     if (bt.includes("accessory_mobility") || bt.includes("regen")) return "flexibility";
     if (bt.includes("accessory_antagonist")) return "upper_body";
+  }
+  if (big === "essentials") {
+    if (bt.includes("warmup_general") || bt.includes("warmup_specific")) return "warmup";
+    if (bt.includes("test")) return "tests";
   }
 
   return null;

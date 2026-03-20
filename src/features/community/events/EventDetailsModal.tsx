@@ -1,7 +1,9 @@
 // src/features/community/events/EventDetailsModal.tsx
-import React from "react";
-import { Modal, View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { useRef, useEffect, useState } from "react";
+import { Modal, View, Text, StyleSheet, Pressable, ScrollView, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
+const DURATION = 280;
 
 export default function EventDetailsModal({
   visible,
@@ -14,12 +16,33 @@ export default function EventDetailsModal({
   title: string;
   text: string;
 }) {
+  const [modalVisible, setModalVisible] = useState(false);
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const sheetAnim = useRef(new Animated.Value(500)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setModalVisible(true);
+      backdropAnim.setValue(0);
+      sheetAnim.setValue(500);
+      Animated.parallel([
+        Animated.timing(backdropAnim, { toValue: 1, duration: DURATION, useNativeDriver: true }),
+        Animated.timing(sheetAnim, { toValue: 0, duration: DURATION, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(backdropAnim, { toValue: 0, duration: DURATION, useNativeDriver: true }),
+        Animated.timing(sheetAnim, { toValue: 500, duration: DURATION, useNativeDriver: true }),
+      ]).start(() => setModalVisible(false));
+    }
+  }, [visible]);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+    <Modal visible={modalVisible} animationType="none" transparent onRequestClose={onClose}>
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={styles.sheet}>
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetAnim }] }]}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{title}</Text>
             <Pressable onPress={onClose} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
@@ -30,8 +53,8 @@ export default function EventDetailsModal({
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.body}>{text}</Text>
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }

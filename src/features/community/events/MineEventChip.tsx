@@ -1,26 +1,33 @@
-// src/features/community/events/UpcomingEventChip.tsx
+// src/features/community/events/MineEventChip.tsx
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import type { EventItem } from "./mockEvents";
+import type { EventOut } from "./types";
+
+function formatDateShort(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
 
 export default function MineEventChip({
   item,
   onPress,
 }: {
-  item: EventItem;
+  item: EventOut;
   onPress?: () => void;
 }) {
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.85} onPress={onPress}>
-      <View style={[styles.logo, { backgroundColor: item.gym.accent ?? "#111" }]} />
+      <View style={[styles.logo, { backgroundColor: "#111" }]} />
       <Text style={styles.title} numberOfLines={1}>
         {item.title}
       </Text>
       <Text style={styles.meta} numberOfLines={1}>
-        {item.dateText}
+        {formatDateShort(item.start_at)}
       </Text>
       <Text style={styles.gym} numberOfLines={1}>
-        {item.gym.name}
+        {item.publisher.name}
       </Text>
     </TouchableOpacity>
   );

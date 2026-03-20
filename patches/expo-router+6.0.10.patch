@@ -1,0 +1,14 @@
+diff --git a/node_modules/expo-router/build/native-tabs/NativeBottomTabs/NativeTabsView.js b/node_modules/expo-router/build/native-tabs/NativeBottomTabs/NativeTabsView.js
+index e88d8c0..fcda7fc 100644
+--- a/node_modules/expo-router/build/native-tabs/NativeBottomTabs/NativeTabsView.js
++++ b/node_modules/expo-router/build/native-tabs/NativeBottomTabs/NativeTabsView.js
+@@ -121,7 +121,8 @@ function Screen(props) {
+     const role = descriptor.options.role;
+     // To align with apple documentation and prevent untested cases,
+     // title and icon cannot be changed when role is defined
+-    const shouldResetTitleAndIcon = !!role && process.env.EXPO_OS === 'ios';
++    // PATCHED: allow custom icon to override system icon when role is set
++    const shouldResetTitleAndIcon = !!role && process.env.EXPO_OS === 'ios' && !descriptor.options.icon;
+     const title = descriptor.options.title ?? name;
+     const icon = useAwaitedScreensIcon(descriptor.options.icon);
+     const selectedIcon = useAwaitedScreensIcon(descriptor.options.selectedIcon);

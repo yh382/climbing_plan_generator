@@ -5,24 +5,38 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
 
 import useLogsStore from "../../store/useLogsStore";
+import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
 
 type Props = {
   style?: any;
   variant?: "floating" | "inline";
 };
 
-const TAB_H = 60; // 与 SplitFloatingTabBar H 一致
-const TAB_W = 72; // 与 BTN 一致
+const PILL_H = 60;
+const PILL_W = 72;
 const RADIUS = 32;
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
 }
 
+function formatSec(totalSec: number) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return { h, m, s };
+}
+
 export default function ActiveSessionFloat({ style, variant = "floating" }: Props) {
   const router = useRouter();
+
+  // Log session
   const { activeSession } = useLogsStore();
   const [elapsedMs, setElapsedMs] = useState(0);
+
+  // Workout session
+  const { isActive: workoutActive, isMinimized: workoutMinimized, seconds: workoutSeconds, sessionJson } = useActiveWorkoutStore();
+  const showWorkout = workoutActive && workoutMinimized;
 
   useEffect(() => {
     if (!activeSession) return;
@@ -32,51 +46,75 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
     return () => clearInterval(id);
   }, [activeSession]);
 
-  if (!activeSession) return null;
+  const hasLog = !!activeSession;
+  const hasWorkout = showWorkout;
 
-  const totalSec = Math.floor(elapsedMs / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
+  if (!hasLog && !hasWorkout) return null;
 
-  const topText = h >= 1 ? pad2(h) : pad2(m);
-  const bottomText = h >= 1 ? pad2(m) : pad2(s);
+  // Log timer values
+  const logSec = Math.floor(elapsedMs / 1000);
+  const logTime = formatSec(logSec);
+  const logTopText = logTime.h >= 1 ? pad2(logTime.h) : pad2(logTime.m);
+  const logBottomText = logTime.h >= 1 ? pad2(logTime.m) : pad2(logTime.s);
 
-  const handlePress = () => router.push("/journal");
+  // Workout timer values
+  const wTime = formatSec(workoutSeconds);
+  const wTopText = wTime.h >= 1 ? pad2(wTime.h) : pad2(wTime.m);
+  const wBottomText = wTime.h >= 1 ? pad2(wTime.m) : pad2(wTime.s);
 
-  // Inline 仍然保持原逻辑
+  const handleLogPress = () => router.push("/journal");
+  const handleWorkoutPress = () => {
+    if (sessionJson) {
+      router.push({ pathname: "/library/plan-view", params: { sessionJson } } as any);
+    }
+  };
+
+  // Inline variant (unchanged logic, only log)
   if (variant === "inline") {
+    if (!hasLog) return null;
     return (
-      <TouchableOpacity style={[styles.inlineContainer, style]} onPress={handlePress} activeOpacity={0.8}>
+      <TouchableOpacity style={[styles.inlineContainer, style]} onPress={handleLogPress} activeOpacity={0.8}>
         <View style={styles.liveDot} />
-        <Text style={styles.inlineText}>{`${pad2(h)}:${pad2(m)}:${pad2(s)}`}</Text>
+        <Text style={styles.inlineText}>{`${pad2(logTime.h)}:${pad2(logTime.m)}:${pad2(logTime.s)}`}</Text>
         <Ionicons name="chevron-forward" size={14} color="#FFF" style={{ opacity: 0.6, marginLeft: 4 }} />
       </TouchableOpacity>
     );
   }
 
+  // Floating variant: side-by-side pills
   return (
     <Animated.View
       entering={FadeInUp.springify().damping(40)}
       exiting={FadeOutDown.duration(200)}
-      style={[styles.floatingOuter, style]}
+      style={[styles.floatingRow, style]}
     >
-      <TouchableOpacity style={styles.floatingContent} onPress={handlePress} activeOpacity={0.9}>
-        <View style={styles.liveDot} />
+      {/* Workout pill */}
+      {hasWorkout ? (
+        <TouchableOpacity style={styles.pill} onPress={handleWorkoutPress} activeOpacity={0.9}>
+          <Ionicons name="body-outline" size={14} color="#60A5FA" />
+          <View style={styles.twoLineCol}>
+            <Text style={styles.timeTop}>{wTopText}</Text>
+            <Text style={styles.timeBottom}>{wBottomText}</Text>
+          </View>
+        </TouchableOpacity>
+      ) : null}
 
-        <View style={styles.twoLineCol}>
-          <Text style={styles.timeTop}>{topText}</Text>
-          <Text style={styles.timeBottom}>{bottomText}</Text>
-        </View>
-
-        <Ionicons name="chevron-forward" size={12} color="#E5E7EB" />
-      </TouchableOpacity>
+      {/* Log pill */}
+      {hasLog ? (
+        <TouchableOpacity style={styles.pill} onPress={handleLogPress} activeOpacity={0.9}>
+          <View style={styles.liveDot} />
+          <View style={styles.twoLineCol}>
+            <Text style={styles.timeTop}>{logTopText}</Text>
+            <Text style={styles.timeBottom}>{logBottomText}</Text>
+          </View>
+        </TouchableOpacity>
+      ) : null}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* Inline（不变） */
+  /* Inline */
   inlineContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -98,26 +136,29 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
 
-  /* Floating（深色 + 对齐 TabBar） */
-  floatingOuter: {
-    width: TAB_W,
-    height: TAB_H,
+  /* Floating row container */
+  floatingRow: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+  },
+
+  /* Individual pill */
+  pill: {
+    width: PILL_W,
+    height: PILL_H,
     borderRadius: RADIUS,
-    backgroundColor: "#0F172A", // ✅ 原来的深色背景
+    backgroundColor: "#0F172A",
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
-    overflow: "hidden",
-  },
-  floatingContent: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8, // ✅ 紧凑
-    gap: 6,
+    paddingHorizontal: 8,
+    gap: 5,
   },
 
   twoLineCol: {

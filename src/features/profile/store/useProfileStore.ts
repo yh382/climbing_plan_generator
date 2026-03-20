@@ -50,6 +50,31 @@ export type Profile = {
   performance?: Performance;
   ability_scores?: AbilityScores;
 
+  capacity?: {
+    max_pullups?: number;
+    weighted_pullup_kg?: number;
+  };
+  finger_strength?: {
+    protocol?: "maxhang" | "repeater" | null;
+    edge_mm?: number | null;
+    grip?: "half_crimp" | "open_hand" | "full_crimp" | null;
+    fingers?: number | null;
+    added_weight_kg?: number | null;
+    hang_seconds?: number | null;
+    index?: number | null;
+    ref_edge_mm?: number;
+    ref_grip?: "half_crimp";
+    ref_fingers?: number;
+    ref_hang_seconds?: number;
+    version?: number;
+    updated_at?: string;
+  };
+  climbing_background?: {
+    discipline?: string;
+    preferred_angle?: string;
+    experience_years?: number;
+  };
+
   strength?: any;
   mobility?: any;
 

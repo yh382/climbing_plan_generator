@@ -6,10 +6,8 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  Dimensions,
-  Platform,
+  ActivityIndicator,
   ViewStyle,
-  TextStyle,
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -115,16 +113,10 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { event, onToggleJoin, joined } = useEventDetailData();
+  const { event, eventRaw, onToggleJoin, joined, loading } = useEventDetailData();
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  // Thumbnail logic
-  const thumb =
-    (event as any)?.organizerAvatar ||
-    (event as any)?.gymLogo ||
-    (event as any)?.thumbnail;
-
-  // ===== Scroll Animation (Header Fade) =====
+  // ===== Scroll Animation (Header Fade) — hooks must be before early return =====
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((evt) => {
     scrollY.value = evt.contentOffset.y;
@@ -150,13 +142,31 @@ export default function EventDetailScreen() {
 
   // ===== Text Derivations =====
   const startText = useMemo(
-    () => formatYMD(event.startDateISO),
-    [event.startDateISO]
+    () => (event ? formatYMD(event.startDateISO) : ""),
+    [event?.startDateISO]
   );
   const endText = useMemo(
-    () => formatYMD(event.endDateISO),
-    [event.endDateISO]
+    () => (event ? formatYMD(event.endDateISO) : ""),
+    [event?.endDateISO]
   );
+  const left = useMemo(
+    () => (event ? daysLeft(event.endDateISO ?? event.startDateISO) : null),
+    [event?.endDateISO, event?.startDateISO]
+  );
+
+  // Loading / not found states
+  if (loading || !event) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="small" color="#9CA3AF" />
+      </View>
+    );
+  }
+
+  // Thumbnail logic — use publisher logo if available
+  const thumb = eventRaw?.publisher?.logoUrl
+    ? { uri: eventRaw.publisher.logoUrl }
+    : undefined;
 
   const hasRange =
     !!event.endDateISO && event.endDateISO !== event.startDateISO;
@@ -167,11 +177,6 @@ export default function EventDetailScreen() {
         event.endTimeISO ? ` - ${formatTimeHM(event.endTimeISO)}` : ""
       }`
     : "";
-
-  const left = useMemo(
-    () => daysLeft(event.endDateISO ?? event.startDateISO),
-    [event.endDateISO, event.startDateISO]
-  );
 
   const showDate = event.display?.showDate !== false;
   const showTime = event.display?.showTime === true;

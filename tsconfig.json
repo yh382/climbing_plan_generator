@@ -26,7 +26,7 @@
         "lib/*"
       ],
       "@/features/*": ["src/features/*"],
-      "@/components/*": ["src/features/profile/components/*"],
+      "@/components/*": ["src/components/*"],
       "@/store/*": ["src/store/*"],
       "@/lib/*": ["src/lib/*"],
       "@/assets/*": ["app/assets/*"]
@@ -48,6 +48,6 @@
     "app.config.ts",
     "lib",                             // ← 加上
     "components"
-, "src/features", "src/store", "src/lib", "src/contexts"  ],
+, "src/features", "src/store", "src/lib", "src/contexts", "src/components"  ],
   "extends": "expo/tsconfig.base.json"
 }

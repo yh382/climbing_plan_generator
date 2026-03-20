@@ -1,6 +1,6 @@
 // src/features/calendar/ActionDetailModal.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -12,7 +12,7 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { PlanV3SessionItem } from "../../types/plan";
 import { tokens } from "../../../components/ui/Theme";
 
@@ -31,9 +31,6 @@ const VIDEO_HEIGHT = width * 0.8;
 type TimerPhase = "IDLE" | "PREPARE" | "WORK" | "REST_REP" | "REST_SET" | "COMPLETE";
 
 export default function ActionDetailModal({ visible, onClose, item, isZH }: Props) {
-  const videoRef = useRef<Video>(null);
-  const [status, setStatus] = useState({});
-  
   // --- 自动计时器核心状态 ---
   const [phase, setPhase] = useState<TimerPhase>("IDLE");
   const [timeLeft, setTimeLeft] = useState(0); // 当前倒计时
@@ -173,6 +170,10 @@ export default function ActionDetailModal({ visible, onClose, item, isZH }: Prop
     }
   };
 
+  const videoPlayer = useVideoPlayer(item?.media?.video ?? null, (p) => {
+    p.loop = true;
+  });
+
   if (!item) return null;
 
   const name = item.name_override?.zh || item.action_id;
@@ -207,14 +208,11 @@ export default function ActionDetailModal({ visible, onClose, item, isZH }: Prop
           {/* 2. 视频区域 */}
           <View style={styles.mediaContainer}>
             {videoUrl ? (
-              <Video
-                ref={videoRef}
+              <VideoView
+                player={videoPlayer}
                 style={styles.video}
-                source={{ uri: videoUrl }}
-                useNativeControls
-                resizeMode={ResizeMode.CONTAIN}
-                isLooping
-                onPlaybackStatusUpdate={status => setStatus(() => status)}
+                nativeControls
+                contentFit="contain"
               />
             ) : imageUrl ? (
               <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />

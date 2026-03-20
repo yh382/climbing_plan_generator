@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, Pressable } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { useClimbsStore } from "../store/useClimbsStore";
 
 export function RecentClimbsList() {
@@ -18,23 +18,25 @@ export function RecentClimbsList() {
   }
 
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(it) => it.id}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
-      onEndReached={() => nextCursor && loadMore()}
-      renderItem={({ item }) => (
-        <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12 }}>
+    <View style={{ gap: 12 }}>
+      {items.map((item) => (
+        <View key={item.id} style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12 }}>
           <Text style={{ fontWeight: "700" }}>{item.route_name ?? "(未命名路线)"} · {item.grade_value}</Text>
           <Text style={{ color: "#6b7280", marginTop: 4 }}>
             {item.date} · {item.location_type}/{item.discipline} · 尝试 {item.attempts} · 完成 {item.sends}
           </Text>
           {!!item.notes && <Text style={{ marginTop: 4 }}>{item.notes}</Text>}
         </View>
+      ))}
+      {loading && <ActivityIndicator size="small" color="#6b7280" style={{ padding: 12 }} />}
+      {!loading && nextCursor && (
+        <Pressable
+          onPress={loadMore}
+          style={{ padding: 12, alignItems: "center" }}
+        >
+          <Text style={{ color: "#2BB673", fontWeight: "600", fontSize: 13 }}>Load More</Text>
+        </Pressable>
       )}
-      ListFooterComponent={
-        loading ? <Text style={{ textAlign: "center", padding: 12, color: "#6b7280" }}>加载中...</Text> : null
-      }
-    />
+    </View>
   );
 }

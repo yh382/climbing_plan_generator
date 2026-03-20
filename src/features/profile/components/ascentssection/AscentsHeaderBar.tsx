@@ -54,7 +54,7 @@ export default function AscentsHeaderBar({
         {/* Analysis icon entry */}
         <Pressable
           style={s.analysisBtn}
-          onPress={() => router.push("/(tabs)/analysis")}
+          onPress={() => router.push("/analysis")}
           hitSlop={10}
         >
           <MaterialCommunityIcons name="chart-bar" size={22} color="#111" />

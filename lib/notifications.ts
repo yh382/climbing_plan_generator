@@ -62,14 +62,6 @@ export async function scheduleDailyReminder(
     minute,
   };
 
-  const { tr } = useI18N();
-  await scheduleDailyReminder(9, 0, {
-    title: tr("查看今天的训练计划 ✅", "Check today's training plan ✅"),
-    body: tr("打开训练日历，打卡你的训练项目。", "Open the calendar and log your training."),
-    sound: true, // 需要声音就传 true；静音则删掉此行
-  });
-
-
   const content: Notifications.NotificationContentInput = {
     title: opts?.title ?? "查看今天的训练计划 ✅",
     body: opts?.body ?? "打开训练日历，打卡你的训练项目。",

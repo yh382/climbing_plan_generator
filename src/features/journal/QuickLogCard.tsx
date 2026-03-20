@@ -15,8 +15,8 @@ const YDS_GROUPS = {
 type YdsGroupKey = keyof typeof YDS_GROUPS;
 
 type Props = {
-  mode: "boulder" | "yds";
-  onChangeMode: (m: "boulder" | "yds") => void;
+  mode: "boulder" | "toprope" | "lead";
+  onChangeMode: (m: "boulder" | "toprope" | "lead") => void;
 
   // i18n
   tr: (zh: string, en: string) => string;
@@ -99,7 +99,7 @@ export default function QuickLogCard({
 
   return (
     <View>
-      {/* Bouldering / Rope 顶部切换 */}
+      {/* Boulder / Top Rope / Lead toggle */}
       <View style={styles.segmentWrap}>
         <TouchableOpacity
           onPress={() => onChangeMode("boulder")}
@@ -107,17 +107,27 @@ export default function QuickLogCard({
           activeOpacity={0.9}
         >
           <Text style={[styles.segmentText, mode === "boulder" && styles.segmentTextActive]}>
-            {tr("抱石", "Bouldering")}
+            {tr("抱石", "Boulder")}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onChangeMode("yds")}
-          style={[styles.segmentBtn, mode === "yds" && styles.segmentBtnActive]}
+          onPress={() => onChangeMode("toprope")}
+          style={[styles.segmentBtn, mode === "toprope" && styles.segmentBtnActive]}
           activeOpacity={0.9}
         >
-          <Text style={[styles.segmentText, mode === "yds" && styles.segmentTextActive]}>
-            {tr("绳索", "Rope")}
+          <Text style={[styles.segmentText, mode === "toprope" && styles.segmentTextActive]}>
+            Top Rope
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onChangeMode("lead")}
+          style={[styles.segmentBtn, mode === "lead" && styles.segmentBtnActive]}
+          activeOpacity={0.9}
+        >
+          <Text style={[styles.segmentText, mode === "lead" && styles.segmentTextActive]}>
+            Lead
           </Text>
         </TouchableOpacity>
       </View>

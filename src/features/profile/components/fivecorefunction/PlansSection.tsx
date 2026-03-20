@@ -38,7 +38,7 @@ export default function PlansSection({
     if (onPressPlan) return onPressPlan(plan);
     router.push({
       pathname: "/library/plan-overview",
-      params: { planId: plan.id, source: "profile" },
+      params: { planId: plan.id, source: isOwner ? "user" : "market" },
     });
   };
 

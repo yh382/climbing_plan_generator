@@ -1,15 +1,30 @@
-import React from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { communityApi } from "../../src/features/community/api";
+import type { BlockedUserOut } from "../../src/features/community/types";
 
 export default function BlockedUsers() {
   const router = useRouter();
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUserOut[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const blockedUsers = [
-    { id: 1, name: "Spammer123", avatar: "https://i.pravatar.cc/150?u=1" },
-    { id: 2, name: "MeanClimber", avatar: "https://i.pravatar.cc/150?u=2" },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await communityApi.getBlockedUsers();
+        setBlockedUsers(data);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleUnblock = async (userId: string) => {
+    await communityApi.unblockUser(userId);
+    setBlockedUsers(prev => prev.filter(u => u.userId !== userId));
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -21,19 +36,30 @@ export default function BlockedUsers() {
         <View style={styles.headerBtn} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {blockedUsers.map(user => (
-          <View key={user.id} style={styles.userRow}>
-            <View style={styles.userInfo}>
-              <Image source={{ uri: user.avatar }} style={styles.avatar} />
-              <Text style={styles.userName}>{user.name}</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {blockedUsers.length === 0 && (
+            <Text style={{ textAlign: "center", color: "#94A3B8", marginTop: 40 }}>No blocked users</Text>
+          )}
+          {blockedUsers.map(user => (
+            <View key={user.id} style={styles.userRow}>
+              <View style={styles.userInfo}>
+                {user.avatarUrl ? (
+                  <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, { backgroundColor: "#CBD5E1" }]} />
+                )}
+                <Text style={styles.userName}>{user.username}</Text>
+              </View>
+              <TouchableOpacity style={styles.unblockBtn} onPress={() => handleUnblock(user.userId)}>
+                <Text style={styles.unblockText}>Unblock</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.unblockBtn}>
-              <Text style={styles.unblockText}>Unblock</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

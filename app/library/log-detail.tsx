@@ -1,16 +1,18 @@
 // app/library/log-detail.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 
 import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
 import DualActivityRing from "../../src/features/journal/DualActivityRing";
+import ClimbItemCard from "../../src/components/shared/ClimbItemCard";
 import { usePlanStore } from "../../src/store/usePlanStore";
+import useLogsStore from "../../src/store/useLogsStore";
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
-
-import { readDayList, readSessionList, readNotesByRoutes } from "../../src/features/journal/loglist/storage";
+import { readDayList, readSessionList } from "../../src/features/journal/loglist/storage";
+import { enqueueLogEvent } from "../../src/features/journal/sync/logsOutbox";
 
 const SIDE_PAD = 16;
 
@@ -24,6 +26,30 @@ function inferSendCount(item: any): number {
   if (item?.isSent === true) return 1;
   if (item?.status === "sent" || item?.status === "send") return 1;
   return 0;
+}
+
+function vNumber(g?: string): number {
+  if (!g) return -1;
+  const m = String(g).trim().match(/^V(\d+)/i);
+  return m ? parseInt(m[1], 10) : -1;
+}
+
+function ydsRank(g?: string): number {
+  if (!g) return -1;
+  const m = String(g).trim().match(/^5\.(\d+)([abcd+-])?$/i);
+  if (!m) return -1;
+  const major = parseInt(m[1], 10);
+  const suf = (m[2] || "").toLowerCase();
+  const sufMap: Record<string, number> = { "": 0, a: 1, b: 2, c: 3, d: 4, "+": 5, "-": -1 };
+  return major * 10 + (sufMap[suf] ?? 0);
+}
+
+function gradeRank(g?: string): number {
+  const v = vNumber(g);
+  if (v >= 0) return v * 10 + 100;
+  const y = ydsRank(g);
+  if (y >= 0) return y;
+  return -1;
 }
 
 export default function LogDetailScreen() {
@@ -43,11 +69,18 @@ export default function LogDetailScreen() {
   const modeParam = params.mode;
 
   const { percentForDate } = usePlanStore();
+  const sessions = useLogsStore((s) => s.sessions);
   const [trainingPct, setTrainingPct] = useState(0);
 
   const [itemsB, setItemsB] = useState<any[]>([]);
   const [itemsR, setItemsR] = useState<any[]>([]);
-  const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
+
+  // Find matching session entry for duration info
+  const sessionEntry = useMemo(() => {
+    if (sessionKey) return sessions.find((s) => s.sessionKey === sessionKey) ?? null;
+    if (date) return sessions.find((s) => s.date === date) ?? null;
+    return null;
+  }, [sessions, sessionKey, date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,34 +90,34 @@ export default function LogDetailScreen() {
 
       const useSession = !!sessionKey;
 
-      const [b, r] = await Promise.all([
+      const [b, tr, ld] = await Promise.all([
         useSession ? readSessionList(sessionKey, "boulder") : readDayList(date, "boulder"),
-        useSession ? readSessionList(sessionKey, "yds") : readDayList(date, "yds"),
+        useSession ? readSessionList(sessionKey, "toprope") : readDayList(date, "toprope"),
+        useSession ? readSessionList(sessionKey, "lead") : readDayList(date, "lead"),
       ]);
 
       if (cancelled) return;
 
       const bb = Array.isArray(b) ? b : [];
-      const rr = Array.isArray(r) ? r : [];
+      const rr = [
+        ...(Array.isArray(tr) ? tr : []),
+        ...(Array.isArray(ld) ? ld : []),
+      ];
 
       setItemsB(bb);
       setItemsR(rr);
-
-      const names = [...bb, ...rr]
-        .map((x: any) => (x?.name || x?.routeName || x?.route || "").trim())
-        .filter(Boolean);
-
-      const notes = await readNotesByRoutes(names);
-      if (!cancelled) setLocalNotes(notes);
     };
 
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [date, sessionKey]);
 
-  const dailyLogs = useMemo(() => [...itemsB, ...itemsR], [itemsB, itemsR]);
+  // Sort by grade descending
+  const dailyLogs = useMemo(
+    () =>
+      [...itemsB, ...itemsR].sort((a, b) => gradeRank(b?.grade) - gradeRank(a?.grade)),
+    [itemsB, itemsR]
+  );
 
   useEffect(() => {
     if (!date) return;
@@ -97,23 +130,19 @@ export default function LogDetailScreen() {
 
   const displayDate = useMemo(() => {
     if (!date) return "Unknown Date";
-    try {
-      return format(parseISO(date), "EEEE, MMM dd");
-    } catch {
-      return date;
-    }
+    try { return format(parseISO(date), "EEEE, MMM dd"); } catch { return date; }
   }, [date]);
 
   const gymName = useMemo(() => {
     if (gymNameParam) return gymNameParam;
+    if (sessionEntry?.gymName) return sessionEntry.gymName;
     const first: any = dailyLogs[0];
     return first?.gymName || first?.gym || first?.location || "";
-  }, [gymNameParam, dailyLogs]);
+  }, [gymNameParam, sessionEntry, dailyLogs]);
 
   const hasBoulder = useMemo(() => dailyLogs.some((l: any) => isBoulderGrade(l?.grade)), [dailyLogs]);
   const hasRoutes = useMemo(() => dailyLogs.some((l: any) => isRouteGrade(l?.grade)), [dailyLogs]);
 
-  // ring parts（按 items 分布，不依赖 store）
   const boulderParts = useMemo(() => {
     const map = new Map<string, number>();
     for (const it of itemsB) {
@@ -136,6 +165,14 @@ export default function LogDetailScreen() {
   const routeTotal = itemsR.length;
   const sessionSends = useMemo(() => dailyLogs.reduce((s: number, it: any) => s + inferSendCount(it), 0), [dailyLogs]);
 
+  const bestGrade = useMemo(() => {
+    if (sessionEntry?.best && sessionEntry.best !== "V?") return sessionEntry.best;
+    const sorted = [...dailyLogs].sort((a, b) => gradeRank(b?.grade) - gradeRank(a?.grade));
+    return sorted[0]?.grade || "—";
+  }, [sessionEntry, dailyLogs]);
+
+  const duration = sessionEntry?.duration || "";
+
   const handleBack = () => {
     if (origin === "end_log") {
       router.replace("/calendar");
@@ -144,141 +181,105 @@ export default function LogDetailScreen() {
     router.back();
   };
 
-  const renderClimbCard = ({ item }: { item: any }) => {
-    const status = item.status || (item.attempts === 1 ? "flash" : "sent");
-    const statusColor = status === "flash" ? "#F59E0B" : status === "sent" ? "#10B981" : "#EF4444";
-    const statusText = status === "flash" ? "⚡ Flash" : status === "sent" ? "✅ Sent" : "❌ Attempt";
-
-    const routeName = (item?.name || item?.routeName || item?.route || "").trim();
-    const note = ((routeName && localNotes[routeName]) || item?.note || item?.notes || "").trim();
-
-    const imageUri = item?.image || item?.media?.[0]?.uri || item?.media?.[0]?.url || "";
-
-    return (
-      <View style={{ paddingHorizontal: SIDE_PAD }}>
-        <View style={styles.card}>
-          <View style={styles.imageContainer}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
-            ) : (
-              <View style={[styles.image, styles.noImage]}>
-                <Text style={{ fontSize: 24, fontWeight: "900", color: "#E5E7EB" }}>{item.grade}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.infoContainer}>
-            <View style={styles.rowTop}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={[styles.gradeBadge, { backgroundColor: statusColor }]}>
-                  <Text style={styles.gradeText}>{item.grade}</Text>
-                </View>
-                <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
-              </View>
-            </View>
-
-            {routeName ? <Text style={styles.routeName} numberOfLines={1}>{routeName}</Text> : null}
-
-            <View style={styles.rowBottom}>
-              <Ionicons name="refresh" size={14} color="#6B7280" />
-              <Text style={styles.attemptsText}>{item?.attemptsTotal || item?.attempts || 1} attempts</Text>
-            </View>
-
-            {note ? (
-              <View style={styles.noteBubble}>
-                <Ionicons name="chatbubble-ellipses-outline" size={14} color="#64748B" />
-                <Text style={styles.noteText} numberOfLines={2}>{note}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-    );
+  const handleMenu = () => {
+    Alert.alert("Session Options", undefined, [
+      {
+        text: "Delete Session",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert("Delete", "Are you sure?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: async () => {
+                const itemIds = await useLogsStore.getState().deleteSession(sessionKey);
+                for (const id of itemIds) {
+                  await enqueueLogEvent({ type: "delete", localId: id });
+                }
+                router.back();
+              },
+            },
+          ]);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
-  const ring = useMemo(() => {
-    const emptyParts: any[] = [];
+  const renderClimbCard = ({ item }: { item: any }) => (
+    <ClimbItemCard
+      item={item}
+      onPress={() => {
+        router.push({
+          pathname: "/library/route-detail",
+          params: {
+            date,
+            itemId: item.id,
+            type: item.type,
+            sessionKey,
+          },
+        });
+      }}
+    />
+  );
 
-    if (modeParam === "boulder") {
-      return (
-        <DualActivityRing
-          size={170}
-          thickness={14}
-          trainingPct={trainingPct}
-          climbCount={boulderTotal}
-          parts={boulderParts.length ? boulderParts : emptyParts}
-          climbGoal={10}
-          outerColor="#A5D23D"
-          innerColor="#3B82F6"
-        />
-      );
-    }
-    if (modeParam === "rope") {
-      return (
-        <DualActivityRing
-          size={170}
-          thickness={14}
-          trainingPct={trainingPct}
-          climbCount={routeTotal}
-          parts={routeParts.length ? routeParts : emptyParts}
-          climbGoal={10}
-          outerColor="#A5D23D"
-          innerColor="#3B82F6"
-        />
-      );
-    }
+  const activeParts = useMemo(() => {
+    if (modeParam === "rope" || (hasRoutes && !hasBoulder)) return routeParts;
+    return boulderParts;
+  }, [modeParam, hasBoulder, hasRoutes, boulderParts, routeParts]);
 
-    if (hasBoulder && !hasRoutes) {
-      return (
-        <DualActivityRing
-          size={170}
-          thickness={14}
-          trainingPct={trainingPct}
-          climbCount={boulderTotal}
-          parts={boulderParts.length ? boulderParts : emptyParts}
-          climbGoal={10}
-          outerColor="#A5D23D"
-          innerColor="#3B82F6"
-        />
-      );
-    }
-    if (hasRoutes && !hasBoulder) {
-      return (
-        <DualActivityRing
-          size={170}
-          thickness={14}
-          trainingPct={trainingPct}
-          climbCount={routeTotal}
-          parts={routeParts.length ? routeParts : emptyParts}
-          climbGoal={10}
-          outerColor="#A5D23D"
-          innerColor="#3B82F6"
-        />
-      );
-    }
+  const activeTotal = useMemo(() => {
+    if (modeParam === "rope" || (hasRoutes && !hasBoulder)) return routeTotal;
+    return boulderTotal;
+  }, [modeParam, hasBoulder, hasRoutes, boulderTotal, routeTotal]);
 
-    // both or none -> just show boulder by default
-    return (
-      <DualActivityRing
-        size={170}
-        thickness={14}
-        trainingPct={trainingPct}
-        climbCount={boulderTotal}
-        parts={boulderParts.length ? boulderParts : emptyParts}
-        climbGoal={10}
-        outerColor="#A5D23D"
-        innerColor="#3B82F6"
-      />
-    );
-  }, [modeParam, trainingPct, boulderTotal, routeTotal, boulderParts, routeParts, hasBoulder, hasRoutes]);
+  const ring = (
+    <DualActivityRing
+      size={170}
+      thickness={14}
+      trainingPct={trainingPct}
+      climbCount={activeTotal}
+      parts={activeParts.length ? activeParts : []}
+      climbGoal={10}
+      outerColor="#A5D23D"
+      innerColor="#3B82F6"
+    />
+  );
+
+  const kpiRow = (
+    <View style={styles.kpiRow}>
+      <View style={styles.kpiItem}>
+        <Text style={styles.kpiValue}>{sessionSends}</Text>
+        <Text style={styles.kpiLabel}>Sends</Text>
+      </View>
+      <View style={styles.kpiDivider} />
+      <View style={styles.kpiItem}>
+        <Text style={styles.kpiValue}>{bestGrade}</Text>
+        <Text style={styles.kpiLabel}>Best</Text>
+      </View>
+      {duration ? (
+        <>
+          <View style={styles.kpiDivider} />
+          <View style={styles.kpiItem}>
+            <Text style={styles.kpiValue}>{duration}</Text>
+            <Text style={styles.kpiLabel}>Duration</Text>
+          </View>
+        </>
+      ) : null}
+      <View style={styles.kpiDivider} />
+      <View style={styles.kpiItem}>
+        <Text style={styles.kpiValue}>{dailyLogs.length}</Text>
+        <Text style={styles.kpiLabel}>Climbs</Text>
+      </View>
+    </View>
+  );
 
   const listHeader = (
     <View style={{ paddingTop: 12, paddingBottom: 8, alignItems: "center" }}>
       {ring}
-      <View style={{ height: 10 }} />
-      <Text style={{ fontSize: 14, color: "#6B7280" }}>{displayDate}</Text>
-      {gymName ? <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{gymName}</Text> : null}
-      <Text style={{ fontSize: 12, color: "#111", marginTop: 6, fontWeight: "800" }}>{sessionSends} sends</Text>
+      <View style={{ height: 12 }} />
+      {kpiRow}
       <View style={{ height: 12 }} />
     </View>
   );
@@ -291,14 +292,30 @@ export default function LogDetailScreen() {
     </View>
   );
 
+  const RightActions = (
+    <TouchableOpacity onPress={handleMenu} style={styles.iconBtn}>
+      <Ionicons name="ellipsis-horizontal" size={22} color="#111" />
+    </TouchableOpacity>
+  );
+
   return (
     <CollapsibleLargeHeaderFlatList
       backgroundColor="#F9FAFB"
-      smallTitle="Daily Log"
-      largeTitle={<Text style={styles.largeTitle}>Daily Log</Text>}
-      subtitle={<Text style={styles.largeSubtitle}>{displayDate}</Text>}
+      smallTitle="Route Log"
+      largeTitle={<Text style={styles.largeTitle}>Route Log</Text>}
+      subtitle={
+        <View>
+          <Text style={styles.largeSubtitle}>{displayDate}</Text>
+          {gymName ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+              <Ionicons name="location-outline" size={12} color="#9CA3AF" />
+              <Text style={{ fontSize: 12, color: "#9CA3AF" }}>{gymName}</Text>
+            </View>
+          ) : null}
+        </View>
+      }
       leftActions={LeftActions}
-      rightActions={null as any}
+      rightActions={RightActions}
       data={dailyLogs}
       keyExtractor={(item: any, index: number) => item.id || index.toString()}
       renderItem={renderClimbCard as any}
@@ -317,41 +334,24 @@ const styles = StyleSheet.create({
   largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
   largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
 
-  card: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    marginBottom: 12,
+  // KPI row
+  kpiRow: {
     flexDirection: "row",
-    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+    marginHorizontal: SIDE_PAD,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     shadowColor: "#000",
     shadowOpacity: 0.03,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-  imageContainer: { width: 100, height: 100 },
-  image: { width: "100%", height: "100%" },
-  noImage: { backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
-  infoContainer: { flex: 1, padding: 12, justifyContent: "space-between" },
+  kpiItem: { flex: 1, alignItems: "center" },
+  kpiValue: { fontSize: 18, fontWeight: "800", color: "#111" },
+  kpiLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", marginTop: 2 },
+  kpiDivider: { width: 1, height: 28, backgroundColor: "#F3F4F6" },
 
-  rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
-  gradeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, minWidth: 40, alignItems: "center" },
-  gradeText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
-  statusText: { fontSize: 12, fontWeight: "600" },
-
-  routeName: { marginTop: 6, fontSize: 13, fontWeight: "800", color: "#111" },
-
-  rowBottom: { flexDirection: "row", alignItems: "center", gap: 4 },
-  attemptsText: { fontSize: 13, color: "#6B7280" },
-
-  noteBubble: {
-    marginTop: 10,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  noteText: { flex: 1, color: "#334155", fontSize: 13, fontWeight: "700" },
 });

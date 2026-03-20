@@ -61,7 +61,7 @@ export default function HelpCenter() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         

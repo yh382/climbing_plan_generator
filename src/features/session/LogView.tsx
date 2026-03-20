@@ -44,8 +44,8 @@ type Props = {
   selectedDate: Date;
   headerHeight: number;
   // [关键] 从父组件接收 mode 和 setMode
-  mode: "boulder" | "yds";
-  setMode: (m: "boulder" | "yds") => void;
+  mode: "boulder" | "toprope" | "lead";
+  setMode: (m: "boulder" | "toprope" | "lead") => void;
 };
 
 // [关键] 在函数参数里解构 mode, setMode
@@ -66,7 +66,7 @@ export default function LogView({ selectedDate, headerHeight, mode, setMode }: P
   const todayKey = useMemo(() => toDateString(selectedDate), [selectedDate]);
   
   // 这里现在可以直接使用 props 里的 mode
-  const logType = mode === "boulder" ? "boulder" : "yds";
+  const logType = mode;
 
   const todayTotal = useMemo(() => {
     return logs
@@ -118,8 +118,11 @@ export default function LogView({ selectedDate, headerHeight, mode, setMode }: P
       <TouchableOpacity onPress={() => setMode("boulder")} style={[styles.modeBtn, mode === "boulder" && styles.modeBtnActive]}>
         <Text style={[styles.modeText, mode === "boulder" && styles.modeTextActive]}>{tr("抱石", "Bouldering")}</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => setMode("yds")} style={[styles.modeBtn, mode === "yds" && styles.modeBtnActive]}>
-        <Text style={[styles.modeText, mode === "yds" && styles.modeTextActive]}>{tr("绳索", "Rope")}</Text>
+      <TouchableOpacity onPress={() => setMode("toprope")} style={[styles.modeBtn, mode === "toprope" && styles.modeBtnActive]}>
+        <Text style={[styles.modeText, mode === "toprope" && styles.modeTextActive]}>{tr("顶绳", "Top Rope")}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setMode("lead")} style={[styles.modeBtn, mode === "lead" && styles.modeBtnActive]}>
+        <Text style={[styles.modeText, mode === "lead" && styles.modeTextActive]}>{tr("先锋", "Lead")}</Text>
       </TouchableOpacity>
     </View>
   );

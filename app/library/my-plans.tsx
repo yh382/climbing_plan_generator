@@ -1,42 +1,14 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from "react-native";
+// app/library/my-plans.tsx
+import { useMemo, useState } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import TopBar from "../../components/TopBar";
 
-import { TrainingPlanCard, TrainingPlan } from "../../src/components/plancard";
-
-// ---- Mock Data ----
-// From Others: 你收藏/跟练的别人计划（可视为“已加入我的计划库”）
-const SAVED_FROM_OTHERS: TrainingPlan[] = [
-  {
-    id: "o1",
-    title: "Endurance Beast",
-    source: "custom",
-    visibility: "private",
-    status: "paused",
-    trainingType: "endurance",
-    durationWeeks: 8,
-    author: { authorName: "Adam Ondra" },
-    progress: { currentWeek: 1, totalWeeks: 8 },
-  },
-];
-
-// My Custom: 我自己创建的计划（可管理 public/private）
-const MY_CUSTOM_PLANS: TrainingPlan[] = [
-  {
-    id: "m1",
-    title: "My Weakness Fix",
-    source: "custom",
-    visibility: "private",
-    status: "active",
-    trainingType: "strength",
-    durationWeeks: 4,
-    author: { authorName: "Me" },
-    progress: { currentWeek: 2, totalWeeks: 4 },
-  },
-];
+import { TrainingPlanCard } from "../../src/components/plancard";
+import { useMyPlans } from "../../src/features/plans/hooks";
+import { planSummaryToTrainingPlan } from "../../src/features/plans/adapters";
 
 type TabKey = "Others" | "Custom";
 
@@ -44,23 +16,32 @@ export default function MyPlansScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [activeTab, setActiveTab] = useState<TabKey>("Others");
+  const [activeTab, setActiveTab] = useState<TabKey>("Custom");
   const [fabOpen, setFabOpen] = useState(false);
 
+  const { plans, loading } = useMyPlans();
+
   const data = useMemo(() => {
-    return activeTab === "Others" ? SAVED_FROM_OTHERS : MY_CUSTOM_PLANS;
-  }, [activeTab]);
+    const uiPlans = plans.map(planSummaryToTrainingPlan);
+    if (activeTab === "Custom") {
+      return uiPlans.filter((p) => p.source === "ai" || p.source === "custom");
+    }
+    // "Others" = official plans or forked plans
+    return uiPlans.filter((p) => p.source === "official" || p.forkedFromPlanId);
+  }, [plans, activeTab]);
 
   const handleFabAction = (action: "AI" | "Custom") => {
     setFabOpen(false);
-
-    // 这里先占位，你后续接实际创建/AI picker 路由即可
-    if (action === "AI") Alert.alert("AI Pick", "Navigate to AI Generator");
-    if (action === "Custom") Alert.alert("Create", "Navigate to Plan Creator");
+    if (action === "AI") {
+      Alert.alert("Coming Soon", "AI plan generation will be available with Coach AI");
+      return;
+    }
+    if (action === "Custom") {
+      router.push("/library/plan-builder" as any);
+    }
   };
 
-  const openManageMenu = (plan: TrainingPlan) => {
-    // Step 6 再接真正的 action sheet / modal
+  const openManageMenu = (plan: any) => {
     Alert.alert(
       "Manage Plan",
       `Plan: ${plan.title}\n\n(Next) Public / Private / Archive`,
@@ -87,8 +68,8 @@ export default function MyPlansScreen() {
       {/* Tabs */}
       <View style={styles.tabContainer}>
         {[
-          { label: "From Others", key: "Others" as const },
           { label: "My Custom", key: "Custom" as const },
+          { label: "From Others", key: "Others" as const },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -106,42 +87,49 @@ export default function MyPlansScreen() {
       </View>
 
       {/* Plans List */}
-      <FlatList
-        data={data}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TrainingPlanCard
-            plan={item}
-            variant="compact"
-            context="personal"
-            handlers={{
-              onPress: () =>
-                router.push({
-                  pathname: "/library/plan-overview",
-                  params: { planId: item.id },
-                }),
-              onOpenMenu: () => openManageMenu(item),
-            }}
-            display={{
-              showSourceBadge: true,
-              // 仅 My Custom 默认显示可见性；From Others 也可以显示，但通常没必要
-              showVisibilityBadge: activeTab === "Custom",
-            }}
-          />
-        )}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="albums-outline" size={44} color="#E5E7EB" />
-            <Text style={styles.emptyTitle}>No plans yet</Text>
-            <Text style={styles.emptySub}>
-              {activeTab === "Others"
-                ? "Save a plan from the community to see it here."
-                : "Create your first custom plan."}
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.empty}>
+          <ActivityIndicator size="large" color="#111" />
+        </View>
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+              <TrainingPlanCard
+                plan={item}
+                variant="compact"
+                context="personal"
+                handlers={{
+                  onPress: () =>
+                    router.push({
+                      pathname: "/library/plan-overview",
+                      params: { planId: item.id, source: "user" },
+                    }),
+                  onOpenMenu: () => openManageMenu(item),
+                }}
+                display={{
+                  showSourceBadge: true,
+                  showVisibilityBadge: activeTab === "Custom",
+                }}
+              />
+            </View>
+          )}
+          contentContainerStyle={{ paddingTop: 6, paddingBottom: 40 }}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="albums-outline" size={44} color="#E5E7EB" />
+              <Text style={styles.emptyTitle}>No plans yet</Text>
+              <Text style={styles.emptySub}>
+                {activeTab === "Others"
+                  ? "Save a plan from the community to see it here."
+                  : "Create your first custom plan."}
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {/* FAB Overlay */}
       {fabOpen && (

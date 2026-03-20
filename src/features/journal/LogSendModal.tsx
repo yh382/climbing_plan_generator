@@ -109,6 +109,10 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const handleStyleChange = (newStyle: SendStyle) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setStyle(newStyle);
+    // Flash/Onsight = first-try success, force attempts to 1
+    if (newStyle !== "redpoint") {
+      setAttempts(1);
+    }
   };
 
   const panResponder = useRef(
@@ -146,7 +150,8 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     if (submitting) return;
     setSubmitting(true);
     try {
-      await Promise.resolve(onDone({ style, attempts, feel, name, note }));
+      const finalAttempts = style === "redpoint" ? attempts : 1;
+      await Promise.resolve(onDone({ style, attempts: finalAttempts, feel, name, note }));
       closeWithAnimation();
     } finally {
       setSubmitting(false);

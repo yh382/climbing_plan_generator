@@ -2,32 +2,35 @@
 
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
-import { planThemeByTrainingType, sourceLabel } from "../PlanCard.styles";
+import { sourceLabel } from "../PlanCard.styles";
+import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
 
 function formatDate(iso?: string) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-
-  // simple local format: Jan 13, 2026
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function HistoryPlanCard(props: TrainingPlanCardProps) {
   const { plan, handlers, display } = props;
-  const theme = planThemeByTrainingType(plan.trainingType);
+
+  const gradient = TRAINING_TYPE_GRADIENTS[plan.trainingType] ?? TRAINING_TYPE_GRADIENTS.mixed;
+  const hasCover = !!plan.coverImageUri;
+  const typeLabel = plan.trainingType.charAt(0).toUpperCase() + plan.trainingType.slice(1);
 
   const showSource = display?.showSourceBadge ?? false;
   const showAuthor = display?.showAuthor ?? true;
 
   const finishedText = useMemo(() => {
-    // Use lastTrainedAt as a proxy; later you can add real completedAt
     return formatDate(plan.progress?.lastTrainedAt) ?? "Completed";
   }, [plan.progress?.lastTrainedAt]);
 
   const rating = plan.market?.ratingAvg;
-  const ratingText = typeof rating === "number" ? `${Math.max(0, Math.min(5, rating)).toFixed(1)}` : null;
+  const ratingText = typeof rating === "number" ? Math.max(0, Math.min(5, rating)).toFixed(1) : null;
 
   return (
     <TouchableOpacity
@@ -35,40 +38,62 @@ export default function HistoryPlanCard(props: TrainingPlanCardProps) {
       onPress={() => handlers?.onPress?.(plan)}
       style={styles.card}
     >
-      <View style={[styles.leftBadge, { backgroundColor: theme.bg }]} />
+      {/* Background: cover image or gradient */}
+      {hasCover ? (
+        <Image
+          source={{ uri: plan.coverImageUri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={200}
+        />
+      ) : (
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
-      <View style={styles.main}>
+      {/* Dark overlay */}
+      <View style={[StyleSheet.absoluteFill, styles.overlay]} />
+
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Top: type pill + rating pill */}
         <View style={styles.topRow}>
-          <Text numberOfLines={1} style={styles.title}>
-            {plan.title}
-          </Text>
+          <View style={styles.typePill}>
+            <Text style={styles.typePillText}>{typeLabel}</Text>
+          </View>
 
           {ratingText ? (
             <View style={styles.ratingPill}>
               <Text style={styles.star}>★</Text>
-              <Text style={styles.rating}>{ratingText}</Text>
+              <Text style={styles.ratingText}>{ratingText}</Text>
             </View>
           ) : null}
         </View>
 
-        <View style={styles.subRow}>
-          <Text style={styles.subText}>Finished</Text>
-          <Text style={styles.subDot}> • </Text>
-          <Text style={styles.subText}>{finishedText}</Text>
+        {/* Title */}
+        <Text numberOfLines={1} style={styles.title}>
+          {plan.title}
+        </Text>
 
+        {/* Bottom: finished + source + author */}
+        <View style={styles.bottomRow}>
+          <View style={styles.completedBadge}>
+            <Text style={styles.completedText}>Completed</Text>
+          </View>
+          <Text style={styles.bottomText}>{finishedText}</Text>
           {showSource ? (
-            <>
-              <Text style={styles.subDot}> • </Text>
-              <Text style={styles.subText}>{sourceLabel(plan.source)}</Text>
-            </>
+            <Text style={styles.bottomText}>{sourceLabel(plan.source)}</Text>
+          ) : null}
+          {showAuthor && plan.author?.authorName ? (
+            <Text numberOfLines={1} style={styles.bottomText}>
+              by {plan.author.authorName}
+            </Text>
           ) : null}
         </View>
-
-        {showAuthor && plan.author?.authorName ? (
-          <Text numberOfLines={1} style={styles.author}>
-            by {plan.author.authorName}
-          </Text>
-        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -76,36 +101,74 @@ export default function HistoryPlanCard(props: TrainingPlanCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginVertical: 8,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
     overflow: "hidden",
-    flexDirection: "row",
+    height: 150,
   },
-  leftBadge: { width: 10 },
-
-  main: { flex: 1, padding: 12 },
-
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  title: { flex: 1, fontSize: 15, fontWeight: "900", color: "#111" },
-
+  overlay: {
+    backgroundColor: "rgba(0,0,0,0.40)",
+  },
+  content: {
+    flex: 1,
+    padding: 14,
+    justifyContent: "space-between",
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  typePill: {
+    backgroundColor: "rgba(255,255,255,0.20)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  typePillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   ratingPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#111827",
+    backgroundColor: "rgba(17,24,39,0.70)",
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  star: { color: "#FBBF24", fontSize: 12, fontWeight: "900", marginRight: 6 },
-  rating: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
+  star: { color: "#FBBF24", fontSize: 11, fontWeight: "900", marginRight: 4 },
+  ratingText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
 
-  subRow: { marginTop: 6, flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
-  subText: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
-  subDot: { fontSize: 12, fontWeight: "900", color: "#9CA3AF" },
-
-  author: { marginTop: 6, fontSize: 12, fontWeight: "700", color: "#6B7280" },
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    lineHeight: 22,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  completedBadge: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  completedText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.85)",
+  },
+  bottomText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.70)",
+  },
 });

@@ -1,58 +1,42 @@
 // app/library/plan-view.tsx
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Modal, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import PlanView from "../../src/features/session/PlanView";
-import ActionDetailModal from "../../src/features/calendar/ActionDetailModal";
-import { useI18N } from "../../lib/i18n"; 
+import SelfAssessment, { type SelfAssessmentData } from "../../src/features/session/components/SelfAssessment";
+import { useI18N } from "../../lib/i18n";
 import { PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
 import useActiveWorkoutStore from "../../src/store/useActiveWorkoutStore";
 
-// Mock Data
-const getMockSession = (id: string, title: string): PlanV3Session => ({
-  id: id || "mock-id-001",
-  session_id: id || "mock-session-001",
-  type: "train", 
-  name: title || "Workout",
+// Fallback mock data (only used when no sessionJson param)
+const MOCK_SESSION: PlanV3Session = {
+  id: "mock-id-001",
+  session_id: "mock-session-001",
+  type: "train",
+  name: "Workout",
   blocks: [
     {
-      block_type: "Linear", 
+      block_type: "Linear",
       items: [
-        {
-          action_id: "Barbell Bench Press",
-          name_override: { en: "Barbell Bench Press", zh: "杠铃卧推" },
-          sets: 3,
-          reps: 8,
-          notes: { en: "Focus on chest", zh: "专注于胸肌发力" },
-          media: { video: "https://example.com/bench.mp4" } 
-        },
-        {
-          action_id: "Weighted Pull-ups",
-          name_override: { en: "Weighted Pull-ups", zh: "负重引体向上" },
-          sets: 3,
-          reps: 6,
-        },
-        {
-          action_id: "Dumbbell Shoulder Press",
-          name_override: { en: "DB Shoulder Press", zh: "哑铃推举" },
-          sets: 3,
-          reps: 10,
-        }
-      ]
-    }
-  ]
-});
+        { action_id: "Barbell Bench Press", name_override: { en: "Barbell Bench Press", zh: "杠铃卧推" }, sets: 3, reps: 8 },
+        { action_id: "Weighted Pull-ups", name_override: { en: "Weighted Pull-ups", zh: "负重引体向上" }, sets: 3, reps: 6 },
+        { action_id: "DB Shoulder Press", name_override: { en: "DB Shoulder Press", zh: "哑铃推举" }, sets: 3, reps: 10 },
+      ],
+    },
+  ],
+};
 
 export default function PlanViewRoute() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { isZH } = useI18N(); 
-  
-  const { startWorkout, minimizeWorkout, finishWorkout, isActive, tick } = useActiveWorkoutStore();
+  const { isZH } = useI18N();
 
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<PlanV3SessionItem | null>(null);
+  const { isActive, isMinimized, startWorkout, minimizeWorkout, maximizeWorkout, finishWorkout, tick } = useActiveWorkoutStore();
+
+  const [showAssessment, setShowAssessment] = useState(false);
 
   const tt = (v: any) => {
     if (!v) return "";
@@ -60,16 +44,35 @@ export default function PlanViewRoute() {
     return isZH ? (v.zh || v.en) : (v.en || v.zh);
   };
 
-  const todaySession = useMemo(() => {
-    const sid = Array.isArray(params.id) ? params.id[0] : params.id;
-    const stitle = Array.isArray(params.title) ? params.title[0] : params.title;
-    return getMockSession(sid || "", stitle || "");
-  }, [params.id, params.title]);
+  const todaySession = useMemo((): PlanV3Session => {
+    const raw = Array.isArray(params.sessionJson) ? params.sessionJson[0] : params.sessionJson;
+    if (raw) {
+      try {
+        return JSON.parse(raw) as PlanV3Session;
+      } catch { /* fall through to mock */ }
+    }
+    return MOCK_SESSION;
+  }, [params.sessionJson]);
 
   useEffect(() => {
-    if (!isActive) {
-      startWorkout(todaySession.name || "Workout", []);
+    if (isActive && isMinimized) {
+      // Returning from minimized state — just maximize
+      maximizeWorkout();
+      return;
     }
+    // Fresh start — init workout with session data
+    const items: any[] = [];
+    todaySession.blocks?.forEach(b => {
+      b.items?.forEach(it => {
+        items.push({
+          label: it.name_override || { en: it.action_id, zh: it.action_id },
+          raw: it,
+          completed: false,
+        });
+      });
+    });
+    const raw = Array.isArray(params.sessionJson) ? params.sessionJson[0] : params.sessionJson;
+    startWorkout(todaySession.name || "Workout", items, raw || "");
   }, []);
 
   useEffect(() => {
@@ -79,51 +82,79 @@ export default function PlanViewRoute() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleFinish = (data: any) => {
-    finishWorkout(); 
-    router.dismissAll(); 
+  const handleFinish = useCallback((data: any) => {
+    setShowAssessment(true);
+  }, []);
+
+  const planId = Array.isArray(params.planId) ? params.planId[0] : params.planId;
+
+  const handleAssessmentSubmit = useCallback(async (assessment: SelfAssessmentData) => {
+    const { sessionData, seconds } = useActiveWorkoutStore.getState();
+    const completedCount = sessionData.filter((i: any) => i.completed).length;
+    const totalCount = sessionData.length;
+
+    // Persist exercise completion marks for plan-overview
+    if (planId) {
+      for (const item of sessionData) {
+        if (item.completed && item.raw?.action_id) {
+          await AsyncStorage.setItem(
+            `exercise_completion_${planId}_${item.raw.action_id}`,
+            "true"
+          );
+        }
+      }
+    }
+
+    finishWorkout();
+    setShowAssessment(false);
+
+    router.push({
+      pathname: "/training/summary",
+      params: {
+        duration: String(seconds),
+        completedCount: String(completedCount),
+        totalCount: String(totalCount),
+        rpe: String(assessment.rpe),
+        feeling: String(assessment.feeling),
+      },
+    } as any);
+  }, [finishWorkout, router, planId]);
+
+  const handleMinimize = useCallback(() => {
+    minimizeWorkout();
+    router.dismissAll();
     router.navigate("/(tabs)/calendar");
-  };
+  }, [minimizeWorkout, router]);
 
-  // [修改] 统一返回逻辑
-  const handleMinimize = () => {
-    minimizeWorkout(); 
-    
-    // 强制回到日历 Tab，而不是简单的 back()
-    // dismissAll() 有助于清理堆栈，防止用户按安卓物理返回键又回到这里
-    router.dismissAll(); 
-    router.navigate("/(tabs)/calendar");     
-  };
-
-  const handleOpenDetail = (item: PlanV3SessionItem) => {
-    setSelectedItem(item);
-    setDetailVisible(true);
-  };
+  const handleExerciseNavigate = useCallback((item: PlanV3SessionItem, index: number) => {
+    router.push({
+      pathname: "/library/exercise-detail",
+      params: {
+        exerciseId: item.action_id,
+        context: "execution",
+        sessionItem: JSON.stringify(item),
+        exerciseIndex: String(index),
+      },
+    } as any);
+  }, [router]);
 
   return (
     <>
       <PlanView
         todaySession={todaySession}
         selectedDate={new Date().toISOString().split('T')[0]}
-        
-        // 传递回调
         onMinimize={handleMinimize}
         onFinishWorkout={handleFinish}
-        onOpenDetail={handleOpenDetail}
-        
-        currentReadiness={3}
-        onOpenStatus={() => console.log("Open Status Picker")}
-        
+        onExerciseNavigate={handleExerciseNavigate}
         isZH={isZH}
         tt={tt}
       />
 
-      <ActionDetailModal 
-        visible={detailVisible}
-        onClose={() => setDetailVisible(false)}
-        item={selectedItem}
-        isZH={isZH}
-      />
+      <Modal visible={showAssessment} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: "#FFF", justifyContent: "center" }}>
+          <SelfAssessment onSubmit={handleAssessmentSubmit} isZH={isZH} />
+        </View>
+      </Modal>
     </>
   );
 }

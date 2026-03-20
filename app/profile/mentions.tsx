@@ -1,16 +1,36 @@
-import React from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Card } from "@components/ui/Card";
+import { communityApi } from "../../src/features/community/api";
+import type { MentionOut } from "../../src/features/community/types";
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function Mentions() {
   const router = useRouter();
+  const [mentions, setMentions] = useState<MentionOut[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mentions = [
-    { id: 1, user: "adam_ondra", action: "mentioned you in a story", time: "2h ago" },
-    { id: 2, user: "magnus_mid", action: "mentioned you in a comment", time: "1d ago" },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await communityApi.getMentions();
+        setMentions(data);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -22,24 +42,36 @@ export default function Mentions() {
         <View style={styles.headerBtn} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {mentions.map((item) => (
-          <Card key={item.id} style={styles.mentionCard}>
-             <View style={styles.row}>
-                <View style={styles.avatarPlaceholder} />
-                <View style={{flex: 1}}>
-                    <Text style={styles.mentionText}>
-                        <Text style={styles.bold}>{item.user}</Text> {item.action}
-                    </Text>
-                    <Text style={styles.time}>{item.time}</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {mentions.map((item) => (
+            <Card key={item.id} style={styles.mentionCard}>
+              <View style={styles.row}>
+                {item.mentionerAvatar ? (
+                  <Image source={{ uri: item.mentionerAvatar }} style={styles.avatarPlaceholder} />
+                ) : (
+                  <View style={styles.avatarPlaceholder} />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mentionText}>
+                    <Text style={styles.bold}>{item.mentionerName}</Text>{" "}
+                    mentioned you in a {item.contentType}
+                  </Text>
+                  {item.contentPreview ? (
+                    <Text style={styles.preview} numberOfLines={1}>{item.contentPreview}</Text>
+                  ) : null}
+                  <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
                 </View>
-             </View>
-          </Card>
-        ))}
-        {mentions.length === 0 && (
-            <Text style={{textAlign: 'center', color: '#94A3B8', marginTop: 40}}>No mentions yet</Text>
-        )}
-      </ScrollView>
+              </View>
+            </Card>
+          ))}
+          {mentions.length === 0 && (
+            <Text style={{ textAlign: 'center', color: '#94A3B8', marginTop: 40 }}>No mentions yet</Text>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -55,5 +87,6 @@ const styles = StyleSheet.create({
   avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#CBD5E1' },
   mentionText: { fontSize: 15, color: '#1E293B', lineHeight: 20 },
   bold: { fontWeight: '600' },
+  preview: { fontSize: 13, color: '#64748B', marginTop: 2 },
   time: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
 });

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 
 import type { LocalDayLogItem, LogMedia } from "./types";
 import {
@@ -25,8 +25,23 @@ import {
   deleteSessionItem,
 } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
+import useLogsStore from "../../../store/useLogsStore";
 
-type Params = { id?: string; date?: string; logType?: "boulder" | "yds"; sessionKey?: string };
+type Params = { id?: string; date?: string; logType?: "boulder" | "toprope" | "lead"; sessionKey?: string };
+
+function VideoPlayerModal({ uri, onClose }: { uri: string; onClose: () => void }) {
+  const player = useVideoPlayer({ uri }, (p) => { p.play(); });
+  return (
+    <View style={styles.playerOverlay}>
+      <TouchableOpacity style={styles.playerClose} onPress={onClose} activeOpacity={0.85}>
+        <Ionicons name="close" size={22} color="#fff" />
+      </TouchableOpacity>
+      <View style={styles.playerBox}>
+        <VideoView player={player} style={{ width: "100%", height: "100%" }} nativeControls contentFit="contain" />
+      </View>
+    </View>
+  );
+}
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -58,7 +73,7 @@ export default function LogItemDetailScreen() {
 
   const id = typeof params.id === "string" ? params.id : "";
   const date = typeof params.date === "string" ? params.date : "";
-  const logType = params.logType === "yds" ? "yds" : "boulder";
+  const logType = params.logType || "boulder";
   const sessionKey = typeof params.sessionKey === "string" ? params.sessionKey : "";
 
   const [items, setItems] = useState<LocalDayLogItem[]>([]);
@@ -159,6 +174,17 @@ export default function LogItemDetailScreen() {
             : await deleteDayItem(date, logType, item.id);
 
           if (next) setItems(next);
+
+          // Sync Zustand logs (keeps calendar rings accurate)
+          const sends = typeof item.sendCount === "number" ? item.sendCount : 1;
+          if (sends > 0) {
+            useLogsStore.getState().upsertCount({
+              date,
+              type: logType,
+              grade: item.grade,
+              delta: -sends,
+            });
+          }
 
           // ✅ enqueue outbox event (offline-first; backend sync later)
           await enqueueLogEvent({ type: "delete", localId: item.id });
@@ -353,23 +379,9 @@ export default function LogItemDetailScreen() {
         transparent
         onRequestClose={() => setPlayingVideoUri(null)}
       >
-        <View style={styles.playerOverlay}>
-          <TouchableOpacity style={styles.playerClose} onPress={() => setPlayingVideoUri(null)} activeOpacity={0.85}>
-            <Ionicons name="close" size={22} color="#fff" />
-          </TouchableOpacity>
-
-          <View style={styles.playerBox}>
-            {playingVideoUri ? (
-              <Video
-                source={{ uri: playingVideoUri }}
-                style={{ width: "100%", height: "100%" }}
-                resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
-                shouldPlay
-              />
-            ) : null}
-          </View>
-        </View>
+        {playingVideoUri ? (
+          <VideoPlayerModal uri={playingVideoUri} onClose={() => setPlayingVideoUri(null)} />
+        ) : null}
       </Modal>
 
       {/* image preview modal */}

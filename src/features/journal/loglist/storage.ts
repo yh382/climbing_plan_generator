@@ -1,16 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LocalDayLogItem } from "./types";
 
+type StorageType = "boulder" | "toprope" | "lead";
+
 export const NOTE_BY_ROUTE_KEY = (routeName: string) => `logsend_note_by_route_${routeName}`;
-export const DAY_LIST_KEY = (date: string, type: "boulder" | "yds") => `journal_day_list_${date}_${type}`;
+export const DAY_LIST_KEY = (date: string, type: StorageType) => `journal_day_list_${date}_${type}`;
 
 // ✅ Session-scoped list: one list per active climbing session
 // Use a stable sessionKey (recommended: String(activeSession.startTime))
-export const SESSION_LIST_KEY = (sessionKey: string, type: "boulder" | "yds") =>
+export const SESSION_LIST_KEY = (sessionKey: string, type: StorageType) =>
   `journal_session_list_${sessionKey}_${type}`;
 
 /** ---------- Day list ---------- */
-export async function readDayList(date: string, type: "boulder" | "yds"): Promise<LocalDayLogItem[]> {
+export async function readDayList(date: string, type: StorageType): Promise<LocalDayLogItem[]> {
   try {
     const raw = await AsyncStorage.getItem(DAY_LIST_KEY(date, type));
     const arr = raw ? (JSON.parse(raw) as LocalDayLogItem[]) : [];
@@ -20,7 +22,7 @@ export async function readDayList(date: string, type: "boulder" | "yds"): Promis
   }
 }
 
-export async function writeDayList(date: string, type: "boulder" | "yds", items: LocalDayLogItem[]) {
+export async function writeDayList(date: string, type: StorageType, items: LocalDayLogItem[]) {
   try {
     await AsyncStorage.setItem(DAY_LIST_KEY(date, type), JSON.stringify(items));
   } catch {
@@ -31,7 +33,7 @@ export async function writeDayList(date: string, type: "boulder" | "yds", items:
 /** ✅ NEW: update a single item in day list */
 export async function updateDayItem(
   date: string,
-  type: "boulder" | "yds",
+  type: StorageType,
   itemId: string,
   updater: (old: LocalDayLogItem) => LocalDayLogItem
 ): Promise<LocalDayLogItem[] | null> {
@@ -48,7 +50,7 @@ export async function updateDayItem(
 /** ✅ NEW: delete a single item in day list */
 export async function deleteDayItem(
   date: string,
-  type: "boulder" | "yds",
+  type: StorageType,
   itemId: string
 ): Promise<LocalDayLogItem[] | null> {
   const list = await readDayList(date, type);
@@ -59,7 +61,7 @@ export async function deleteDayItem(
 }
 
 /** ---------- Session list (方案A) ---------- */
-export async function readSessionList(sessionKey: string, type: "boulder" | "yds"): Promise<LocalDayLogItem[]> {
+export async function readSessionList(sessionKey: string, type: StorageType): Promise<LocalDayLogItem[]> {
   try {
     const raw = await AsyncStorage.getItem(SESSION_LIST_KEY(sessionKey, type));
     const arr = raw ? (JSON.parse(raw) as LocalDayLogItem[]) : [];
@@ -69,7 +71,7 @@ export async function readSessionList(sessionKey: string, type: "boulder" | "yds
   }
 }
 
-export async function writeSessionList(sessionKey: string, type: "boulder" | "yds", items: LocalDayLogItem[]) {
+export async function writeSessionList(sessionKey: string, type: StorageType, items: LocalDayLogItem[]) {
   try {
     await AsyncStorage.setItem(SESSION_LIST_KEY(sessionKey, type), JSON.stringify(items));
   } catch {
@@ -77,7 +79,7 @@ export async function writeSessionList(sessionKey: string, type: "boulder" | "yd
   }
 }
 
-export async function clearSessionList(sessionKey: string, type: "boulder" | "yds") {
+export async function clearSessionList(sessionKey: string, type: StorageType) {
   try {
     await AsyncStorage.removeItem(SESSION_LIST_KEY(sessionKey, type));
   } catch {
@@ -88,7 +90,7 @@ export async function clearSessionList(sessionKey: string, type: "boulder" | "yd
 /** ✅ NEW: update a single item in session list */
 export async function updateSessionItem(
   sessionKey: string,
-  type: "boulder" | "yds",
+  type: StorageType,
   itemId: string,
   updater: (old: LocalDayLogItem) => LocalDayLogItem
 ): Promise<LocalDayLogItem[] | null> {
@@ -105,7 +107,7 @@ export async function updateSessionItem(
 /** ✅ NEW: delete a single item in session list */
 export async function deleteSessionItem(
   sessionKey: string,
-  type: "boulder" | "yds",
+  type: StorageType,
   itemId: string
 ): Promise<LocalDayLogItem[] | null> {
   const list = await readSessionList(sessionKey, type);
@@ -141,4 +143,43 @@ export async function readNotesByRoutes(routeNames: string[]): Promise<Record<st
     if (note) out[name] = note;
   }
   return out;
+}
+
+/** ---------- Migration: "yds" → "lead" ---------- */
+const MIGRATION_KEY = "migration_yds_to_rope_v1";
+
+async function migrateYdsToRopeTypes() {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const ydsKeys = allKeys.filter((k) => k.includes("_yds"));
+
+  for (const oldKey of ydsKeys) {
+    const data = await AsyncStorage.getItem(oldKey);
+    if (!data) continue;
+
+    try {
+      const items = JSON.parse(data);
+      const migrated = (Array.isArray(items) ? items : []).map((item: any) => ({
+        ...item,
+        type: "lead",
+      }));
+
+      const newKey = oldKey.replace("_yds", "_lead");
+      await AsyncStorage.setItem(newKey, JSON.stringify(migrated));
+      await AsyncStorage.removeItem(oldKey);
+    } catch {
+      // skip corrupt data
+    }
+  }
+}
+
+export async function runMigrationsIfNeeded() {
+  try {
+    const done = await AsyncStorage.getItem(MIGRATION_KEY);
+    if (!done) {
+      await migrateYdsToRopeTypes();
+      await AsyncStorage.setItem(MIGRATION_KEY, "1");
+    }
+  } catch {
+    // best-effort
+  }
 }

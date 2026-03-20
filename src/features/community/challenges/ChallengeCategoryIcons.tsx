@@ -2,7 +2,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { ChallengeCategory } from "./mockChallenges";
+type ChallengeCategory = "boulder" | "toprope" | "indoor" | "outdoor";
 
 const iconMap: Record<ChallengeCategory, { name: any; label: string }> = {
   boulder: { name: "cube-outline", label: "Boulder" },

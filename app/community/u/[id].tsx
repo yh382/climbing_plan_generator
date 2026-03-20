@@ -1,372 +1,472 @@
 // app/community/u/[id].tsx
 
-import React, { useState, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Animated,
-  Dimensions, // [新增] 引入 Dimensions 用于精确计算
+  ActivityIndicator,
+  Alert,
+  Share,
+  FlatList,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-// [保持原样] 保留您的原始引用
+import { Ionicons } from "@expo/vector-icons";
 import { useI18N } from "../../../lib/i18n";
 
-import TopBar from "../../../components/TopBar";
-import FeedPost from "../../../src/features/community/components/FeedPost";
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolate,
+} from "react-native-reanimated";
 
-/* ---------------- Mock Data ---------------- */
+import ProfileTopBar from "../../../src/components/shared/ProfileTopBar";
+import ProfileHeader from "../../../src/components/shared/ProfileHeader";
+import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
+import ProfilePostGrid from "../../../src/features/profile/components/ProfilePostGrid";
+import BadgeCard from "../../../src/features/profile/components/badgessection/BadgeCard";
+import type { Badge, BadgeSectionKey, BadgeTier } from "../../../src/features/profile/components/badgessection/types";
+import { usePublicProfile, PublicBadge } from "../../../src/features/community/hooks";
+import { communityApi } from "../../../src/features/community/api";
+import { chatApi } from "../../../src/features/chat/api";
 
-const USER_PROFILE = {
-  id: "u1",
-  name: "Adam Ondra",
-  username: "@adam.ondra",
-  avatar: "https://i.pravatar.cc/150?u=ao",
-  location: "Brno, CZ",
-  homeGym: "Hanger Brno",
-  stats: {
-    boulderMax: "V17",
-    routeMax: "5.15d",
-    totalSends: 1420,
-    followers: "45k",
-    following: 120,
-  },
-};
+function publicBadgeToBadge(b: PublicBadge): Badge {
+  return {
+    id: b.code,
+    title: b.name,
+    section: (b.category ?? "special") as BadgeSectionKey,
+    tier: (b.tier ?? null) as BadgeTier,
+    status: "unlocked",
+    progress: 1,
+    iconUrl: b.iconUrl,
+    awardedAt: b.awardedAt,
+    sourceType: b.sourceType,
+    sourceId: b.sourceId,
+  };
+}
 
-const MOCK_USER_POSTS = [
-  {
-    id: "p1",
-    user: {
-      id: "u1",
-      username: "Adam Ondra",
-      avatar: "https://i.pravatar.cc/150?u=ao",
-      homeGym: "Hanger Brno",
-    },
-    timestamp: new Date().toISOString(),
-    content: "Projecting hard today! This overhang is brutal but fun. The crux move requires insane core tension.",
-    likes: 120,
-    comments: 15,
-    isLiked: false,
-    isSaved: false,
-  },
-  {
-    id: "p2",
-    user: {
-      id: "u1",
-      username: "Adam Ondra",
-      avatar: "https://i.pravatar.cc/150?u=ao",
-    },
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-    content: "Rest day visualization. Sometimes the mind needs to climb before the body does.",
-    likes: 85,
-    comments: 8,
-    isLiked: true,
-    isSaved: false,
-  },
-  {
-    id: "p3",
-    user: {
-      id: "u1",
-      username: "Adam Ondra",
-      avatar: "https://i.pravatar.cc/150?u=ao",
-    },
-    timestamp: new Date(Date.now() - 172800000).toISOString(),
-    content: "Throwback to Norway. What a line! Silence is still one of my proudest achievements.",
-    images: ["https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=800&q=80"],
-    likes: 3420,
-    comments: 156,
-    isLiked: false,
-    isSaved: true,
-  },
+function deduplicateGradeBadges(badges: Badge[]): Badge[] {
+  const byGrade = new Map<string, Badge>();
+  for (const b of badges) {
+    const suffix = b.id.replace(/^(limit|solid)_(boulder|rope)_/, "");
+    const existing = byGrade.get(suffix);
+    if (!existing) {
+      byGrade.set(suffix, b);
+    } else if (b.id.startsWith("solid_") && existing.id.startsWith("limit_")) {
+      byGrade.set(suffix, b);
+    }
+  }
+  return Array.from(byGrade.values());
+}
+
+const BADGE_GROUPS: { key: string; title: string; filter: (b: Badge) => boolean; dedupe?: boolean }[] = [
+  { key: "boulder", title: "Boulder", filter: (b) => b.id.startsWith("limit_boulder_") || b.id.startsWith("solid_boulder_"), dedupe: true },
+  { key: "rope", title: "Rope", filter: (b) => b.id.startsWith("limit_rope_") || b.id.startsWith("solid_rope_"), dedupe: true },
+  { key: "lifetime", title: "Lifetime", filter: (b) => b.section === "lifetime" },
+  { key: "monthly", title: "Monthly", filter: (b) => b.section === "monthly" },
+  { key: "milestone", title: "Milestone", filter: (b) => b.section === "milestone" },
+  { key: "influence", title: "Influence", filter: (b) => b.section === "influence" },
+  { key: "special", title: "Special", filter: (b) => b.section === "special" },
 ];
 
-const MOCK_LOGS = [
-  { id: "l1", name: "Silence", grade: "9c / 5.15d", type: "Sport", date: "Oct 12", status: "Sent" },
-  { id: "l2", name: "La Dura Dura", grade: "9b+ / 5.15c", type: "Sport", date: "Sep 28", status: "Repeat" },
-  { id: "l3", name: "Terranova", grade: "8C+ / V16", type: "Boulder", date: "Aug 15", status: "Sent" },
-  { id: "l4", name: "Change", grade: "9b+ / 5.15c", type: "Sport", date: "Jul 10", status: "Sent" },
-  { id: "l5", name: "Vasil Vasil", grade: "9b+ / 5.15c", type: "Sport", date: "Jun 22", status: "Sent" },
-];
-
-/* ---------------- Screen ---------------- */
-
-// [新增] 获取屏幕宽度，计算每个 Tab 的精确宽度
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const TAB_WIDTH = SCREEN_WIDTH / 3;
+const SCROLL_THRESHOLD = 44;
 
 export default function PublicProfileScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tt, tr } = useI18N();
+  const { tt } = useI18N();
 
-  const tabs = [
-    { key: "Posts", label: tt({ zh: "动态", en: "Posts" }) },
-    { key: "Plans", label: tt({ zh: "计划", en: "Plans" }) },
-    { key: "Logs",  label: tt({ zh: "记录", en: "Logs" }) },
-  ];
+  const { profile, posts, plans, badges, loading } = usePublicProfile(id ?? null);
+  const { width } = useWindowDimensions();
 
-  const [activeTab, setActiveTab] = useState<string>("Posts");
+  const badgeCardSize = useMemo(() => (width - 24 - 12) / 3, [width]);
 
-  /* underline 动画 */
-  const indicator = useRef(new Animated.Value(0)).current;
+  const allBadgesMapped = useMemo(() => {
+    const seen = new Set<string>();
+    return badges.map(publicBadgeToBadge).filter(b => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+  }, [badges]);
 
-  const onTabPress = (index: number, key: string) => {
-    setActiveTab(key);
-    Animated.spring(indicator, {
-      toValue: index,
-      useNativeDriver: true,
-      stiffness: 180,
-      damping: 20,
-      mass: 0.4,
-    }).start();
+  const groupedBadges = useMemo(() => {
+    return BADGE_GROUPS
+      .map(g => {
+        const filtered = allBadgesMapped.filter(g.filter);
+        const deduped = g.dedupe ? deduplicateGradeBadges(filtered) : filtered;
+        return { ...g, badges: [...deduped].reverse() };
+      })
+      .filter(g => g.badges.length > 0);
+  }, [allBadgesMapped]);
+
+  // Follow state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [localFollowersCount, setLocalFollowersCount] = useState(0);
+
+  useEffect(() => {
+    if (profile) {
+      setIsFollowing(profile.isFollowing);
+      setLocalFollowersCount(profile.followersCount);
+    }
+  }, [profile]);
+
+  const handleFollow = async () => {
+    if (!id || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await communityApi.unfollowUser(id);
+        setIsFollowing(false);
+        setLocalFollowersCount((c) => Math.max(0, c - 1));
+      } else {
+        await communityApi.followUser(id);
+        setIsFollowing(true);
+        setLocalFollowersCount((c) => c + 1);
+      }
+    } catch (_e) { /* swallow */ }
+    finally { setFollowLoading(false); }
   };
 
-  // [修改] 使用精确像素值进行插值
-  const translateX = indicator.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0, TAB_WIDTH, TAB_WIDTH * 2], // 0 -> 1/3屏 -> 2/3屏
+  const handleMessage = useCallback(async () => {
+    if (!id || msgLoading) return;
+    setMsgLoading(true);
+    try {
+      const conv = await chatApi.startConversation(id);
+      router.push(`/chat/${conv.id}` as any);
+    } catch (_e) {
+      router.push("/chat" as any);
+    } finally {
+      setMsgLoading(false);
+    }
+  }, [id, msgLoading, router]);
+
+  const submitReport = useCallback(async (targetType: 'user' | 'post', targetId: string, reason: string) => {
+    try {
+      await communityApi.report(targetType, targetId, reason);
+      Alert.alert(
+        tt({ zh: "举报已提交", en: "Report Submitted" }),
+        tt({ zh: "感谢你的反馈，我们会尽快处理", en: "Thank you for your feedback. We will review it shortly." }),
+      );
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        Alert.alert(
+          tt({ zh: "已举报", en: "Already Reported" }),
+          tt({ zh: "你已经举报过了", en: "You have already reported this." }),
+        );
+      } else {
+        Alert.alert(tt({ zh: "举报失败", en: "Report Failed" }));
+      }
+    }
+  }, [tt]);
+
+  // ── Three-dot menu ──
+  const handleMorePress = useCallback(() => {
+    if (!id) return;
+    Alert.alert(
+      profile?.displayName ?? "",
+      undefined,
+      [
+        {
+          text: tt({ zh: "屏蔽", en: "Block" }),
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              tt({ zh: "确认屏蔽", en: "Confirm Block" }),
+              tt({
+                zh: `屏蔽后将无法看到对方的内容`,
+                en: `You won't see their content after blocking`,
+              }),
+              [
+                { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
+                {
+                  text: tt({ zh: "屏蔽", en: "Block" }),
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await communityApi.blockUser(id);
+                      router.back();
+                    } catch (_e) { /* swallow */ }
+                  },
+                },
+              ],
+            );
+          },
+        },
+        {
+          text: tt({ zh: "举报", en: "Report" }),
+          onPress: () => {
+            Alert.alert(
+              tt({ zh: "选择举报原因", en: "Select Report Reason" }),
+              undefined,
+              [
+                { text: tt({ zh: "垃圾内容", en: "Spam" }), onPress: () => submitReport("user", id!, "spam") },
+                { text: tt({ zh: "骚扰", en: "Harassment" }), onPress: () => submitReport("user", id!, "harassment") },
+                { text: tt({ zh: "不当内容", en: "Inappropriate" }), onPress: () => submitReport("user", id!, "inappropriate") },
+                { text: tt({ zh: "其他", en: "Other" }), onPress: () => submitReport("user", id!, "other") },
+                { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
+              ],
+            );
+          },
+        },
+        {
+          text: tt({ zh: "分享主页", en: "Share Profile" }),
+          onPress: () => {
+            Share.share({
+              message: `Check out ${profile?.displayName ?? profile?.username}'s climbing profile!`,
+            }).catch(() => {});
+          },
+        },
+        { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
+      ],
+    );
+  }, [id, profile, tt, router]);
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState("posts");
+
+  // --------------------- Reanimated scroll ---------------------
+  const scrollY = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
   });
 
-  return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <View style={{ paddingTop: insets.top }}>
-        <TopBar
-          routeName="public_profile"
-          title={USER_PROFILE.username}
-          useSafeArea={false}
-          leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
+  const topbarBgStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [0, 1], Extrapolate.CLAMP),
+  }));
+
+  const topbarTitleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD + 10], [0, 1], Extrapolate.CLAMP),
+    transform: [{
+      translateY: interpolate(scrollY.value, [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD + 10], [10, 0], Extrapolate.CLAMP),
+    }],
+  }));
+
+  const headerTitleAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0], Extrapolate.CLAMP),
+    transform: [
+      { scale: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0.92], Extrapolate.CLAMP) },
+      { translateY: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [0, -10], Extrapolate.CLAMP) },
+    ],
+  }));
+
+  // Privacy helpers
+  const privacy = profile?.privacy;
+
+  // --------------------- Loading / Error states ---------------------
+  if (loading && !profile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color="#111" />
       </View>
+    );
+  }
 
-      <ScrollView 
-        stickyHeaderIndices={[1]} 
+  if (!profile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }}>
+        <Ionicons name="person-outline" size={48} color="#E5E7EB" />
+        <Text style={{ color: "#9CA3AF", marginTop: 8 }}>User not found</Text>
+      </View>
+    );
+  }
+
+  const gradeDisplay = `${profile.boulderMax || "—"}/${profile.routeMax || "—"}`;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+      <ProfileTopBar
+        title={profile.displayName}
+        isOwnProfile={false}
+        topbarBgStyle={topbarBgStyle}
+        topbarTitleStyle={topbarTitleStyle}
+        insetTop={insets.top}
+        onBackPress={() => router.back()}
+        onMorePress={handleMorePress}
+      />
+
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
       >
-        {/* ---------- Header (Index 0) ---------- */}
-        <View style={styles.headerContainer}>
-          <View style={styles.profileRow}>
-            <Image source={{ uri: USER_PROFILE.avatar }} style={styles.avatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{USER_PROFILE.name}</Text>
+        {/* [0] Cover/gradient + header */}
+        <ProfileHeader
+          name={profile.displayName}
+          username={profile.username}
+          avatarUrl={profile.avatarUrl}
+          coverUrl={profile.coverUrl}
+          bio={profile.bio}
+          location={profile.location}
+          homeGym={profile.homeGym}
+          followersCount={localFollowersCount}
+          followingCount={profile.followingCount}
+          gradeDisplay={gradeDisplay}
+          totalSends={profile.totalSends}
+          isOwnProfile={false}
+          isFollowing={isFollowing}
+          followLoading={followLoading}
+          msgLoading={msgLoading}
+          onFollowPress={handleFollow}
+          onMessagePress={handleMessage}
+          headerTitleAnimStyle={headerTitleAnimStyle}
+          topPadding={insets.top + 44}
+        />
 
-              <View style={styles.socialRow}>
-                <Text style={styles.socialText}>
-                  <Text style={styles.bold}>{USER_PROFILE.stats.followers}</Text> Followers
-                </Text>
-                <Text style={styles.dot}>·</Text>
-                <Text style={styles.socialText}>
-                  <Text style={styles.bold}>{USER_PROFILE.stats.following}</Text> Following
-                </Text>
-              </View>
+        {/* [1] Tab bar (sticky) */}
+        <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
 
-              <View style={styles.badgesRow}>
-                <View style={styles.badge}>
-                  <Ionicons name="location-sharp" size={10} color="#6B7280" />
-                  <Text style={styles.badgeText}>{USER_PROFILE.location}</Text>
-                </View>
-                <View style={styles.badge}>
-                  <MaterialCommunityIcons name="office-building-marker" size={10} color="#6B7280" />
-                  <Text style={styles.badgeText}>{USER_PROFILE.homeGym}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Stats Row */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-                <Text style={styles.statLabel}>BOULDER</Text>
-                <Text style={[styles.statNum, { color: '#D97706' }]}>{USER_PROFILE.stats.boulderMax}</Text>
-            </View>
-            <View style={styles.vertDivider} />
-            <View style={styles.statItem}>
-                <Text style={styles.statLabel}>ROUTE</Text>
-                <Text style={[styles.statNum, { color: '#4F46E5' }]}>{USER_PROFILE.stats.routeMax}</Text>
-            </View>
-            <View style={styles.vertDivider} />
-            <View style={styles.statItem}>
-                <Text style={styles.statLabel}>SENDS</Text>
-                <Text style={styles.statNum}>{USER_PROFILE.stats.totalSends}</Text>
-            </View>
-          </View>
-
-          {/* Action Row */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.followBtn}>
-                <Text style={styles.followText}>Follow</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.msgBtn}>
-                <Ionicons name="chatbubble-outline" size={20} color="#111" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ---------- Sticky Tabs (Index 1) ---------- */}
-        <View style={styles.stickyWrapper}>
-          <View style={styles.tabContainer}>
-            {tabs.map((tab, index) => {
-              const isActive = activeTab === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={styles.tabItem}
-                  onPress={() => onTabPress(index, tab.key)}
-                >
-                  <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* [修改] 黑色指示条 */}
-            <Animated.View
-              style={[
-                styles.indicator,
-                {
-                  transform: [{ translateX }], // 直接应用计算好的像素值
-                },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* ---------- Content (Index 2) ---------- */}
+        {/* Content */}
         <View style={styles.contentArea}>
-            {activeTab === "Posts" &&
-            MOCK_USER_POSTS.map((post) => (
-                <FeedPost
-                key={post.id}
-                post={post as any}
-                simpleMode
-                onLike={() => {}}
-                onPress={() => {}}
-                onPressComment={() => {}}
-                onPressAttachment={() => {}}
-                />
-            ))}
-
-          {activeTab === "Plans" && (
-            <View style={styles.emptyState}>
-              <Ionicons name="document-text-outline" size={40} color="#E5E7EB" />
-              <Text style={styles.emptyText}>{tt({ zh: "暂无公开计划", en: "No public plans" })}</Text>
-            </View>
+          {activeTab === "posts" && (
+            privacy?.posts === false ? (
+              <PrivateSection
+                message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
+              />
+            ) : (
+              <ProfilePostGrid
+                posts={posts as any}
+                onPressPost={() => {}}
+              />
+            )
           )}
 
-          {activeTab === "Logs" &&
-            MOCK_LOGS.map((log) => (
-              <View key={log.id} style={styles.logItem}>
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
-                     <View style={[styles.logIcon, log.type === 'Boulder' ? styles.bgBoulder : styles.bgSport]}>
-                        <Text style={[styles.logGrade, log.type === 'Boulder' ? styles.textBoulder : styles.textSport]}>
-                            {log.grade.split('/')[0]}
-                        </Text>
-                     </View>
-                     <View>
-                        <Text style={styles.logName}>{log.name}</Text>
-                        <Text style={styles.logMeta}>{log.type} · {log.date}</Text>
-                     </View>
-                </View>
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                     <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                     <Text style={{fontSize: 12, fontWeight: '600', color: '#10B981'}}>{log.status}</Text>
-                </View>
+          {activeTab === "stats" && (
+            privacy?.analysis === false ? (
+              <PrivateSection
+                message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="stats-chart-outline" size={40} color="#E5E7EB" />
+                <Text style={styles.emptyText}>
+                  {tt({ zh: "暂无公开统计", en: "No public stats" })}
+                </Text>
               </View>
-            ))}
+            )
+          )}
+
+          {activeTab === "plans" && (
+            privacy?.plans === false ? (
+              <PrivateSection
+                message={tt({ zh: "训练计划已设为私密", en: "Plans are private" })}
+              />
+            ) : plans.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="calendar-outline" size={40} color="#E5E7EB" />
+                <Text style={styles.emptyText}>
+                  {tt({ zh: "暂无公开计划", en: "No public plans" })}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.listContainer}>
+                {plans.map((p) => (
+                  <View key={p.id} style={styles.planCard}>
+                    <View style={styles.planHeader}>
+                      <Ionicons name="calendar" size={18} color="#6366F1" />
+                      <Text style={styles.planTitle} numberOfLines={1}>{p.title}</Text>
+                    </View>
+                    <View style={styles.planMeta}>
+                      {p.trainingType ? (
+                        <View style={styles.tag}>
+                          <Text style={styles.tagText}>{p.trainingType}</Text>
+                        </View>
+                      ) : null}
+                      {p.durationWeeks ? (
+                        <Text style={styles.metaText}>
+                          {p.durationWeeks} {tt({ zh: "周", en: "weeks" })}
+                        </Text>
+                      ) : null}
+                      <View style={[styles.statusDot, { backgroundColor: p.status === "active" ? "#22C55E" : "#9CA3AF" }]} />
+                      <Text style={styles.metaText}>{p.status}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )
+          )}
+
+          {activeTab === "badges" && (
+            privacy?.badges === false ? (
+              <PrivateSection
+                message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
+              />
+            ) : badges.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="ribbon-outline" size={40} color="#E5E7EB" />
+                <Text style={styles.emptyText}>
+                  {tt({ zh: "暂无徽章", en: "No badges yet" })}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ paddingTop: 8 }}>
+                {groupedBadges.map(group => (
+                  <View key={group.key} style={styles.badgeSectionBlock}>
+                    <Text style={styles.badgeSectionTitle}>{group.title}</Text>
+                    <FlatList
+                      data={group.badges}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyExtractor={item => item.id}
+                      renderItem={({ item }) => (
+                        <BadgeCard
+                          badge={item}
+                          size={badgeCardSize}
+                          onPress={item.sourceType === "challenge" && item.sourceId
+                            ? () => router.push(`/community/challenges/${item.sourceId}`)
+                            : undefined
+                          }
+                        />
+                      )}
+                      ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+                      contentContainerStyle={{ paddingHorizontal: 12 }}
+                    />
+                  </View>
+                ))}
+              </View>
+            )
+          )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
 
-/* ---------------- Styles ---------------- */
+function PrivateSection({ message }: { message: string }) {
+  return (
+    <View style={styles.privateState}>
+      <Ionicons name="lock-closed-outline" size={36} color="#D1D5DB" />
+      <Text style={styles.privateText}>{message}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  headerContainer: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 },
-  profileRow: { flexDirection: "row", gap: 14, marginBottom: 20 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#F3F4F6' },
-  name: { fontSize: 18, fontWeight: "800", color: "#111" },
-
-  socialRow: { flexDirection: "row", marginVertical: 6 },
-  socialText: { fontSize: 13, color: "#6B7280" },
-  dot: { marginHorizontal: 6, color: "#9CA3AF" },
-  bold: { fontWeight: "700", color: "#111" },
-
-  badgesRow: { flexDirection: "row", gap: 6 },
-  badge: {
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#F3F4F6'
-  },
-  badgeText: { fontSize: 10, color: "#6B7280" },
-
-  // Stats
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 20, backgroundColor: '#FAFAFA', paddingVertical: 12, borderRadius: 12 },
-  statItem: { alignItems: 'center', width: 80 },
-  statLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', marginBottom: 2, letterSpacing: 0.5 },
-  statNum: { fontSize: 18, fontWeight: '800', color: '#111' },
-  vertDivider: { width: 1, height: 24, backgroundColor: '#E5E7EB' },
-
-  // Actions
-  actionRow: { flexDirection: 'row', gap: 10 },
-  followBtn: { flex: 1, backgroundColor: '#111', height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  followText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
-  msgBtn: { width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
-
-  stickyWrapper: {
-    backgroundColor: "#FFF",
-    zIndex: 20,
-    width: "100%",
-  },
-
-  tabContainer: {
-    flexDirection: "row",
-    width: "100%",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    alignItems: 'center',
-  },
-  tabItem: { 
-    flex: 1, 
-    paddingVertical: 14, 
-    alignItems: "center" 
-  },
-  tabText: { fontSize: 15, color: "#9CA3AF", fontWeight: "600" },
-  tabTextActive: { color: "#111", fontWeight: "800" },
-
-  // [修改] 指示条样式
-  indicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 0, // 确保从左边开始
-    width: TAB_WIDTH, // 固定宽度为屏幕的 1/3
-    height: 2,
-    backgroundColor: "#111",
-  },
-
   contentArea: { minHeight: 400 },
-
   emptyState: { padding: 48, alignItems: "center" },
   emptyText: { color: "#9CA3AF", marginTop: 8 },
-
-  logItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
-  logName: { fontWeight: "600", color: "#111", fontSize: 15 },
-  logMeta: { fontSize: 12, color: "#6B7280" },
-  logIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  bgBoulder: { backgroundColor: '#FFF7ED' },
-  bgSport: { backgroundColor: '#EEF2FF' },
-  logGrade: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  textBoulder: { color: '#C2410C' },
-  textSport: { color: '#4338CA' },
+  privateState: { padding: 48, alignItems: "center", gap: 8 },
+  privateText: { color: "#9CA3AF", fontSize: 14 },
+  // Plans
+  listContainer: { padding: 16, gap: 12 },
+  planCard: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, gap: 8 },
+  planHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  planTitle: { fontSize: 15, fontWeight: "600", color: "#111", flex: 1 },
+  planMeta: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  tag: { backgroundColor: "#EEF2FF", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  tagText: { fontSize: 12, color: "#6366F1", fontWeight: "500" },
+  metaText: { fontSize: 12, color: "#6B7280" },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  // Badges
+  badgeSectionBlock: { marginBottom: 16 },
+  badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: "#666", marginBottom: 8, paddingHorizontal: 12 },
 });

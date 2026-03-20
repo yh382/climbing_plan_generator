@@ -1,10 +1,10 @@
 // src/features/community/components/SmartBottomSheet.tsx
 
-import React, { useEffect, useRef } from "react";
-import { 
-  View, Text, StyleSheet, TouchableOpacity, Modal, 
-  Animated, Dimensions, PanResponder, LayoutAnimation, 
-  Platform, UIManager
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View, Text, StyleSheet, Modal, ScrollView,
+  Animated, Dimensions, PanResponder, LayoutAnimation,
+  Platform, UIManager, Pressable
 } from "react-native";
 
 // 开启 LayoutAnimation (Android 需要)
@@ -24,39 +24,42 @@ interface Props {
   children: React.ReactNode;
 }
 
-export default function SmartBottomSheet({ 
-  visible, 
-  onClose, 
-  mode = 'menu', 
-  title, 
-  children 
+export default function SmartBottomSheet({
+  visible,
+  onClose,
+  mode = 'menu',
+  title,
+  children
 }: Props) {
-  // 动画值：Y轴位移
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  
-  // 目标高度配置
-  const targetHeight = mode === 'menu' ? SCREEN_HEIGHT * 0.22 : SCREEN_HEIGHT * 0.6;
+  const [showModal, setShowModal] = useState(false);
 
-  // 手势响应器
+  const targetHeight = mode === 'menu' ? SCREEN_HEIGHT * 0.32 : SCREEN_HEIGHT * 0.9;
+
+  const animateClose = () => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowModal(false);
+      onClose();
+    });
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // 只有向下滑动超过一定阈值才接管
-        return gestureState.dy > 5;
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
       onPanResponderMove: (_, gestureState) => {
-        // 只能向下滑动 (dy > 0)
         if (gestureState.dy > 0) {
           translateY.setValue(gestureState.dy);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        // 如果向下滑动超过 100px 或速度够快，则关闭
         if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-          onClose();
+          animateClose();
         } else {
-          // 否则回弹
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -67,64 +70,72 @@ export default function SmartBottomSheet({
     })
   ).current;
 
-  // 监听 visible 变化：进场/离场动画
   useEffect(() => {
     if (visible) {
+      setShowModal(true);
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
-        bounciness: 0 
+        bounciness: 0
       }).start();
-    } else {
+    } else if (showModal) {
+      // visible turned false externally — animate out then unmount
       Animated.timing(translateY, {
         toValue: SCREEN_HEIGHT,
         duration: 250,
-        useNativeDriver: true
-      }).start();
+        useNativeDriver: true,
+      }).start(() => {
+        setShowModal(false);
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // 监听 mode 变化：高度过渡动画
   useEffect(() => {
     if (visible) {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
   }, [mode]);
 
-  if (!visible) return null;
+  if (!showModal) return null;
 
   return (
-    <Modal transparent visible={visible} onRequestClose={onClose}>
-      <TouchableOpacity 
-        style={styles.modalOverlay} 
-        activeOpacity={1} 
-        onPress={onClose}
-      >
-        <Animated.View 
-            style={[
-                styles.modalContent, 
-                { height: targetHeight, transform: [{ translateY }] }
-            ]}
-            {...panResponder.panHandlers}
+    <Modal transparent visible={showModal} onRequestClose={animateClose}>
+      <Pressable style={styles.modalOverlay} onPress={animateClose}>
+        <Animated.View
+          style={[
+            styles.modalContent,
+            { height: targetHeight, transform: [{ translateY }] }
+          ]}
         >
-          {/* 把手 (Handle Bar) */}
-          <View style={styles.handleBarContainer}>
-            <View style={styles.handleBar} />
-          </View>
-          
-          {/* 标题栏 (仅在 List 模式显示) */}
-          {mode === 'list' && title && (
-            <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{title}</Text>
+          {/* Handle Bar — draggable to dismiss */}
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View {...panResponder.panHandlers}>
+              <View style={styles.handleBarContainer}>
+                <View style={styles.handleBar} />
+              </View>
             </View>
-          )}
 
-          {/* 内容区域 */}
-          <View style={{ flex: 1 }}>
-             {children}
-          </View>
+            {/* Title (list mode only) */}
+            {mode === 'list' && title && (
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{title}</Text>
+              </View>
+            )}
+          </Pressable>
+
+          {/* Scrollable content */}
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              {children}
+            </Pressable>
+          </ScrollView>
         </Animated.View>
-      </TouchableOpacity>
+      </Pressable>
     </Modal>
   );
 }

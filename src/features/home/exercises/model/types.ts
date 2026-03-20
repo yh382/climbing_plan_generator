@@ -25,6 +25,8 @@ export type ActionSummary = {
   muscles: string[];
   equipment: string[];
   block_tags: string[];
+  user_tags?: string[];
+  duration_min?: number;
     // ✅ optional fields (if backend provides later)
   cues?: I18N;
   short_desc?: I18N | string;
@@ -33,7 +35,7 @@ export type ActionSummary = {
   // media could be { thumbnail_url, image_url } etc.
   media?: any;
 
-  // duration hints
+  // duration hints (legacy, kept for backward compat)
   duration_min_range?: [number, number];
   est_duration_min?: number;
 };

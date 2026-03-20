@@ -48,7 +48,7 @@ export default function AvatarPickerSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const closeWithAnimation = () => {
+  const closeWithAnimation = (afterClose?: () => void) => {
     Animated.timing(translateY, {
       toValue: SCREEN_HEIGHT,
       duration: 250,
@@ -56,6 +56,7 @@ export default function AvatarPickerSheet({
     }).start(() => {
       setShowModal(false);
       onClose();
+      if (afterClose) setTimeout(afterClose, 50);
     });
   };
 
@@ -88,10 +89,10 @@ export default function AvatarPickerSheet({
       animationType="fade"
       transparent
       visible={showModal}
-      onRequestClose={closeWithAnimation}
+      onRequestClose={() => closeWithAnimation()}
     >
       {/* 点击背景关闭 */}
-      <Pressable style={styles.overlay} onPress={closeWithAnimation}>
+      <Pressable style={styles.overlay} onPress={() => closeWithAnimation()}>
         <Animated.View
           style={[
             styles.modalContent,
@@ -115,14 +116,7 @@ export default function AvatarPickerSheet({
               <TouchableOpacity
                 style={styles.row}
                 activeOpacity={0.75}
-                onPress={() => {
-                  closeWithAnimation();
-                  // close 动画结束后再 push 更顺滑
-                  // 但这里 closeWithAnimation 会调用 onClose，
-                  // 你在 onClose 里通常会 setVisible(false)，
-                  // 所以我们用一个微小延迟确保不会卡住。
-                  setTimeout(onChooseFromLibrary, 60);
-                }}
+                onPress={() => closeWithAnimation(onChooseFromLibrary)}
               >
                 <View style={styles.iconCircle}>
                   <Ionicons name="images-outline" size={22} color="#0F172A" />
@@ -133,10 +127,7 @@ export default function AvatarPickerSheet({
               <TouchableOpacity
                 style={styles.row}
                 activeOpacity={0.75}
-                onPress={() => {
-                  closeWithAnimation();
-                  setTimeout(onTakePhoto, 60);
-                }}
+                onPress={() => closeWithAnimation(onTakePhoto)}
               >
                 <View style={styles.iconCircle}>
                   <Ionicons name="camera-outline" size={22} color="#0F172A" />

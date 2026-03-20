@@ -1,54 +1,25 @@
 // app/library/plans.tsx
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import PlanCard, { PlanProps } from "../../components/PlanCard";
+import { TrainingPlanCard, TrainingIntent, TRAINING_INTENTS } from "../../src/components/plancard";
 import TrendingPlansEntryCard from "./TrendingPlansEntryCard";
-import { TrainingIntent, TRAINING_INTENTS } from "../../src/components/plancard";
 import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
-
-type PlanPropsWithDate = PlanProps & { createdAt: string };
-
-const MOCK_DATA: PlanPropsWithDate[] = [
-  {
-    id: "p1",
-    title: "Finger Strength 101",
-    author: "Lattice",
-    level: "V4-V7",
-    duration: "6 Wks",
-    users: 1240,
-    type: "Strength",
-    rating: 4.8,
-    color: "#4F46E5",
-    image:
-      "https://images.unsplash.com/photo-1564769662533-4f00a87b4056?auto=format&fit=crop&w=800&q=80",
-    createdAt: "2026-01-10T10:00:00Z",
-  },
-  {
-    id: "p2",
-    title: "Endurance Beast",
-    author: "Adam Ondra",
-    level: "5.12+",
-    duration: "8 Wks",
-    users: 3500,
-    type: "Endurance",
-    rating: 4.9,
-    color: "#059669",
-    image:
-      "https://images.unsplash.com/photo-1601925348897-4c7595fe1423?auto=format&fit=crop&w=800&q=80",
-    createdAt: "2026-01-06T10:00:00Z",
-  },
-];
+import { usePublicPlans, useMyPlans } from "../../src/features/plans/hooks";
+import { planSummaryToTrainingPlan } from "../../src/features/plans/adapters";
 
 const SIDE_PAD = 16;
 
+type TabKey = "MyPlans" | "Official" | "Plaza";
+
 export default function PlansHubScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"Plaza" | "Library">("Plaza");
+  const [activeTab, setActiveTab] = useState<TabKey>("MyPlans");
 
   // Search
   const [query, setQuery] = useState("");
@@ -57,6 +28,13 @@ export default function PlansHubScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortType, setSortType] = useState<"Newest" | "Highest">("Newest");
   const [selectedIntents, setSelectedIntents] = useState<TrainingIntent[]>([]);
+
+  // FAB (My Plans tab)
+  const [fabOpen, setFabOpen] = useState(false);
+
+  // API data
+  const { plans: publicPlans, loading: publicLoading } = usePublicPlans();
+  const { plans: myPlans, loading: myLoading } = useMyPlans();
 
   const toggleFilter = () => setFilterOpen((v) => !v);
 
@@ -67,55 +45,72 @@ export default function PlansHubScreen() {
     });
   };
 
+  const handleFabAction = (action: "AI" | "Custom") => {
+    setFabOpen(false);
+    if (action === "AI") {
+      Alert.alert("Coming Soon", "AI plan generation will be available with Coach AI");
+      return;
+    }
+    if (action === "Custom") {
+      router.push("/library/plan-builder" as any);
+    }
+  };
+
+  // My Plans data
+  const myPlansData = useMemo(() => {
+    const list = myPlans.map(planSummaryToTrainingPlan);
+    const q = query.trim().toLowerCase();
+    if (q.length > 0) {
+      return list.filter((p) => (p.title ?? "").toLowerCase().includes(q));
+    }
+    return list;
+  }, [myPlans, query]);
+
+  // Public plans data (Plaza + Official)
   const displayedData = useMemo(() => {
-    let list = [...MOCK_DATA];
+    let list = publicPlans.map(planSummaryToTrainingPlan);
+
+    // Official tab: filter official source
+    if (activeTab === "Official") {
+      list = list.filter((p) => p.source === "official");
+    }
 
     const q = query.trim().toLowerCase();
     if (q.length > 0) {
       list = list.filter((p) => {
         const title = (p.title ?? "").toLowerCase();
-        const author = ((p as any).author ?? "").toLowerCase();
+        const author = (p.author?.authorName ?? "").toLowerCase();
         return title.includes(q) || author.includes(q);
       });
     }
 
-    if (activeTab === "Plaza" && selectedIntents.length > 0) {
-      const normalized = (t?: string) =>
-        (t ? (t.toLowerCase() as TrainingIntent) : undefined);
-      list = list.filter((p) => {
-        const it = normalized((p as any).type);
-        return it ? selectedIntents.includes(it) : false;
-      });
+    if (selectedIntents.length > 0) {
+      list = list.filter((p) => selectedIntents.includes(p.trainingType as TrainingIntent));
     }
 
-    if (sortType === "Newest") {
+    if (sortType === "Highest") {
       list.sort((a, b) => {
-        const ta = Date.parse((a as any).createdAt || "");
-        const tb = Date.parse((b as any).createdAt || "");
-        return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
-      });
-    } else {
-      list.sort((a, b) => {
-        const ra =
-          typeof (a as any).rating === "number" ? (a as any).rating : -1;
-        const rb =
-          typeof (b as any).rating === "number" ? (b as any).rating : -1;
+        const ra = a.market?.ratingAvg ?? -1;
+        const rb = b.market?.ratingAvg ?? -1;
         if (rb !== ra) return rb - ra;
-
-        const ua = typeof (a as any).users === "number" ? (a as any).users : -1;
-        const ub = typeof (b as any).users === "number" ? (b as any).users : -1;
+        const ua = a.market?.followerCount ?? -1;
+        const ub = b.market?.followerCount ?? -1;
         return ub - ua;
       });
     }
 
     return list;
-  }, [activeTab, query, selectedIntents, sortType]);
+  }, [publicPlans, activeTab, query, selectedIntents, sortType]);
+
+  // Determine which dataset is active
+  const isMyPlansTab = activeTab === "MyPlans";
+  const activeData = isMyPlansTab ? myPlansData : displayedData;
+  const activeLoading = isMyPlansTab ? myLoading : publicLoading;
 
   const LargeTitle = <Text style={styles.largeTitle}>Plans</Text>;
-
   const Subtitle = (
     <Text style={styles.largeSubtitle}>
-      {activeTab === "Plaza" ? "Plaza" : "Library"}
+      {activeTab === "MyPlans" ? "My Plans" : activeTab === "Official" ? "Official" : "Plaza"}
     </Text>
   );
 
@@ -125,157 +120,211 @@ export default function PlansHubScreen() {
     </TouchableOpacity>
   );
 
-  const RightActions = (
-    <TouchableOpacity
-      onPress={() => router.push("/library/my-plans")}
-      activeOpacity={0.7}
-      style={styles.rightBtn}
-    >
-      <Ionicons name="bookmark-outline" size={25} color="#111" />
-    </TouchableOpacity>
-  );
-
   const ListHeader = (
     <View>
-      {/* Search (独立边距 16) */}
+      {/* Search */}
       <View style={{ paddingHorizontal: SIDE_PAD }}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search plans, authors..."
+            placeholder="Search plans..."
             placeholderTextColor="#9CA3AF"
             style={{ flex: 1, marginLeft: 8, fontSize: 15, color: "#111" }}
           />
         </View>
       </View>
 
-      {/* Tabs（全宽，保持你原样） */}
+      {/* 3 Tabs */}
       <View style={styles.tabContainer}>
-        {(["Plaza", "Library"] as const).map((tab) => (
+        {([
+          { key: "MyPlans" as const, label: "My Plans" },
+          { key: "Official" as const, label: "Official" },
+          { key: "Plaza" as const, label: "Plaza" },
+        ]).map((tab) => (
           <TouchableOpacity
-            key={tab}
-            style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
-            onPress={() => setActiveTab(tab)}
+            key={tab.key}
+            style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]}
+            onPress={() => setActiveTab(tab.key)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              Plan {tab}
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+              {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Filter Toggle（全宽，内部已经 paddingHorizontal: 16） */}
-      <TouchableOpacity style={styles.filterHeader} onPress={toggleFilter} activeOpacity={0.7}>
-        <Text style={styles.filterTitle}>
-          Filter:{" "}
-          <Text style={{ fontWeight: "400" }}>
-            {sortType}
-            {activeTab === "Plaza"
-              ? `, ${selectedIntents.length > 0 ? `${selectedIntents.length} types` : "All"}`
-              : ""}
-          </Text>
-        </Text>
-        <Ionicons name={filterOpen ? "chevron-up" : "chevron-down"} size={16} color="#6B7280" />
-      </TouchableOpacity>
+      {/* Filter — only for Plaza/Official */}
+      {!isMyPlansTab ? (
+        <>
+          <TouchableOpacity style={styles.filterHeader} onPress={toggleFilter} activeOpacity={0.7}>
+            <Text style={styles.filterTitle}>
+              Filter:{" "}
+              <Text style={{ fontWeight: "400" }}>
+                {sortType}
+                {activeTab === "Plaza"
+                  ? `, ${selectedIntents.length > 0 ? `${selectedIntents.length} types` : "All"}`
+                  : ""}
+              </Text>
+            </Text>
+            <Ionicons name={filterOpen ? "chevron-up" : "chevron-down"} size={16} color="#6B7280" />
+          </TouchableOpacity>
 
-      {/* Filter Body（内部 padding 16） */}
-      {filterOpen ? (
-        <View style={styles.filterBody}>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Sort:</Text>
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              {(["Newest", "Highest"] as const).map((opt) => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.radioBtn, sortType === opt && styles.radioBtnActive]}
-                  onPress={() => setSortType(opt)}
-                >
-                  <Text style={[styles.radioText, sortType === opt && styles.radioTextActive]}>
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {activeTab === "Plaza" ? (
-            <View style={[styles.filterRow, { marginTop: 12, alignItems: "flex-start" }]}>
-              <Text style={styles.filterLabel}>Type:</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, flex: 1 }}>
-                {TRAINING_INTENTS.filter((i) => i.key !== "all").map(({ key, label }) => {
-                  const isSelected = selectedIntents.includes(key);
-                  return (
+          {filterOpen ? (
+            <View style={styles.filterBody}>
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Sort:</Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {(["Newest", "Highest"] as const).map((opt) => (
                     <TouchableOpacity
-                      key={key}
-                      style={[styles.tagBtn, isSelected && styles.tagBtnActive]}
-                      onPress={() => toggleIntent(key)}
+                      key={opt}
+                      style={[styles.radioBtn, sortType === opt && styles.radioBtnActive]}
+                      onPress={() => setSortType(opt)}
                     >
-                      <Text style={[styles.tagText, isSelected && styles.tagTextActive]}>{label}</Text>
+                      <Text style={[styles.radioText, sortType === opt && styles.radioTextActive]}>
+                        {opt}
+                      </Text>
                     </TouchableOpacity>
-                  );
-                })}
+                  ))}
+                </View>
               </View>
+
+              {activeTab === "Plaza" ? (
+                <View style={[styles.filterRow, { marginTop: 12, alignItems: "flex-start" }]}>
+                  <Text style={styles.filterLabel}>Type:</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, flex: 1 }}>
+                    {TRAINING_INTENTS.filter((i) => i.key !== "all").map(({ key, label }) => {
+                      const isSelected = selectedIntents.includes(key);
+                      return (
+                        <TouchableOpacity
+                          key={key}
+                          style={[styles.tagBtn, isSelected && styles.tagBtnActive]}
+                          onPress={() => toggleIntent(key)}
+                        >
+                          <Text style={[styles.tagText, isSelected && styles.tagTextActive]}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
             </View>
           ) : null}
-        </View>
-      ) : null}
 
-      {/* Trending card（独立边距 16） */}
-      {activeTab === "Plaza" ? (
-        <View style={{ paddingHorizontal: SIDE_PAD }}>
-          <TrendingPlansEntryCard />
-        </View>
+          {/* Trending card */}
+          {activeTab === "Plaza" ? (
+            <View style={{ paddingHorizontal: SIDE_PAD }}>
+              <TrendingPlansEntryCard />
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
 
   return (
-    <CollapsibleLargeHeaderFlatList
-      backgroundColor="#FFF"
-      smallTitle="Plans"
-      largeTitle={LargeTitle}
-      subtitle={Subtitle}
-      leftActions={LeftActions}
-      rightActions={RightActions}
-      data={displayedData}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }: any) => (
-        <View style={{ paddingHorizontal: SIDE_PAD }}>
-          <PlanCard
-            item={item}
-            onPress={() =>
-              router.push({
-                pathname: "/library/plan-overview",
-                params: { planId: item.id, source: "market" },
-              })
-            }
-          />
-        </View>
-      )}
-      listHeader={ListHeader}
-      // ✅ 不要再传 paddingHorizontal，避免大标题被叠加缩进
-      contentContainerStyle={{ paddingBottom: 8 }}
-      bottomInsetExtra={28}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
+      <CollapsibleLargeHeaderFlatList
+        backgroundColor="#FFF"
+        smallTitle="Plans"
+        largeTitle={LargeTitle}
+        subtitle={Subtitle}
+        leftActions={LeftActions}
+        data={activeData}
+        keyExtractor={(item: any) => item.id}
+        renderItem={({ item }: any) => (
+          <View style={{ paddingHorizontal: SIDE_PAD }}>
+            <TrainingPlanCard
+              plan={item}
+              variant={isMyPlansTab ? "compact" : "market"}
+              context={isMyPlansTab ? "personal" : "public"}
+              handlers={{
+                onPress: () =>
+                  router.push({
+                    pathname: "/library/plan-overview",
+                    params: {
+                      planId: item.id,
+                      source: isMyPlansTab ? "user" : "market",
+                    },
+                  }),
+              }}
+              display={{
+                showAuthor: !isMyPlansTab,
+                showSourceBadge: true,
+              }}
+            />
+          </View>
+        )}
+        listHeader={
+          <View>
+            {ListHeader}
+            {activeLoading && activeData.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color="#111" />
+              </View>
+            ) : null}
+            {!activeLoading && activeData.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name={isMyPlansTab ? "albums-outline" : "search-outline"} size={44} color="#E5E7EB" />
+                <Text style={styles.emptyTitle}>
+                  {isMyPlansTab ? "No plans yet" : "No plans found"}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {isMyPlansTab
+                    ? "Create your first custom plan."
+                    : "Try adjusting your filters."}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        }
+        contentContainerStyle={{ paddingBottom: 8 }}
+        bottomInsetExtra={28}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {/* FAB — only on My Plans tab */}
+      {isMyPlansTab ? (
+        <>
+          {fabOpen ? (
+            <TouchableOpacity
+              style={styles.fabOverlay}
+              activeOpacity={1}
+              onPress={() => setFabOpen(false)}
+            >
+              <View style={[styles.fabActions, { bottom: insets.bottom + 80 }]}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleFabAction("Custom")}>
+                  <Text style={styles.actionText}>Customize</Text>
+                  <View style={[styles.miniFab, { backgroundColor: "#4F46E5" }]}>
+                    <Ionicons name="construct" size={20} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleFabAction("AI")}>
+                  <Text style={styles.actionText}>AI Pick</Text>
+                  <View style={[styles.miniFab, { backgroundColor: "#10B981" }]}>
+                    <Ionicons name="sparkles" size={20} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.fab, { bottom: insets.bottom + 20 }]}
+            activeOpacity={0.8}
+            onPress={() => setFabOpen((v) => !v)}
+          >
+            <Ionicons name={fabOpen ? "close" : "add"} size={32} color="#FFF" />
+          </TouchableOpacity>
+        </>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rightBtn: {
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
+  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 
   largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
   largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
@@ -337,4 +386,27 @@ const styles = StyleSheet.create({
   tagBtnActive: { backgroundColor: "#EEF2FF", borderColor: "#4F46E5" },
   tagText: { fontSize: 12, color: "#4B5563", fontWeight: "700" },
   tagTextActive: { color: "#4F46E5", fontWeight: "800" },
+
+  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 90, paddingHorizontal: 24 },
+  emptyTitle: { marginTop: 10, fontSize: 15, fontWeight: "900", color: "#111" },
+  emptySub: { marginTop: 6, fontSize: 13, fontWeight: "600", color: "#9CA3AF", textAlign: "center" },
+
+  // FAB
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 5,
+    zIndex: 100,
+  },
+  fabOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.8)", zIndex: 90 },
+  fabActions: { position: "absolute", right: 24, alignItems: "flex-end", gap: 16 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 12 },
+  actionText: { fontSize: 14, fontWeight: "700", color: "#111" },
+  miniFab: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
 });

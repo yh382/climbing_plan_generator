@@ -49,7 +49,7 @@ export default function BasicInfoSection({
       {/* 1) View Detailed Analysis */}
       <TouchableOpacity
         style={styles.analysisCard}
-        onPress={() => router.push("/(tabs)/analysis")}
+        onPress={() => router.push("/analysis")}
         activeOpacity={0.85}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>

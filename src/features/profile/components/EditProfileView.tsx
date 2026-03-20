@@ -1,30 +1,33 @@
 // src/features/profile/components/EditProfileView.tsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { Image } from "expo-image";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "src/lib/apiClient";
+import { uploadImageToR2 } from "src/features/profile/api";
 import LocationPickerSheet from "./LocationPickerSheet";
 import HomeGymPickerSheet from "./HomeGymPickerSheet";
 import AvatarPickerSheet from "./AvatarPickerSheet";
+import { consumePendingImage } from "src/features/profile/imagePickerBridge";
 
 type UserMe = {
   id: string;
   email: string;
   username?: string | null;
   avatar_url?: string | null;
+  cover_url?: string | null;
   units: string;
   locale?: string | null;
 
@@ -47,6 +50,7 @@ type FormState = {
   location: string;
   home_gym: string;
   avatar_url: string;
+  cover_url: string;
 
   location_place_id: string | null;
   location_lat: number | null;
@@ -73,6 +77,7 @@ export default function EditProfileView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
 
   const [me, setMe] = useState<UserMe | null>(null);
 
@@ -82,6 +87,7 @@ export default function EditProfileView() {
     location: "",
     home_gym: "",
     avatar_url: "",
+    cover_url: "",
 
     location_place_id: null,
     location_lat: null,
@@ -109,6 +115,7 @@ export default function EditProfileView() {
           location: (u.location ?? "").toString(),
           home_gym: (u.home_gym ?? "").toString(),
           avatar_url: (u.avatar_url ?? "").toString(),
+          cover_url: (u.cover_url ?? "").toString(),
 
           location_place_id: u.location_place_id ?? null,
             location_lat: u.location_lat ?? null,
@@ -135,13 +142,39 @@ export default function EditProfileView() {
     try {
       setSaving(true);
 
-      // ✅ 只存我们现在需要的字段（username/bio/location/home_gym/avatar_url）
+      const isLocalUri = (url: string) => /^(ph|file):\/\//.test(url);
+      let avatarToSave = form.avatar_url.trim() || null;
+      let coverToSave = form.cover_url.trim() || null;
+
+      // Upload local images to R2 before saving
+      if (avatarToSave && isLocalUri(avatarToSave)) {
+        try {
+          avatarToSave = await uploadImageToR2(avatarToSave, "avatars");
+        } catch (e: any) {
+          Alert.alert("Avatar upload failed", e?.message ?? "Unknown error");
+          setSaving(false);
+          return;
+        }
+      }
+      if (coverToSave && isLocalUri(coverToSave)) {
+        try {
+          coverToSave = await uploadImageToR2(coverToSave, "covers");
+        } catch (e: any) {
+          Alert.alert("Cover upload failed", e?.message ?? "Unknown error");
+          setSaving(false);
+          return;
+        }
+      }
+
+      const isRemoteUrl = (url: string) => /^https?:\/\//.test(url);
+
       const payload = {
         username: form.username.trim() || null,
         bio: form.bio.trim() || null,
         location: form.location.trim() || null,
         home_gym: form.home_gym.trim() || null,
-        avatar_url: form.avatar_url.trim() || null,
+        avatar_url: avatarToSave && isRemoteUrl(avatarToSave) ? avatarToSave : null,
+        cover_url: coverToSave && isRemoteUrl(coverToSave) ? coverToSave : null,
         location_place_id: form.location_place_id ?? null,
         location_lat: form.location_lat ?? null,
         location_lng: form.location_lng ?? null,
@@ -174,6 +207,7 @@ export default function EditProfileView() {
         location: (updated.location ?? "").toString(),
         home_gym: (updated.home_gym ?? "").toString(),
         avatar_url: (updated.avatar_url ?? "").toString(),
+        cover_url: (updated.cover_url ?? "").toString(),
 
         location_place_id: (updated as any).location_place_id ?? null,
         location_lat: (updated as any).location_lat ?? null,
@@ -205,9 +239,24 @@ export default function EditProfileView() {
     // TODO: BottomSheet
   };
 
+  // Pick up image selected from library screen
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingImage();
+      if (pending) {
+        setForm((s) => ({
+          ...s,
+          [pending.target === "cover" ? "cover_url" : "avatar_url"]: pending.uri,
+        }));
+      }
+    }, [])
+  );
+
   const avatarUri = useMemo(() => {
     return form.avatar_url || "https://placekitten.com/200/200";
   }, [form.avatar_url]);
+
+  const coverUri = form.cover_url || null;
 
   if (loading) {
     return (
@@ -242,6 +291,25 @@ export default function EditProfileView() {
         </TouchableOpacity>
         </View>
 
+        {/* Cover Image */}
+        <View style={styles.coverSection}>
+          <Text style={styles.coverLabel}>Cover Photo</Text>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setCoverPickerOpen(true)}>
+            {coverUri ? (
+              <View style={styles.coverPreview}>
+                <Image source={{ uri: coverUri }} style={[StyleSheet.absoluteFill, styles.coverImage]} />
+                <View style={styles.coverOverlay}>
+                  <Ionicons name="camera-outline" size={24} color="#FFFFFF" />
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.coverPreview, styles.coverPlaceholder]}>
+                <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                <Text style={styles.coverPlaceholderText}>Add Cover Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* 表单 */}
         <View style={styles.formGroup}>
@@ -313,6 +381,14 @@ export default function EditProfileView() {
             visible={avatarPickerOpen}
             onClose={() => setAvatarPickerOpen(false)}
             onChooseFromLibrary={() => router.push("/profile/library")}
+            onTakePhoto={() => {
+                Alert.alert("Not supported", "Camera is not available in simulator yet.");
+            }}
+            />
+        <AvatarPickerSheet
+            visible={coverPickerOpen}
+            onClose={() => setCoverPickerOpen(false)}
+            onChooseFromLibrary={() => router.push({ pathname: "/profile/library", params: { target: "cover" } })}
             onTakePhoto={() => {
                 Alert.alert("Not supported", "Camera is not available in simulator yet.");
             }}
@@ -400,4 +476,24 @@ const styles = StyleSheet.create({
   inputBoxLink: { flexDirection: "row", justifyContent: "space-between" },
   linkText: { flex: 1, color: "#0F172A" },
   placeholderText: { color: "#94A3B8" },
+
+  coverSection: { paddingHorizontal: 16, marginBottom: 8 },
+  coverLabel: { fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 8 },
+  coverPreview: { width: "100%", height: 120, borderRadius: 12, overflow: "hidden" },
+  coverImage: { borderRadius: 12 },
+  coverOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  coverPlaceholder: {
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderStyle: "dashed",
+  },
+  coverPlaceholderText: { color: "#94A3B8", fontSize: 13, marginTop: 4 },
 });

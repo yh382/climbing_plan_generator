@@ -1,25 +1,16 @@
 // src/components/plancard/variants/MarketPlanCard.tsx
 
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
-import { planThemeByTrainingType, sourceLabel } from "../PlanCard.styles";
+import { sourceLabel } from "../PlanCard.styles";
+import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
 
-function formatRating(avg?: number, count?: number) {
+function formatRating(avg?: number) {
   if (typeof avg !== "number") return null;
-  const score = Math.max(0, Math.min(5, avg));
-  if (typeof count === "number" && count > 0) return `${score.toFixed(1)}`;
-  return `${score.toFixed(1)}`;
-}
-
-function formatWeeks(weeks?: number) {
-  if (!weeks) return null;
-  return `${weeks} Wks`;
-}
-
-function formatMinutes(mins?: number) {
-  if (!mins) return null;
-  return `${mins} min`;
+  return Math.max(0, Math.min(5, avg)).toFixed(1);
 }
 
 function formatLevel(min?: string, max?: string, label?: string) {
@@ -32,42 +23,65 @@ function formatLevel(min?: string, max?: string, label?: string) {
 
 export default function MarketPlanCard(props: TrainingPlanCardProps) {
   const { plan, handlers, display, context } = props;
-  const theme = planThemeByTrainingType(plan.trainingType);
+
+  const gradient = TRAINING_TYPE_GRADIENTS[plan.trainingType] ?? TRAINING_TYPE_GRADIENTS.mixed;
+  const hasCover = !!plan.coverImageUri;
+  const typeLabel = plan.trainingType.charAt(0).toUpperCase() + plan.trainingType.slice(1);
 
   const ratingText = useMemo(
-    () => formatRating(plan.market?.ratingAvg, plan.market?.ratingCount),
-    [plan.market?.ratingAvg, plan.market?.ratingCount]
+    () => formatRating(plan.market?.ratingAvg),
+    [plan.market?.ratingAvg]
   );
 
-  const weeksText = useMemo(() => formatWeeks(plan.durationWeeks), [plan.durationWeeks]);
-  const minsText = useMemo(() => formatMinutes(plan.estSessionMinutes), [plan.estSessionMinutes]);
-
-  const levelText = useMemo(
-    () => formatLevel(plan.levelRange?.min, plan.levelRange?.max, plan.levelRange?.label),
-    [plan.levelRange?.min, plan.levelRange?.max, plan.levelRange?.label]
-  );
+  const metaLine = useMemo(() => {
+    const parts: string[] = [];
+    if (plan.durationWeeks) parts.push(`${plan.durationWeeks} wks`);
+    if (plan.estSessionMinutes) parts.push(`${plan.estSessionMinutes} min`);
+    const lvl = formatLevel(plan.levelRange?.min, plan.levelRange?.max, plan.levelRange?.label);
+    if (lvl) parts.push(lvl);
+    if (typeof plan.market?.followerCount === "number" && plan.market.followerCount > 0) {
+      parts.push(`${plan.market.followerCount} followers`);
+    }
+    return parts.join(" · ");
+  }, [plan]);
 
   const showSource = display?.showSourceBadge ?? true;
 
-  const onPress = () => handlers?.onPress?.(plan);
-
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.wrap}>
-      <ImageBackground
-        source={plan.coverImageUri ? { uri: plan.coverImageUri } : undefined}
-        style={[styles.card, { backgroundColor: "#9CA3AF" }]}
-        imageStyle={styles.image}
-      >
-        {/* 顶部渐变遮罩（无渐变库就用半透明层） */}
-        <View style={styles.overlay} />
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => handlers?.onPress?.(plan)}
+      style={styles.card}
+    >
+      {/* Background: cover image or gradient */}
+      {hasCover ? (
+        <Image
+          source={{ uri: plan.coverImageUri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={200}
+        />
+      ) : (
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
-        {/* Type tag */}
+      {/* Dark overlay */}
+      <View style={[StyleSheet.absoluteFill, styles.overlay]} />
+
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Top: type pill + rating */}
         <View style={styles.topRow}>
-          <View style={[styles.typeTag, { backgroundColor: theme.bg }]}>
-            <Text style={styles.typeTagText}>{plan.trainingType.toUpperCase()}</Text>
+          <View style={styles.typePill}>
+            <Text style={styles.typePillText}>{typeLabel}</Text>
           </View>
 
-          {typeof ratingText === "string" ? (
+          {ratingText ? (
             <View style={styles.ratingPill}>
               <Text style={styles.star}>★</Text>
               <Text style={styles.ratingText}>{ratingText}</Text>
@@ -75,81 +89,97 @@ export default function MarketPlanCard(props: TrainingPlanCardProps) {
           ) : null}
         </View>
 
-        {/* Title area */}
-        <View style={styles.content}>
-          <Text numberOfLines={2} style={styles.title}>
-            {plan.title}
+        {/* Title */}
+        <Text numberOfLines={2} style={styles.title}>
+          {plan.title}
+        </Text>
+
+        {/* Author */}
+        {display?.showAuthor !== false ? (
+          <Text numberOfLines={1} style={styles.author}>
+            {plan.author?.authorName
+              ? `by ${plan.author.authorName}`
+              : showSource
+                ? `by ${sourceLabel(plan.source)}`
+                : ""}
           </Text>
+        ) : null}
 
-          {display?.showAuthor !== false ? (
-            <Text numberOfLines={1} style={styles.author}>
-              {plan.author?.authorName ? `by ${plan.author.authorName}` : showSource ? `by ${sourceLabel(plan.source)}` : ""}
-            </Text>
-          ) : null}
-
-          {/* Info Row (weeks | level | followers) */}
-          <View style={styles.metaRow}>
-            {weeksText ? <Text style={styles.metaText}>⏱ {weeksText}</Text> : null}
-            {minsText ? <Text style={styles.metaText}> · {minsText}</Text> : null}
-            {levelText ? <Text style={styles.metaText}> · {levelText}</Text> : null}
-
-            {typeof plan.market?.followerCount === "number" ? (
-              <Text style={styles.metaText}> · 👥 {plan.market.followerCount}</Text>
-            ) : null}
-          </View>
-
-          {/* Optional public-context CTA hint (不要做按钮，保持卡片干净) */}
+        {/* Bottom: meta + hint */}
+        <View>
+          {metaLine ? <Text style={styles.metaText}>{metaLine}</Text> : null}
           {context === "public" ? <Text style={styles.hint}>Tap to view</Text> : null}
         </View>
-      </ImageBackground>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: 16, paddingVertical: 10 },
   card: {
-    height: 150,
     borderRadius: 18,
     overflow: "hidden",
+    height: 180,
+  },
+  overlay: {
+    backgroundColor: "rgba(0,0,0,0.38)",
+  },
+  content: {
+    flex: 1,
+    padding: 16,
     justifyContent: "space-between",
   },
-  image: { borderRadius: 18, resizeMode: "cover" },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
-
   topRow: {
-    padding: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  typeTag: {
+  typePill: {
+    backgroundColor: "rgba(255,255,255,0.20)",
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  typeTagText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
-
+  typePillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   ratingPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(17,24,39,0.78)",
-    borderRadius: 12,
+    backgroundColor: "rgba(17,24,39,0.70)",
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
-  star: { color: "#FBBF24", fontSize: 13, fontWeight: "900", marginRight: 6 },
-  ratingText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
+  star: { color: "#FBBF24", fontSize: 12, fontWeight: "900", marginRight: 4 },
+  ratingText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
 
-  content: { padding: 14 },
-  title: { color: "#FFFFFF", fontSize: 24, fontWeight: "900", lineHeight: 28 },
-  author: { color: "rgba(255,255,255,0.75)", fontSize: 14, marginTop: 2, fontWeight: "700" },
-
-  metaRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
-  metaText: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "700" },
-
-  hint: { marginTop: 8, color: "rgba(255,255,255,0.65)", fontSize: 12, fontWeight: "600" },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    lineHeight: 24,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  author: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 2,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.80)",
+  },
+  hint: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.55)",
+  },
 });

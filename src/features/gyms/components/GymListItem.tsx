@@ -1,0 +1,42 @@
+import React from "react";
+import { Text, Pressable, StyleSheet } from "react-native";
+import type { GymPlace } from "../../../../lib/poi/types";
+
+interface GymListItemProps {
+  gym: GymPlace;
+  onPress: () => void;
+  colors: {
+    iconLabel: string;
+    iconInactive: string;
+  };
+}
+
+export function GymListItem({ gym, onPress, colors }: GymListItemProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+      style={styles.rowItem}
+    >
+      <Text style={[styles.rowTitle, { color: colors.iconLabel }]} numberOfLines={1}>
+        {gym.name}
+      </Text>
+      <Text style={[styles.rowMeta, { color: colors.iconInactive }]} numberOfLines={1}>
+        {gym.distanceMiles.toFixed(1)} mi
+        {gym.rating ? ` · ${gym.rating} (${gym.user_ratings_total ?? 0})` : ""}
+      </Text>
+      {(gym.vicinity || gym.formatted_address) && (
+        <Text style={[styles.rowAddr, { color: colors.iconInactive }]} numberOfLines={1}>
+          {gym.vicinity || gym.formatted_address}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  rowItem: { paddingVertical: 10 },
+  rowTitle: { fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  rowMeta: { fontSize: 13, marginBottom: 2 },
+  rowAddr: { fontSize: 13 },
+});

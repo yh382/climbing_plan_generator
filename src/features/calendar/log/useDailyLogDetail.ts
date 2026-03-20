@@ -94,19 +94,24 @@ export function useDailyLogDetail(params: {
       let r: any[] = [];
 
       if (sessionKeyToLoad) {
-        const [sb, sr] = await Promise.all([
+        const [sb, str, sl] = await Promise.all([
           readSessionList(sessionKeyToLoad, "boulder"),
-          readSessionList(sessionKeyToLoad, "yds"),
+          readSessionList(sessionKeyToLoad, "toprope"),
+          readSessionList(sessionKeyToLoad, "lead"),
         ]);
         b = Array.isArray(sb) ? sb : [];
-        r = Array.isArray(sr) ? sr : [];
+        r = [...(Array.isArray(str) ? str : []), ...(Array.isArray(sl) ? sl : [])];
       }
 
       // 2) session 为空才 fallback 到 day list
       if (!sessionKeyToLoad || (b.length === 0 && r.length === 0)) {
-        const [db, dr] = await Promise.all([readDayList(dateKey, "boulder"), readDayList(dateKey, "yds")]);
+        const [db, dtr, dl] = await Promise.all([
+          readDayList(dateKey, "boulder"),
+          readDayList(dateKey, "toprope"),
+          readDayList(dateKey, "lead"),
+        ]);
         b = Array.isArray(db) ? db : [];
-        r = Array.isArray(dr) ? dr : [];
+        r = [...(Array.isArray(dtr) ? dtr : []), ...(Array.isArray(dl) ? dl : [])];
       }
 
       if (cancelled) return;
@@ -148,7 +153,12 @@ export function useDailyLogDetail(params: {
 
   // ✅ ring segments：仍沿用 store 聚合（不动你原逻辑）
   const boulderSegments = useSegmentsByDate(dateKey, "boulder");
-  const routeSegments = useSegmentsByDate(dateKey, "yds");
+  const topropeSegments = useSegmentsByDate(dateKey, "toprope");
+  const leadSegments = useSegmentsByDate(dateKey, "lead");
+  const routeSegments = useMemo(
+    () => [...topropeSegments, ...leadSegments],
+    [topropeSegments, leadSegments]
+  );
 
   const boulderParts = useMemo(
     () =>

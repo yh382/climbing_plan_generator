@@ -1,20 +1,48 @@
-// src/features/community/events/data/useEventDetailData.ts
-import { useMemo, useState } from "react";
-import { EVENT_DETAIL_MOCK } from "./mockEventDetail";
+import { useEffect, useState, useCallback } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { eventApi } from "../api";
+import { eventOutToDetailModel } from "../types";
+import type { EventOut } from "../types";
 import type { EventDetailModel } from "./types";
 
 export function useEventDetailData(): {
-  event: EventDetailModel;
+  event: EventDetailModel | null;
+  eventRaw: EventOut | null;
   joined: boolean;
+  loading: boolean;
   onToggleJoin: () => void;
 } {
-  // 这里先用 mock；后续你接后端时，只需要替换 event 来源
-  const event = useMemo(() => EVENT_DETAIL_MOCK, []);
+  const params = useLocalSearchParams<{ eventId?: string }>();
+  const eventId = params.eventId;
+
+  const [eventRaw, setEventRaw] = useState<EventOut | null>(null);
+  const [loading, setLoading] = useState(true);
   const [joined, setJoined] = useState(false);
 
-  return {
-    event,
-    joined,
-    onToggleJoin: () => setJoined((v) => !v),
-  };
+  useEffect(() => {
+    if (!eventId) return;
+    setLoading(true);
+    eventApi
+      .getDetail(eventId)
+      .then((e) => {
+        setEventRaw(e);
+        setJoined(e.is_registered);
+      })
+      .finally(() => setLoading(false));
+  }, [eventId]);
+
+  const onToggleJoin = useCallback(async () => {
+    if (!eventId) return;
+    if (joined) {
+      await eventApi.unregister(eventId);
+      setJoined(false);
+    } else {
+      await eventApi.register(eventId);
+      setJoined(true);
+    }
+  }, [eventId, joined]);
+
+  const event = eventRaw ? eventOutToDetailModel(eventRaw) : null;
+
+  return { event, eventRaw, joined, loading, onToggleJoin };
 }

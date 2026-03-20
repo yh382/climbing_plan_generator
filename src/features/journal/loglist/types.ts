@@ -11,7 +11,7 @@ export type LogMedia = {
 export type LocalDayLogItem = {
   id: string;
   date: string; // YYYY-MM-DD
-  type: "boulder" | "yds";
+  type: "boulder" | "toprope" | "lead";
   grade: string;
   name: string;
 

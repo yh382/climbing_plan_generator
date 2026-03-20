@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,7 @@ import {
   Pressable,
   ViewStyle,
   TextStyle,
-  Dimensions,
-  Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,41 +18,21 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   interpolate,
-  Extrapolate,
 } from "react-native-reanimated";
-// 如果你想用毛玻璃效果，可以保留 GlassView，这里为了通用性和性能，我使用纯白背景渐变
-// import { GlassView } from "expo-glass-effect"; 
 
 import SegmentedTabs from "./component/SegmentedTabs";
 import LeaderboardFilters from "./component/LeaderboardFilters";
 import RankingRowCard from "./component/RankingRowCard";
-import GalleryGrid from "./component/GalleryGrid";
 import GlassIconButton from "./component/GlassIconButton";
 
 import { useChallengeDetailData } from "./data/useChallengeDetailData";
-import type { ChallengeCategory } from "./data/mockChallengeDetail";
+import { useUserStore } from "@/store/useUserStore";
 
 import ChallengeDetailsModal from "./ChallengeDetailsModal";
-// 添加 GlassView
 import { GlassView } from "expo-glass-effect";
-const COVER_H = 280;
-const THUMB_SIZE = 80;
-const SIDE_PADDING = 12;
 
-function categoryIcon(cat?: ChallengeCategory): keyof typeof Ionicons.glyphMap {
-  switch (cat) {
-    case "boulder":
-      return "flash";
-    case "toprope":
-      return "git-compare";
-    case "indoor":
-      return "home";
-    case "outdoor":
-      return "leaf";
-    default:
-      return "trophy";
-  }
-}
+const COVER_H = 280;
+const SIDE_PADDING = 12;
 
 function formatYMD(iso?: string) {
   if (!iso) return "";
@@ -77,7 +56,7 @@ function daysLeft(endISO?: string) {
   return Math.max(0, diff);
 }
 
-// 标签组件 (TS: as ViewStyle)
+// Category chip
 function CategoryChip({ text }: { text: string }) {
   return (
     <View style={styles.chip as ViewStyle}>
@@ -86,7 +65,7 @@ function CategoryChip({ text }: { text: string }) {
   );
 }
 
-// 极简信息行
+// Info row
 function InfoRow({
   icon,
   children,
@@ -126,77 +105,83 @@ export default function ChallengeDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // --- 1. Reanimated Setup ---
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
 
-  // --- 2. Topbar Background Animation ---
-  // 当滚动超过一定距离（比如封面高度的一半）时，背景逐渐变白
   const headerStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
       scrollY.value,
-      [0, COVER_H - 100], // 输入范围：从顶部 到 封面快结束时
-      [0, 1],             // 输出范围：透明 -> 不透明
-      Extrapolate.CLAMP
+      [0, COVER_H - 100],
+      [0, 1],
+      "clamp"
     );
     return {
       opacity,
-      // 可选：添加一点阴影效果，只有完全显示时才明显
-      shadowOpacity: interpolate(scrollY.value, [0, COVER_H], [0, 0.05], Extrapolate.CLAMP),
+      shadowOpacity: interpolate(scrollY.value, [0, COVER_H], [0, 0.05], "clamp"),
     };
   });
+
+  const currentUser = useUserStore((s) => s.user);
 
   const {
     challenge,
     leaderboard,
-    gallery,
+    loading,
+    joined,
+    onToggleJoin,
     peopleFilter,
     genderFilter,
     setPeopleFilter,
     setGenderFilter,
   } = useChallengeDetailData();
 
-  const [tab, setTab] = useState<"leaderboard" | "gallery">("leaderboard");
+  const myEntry = leaderboard.find((u) => u.userId === currentUser?.id);
 
-  const startText = useMemo(() => formatYMD(challenge.startDateISO), [challenge.startDateISO]);
-  const endText = useMemo(() => formatYMD(challenge.endDateISO), [challenge.endDateISO]);
-  const left = useMemo(() => daysLeft(challenge.endDateISO), [challenge.endDateISO]);
+  const [tab, setTab] = useState<"leaderboard">("leaderboard");
 
-  const firstCat = challenge.categories?.[0];
-  const thumbIcon = categoryIcon(firstCat);
+  const startText = useMemo(() => formatYMD(challenge?.startAt), [challenge?.startAt]);
+  const endText = useMemo(() => formatYMD(challenge?.endAt), [challenge?.endAt]);
+  const left = useMemo(() => daysLeft(challenge?.endAt), [challenge?.endAt]);
 
-  const organizerName = challenge.organizerName ?? "ClimMate Community";
-  const participantsText = typeof challenge.participants === "number" ? `${challenge.participants}` : "—";
+  const organizerName = challenge?.publisher?.name ?? "ClimMate Community";
+  const participantsText = typeof challenge?.participantCount === "number" ? `${challenge.participantCount}` : "—";
 
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // Loading state
+  if (loading || !challenge) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#9CA3AF" />
+      </View>
+    );
+  }
+
+  // Build chips from highlights or challengeKind
+  const chipTexts: string[] = challenge.highlights?.slice(0, 3)
+    ?? (challenge.challengeKind ? [challenge.challengeKind] : []);
+
+  // Reward text from rewardPayload
+  const rewardTexts: string[] = challenge.rewardPayload
+    ? Object.values(challenge.rewardPayload).filter((v): v is string => typeof v === "string")
+    : [];
+
   return (
     <View style={styles.container}>
-      
-{/* === Animated Header Background & Buttons === */}
+
+      {/* === Animated Header Background & Buttons === */}
       <View style={[styles.headerContainer, { height: insets.top + 50 }]}>
-        
-        {/* [修改] 使用 GlassView 替换纯白背景 */}
         <Animated.View style={[StyleSheet.absoluteFill, headerStyle]}>
-          {/* 1. 液态玻璃层 */}
-          <GlassView 
-            glassEffectStyle="regular" 
-            style={StyleSheet.absoluteFill} 
+          <GlassView
+            glassEffectStyle="regular"
+            style={StyleSheet.absoluteFill}
           />
-          
-          {/* 2. 半透明白底层 (Tint) 
-             作用：增加亮度，确保黑色标题/按钮在深色图片背景上也能看清。
-             如果不加这层，玻璃太透，下面是深色图片时，黑色按钮会消失。
-          */}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.65)" }]} />
-          
-          {/* 3. 底部细边框 */}
           <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(0,0,0,0.05)" }} />
         </Animated.View>
-        
-        {/* 按钮层：始终显示 */}
+
         <View style={[styles.headerButtonsRow, { marginTop: insets.top }]}>
           <GlassIconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel="Back" />
           <GlassIconButton icon="share-outline" onPress={() => {}} accessibilityLabel="Share" />
@@ -209,65 +194,79 @@ export default function ChallengeDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* === Hero 区域 === */}
+        {/* === Hero === */}
         <View style={styles.heroWrap}>
-          <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: challenge.color ?? "#111827" }]}>
-            {challenge.coverUri ? <Image source={{ uri: challenge.coverUri }} style={styles.coverImg} /> : null}
+          <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: "#111827" }]}>
+            {challenge.coverUrl ? <Image source={{ uri: challenge.coverUrl }} style={styles.coverImg} /> : null}
             <View style={styles.coverScrim} />
-            
+
             <View style={styles.coverChips}>
-              {(challenge.categories ?? []).slice(0, 3).map((c) => (
+              {chipTexts.map((c) => (
                 <CategoryChip key={c} text={c} />
               ))}
             </View>
           </View>
 
-          {/* Organizer */}
-          <View style={styles.organizerBar}>
-            <Text style={styles.organizerOneLine} numberOfLines={1}>
-              <Text style={styles.organizerPrefix}>Hosted by </Text>
-              {organizerName}
-            </Text>
-          </View>
-
-          {/* 悬浮头像 */}
-          <View style={styles.thumbFloating}>
-            <View style={styles.thumbOuter}>
-              {challenge.thumbnailUri ? (
-                <Image source={{ uri: challenge.thumbnailUri }} style={styles.thumbImg} />
-              ) : (
-                <View style={[styles.thumbImg, { backgroundColor: challenge.color ?? "#111827", alignItems: "center", justifyContent: "center" }]}>
-                  <Ionicons name={thumbIcon} size={24} color="#FFFFFF" />
-                </View>
-              )}
+          {/* Badge/Trophy Center (Strava style) */}
+          <View style={styles.badgeCenterWrap}>
+            <View style={styles.badgeCircle}>
+              <Ionicons name="trophy" size={36} color="#F59E0B" />
             </View>
+            <Text style={styles.badgeSubtext}>Complete to earn this badge</Text>
           </View>
         </View>
 
-        {/* === 主内容区 === */}
+        {/* === Main content === */}
         <View style={styles.mainBlock}>
           <Text style={styles.title}>{challenge.title}</Text>
 
-          {/* Join 按钮 */}
-          <TouchableOpacity activeOpacity={0.9} style={styles.joinBtn} onPress={() => {}}>
-            <Text style={styles.joinBtnText}>{challenge.joined ? "Joined" : "Join Challenge"}</Text>
-          </TouchableOpacity>
+          {/* Join / Joined panel */}
+          {joined ? (
+            <View style={styles.joinedPanel}>
+              <View style={styles.joinedRow}>
+                <View style={styles.joinedStat}>
+                  <Text style={styles.joinedStatValue}>{myEntry?.score ?? 0}</Text>
+                  <Text style={styles.joinedStatLabel}>My Points</Text>
+                </View>
+                {left !== null && (
+                  <>
+                    <View style={styles.joinedDivider} />
+                    <View style={styles.joinedStat}>
+                      <Text style={styles.joinedStatValue}>{left}</Text>
+                      <Text style={styles.joinedStatLabel}>Days Left</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity activeOpacity={0.9} style={styles.joinBtn} onPress={onToggleJoin}>
+              <Text style={styles.joinBtnText}>Join Challenge</Text>
+            </TouchableOpacity>
+          )}
 
-          {/* === 信息列表 === */}
+          {/* === Info list === */}
           <View style={styles.infoListContainer}>
+            <InfoRow icon="business-outline">
+              <Text style={styles.infoValue}>
+                <Text style={{ fontWeight: "400", color: "#6B7280" }}>Hosted by </Text>
+                {organizerName}
+              </Text>
+            </InfoRow>
+
             <InfoRow
               icon="calendar-clear-outline"
               right={left !== null ? <Text style={styles.daysLeftPill}>{left} days left</Text> : null}
             >
               <Text style={styles.infoValue}>
-                {startText && endText ? `${startText} - ${endText}` : challenge.dateRange ?? "—"}
+                {startText && endText ? `${startText} - ${endText}` : startText || "—"}
               </Text>
             </InfoRow>
 
             <InfoRow icon="trophy-outline">
-               {challenge.prizes?.length ? (
+              {rewardTexts.length > 0 ? (
                 <Text style={styles.infoValue} numberOfLines={1}>
-                  {challenge.prizes.join(" · ")}
+                  {rewardTexts.join(" · ")}
                 </Text>
               ) : (
                 <Text style={styles.infoMuted}>No prizes yet</Text>
@@ -281,7 +280,7 @@ export default function ChallengeDetailScreen() {
               right={<Ionicons name="chevron-forward" size={18} color="#9CA3AF" />}
             >
               <Text style={styles.infoValue} numberOfLines={3}>
-                 {challenge.description || "View challenge details and rules."}
+                {challenge.description || "View challenge details and rules."}
               </Text>
             </InfoRow>
           </View>
@@ -290,7 +289,7 @@ export default function ChallengeDetailScreen() {
         {/* === Leaderboard === */}
         <View style={styles.leaderboardSection}>
           <View style={styles.leaderboardCard}>
-            
+
             <View style={styles.leaderHeaderRow}>
               <Text style={styles.cardTitle}>Leaderboard</Text>
               <View style={styles.participantsBadge}>
@@ -299,21 +298,20 @@ export default function ChallengeDetailScreen() {
               </View>
             </View>
 
-            {/* Controls Row: Tabs + Filter */}
+            {/* Controls Row */}
             <View style={styles.controlsRow}>
               <View style={{ flex: 1, marginRight: 12 }}>
                 <SegmentedTabs
                   value={tab}
                   options={[
                     { key: "leaderboard", label: "Ranking" },
-                    { key: "gallery", label: "Gallery" },
                   ]}
                   onChange={setTab}
                 />
               </View>
-              
-              <View style={{ zIndex: 10 }}> 
-                 <LeaderboardFilters
+
+              <View style={{ zIndex: 10 }}>
+                <LeaderboardFilters
                   people={peopleFilter}
                   gender={genderFilter}
                   onChangePeople={setPeopleFilter}
@@ -322,24 +320,32 @@ export default function ChallengeDetailScreen() {
               </View>
             </View>
 
-            {/* 列表内容 */}
+            {/* Leaderboard content */}
             <View style={{ marginTop: 4 }}>
-              {tab === "leaderboard" ? (
+              {leaderboard.length === 0 ? (
+                <View style={{ padding: 20, alignItems: "center" }}>
+                  <Text style={{ color: "#9CA3AF", fontSize: 14 }}>No rankings yet.</Text>
+                </View>
+              ) : (
                 <View style={{ gap: 8 }}>
-                  {leaderboard.map((u, idx) => (
+                  {leaderboard.map((u) => (
                     <RankingRowCard
                       key={u.userId}
-                      rank={idx + 1}
-                      user={u}
+                      rank={u.rank}
+                      user={{
+                        userId: u.userId,
+                        name: u.username || "Unknown",
+                        points: u.score,
+                        gender: "other",
+                        isFollowing: false,
+                      }}
                       onPress={() => router.push(`/community/u/${u.userId}`)}
                     />
                   ))}
                 </View>
-              ) : (
-                <GalleryGrid items={gallery} onPressItem={() => {}} />
               )}
             </View>
-            
+
           </View>
         </View>
       </Animated.ScrollView>
@@ -357,14 +363,12 @@ export default function ChallengeDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
 
-  // --- 新增 Header 样式 ---
   headerContainer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     zIndex: 999,
-    // 不设置背景色，由内部 Animated.View 控制
   },
   headerButtonsRow: {
     flex: 1,
@@ -373,7 +377,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: SIDE_PADDING,
   },
-  // ----------------------
 
   heroWrap: { position: "relative" },
   coverWrap: { width: "100%" },
@@ -403,43 +406,35 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 12, fontWeight: "700", color: "#111" },
 
-  organizerBar: {
-    height: 72,
-    paddingTop: 16,
-    paddingLeft: SIDE_PADDING + THUMB_SIZE + 10,
-    paddingRight: SIDE_PADDING,
-    backgroundColor: "#F9FAFB",
+  badgeCenterWrap: {
+    alignItems: "center",
+    marginTop: -40,
+    paddingBottom: 8,
+    backgroundColor: "transparent",
   },
-  organizerOneLine: { fontSize: 15, fontWeight: "700", color: "#1F2937" },
-  organizerPrefix: { fontWeight: "400", color: "#6B7280" },
-
-  thumbFloating: {
-    position: "absolute",
-    left: SIDE_PADDING,
-    top: COVER_H - THUMB_SIZE / 2,
-    zIndex: 50,
-  },
-  thumbOuter: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: 24,
+  badgeCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
     elevation: 4,
+    borderWidth: 3,
+    borderColor: "#FEF3C7",
   },
-  thumbImg: {
-    width: THUMB_SIZE - 6,
-    height: THUMB_SIZE - 6,
-    borderRadius: 21,
-    backgroundColor: "#E5E7EB",
+  badgeSubtext: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 6,
+    fontWeight: "500",
   },
 
-  mainBlock: { 
-    paddingHorizontal: SIDE_PADDING, 
+  mainBlock: {
+    paddingHorizontal: SIDE_PADDING,
     paddingBottom: 8,
   },
 
@@ -448,14 +443,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#111827",
     letterSpacing: -0.5,
-    marginBottom: 26,
-    marginTop: -10, 
+    marginBottom: 20,
+    marginTop: 4,
     lineHeight: 34,
+    textAlign: "center",
   },
 
   joinBtn: {
-    height: 52,
-    borderRadius: 16,
+    height: 48,
+    width: 200,
+    alignSelf: "center",
+    borderRadius: 24,
     backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
@@ -466,7 +464,25 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 20,
   },
-  joinBtnText: { fontSize: 17, fontWeight: "800", color: "#FFFFFF" },
+  joinBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF" },
+
+  joinedPanel: {
+    borderRadius: 16,
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    padding: 16,
+    marginBottom: 20,
+  },
+  joinedRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  joinedStat: { flex: 1, alignItems: "center" },
+  joinedStatValue: { fontSize: 24, fontWeight: "800", color: "#15803D" },
+  joinedStatLabel: { fontSize: 12, color: "#4B5563", marginTop: 2 },
+  joinedDivider: { width: 1, height: 32, backgroundColor: "#BBF7D0", marginHorizontal: 16 },
 
   infoListContainer: {
     marginTop: 0,
@@ -480,7 +496,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(0,0,0,0.05)",
   },
   infoIconWrap: {
-    width: 28, 
+    width: 28,
     alignItems: "center",
     marginRight: 10,
   },
@@ -502,7 +518,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   infoRight: { marginLeft: 8 },
-  
+
   daysLeftPill: {
     fontSize: 12,
     fontWeight: "700",
@@ -527,7 +543,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
-    zIndex: 1, 
+    zIndex: 1,
   },
 
   leaderHeaderRow: {
@@ -536,17 +552,17 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
-  
+
   controlsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
-    zIndex: 20, 
+    zIndex: 20,
   },
 
   cardTitle: { fontSize: 18, fontWeight: "800", color: "#111" },
-  
+
   participantsBadge: {
     flexDirection: "row",
     alignItems: "center",

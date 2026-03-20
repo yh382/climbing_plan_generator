@@ -1,10 +1,10 @@
 // src/features/community/CommunityScreen.tsx
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput } from "react-native";
+import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { communityApi } from "./api";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import Animated, {
   Extrapolate,
   interpolate,
@@ -13,34 +13,105 @@ import Animated, {
   useSharedValue,
   withTiming, // ✅ 加这个
 } from "react-native-reanimated";
-import { ChallengesTab } from "./challenges";
 import FeedPost from "./components/FeedPost";
+import PostActionSheet from "./components/PostActionSheet";
+import CommentSheet from "./components/CommentSheet";
 import SmartBottomSheet from "./components/SmartBottomSheet";
 import { useCommunityStore } from "../../store/useCommunityStore";
-import { EventsTab } from "./events";
+import { useUserStore } from "../../store/useUserStore";
+import { useChatStore } from "../../store/useChatStore";
+import { RankTab } from "./rank";
+import GymsTab from "./gyms/GymsTab";
 import { GlassView } from "expo-glass-effect";
-type TopTab = "Post" | "Challenges" | "Events";
+
+type TopTab = "Post" | "Rank" | "Gyms";
 type PostFilter = "all" | "shared_plan" | "workout_record" | "nearby";
+type RankDiscipline = "all" | "boulder" | "rope";
 
 const SCROLL_THRESHOLD = 40;
 
-const FILTER_OPTIONS: Array<{ key: Exclude<PostFilter, "all">; label: string }> = [
-  { key: "shared_plan", label: "shared plan" },
-  { key: "workout_record", label: "workout record" },
-  { key: "nearby", label: "nearby" },
+const POST_FILTERS: Array<{ key: PostFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "shared_plan", label: "Shared Plan" },
+  { key: "workout_record", label: "Workout Record" },
+  { key: "nearby", label: "Nearby" },
+];
+
+const RANK_FILTERS: Array<{ key: RankDiscipline; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "boulder", label: "Boulder" },
+  { key: "rope", label: "Rope" },
 ];
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { posts, toggleLike } = useCommunityStore();
+  const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, feedSort, setFeedSort, deletePost } = useCommunityStore();
+  const currentUserId = useUserStore((s) => s.user?.id);
+  const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [actionPost, setActionPost] = useState<any>(null);
+
+  const submitPostReport = useCallback(async (postId: string, reason: string) => {
+    try {
+      await communityApi.report("post", postId, reason);
+      Alert.alert("Report Submitted", "Thank you for your feedback. We will review it shortly.");
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        Alert.alert("Already Reported", "You have already reported this.");
+      } else {
+        Alert.alert("Report Failed");
+      }
+    }
+  }, []);
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const [commentPostOwnerId, setCommentPostOwnerId] = useState<string | undefined>(undefined);
+  const [commentPostCount, setCommentPostCount] = useState<number | undefined>(undefined);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await communityApi.getUnreadCount();
+      setUnreadNotifCount(res.count ?? 0);
+    } catch {
+      // silently ignore
+    }
+  }, []);
+
+  // Poll unread count every 30s
+  useEffect(() => {
+    fetchUnreadCount();
+    pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [fetchUnreadCount]);
+
+  // Chat unread polling
+  useEffect(() => {
+    startUnreadPolling();
+    return () => stopUnreadPolling();
+  }, [startUnreadPolling, stopUnreadPolling]);
+
+  // Refresh count when tab regains focus (e.g. returning from notifications)
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+    }, [fetchUnreadCount])
+  );
+
+  // Fetch feed on mount
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
   const [topTab, setTopTab] = useState<TopTab>("Post");
 
     // --- top tabs underline animation ---
   const tabLayoutsRef = React.useRef<Record<string, { x: number; width: number }>>({});
+  const underlineInitialized = React.useRef(false);
   const underlineX = useSharedValue(0);
   const underlineW = useSharedValue(0);
 
@@ -71,9 +142,15 @@ export default function CommunityScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topTab]);
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<PostFilter>("all");
+  const [postFilter, setPostFilter] = useState<PostFilter>("all");
+  const [rankDiscipline, setRankDiscipline] = useState<RankDiscipline>("all");
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+
+  // Check if any filter is active for the current tab
+  const isFilterActive =
+    topTab === "Post" ? postFilter !== "all"
+    : topTab === "Rank" ? rankDiscipline !== "all"
+    : false;
 
   // Header animation like Home
   const scrollY = useSharedValue(0);
@@ -107,38 +184,27 @@ export default function CommunityScreen() {
     ],
   }));
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 900);
+    await fetchFeed(true);
+    setRefreshing(false);
   };
 
   const filteredPosts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
+    if (postFilter === "all") return posts;
     return posts.filter((p: any) => {
-      // ✅ 修复：UserProfile 没有 name 字段，所以不要用 p.user.name
-      const textHay = `${p?.content ?? ""} ${p?.user?.username ?? ""}`.toLowerCase();
-      const matchSearch = keyword.length === 0 ? true : textHay.includes(keyword);
-
       const attType = p?.attachment?.type;
-      const matchFilter =
-        filter === "all"
-          ? true
-          : filter === "shared_plan"
-            ? attType === "shared_plan"
-            : filter === "workout_record"
-              ? attType === "workout_record"
-              : filter === "nearby"
-                ? true
-                : true;
-
-      return matchSearch && matchFilter;
+      return postFilter === "shared_plan"
+        ? attType === "shared_plan"
+        : postFilter === "workout_record"
+          ? attType === "workout_record"
+          : true;
     });
-  }, [posts, search, filter]);
+  }, [posts, postFilter]);
 
     const listData = useMemo(() => {
     if (topTab === "Post") return filteredPosts;
-    return []; // ✅ Challenges / Events 用 Footer 渲染内容，不走列表 items
+    return []; // Rank / Gyms use Footer rendering, not list items
     }, [topTab, filteredPosts]);
 
 
@@ -152,24 +218,25 @@ export default function CommunityScreen() {
         <View style={{ width: 80 }} />
       </View>
 
-    {/* Post / Challenges / Events */}
+    {/* Post / Rank / Gyms */}
     <View style={{ paddingHorizontal: 16 }}>
     <View style={styles.topTabsWrap}>
         <View style={styles.topTabsRow}>
-        {(["Post", "Challenges", "Events"] as TopTab[]).map((t) => {
+        {(["Post", "Rank", "Gyms"] as TopTab[]).map((t) => {
             const active = topTab === t;
             return (
             <TouchableOpacity
                 key={t}
-                style={styles.topTabItem}
+                style={[styles.topTabItem, active && styles.topTabItemActive]}
                 onPress={() => setTopTab(t)}
                 activeOpacity={0.8}
                 onLayout={(e) => {
                 const { x, width } = e.nativeEvent.layout;
                 tabLayoutsRef.current[t] = { x, width };
 
-                // 初始化 underline（首次布局完成后）
-                if (t === topTab) {
+                // Only snap on very first mount; after that useEffect handles animation
+                if (t === topTab && !underlineInitialized.current) {
+                    underlineInitialized.current = true;
                     updateUnderline(t, false);
                 }
                 }}
@@ -180,67 +247,85 @@ export default function CommunityScreen() {
             </TouchableOpacity>
             );
         })}
+
+          {topTab !== "Gyms" && (
+            <TouchableOpacity
+              style={styles.tabRowFilterBtn}
+              onPress={() => setFilterSheetVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="options-outline" size={18} color={isFilterActive ? "#111" : "#9CA3AF"} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* ✅ 一个“独立”的滑动 underline（绝对定位在 row 底部） */}
+        {/* sliding underline */}
         <Animated.View style={[styles.topTabsUnderline, underlineStyle]} />
     </View>
-    </View>
 
+    {/* Feed scope pills — only when Post tab is active */}
+    {topTab === "Post" && (
+      <View style={styles.feedScopeRow}>
+        <TouchableOpacity
+          style={[styles.feedPill, feedMode === "all" && styles.feedPillActive]}
+          onPress={() => setFeedMode("all")}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.feedPillText, feedMode === "all" && styles.feedPillTextActive]}>
+            All
+          </Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.feedPill, feedMode === "following" && styles.feedPillActive]}
+          onPress={() => setFeedMode("following")}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.feedPillText, feedMode === "following" && styles.feedPillTextActive]}>
+            Following
+          </Text>
+        </TouchableOpacity>
 
-      {/* Post-only: search + filter */}
-      {topTab === "Post" ? (
-        <View style={styles.searchRow}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color="#9CA3AF" />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search"
-              placeholderTextColor="#9CA3AF"
-              style={styles.searchInput}
-              returnKeyType="search"
-            />
+        {/* Sort toggle — only in "All" mode */}
+        {feedMode === "all" && (
+          <View style={styles.sortToggle}>
+            <TouchableOpacity
+              style={[styles.sortPill, feedSort === "hot" && styles.sortPillActive]}
+              onPress={() => setFeedSort("hot")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : "#6B7280"} />
+              <Text style={feedSort === "hot" ? styles.sortTextActive : styles.sortText}>Hot</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sortPill, feedSort === "latest" && styles.sortPillActive]}
+              onPress={() => setFeedSort("latest")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : "#6B7280"} />
+              <Text style={feedSort === "latest" ? styles.sortTextActive : styles.sortText}>Latest</Text>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterSheetVisible(true)}>
-            <Ionicons name="options-outline" size={20} color="#111" />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={{ height: 10 }} />
-      )}
+        )}
+      </View>
+    )}
+    </View>
     </View>
   );
 
   const renderItem = ({ item }: any) => {
-    if (item?.__type === "nav") {
-      const isChallenges = topTab === "Challenges";
-      return (
-        <TouchableOpacity
-          style={styles.navCard}
-          onPress={() => router.push(isChallenges ? "/community/challenges" : "/community/activities")}
-          activeOpacity={0.85}
-        >
-          <View style={styles.navIcon}>
-            <Ionicons name={isChallenges ? "trophy-outline" : "calendar-outline"} size={22} color="#111" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navTitle}>{item.title}</Text>
-            <Text style={styles.navSub}>{item.subtitle}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-        </TouchableOpacity>
-      );
-    }
-
     return (
       <FeedPost
         post={item}
         onLike={(id: string) => toggleLike(id)}
         onPress={() => router.push(`/community/u/${item.user.id}`)}
-        onPressComment={() => router.push("/community/notifications")}
+        onPressComment={(id: string) => {
+          setCommentPostId(id);
+          setCommentPostOwnerId(item.user?.id);
+          setCommentPostCount(item.comments);
+        }}
+        onSave={(id: string) => toggleSave(id)}
+        onThreeDot={() => setActionPost(item)}
         onPressAttachment={(post: any) => {
           const att = post?.attachment;
 
@@ -280,22 +365,40 @@ export default function CommunityScreen() {
         </Animated.View>
 
         <View style={[styles.headerContent, { marginTop: insets.top }]}>
-          <View style={{ width: 80 }} />
+          <View style={styles.headerLeftRow}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/create")}>
+              <Ionicons name="add-circle" size={30} color="#111" />
+            </TouchableOpacity>
+          </View>
 
           <Animated.View style={[styles.headerTitleContainer, headerTitleStyle]}>
             <Text style={styles.headerTitleText}>Community</Text>
           </Animated.View>
 
-          <View style={styles.headerRightRow}>            
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/notifications")}>
-              <Ionicons name="notifications" size={26} color="#111" />
+          <View style={styles.headerRightRow}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/chat" as any)}>
+              <View>
+                <Ionicons name="chatbubbles-outline" size={24} color="#111" />
+                {totalUnread > 0 && (
+                  <View style={styles.chatBadge}>
+                    <Text style={styles.chatBadgeText}>
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/create")}>
-              <Ionicons name="add-circle" size={30} color="#111" />
+            <TouchableOpacity style={styles.iconBtn} onPress={() => { setUnreadNotifCount(0); router.push("/community/notifications"); }}>
+              <View>
+                <Ionicons name="notifications" size={26} color="#111" />
+                {unreadNotifCount > 0 && <View style={styles.badge} />}
+              </View>
             </TouchableOpacity>
 
-
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/search")}>
+              <Ionicons name="search" size={24} color="#111" />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -304,52 +407,90 @@ export default function CommunityScreen() {
     data={listData as any[]}
     keyExtractor={(item: any) => item.id}
     renderItem={renderItem}
-    ListHeaderComponent={ListHeader}
+    ListHeaderComponent={ListHeader()}
     ListFooterComponent={
-        topTab === "Challenges" ? (
-        <ChallengesTab
-            onPressViewAllActive={() => {
-            // 先占位：以后你要做“View all”次级页就 router.push
-            // router.push("/community/challenges");
-            }}
-            onPressChallenge={(item) => {
-              router.push({
-                pathname: "/community/challenges/[challengeId]",
-                params: {
-                  challengeId: item.id,
-                  payload: JSON.stringify(item),
-                },
-              });
-            }}
-
-
-        />
-        ) : topTab === "Events" ? (
-              <EventsTab
-                onPressViewAllMine={() => {
-                  // v1 先空着：以后你要做 /community/events 的次级页
-                  // router.push("/community/events");
-                }}
-                onPressEvent={(item) => {
-                  router.push({
-                    pathname: "/community/events/[eventId]",
-                    params: { eventId: item.id },
-                  });
-
+        topTab === "Rank" ? (
+              <RankTab
+                discipline={rankDiscipline}
+                onPressUser={(userId) => {
+                  router.push(`/community/u/${userId}`);
                 }}
               />
+            ) : topTab === "Gyms" ? (
+              <GymsTab />
             ) : null
-
     }
     onScroll={scrollHandler}
     scrollEventThrottle={16}
     showsVerticalScrollIndicator={false}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     contentContainerStyle={{ paddingBottom: 110 }}
+    ListEmptyComponent={
+      topTab === "Post" ? (
+        <View style={{ padding: 40, alignItems: "center" }}>
+          {feedLoading ? (
+            <ActivityIndicator size="small" color="#111" />
+          ) : (
+            <Text style={{ color: "#9CA3AF", fontSize: 14 }}>No posts yet. Pull to refresh.</Text>
+          )}
+        </View>
+      ) : null
+    }
     />
 
 
-      {/* Filter Bottom Sheet */}
+      <CommentSheet
+        visible={!!commentPostId}
+        onClose={() => { setCommentPostId(null); setCommentPostOwnerId(undefined); setCommentPostCount(undefined); }}
+        postId={commentPostId ?? ''}
+        postOwnerId={commentPostOwnerId}
+        commentCount={commentPostCount}
+      />
+
+      <PostActionSheet
+        visible={!!actionPost}
+        onClose={() => setActionPost(null)}
+        isOwn={!!currentUserId && actionPost?.user?.id === currentUserId}
+        onDelete={() => {
+          if (actionPost) {
+            deletePost(actionPost.id);
+            setActionPost(null);
+          }
+        }}
+        onReport={() => {
+          if (!actionPost) return;
+          const postId = actionPost.id;
+          setActionPost(null);
+          Alert.alert(
+            "Select Report Reason",
+            undefined,
+            [
+              { text: "Spam", onPress: () => submitPostReport(postId, "spam") },
+              { text: "Harassment", onPress: () => submitPostReport(postId, "harassment") },
+              { text: "Inappropriate", onPress: () => submitPostReport(postId, "inappropriate") },
+              { text: "Other", onPress: () => submitPostReport(postId, "other") },
+              { text: "Cancel", style: "cancel" },
+            ],
+          );
+        }}
+        onEdit={() => {
+          if (actionPost) {
+            const mediaUrls = (actionPost.images || []) as string[];
+            router.push({
+              pathname: "/community/create",
+              params: {
+                postId: actionPost.id,
+                editContent: actionPost.content || "",
+                editMedia: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : undefined,
+                editVisibility: "public",
+              },
+            });
+            setActionPost(null);
+          }
+        }}
+      />
+
+      {/* Unified Filter Bottom Sheet — content changes per active tab */}
       <SmartBottomSheet
         visible={filterSheetVisible}
         onClose={() => setFilterSheetVisible(false)}
@@ -357,30 +498,28 @@ export default function CommunityScreen() {
         title="Filter"
       >
         <View style={{ padding: 16, paddingBottom: 24 }}>
-          <TouchableOpacity
-            style={styles.filterRow}
-            onPress={() => {
-              setFilter("all");
-              setFilterSheetVisible(false);
-            }}
-          >
-            <Text style={styles.filterLabel}>All</Text>
-            {filter === "all" ? <Ionicons name="checkmark" size={18} color="#111" /> : null}
-          </TouchableOpacity>
+          {(topTab === "Post" ? POST_FILTERS : RANK_FILTERS
+          ).map((f: { key: string; label: string }) => {
+            const currentValue =
+              topTab === "Post" ? postFilter : rankDiscipline;
 
-          {FILTER_OPTIONS.map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              style={styles.filterRow}
-              onPress={() => {
-                setFilter(opt.key);
-                setFilterSheetVisible(false);
-              }}
-            >
-              <Text style={styles.filterLabel}>{opt.label}</Text>
-              {filter === opt.key ? <Ionicons name="checkmark" size={18} color="#111" /> : null}
-            </TouchableOpacity>
-          ))}
+            const active = currentValue === f.key;
+
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={styles.filterRow}
+                onPress={() => {
+                  if (topTab === "Post") setPostFilter(f.key as PostFilter);
+                  else setRankDiscipline(f.key as RankDiscipline);
+                  setFilterSheetVisible(false);
+                }}
+              >
+                <Text style={styles.filterLabel}>{f.label}</Text>
+                {active ? <Ionicons name="checkmark" size={18} color="#111" /> : null}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </SmartBottomSheet>
     </View>
@@ -395,6 +534,7 @@ const styles = StyleSheet.create({
   headerContent: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
   headerTitleContainer: { position: "absolute", left: 0, right: 0, alignItems: "center", pointerEvents: "none" },
   headerTitleText: { fontSize: 17, fontWeight: "700", color: "#111" },
+  headerLeftRow: { flexDirection: "row", alignItems: "center", width: 80 },
   headerRightRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 
@@ -418,6 +558,9 @@ const styles = StyleSheet.create({
   topTabItem: {
     paddingVertical: 6,
   },
+  topTabItemActive: {
+    transform: [{ scale: 1.1 }],
+  },
   topTabText: {
     fontSize: 14,
     letterSpacing: 0.2,
@@ -440,19 +583,15 @@ const styles = StyleSheet.create({
   },
 
 
-  searchRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 10, marginBottom: 10 },
-  searchBox: {
-    flex: 1,
-    height: 40,
-    borderRadius: 14,
+  tabRowFilterBtn: {
+    marginLeft: "auto",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#F3F4F6",
-    paddingHorizontal: 12,
-    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#111" },
-  filterBtn: { width: 44, height: 40, borderRadius: 14, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
 
   filterRow: {
     height: 48,
@@ -468,24 +607,88 @@ const styles = StyleSheet.create({
   },
   filterLabel: { fontSize: 14, fontWeight: "700", color: "#111" },
 
-  navCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 14,
+  feedScopeRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+  },
+  feedPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
   },
-  navIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
-  navTitle: { fontSize: 15, fontWeight: "800", color: "#111" },
-  navSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  feedPillActive: {
+    backgroundColor: "#111",
+  },
+  feedPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  feedPillTextActive: {
+    color: "#FFF",
+  },
+
+  sortToggle: {
+    flexDirection: "row",
+    marginLeft: "auto",
+    gap: 4,
+  },
+  sortPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F3F4F6",
+  },
+  sortPillActive: {
+    backgroundColor: "#111",
+  },
+  sortText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  sortTextActive: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+    borderWidth: 1.5,
+    borderColor: "#FFF",
+  },
+  chatBadge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    borderWidth: 1.5,
+    borderColor: "#FFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  chatBadgeText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
 });

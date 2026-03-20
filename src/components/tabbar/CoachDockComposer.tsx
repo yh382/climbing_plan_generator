@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function CoachDockComposer({
   expanded,
   onSend,
+  disabled,
 }: {
   expanded: boolean;
   onSend: (t: string) => void;
+  disabled?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
@@ -19,7 +21,7 @@ export default function CoachDockComposer({
 
   const submit = () => {
     const t = text.trim();
-    if (!t) return;
+    if (!t || disabled) return;
     setText("");
     onSend(t);
   };
@@ -50,26 +52,25 @@ export default function CoachDockComposer({
           paddingVertical: 10,
           color: "#111827",
         }}
-        editable={expanded}
+        editable={expanded && !disabled}
         returnKeyType="send"
         onSubmitEditing={submit}
       />
 
       <Pressable
         onPress={submit}
-        disabled={!expanded}
+        disabled={!expanded || disabled}
         style={({ pressed }) => ({
           width: 38,
           height: 38,
           borderRadius: 19,
-          // 如果需要保持按钮的深色背景：
-          backgroundColor: expanded ? "#111827" : "transparent",
+          backgroundColor: expanded && !disabled ? "#111827" : expanded ? "#6B7280" : "transparent",
           alignItems: "center",
           justifyContent: "center",
           opacity: pressed ? 0.9 : 1,
         })}
       >
-        <Ionicons name="arrow-up" size={18} color={expanded ? "#FFF" : "transparent"} />
+        <Ionicons name="arrow-up" size={18} color={expanded && !disabled ? "#FFF" : expanded ? "#9CA3AF" : "transparent"} />
       </Pressable>
     </View>
   );

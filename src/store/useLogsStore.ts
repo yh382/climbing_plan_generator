@@ -8,12 +8,12 @@ import { useCallback } from "react";
 // ✅ 关键：结束 session 时，把 sessionList 落到 dayList，并生成 session summary
 import {
   readSessionList,
-  // clearSessionList,  // 先不清，便于 per-session detail 点击进入（你后面要清也可以）
+  clearSessionList,
   readDayList,
   writeDayList,
 } from "../features/journal/loglist/storage";
 
-export type LogType = "boulder" | "yds";
+export type LogType = "boulder" | "toprope" | "lead";
 
 export type LogEntry = {
   id: string;
@@ -30,11 +30,13 @@ export type SessionEntry = {
   endTime: string; // ISO
   duration: string; // "2h 30m"
   gymName: string;
+  discipline: "boulder" | "rope";
 
   // ✅ NEW: 用于 calendar 每张卡 session 维度展示/跳转
   sessionKey: string; // String(activeSession.startTime)
   sends: number;      // 本 session sends
   best: string;       // 本 session best（优先 V，否则 YDS）
+  climbs: number;     // 本 session total climb items
 };
 
 export type GradeCount = { grade: string; count: number };
@@ -43,14 +45,15 @@ type LogsState = {
   logs: LogEntry[];
 
   sessions: SessionEntry[];
-  activeSession: { startTime: number; gymName: string } | null;
+  activeSession: { startTime: number; gymName: string; discipline: "boulder" | "rope" } | null;
 
   upsertCount: (p: { date: string; type: LogType; grade: string; delta: number }) => void;
   remove: (id: string) => void;
   resetDay: (date: string, type?: LogType) => void;
 
-  startSession: (gymName: string) => void;
+  startSession: (gymName: string, discipline: "boulder" | "rope") => void;
   endSession: () => Promise<SessionEntry | null>;
+  deleteSession: (sessionKey: string) => Promise<string[]>;
 
   countByDateType: (date: string, type: LogType) => number;
   countsForWeek: (weekStart: string, type: LogType) => Record<string, number>;
@@ -145,9 +148,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       sessions: [],
       activeSession: null,
 
-      startSession: (gymName) => {
+      startSession: (gymName, discipline) => {
         set({
-          activeSession: { startTime: Date.now(), gymName },
+          activeSession: { startTime: Date.now(), gymName, discipline },
         });
       },
 
@@ -162,39 +165,44 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         const durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
         const sessionKey = String(activeSession.startTime);
-        const sessionDate = new Date(activeSession.startTime).toISOString().split("T")[0];
+        const sessionDate = keyOf(new Date(activeSession.startTime));
 
-        // 1) read session lists
-        const [sb, sr] = await Promise.all([
+        // 1) read session lists (all 3 types)
+        const [sb, str, sl] = await Promise.all([
           readSessionList(sessionKey, "boulder"),
-          readSessionList(sessionKey, "yds"),
+          readSessionList(sessionKey, "toprope"),
+          readSessionList(sessionKey, "lead"),
         ]);
 
         // 2) merge into day lists
-        const [db, dr] = await Promise.all([
+        const [db, dtr, dl] = await Promise.all([
           readDayList(sessionDate, "boulder"),
-          readDayList(sessionDate, "yds"),
+          readDayList(sessionDate, "toprope"),
+          readDayList(sessionDate, "lead"),
         ]);
 
         const nextDayBoulder = mergeById(db || [], sb || []);
-        const nextDayRoutes = mergeById(dr || [], sr || []);
+        const nextDayToprope = mergeById(dtr || [], str || []);
+        const nextDayLead = mergeById(dl || [], sl || []);
 
         await Promise.all([
           writeDayList(sessionDate, "boulder", nextDayBoulder),
-          writeDayList(sessionDate, "yds", nextDayRoutes),
+          writeDayList(sessionDate, "toprope", nextDayToprope),
+          writeDayList(sessionDate, "lead", nextDayLead),
         ]);
 
         // 3) rebuild aggregated day logs (for rings/weekly counts)
         const rebuilt = [
           ...aggregateSends(sessionDate, "boulder", nextDayBoulder),
-          ...aggregateSends(sessionDate, "yds", nextDayRoutes),
+          ...aggregateSends(sessionDate, "toprope", nextDayToprope),
+          ...aggregateSends(sessionDate, "lead", nextDayLead),
         ];
 
         const kept = (logs || []).filter((l) => l.date !== sessionDate);
         const nextLogs = [...kept, ...rebuilt];
 
         // 4) compute session summary (per-session card)
-        const sessionItems = [...(sb || []), ...(sr || [])];
+        const sessionItems = [...(sb || []), ...(str || []), ...(sl || [])];
         const sends = sessionItems.reduce((s: number, it: any) => s + inferSendCount(it), 0);
 
         let best = "V?";
@@ -220,10 +228,12 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           endTime: new Date(endTime).toISOString(),
           duration: durationStr,
           gymName: activeSession.gymName,
+          discipline: activeSession.discipline,
 
           sessionKey,
           sends,
           best,
+          climbs: sessionItems.length,
         };
 
         set({
@@ -233,6 +243,60 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         });
 
         return newSession;
+      },
+
+      deleteSession: async (sessionKey) => {
+        const { sessions, logs } = get();
+        const session = sessions.find((s) => s.sessionKey === sessionKey);
+        if (!session) return [];
+
+        const date = session.date;
+
+        // 1) read session lists to get item IDs
+        const [sb, str, sl] = await Promise.all([
+          readSessionList(sessionKey, "boulder"),
+          readSessionList(sessionKey, "toprope"),
+          readSessionList(sessionKey, "lead"),
+        ]);
+        const sessionItemIds = new Set(
+          [...(sb || []), ...(str || []), ...(sl || [])].map((it: any) => it.id)
+        );
+
+        // 2) remove session items from day lists
+        const [db, dtr, dl] = await Promise.all([
+          readDayList(date, "boulder"),
+          readDayList(date, "toprope"),
+          readDayList(date, "lead"),
+        ]);
+        const nextDb = (db || []).filter((it) => !sessionItemIds.has(it.id));
+        const nextDtr = (dtr || []).filter((it) => !sessionItemIds.has(it.id));
+        const nextDl = (dl || []).filter((it) => !sessionItemIds.has(it.id));
+
+        await Promise.all([
+          writeDayList(date, "boulder", nextDb),
+          writeDayList(date, "toprope", nextDtr),
+          writeDayList(date, "lead", nextDl),
+          clearSessionList(sessionKey, "boulder"),
+          clearSessionList(sessionKey, "toprope"),
+          clearSessionList(sessionKey, "lead"),
+        ]);
+
+        // 3) rebuild aggregated logs for this date
+        const rebuilt = [
+          ...aggregateSends(date, "boulder", nextDb),
+          ...aggregateSends(date, "toprope", nextDtr),
+          ...aggregateSends(date, "lead", nextDl),
+        ];
+        const kept = (logs || []).filter((l) => l.date !== date);
+        const nextLogs = [...kept, ...rebuilt];
+
+        // 4) update Zustand state
+        set({
+          sessions: sessions.filter((s) => s.sessionKey !== sessionKey),
+          logs: nextLogs,
+        });
+
+        return Array.from(sessionItemIds);
       },
 
       upsertCount: ({ date, type, grade, delta }) => {

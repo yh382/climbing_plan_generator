@@ -209,6 +209,9 @@ export type TrainingPlanCardHandlers = {
    * For owner/manage contexts (My Plans / Plan Detail)
    */
   onOpenMenu?: (plan: TrainingPlan) => void;
+
+  /** Resume minimized workout */
+  onResumeWorkout?: () => void;
 };
 
 export type TrainingPlanCardProps = {
@@ -240,6 +243,9 @@ export type TrainingPlanCardProps = {
   rightAccessory?: ReactNode;
 
   handlers?: TrainingPlanCardHandlers;
+
+  /** Formatted workout timer string (e.g. "05:23") when a workout is active & minimized */
+  workoutTimer?: string;
 
   /**
    * Useful for list rendering or testing

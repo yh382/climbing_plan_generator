@@ -9,9 +9,10 @@ interface ActiveWorkoutState {
   
   sessionData: any[];     // 训练记录数据
   sessionTitle: string;   // 训练标题
+  sessionJson: string;    // serialized session for floating widget navigation
 
   // Actions
-  startWorkout: (title: string, data: any[]) => void;
+  startWorkout: (title: string, data: any[], sessionJson?: string) => void;
   pauseWorkout: () => void;
   resumeWorkout: () => void;
   minimizeWorkout: () => void;
@@ -28,14 +29,16 @@ const useActiveWorkoutStore = create<ActiveWorkoutState>((set) => ({
   seconds: 0,
   sessionData: [],
   sessionTitle: "",
+  sessionJson: "",
 
-  startWorkout: (title, data) => set({ 
-    isActive: true, 
-    isMinimized: false, 
-    isPaused: false, 
-    seconds: 0, 
+  startWorkout: (title, data, sessionJson) => set({
+    isActive: true,
+    isMinimized: false,
+    isPaused: false,
+    seconds: 0,
     sessionTitle: title,
-    sessionData: data 
+    sessionData: data,
+    sessionJson: sessionJson || "",
   }),
 
   pauseWorkout: () => set({ isPaused: true }),

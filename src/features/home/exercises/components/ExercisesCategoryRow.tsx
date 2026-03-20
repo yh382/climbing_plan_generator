@@ -17,6 +17,7 @@ function detectLocale(): LocaleKey {
 }
 
 function iconForBig(big: BigCat): keyof typeof Ionicons.glyphMap {
+  if (big === "essentials") return "sunny-outline";
   if (big === "endurance") return "water-outline";
   if (big === "power_endurance") return "flame-outline";
   if (big === "strength_power") return "flash-outline";
@@ -24,6 +25,7 @@ function iconForBig(big: BigCat): keyof typeof Ionicons.glyphMap {
 }
 
 function bgForBig(big: BigCat) {
+  if (big === "essentials") return "#FEF9C3";
   if (big === "endurance") return "#EFF6FF";
   if (big === "power_endurance") return "#FFF7ED";
   if (big === "strength_power") return "#F5F3FF";
@@ -31,7 +33,7 @@ function bgForBig(big: BigCat) {
 }
 
 /**
- * Home row: shows ONLY the 4 big library entry cards.
+ * Home row: shows the 5 big library entry cards.
  * Requirements:
  * 1) Horizontal padding aligns with other Home sections -> fixed 16 here (do not wrap another 16 outside)
  * 2) Cards slightly wider
@@ -41,9 +43,9 @@ export function ExercisesCategoryRow() {
   const router = useRouter();
   const locale = useMemo(() => detectLocale(), []);
 
-  // Home-only order: Strength & Power first
+  // Home-only order: Strength & Power first, Essentials last
   const ordered = useMemo(() => {
-    const order: BigCat[] = ["strength_power", "endurance", "power_endurance", "conditioning"];
+    const order: BigCat[] = ["strength_power", "endurance", "power_endurance", "conditioning", "essentials"];
     const map = new Map<BigCat, (typeof USER_TAXONOMY)[number]>();
     for (const c of USER_TAXONOMY) map.set(c.key as BigCat, c);
     return order.map((k) => map.get(k)).filter(Boolean) as (typeof USER_TAXONOMY)[number][];

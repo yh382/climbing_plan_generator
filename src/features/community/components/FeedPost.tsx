@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedPost as FeedPostType, PostAttachment } from "../../../types/community";
+import MediaCarousel from "../../../components/shared/MediaCarousel";
+import ImageViewer from "../../../components/shared/ImageViewer";
 
 const { width } = Dimensions.get("window");
 
@@ -22,6 +24,8 @@ interface Props {
   onPressAttachment: (post: FeedPostType) => void;
   onPress: (userId: string) => void;
   onPressComment: (id: string) => void;
+  onSave: (id: string) => void;
+  onThreeDot?: () => void;
 
   // [新增] 简易模式开关：用于在个人主页隐藏头像用户名
   simpleMode?: boolean;
@@ -122,8 +126,18 @@ export default function FeedPost({
   onPressAttachment,
   onPress,
   onPressComment,
+  onSave,
+  onThreeDot,
   simpleMode = false, // 默认为 false
 }: Props) {
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  const openViewer = (index: number) => {
+    setViewerIndex(index);
+    setViewerVisible(true);
+  };
+
   return (
     <View style={[styles.container, simpleMode && styles.containerSimple]}>
       {/* 1. Header 逻辑分支 */}
@@ -131,30 +145,40 @@ export default function FeedPost({
         // [新增] 简易模式 Header：只显示时间地点
         <View style={styles.simpleHeader}>
           <Text style={styles.time}>
-            {new Date(post.timestamp).toLocaleDateString()} · {post.user.homeGym || "Climber"}
+            {new Date(post.timestamp).toLocaleDateString()} · {post.user?.homeGym || "Climber"}
           </Text>
         </View>
       ) : (
         // 原版 Header：显示头像用户名
         <TouchableOpacity style={styles.header} onPress={() => onPress(post.user.id)} activeOpacity={0.7}>
-          <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
+          {post.user.avatar ? (
+            <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="person" size={18} color="#9CA3AF" />
+            </View>
+          )}
           <View style={styles.headerText}>
             <Text style={styles.username}>{post.user.username}</Text>
             <Text style={styles.time}>
-              {new Date(post.timestamp).toLocaleDateString()} · {post.user.homeGym || "Climber"}
+              {new Date(post.timestamp).toLocaleDateString()} · {post.user?.homeGym || "Climber"}
             </Text>
           </View>
-          <TouchableOpacity style={{ padding: 4 }}>
+          <TouchableOpacity style={{ padding: 4 }} onPress={onThreeDot}>
             <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </TouchableOpacity>
       )}
 
-      {/* ✅ 新顺序：图片/视频在最上面 */}
-      {/* 2. Images / Video (top priority in feed) */}
+      {/* 2. Images / Video — carousel with full-screen viewer */}
       {post.images && post.images.length > 0 ? (
         <View style={styles.mediaBlock}>
-          <Image source={{ uri: post.images[0] }} style={styles.postImage} resizeMode="cover" />
+          <MediaCarousel
+            images={post.images}
+            width={width}
+            height={width}
+            onPressImage={openViewer}
+          />
         </View>
       ) : null}
 
@@ -185,10 +209,20 @@ export default function FeedPost({
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => onSave(post.id)}>
           <Ionicons name={post.isSaved ? "bookmark" : "bookmark-outline"} size={20} color="#111" />
         </TouchableOpacity>
       </View>
+
+      {/* Full-screen image viewer modal */}
+      {post.images && post.images.length > 0 && (
+        <ImageViewer
+          images={post.images}
+          initialIndex={viewerIndex}
+          visible={viewerVisible}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
     </View>
   );
 }
@@ -248,7 +282,6 @@ const styles = StyleSheet.create({
   attachTitle: { fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 2 },
   attachSub: { fontSize: 12, color: "#6B7280" },
 
-  postImage: { width: width, height: width, backgroundColor: "#F3F4F6" },
 
   footer: { flexDirection: "row", paddingHorizontal: 16, marginTop: 4, alignItems: "center", gap: 20 },
   iconRow: { flexDirection: "row", alignItems: "center", gap: 6 },

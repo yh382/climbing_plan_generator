@@ -2,9 +2,8 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { EventType, EventVenue, EventDiscipline } from "./mockEvents";
 
-const typeIcon: Record<EventType, any> = {
+const typeIcon: Record<string, any> = {
   competition: "trophy-outline",
   meetup: "people-outline",
   training: "barbell-outline",
@@ -13,14 +12,15 @@ const typeIcon: Record<EventType, any> = {
   community: "heart-outline",
 };
 
-const venueIcon: Record<EventVenue, any> = {
+const venueIcon: Record<string, any> = {
   indoor: "home-outline",
   outdoor: "leaf-outline",
 };
 
-const disciplineIcon: Record<EventDiscipline, any> = {
+const disciplineIcon: Record<string, any> = {
   boulder: "cube-outline",
   toprope: "git-branch-outline",
+  rope: "git-branch-outline",
   mixed: "shuffle-outline",
 };
 
@@ -29,21 +29,24 @@ export default function EventTypeIcons({
   venue,
   discipline,
 }: {
-  type: EventType;
-  venue: EventVenue;
-  discipline: EventDiscipline;
+  type?: string;
+  venue?: string;
+  discipline?: string;
 }) {
+  const icons: string[] = [];
+  if (type && typeIcon[type]) icons.push(typeIcon[type]);
+  if (venue && venueIcon[venue]) icons.push(venueIcon[venue]);
+  if (discipline && disciplineIcon[discipline]) icons.push(disciplineIcon[discipline]);
+
+  if (icons.length === 0) return null;
+
   return (
     <View style={styles.row}>
-      <View style={styles.chip}>
-        <Ionicons name={typeIcon[type]} size={14} color="#6B7280" />
-      </View>
-      <View style={styles.chip}>
-        <Ionicons name={venueIcon[venue]} size={14} color="#6B7280" />
-      </View>
-      <View style={styles.chip}>
-        <Ionicons name={disciplineIcon[discipline]} size={14} color="#6B7280" />
-      </View>
+      {icons.map((iconName, idx) => (
+        <View key={idx} style={styles.chip}>
+          <Ionicons name={iconName as any} size={14} color="#6B7280" />
+        </View>
+      ))}
     </View>
   );
 }

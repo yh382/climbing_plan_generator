@@ -1,0 +1,40 @@
+export const theme = {
+  colors: {
+    accent: '#306E6F',
+    background: '#FFFFFF',
+    backgroundSecondary: '#F7F7F7',
+    cardDark: '#1C1C1E',
+    cardDarkImage: '#272727',
+    textPrimary: '#000000',
+    textSecondary: '#888888',
+    textTertiary: '#BBBBBB',
+    border: 'rgba(0,0,0,0.08)',
+  },
+  typography: {
+    hero: { fontSize: 33, fontWeight: '900' as const, letterSpacing: -1.5 },
+    sectionTitle: { fontSize: 18, fontWeight: '900' as const, letterSpacing: -0.5 },
+    cardTitle: { fontSize: 13, fontWeight: '700' as const },
+    body: { fontSize: 14, fontWeight: '400' as const },
+    caption: { fontSize: 11, fontWeight: '400' as const },
+    label: { fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.3 },
+  },
+  fonts: {
+    regular: 'DMSans_400Regular',
+    medium: 'DMSans_500Medium',
+    bold: 'DMSans_700Bold',
+    black: 'DMSans_900Black',
+    monoRegular: 'DMMono_400Regular',
+    monoMedium: 'DMMono_500Medium',
+  },
+  spacing: {
+    screenPadding: 22,
+    sectionGap: 20,
+    cardGap: 8,
+    cardPadding: 12,
+  },
+  borderRadius: {
+    card: 14,
+    cardSmall: 12,
+    pill: 999,
+  },
+} as const

@@ -11,9 +11,6 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.yh382.climmate",
-    config: {
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
-    },
   infoPlist: {
     NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
 
@@ -34,11 +31,6 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.yh382.climmate",
-    config: {
-      googleMaps: {
-        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
-      },
-    },
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff",
@@ -50,16 +42,26 @@ const config: ExpoConfig = {
   
   extra: {
     MAPBOX_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "",
-    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+    REGION: process.env.EXPO_PUBLIC_REGION ?? "global",
+    AMAP_KEY: process.env.EXPO_PUBLIC_AMAP_KEY ?? "",
     eas: { projectId: "d4b98925-c856-48a8-9c93-e2bfa0cc4e24" },
     router: {},
   },
 
   plugins: [
+    "expo-font",
     "expo-router",
     "expo-location",
     "expo-secure-store",
+    "expo-video",
     ["expo-build-properties", { ios: { useFrameworks: "static" } }],
+    ["expo-media-library", {
+      photosPermission: "ClimMate 需要访问你的相册，以便选择头像和封面照片。",
+    }],
+    ["expo-notifications", {
+      icon: "./assets/images/icon.png",
+      color: "#22C55E",
+    }],
   ],
 
   updates: {

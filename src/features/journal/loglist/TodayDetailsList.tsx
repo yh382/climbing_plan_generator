@@ -12,7 +12,7 @@ type Props = {
   sessionKey: string;
   /** Date string used for payload + navigation context */
   date: string; // YYYY-MM-DD
-  logType: "boulder" | "yds";
+  logType: "boulder" | "toprope" | "lead";
   labelOf: (grade: string) => string;
   tr: (zh: string, en: string) => string;
   refreshKey?: number | string;

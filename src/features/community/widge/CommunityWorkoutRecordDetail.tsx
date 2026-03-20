@@ -9,7 +9,7 @@ import CollapsibleLargeHeaderFlatList from "../../../components/CollapsibleLarge
 import DualActivityRing from "../../journal/DualActivityRing";
 import { colorForBoulder, colorForYDS } from "../../../../lib/gradeColors";
 
-type LogType = "boulder" | "yds";
+type LogType = "boulder" | "toprope" | "lead";
 
 function inferSendCount(item: any): number {
   if (typeof item?.sendCount === "number") return item.sendCount;
@@ -99,7 +99,7 @@ export default function CommunityWorkoutRecordDetail() {
   const sends = useMemo(() => list.reduce((s, it) => s + inferSendCount(it), 0), [list]);
 
   const bParts = useMemo(() => toParts(itemsB, "boulder"), [itemsB]);
-  const rParts = useMemo(() => toParts(itemsR, "yds"), [itemsR]);
+  const rParts = useMemo(() => toParts(itemsR, "lead"), [itemsR]);
 
   const renderItem = ({ item }: { item: any }) => {
     const status = item.status || (item.attempts === 1 ? "flash" : "sent");

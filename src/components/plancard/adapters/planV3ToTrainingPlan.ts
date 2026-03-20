@@ -20,6 +20,7 @@ type Options = {
   visibility?: PlanVisibility;
   source?: PlanSource;
   trainingType?: TrainingType;
+  createdAt?: string;
 };
 
 const inferTitle = (p: PlanV3): string => {
@@ -86,8 +87,18 @@ export function planV3ToTrainingPlan(planV3: PlanV3, opts?: Options): TrainingPl
 
   const title = inferTitle(planV3);
   const durationWeeks = inferWeeks(planV3);
-  const currentWeek = inferCurrentWeek(planV3) ?? 1;
   const totalWeeks = durationWeeks;
+
+  let currentWeek = inferCurrentWeek(planV3);
+  if (currentWeek === undefined && opts?.createdAt && durationWeeks) {
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const weeksElapsed = Math.floor(
+      (Date.now() - new Date(opts.createdAt).getTime()) / msPerWeek
+    ) + 1;
+    currentWeek = Math.max(1, Math.min(weeksElapsed, durationWeeks));
+  } else {
+    currentWeek = currentWeek ?? 1;
+  }
 
   const progressRatio =
     typeof totalWeeks === "number" && totalWeeks > 0

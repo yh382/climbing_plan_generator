@@ -72,8 +72,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 };
 
+const FALLBACK: SettingsState = {
+  lang: "zh", unit: "metric", boulderScale: "V", ropeScale: "YDS",
+  setLang: async () => {}, setUnit: async () => {},
+  setBoulderScale: async () => {}, setRopeScale: async () => {},
+  ready: false, isZH: true, tr: (zh: string, _en: string) => zh,
+};
+
 export const useSettings = () => {
   const ctx = useContext(SettingsCtx);
-  if (!ctx) throw new Error("useSettings must be used within <SettingsProvider />");
+  if (!ctx) {
+    if (__DEV__) console.warn("useSettings called outside SettingsProvider, using fallback");
+    return FALLBACK;
+  }
   return ctx;
 };

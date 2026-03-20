@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useProfileStore } from "../../store/useProfileStore"; 
-import AbilityRadar from "../AbilityRadar"; 
+import AbilityRadar from "../basicinfo/cards/AbilityRadar";
 import { tokens } from "../../../../../components/ui/Theme"; 
 
 // --- 辅助组件 ---

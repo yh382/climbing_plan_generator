@@ -1,6 +1,7 @@
 // src/store/useUserStore.ts
 import { create } from "zustand";
 import { api } from "@/lib/apiClient";
+import { sanitizeImageUrl } from "@/lib/imageUtils";
 
 export type UserLite = {
   id: string;
@@ -28,7 +29,7 @@ function normalizeUser(raw: any): UserLite {
     username: u.username ?? u.name ?? u.handle ?? "User",
     email: u.email ?? undefined,
     email_verified: u.email_verified ?? u.is_email_verified ?? false,
-    avatar_url: u.avatar_url ?? u.avatar ?? null,
+    avatar_url: sanitizeImageUrl(u.avatar_url ?? u.avatar),
     bio,                         // ← 写入
     units: u.units ?? u.pref_units ?? "metric",
     locale: u.locale ?? u.lang ?? undefined,

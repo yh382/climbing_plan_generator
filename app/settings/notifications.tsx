@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Card } from "@components/ui/Card"; 
-import { Segmented } from "@components/ui/Segmented"; 
+import { Card } from "@components/ui/Card";
+import { Segmented } from "@components/ui/Segmented";
+import { communityApi } from "../../src/features/community/api";
 
 // 1. 定义接口解决 TS 报错
 interface SettingRowProps {
@@ -22,11 +23,38 @@ export default function NotificationsSettings() {
     followers: "On",
     comments: "On",
     mentions: "On",
+    challenges: "On",
+    events: "On",
   });
+  // Load from backend on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const prefs = await communityApi.getNotificationPreferences();
+        setSettings({
+          likes: prefs.likes ? "On" : "Off",
+          followers: prefs.followers ? "On" : "Off",
+          comments: prefs.comments ? "On" : "Off",
+          mentions: prefs.mentions ? "On" : "Off",
+          challenges: prefs.challenges ? "On" : "Off",
+          events: prefs.events ? "On" : "Off",
+        });
+      } catch (e) {
+        // Default all On on error
+      }
+    })();
+  }, []);
 
-  // 显式指定 key 类型
-  const toggle = (key: keyof typeof settings, val: string) => {
-    setSettings(prev => ({ ...prev, [key]: val }));
+  // Persist to backend on toggle
+  const toggle = async (key: keyof typeof settings, val: string) => {
+    const prev = settings[key];
+    setSettings(s => ({ ...s, [key]: val }));
+    try {
+      await communityApi.updateNotificationPreferences({ [key]: val === "On" });
+    } catch (e) {
+      // Revert on error
+      setSettings(s => ({ ...s, [key]: prev }));
+    }
   };
 
   const options = [{ label: "On", value: "On" }, { label: "Off", value: "Off" }];
@@ -35,7 +63,7 @@ export default function NotificationsSettings() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -64,12 +92,28 @@ export default function NotificationsSettings() {
             options={options} 
             onChange={(v: string) => toggle('comments', v)} 
           />
-          <SettingRow 
-            label="Mentions (@)" 
-            value={settings.mentions} 
-            options={options} 
-            onChange={(v: string) => toggle('mentions', v)} 
-            last 
+          <SettingRow
+            label="Mentions (@)"
+            value={settings.mentions}
+            options={options}
+            onChange={(v: string) => toggle('mentions', v)}
+          />
+        </Card>
+
+        <Text style={styles.sectionTitle}>Activity Notifications</Text>
+        <Card style={styles.card}>
+          <SettingRow
+            label="Challenges"
+            value={settings.challenges}
+            options={options}
+            onChange={(v: string) => toggle('challenges', v)}
+          />
+          <SettingRow
+            label="Events"
+            value={settings.events}
+            options={options}
+            onChange={(v: string) => toggle('events', v)}
+            last
           />
         </Card>
       </ScrollView>

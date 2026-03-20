@@ -2,15 +2,17 @@
 
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
-import { clamp01, planThemeByTrainingType, sourceLabel } from "../PlanCard.styles";
+import { clamp01 } from "../PlanCard.styles";
+import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
 
 type Props = TrainingPlanCardProps & {
   style?: ViewStyle;
 };
 
 function getProgressRatio(plan: TrainingPlanCardProps["plan"]) {
-  // Prefer explicit ratio
   const ratio = plan.progress?.progressRatio;
   if (typeof ratio === "number") return clamp01(ratio);
 
@@ -20,7 +22,6 @@ function getProgressRatio(plan: TrainingPlanCardProps["plan"]) {
     return clamp01(currentWeek / totalWeeks);
   }
 
-  // Sessions fallback
   const done = plan.progress?.sessionsCompleted;
   const all = plan.progress?.sessionsPlanned;
   if (typeof done === "number" && typeof all === "number" && all > 0) {
@@ -31,21 +32,28 @@ function getProgressRatio(plan: TrainingPlanCardProps["plan"]) {
 }
 
 export default function ActivePlanCard(props: Props) {
-  const { plan, context, handlers, display, rightAccessory, style } = props;
-  const theme = planThemeByTrainingType(plan.trainingType);
+  const { plan, handlers, rightAccessory, style, workoutTimer } = props;
 
   const progressRatio = useMemo(() => getProgressRatio(plan), [plan]);
 
   const weekText = useMemo(() => {
     const cw = plan.progress?.currentWeek;
     const tw = plan.progress?.totalWeeks ?? plan.durationWeeks;
-    if (typeof cw === "number" && typeof tw === "number") return `Week ${cw} / ${tw}`;
+    if (typeof cw === "number" && typeof tw === "number") return `Week ${cw}/${tw}`;
     if (typeof tw === "number") return `${tw} weeks`;
     return undefined;
   }, [plan]);
 
-  const showSource = display?.showSourceBadge ?? false;
-  const showVisibility = display?.showVisibilityBadge ?? false;
+  const metaLine = useMemo(() => {
+    const parts: string[] = [];
+    const tw = plan.progress?.totalWeeks ?? plan.durationWeeks;
+    if (typeof tw === "number") parts.push(`${tw} weeks`);
+    const sess = plan.progress?.sessionsPlanned;
+    if (typeof sess === "number" && typeof tw === "number" && tw > 0) {
+      parts.push(`${Math.round(sess / tw)} sessions/wk`);
+    }
+    return parts.join(" · ");
+  }, [plan]);
 
   const primary = handlers?.primaryAction;
   const primaryLabel =
@@ -60,79 +68,118 @@ export default function ActivePlanCard(props: Props) {
             ? "Follow"
             : "Continue");
 
+  const hasCover = !!plan.coverImageUri;
+  const gradient = TRAINING_TYPE_GRADIENTS[plan.trainingType] ?? TRAINING_TYPE_GRADIENTS.mixed;
+  const typeLabel = plan.trainingType.charAt(0).toUpperCase() + plan.trainingType.slice(1);
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() => handlers?.onPress?.(plan)}
-      style={[
-        styles.card,
-        { backgroundColor: theme.bg, borderColor: theme.border },
-        display?.compactPadding ? styles.compactPad : styles.normalPad,
-        style,
-      ]}
+      style={[styles.card, style]}
     >
-      {/* Top row */}
-      <View style={styles.topRow}>
-        <View style={styles.badgeRow}>
-          <View style={[styles.pill, { backgroundColor: theme.pillBg }]}>
-            <Text style={[styles.pillText, { color: theme.pillFg }]}>{context === "personal" ? "My Plan" : "Plan"}</Text>
+      {/* Background: cover image or gradient */}
+      {hasCover ? (
+        <Image
+          source={{ uri: plan.coverImageUri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={200}
+        />
+      ) : (
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+
+      {/* Dark overlay */}
+      <View style={[StyleSheet.absoluteFill, styles.overlay]} />
+
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Top row: type pill + right accessory */}
+        <View style={styles.topRow}>
+          <View style={styles.typePill}>
+            <Text style={styles.typePillText}>{typeLabel}</Text>
+          </View>
+          {rightAccessory ? <View>{rightAccessory}</View> : null}
+        </View>
+
+        {/* Title */}
+        <Text numberOfLines={2} style={styles.title}>
+          {plan.title}
+        </Text>
+
+        {/* Meta line */}
+        {metaLine ? (
+          <Text style={styles.metaText}>{metaLine}</Text>
+        ) : null}
+
+        {/* Workout timer row (when minimized) */}
+        {workoutTimer ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => handlers?.onResumeWorkout?.()}
+            style={styles.timerRow}
+          >
+            <View style={styles.liveDot} />
+            <Text style={styles.timerLabel}>Training</Text>
+            <Text style={styles.timerValue}>{workoutTimer}</Text>
+            <View style={styles.resumePill}>
+              <Text style={styles.resumeText}>Resume</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Progress bar */}
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${Math.round(progressRatio * 100)}%` }]} />
+        </View>
+
+        {/* Bottom row: author + status + CTA */}
+        <View style={styles.bottomRow}>
+          <View style={styles.bottomMeta}>
+            {plan.author?.authorName ? (
+              <Text style={styles.bottomMetaText}>By {plan.author.authorName}</Text>
+            ) : null}
+            {plan.status === "active" ? (
+              <View style={styles.statusDot}>
+                <View style={styles.greenDot} />
+                <Text style={styles.bottomMetaText}>Active</Text>
+              </View>
+            ) : null}
+            {weekText ? (
+              <Text style={styles.bottomMetaText}>{weekText}</Text>
+            ) : null}
           </View>
 
-          {showSource ? (
-            <View style={[styles.pill, { backgroundColor: theme.pillBg }]}>
-              <Text style={[styles.pillText, { color: theme.pillFg }]}>{sourceLabel(plan.source)}</Text>
-            </View>
-          ) : null}
+          {/* CTA */}
+          {primary ? (
+            <View style={styles.ctaRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => primary.onAction(plan)}
+                style={styles.ctaBtn}
+              >
+                <Text style={styles.ctaText}>{primaryLabel}</Text>
+              </TouchableOpacity>
 
-          {showVisibility ? (
-            <View style={[styles.pill, { backgroundColor: theme.pillBg }]}>
-              <Text style={[styles.pillText, { color: theme.pillFg }]}>{plan.visibility === "public" ? "Public" : "Private"}</Text>
+              {handlers?.onOpenMenu ? (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => handlers.onOpenMenu?.(plan)}
+                  style={styles.menuBtn}
+                >
+                  <Text style={styles.menuBtnText}>⋯</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : null}
         </View>
-
-        {rightAccessory ? <View>{rightAccessory}</View> : null}
       </View>
-
-      {/* Title */}
-      <Text numberOfLines={2} style={[styles.title, { color: theme.fg }]}>
-        {plan.title}
-      </Text>
-
-      {/* Sub row */}
-      <View style={styles.subRow}>
-        <Text style={[styles.subText, { color: theme.sub }]}>Active</Text>
-        {weekText ? <Text style={[styles.subDot, { color: theme.sub }]}> • </Text> : null}
-        {weekText ? <Text style={[styles.subText, { color: theme.sub }]}>{weekText}</Text> : null}
-      </View>
-
-      {/* Progress bar */}
-      <View style={[styles.progressTrack, { backgroundColor: "rgba(255,255,255,0.14)" }]}>
-        <View style={[styles.progressFill, { width: `${Math.round(progressRatio * 100)}%`, backgroundColor: "rgba(255,255,255,0.70)" }]} />
-      </View>
-
-      {/* CTA row */}
-      {primary ? (
-        <View style={styles.ctaRow}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => primary.onAction(plan)}
-            style={[styles.ctaBtn, { backgroundColor: "rgba(255,255,255,0.16)", borderColor: "rgba(255,255,255,0.18)" }]}
-          >
-            <Text style={[styles.ctaText, { color: "#FFFFFF" }]}>{primaryLabel}</Text>
-          </TouchableOpacity>
-
-          {handlers?.onOpenMenu ? (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => handlers.onOpenMenu?.(plan)}
-              style={[styles.menuBtn, { backgroundColor: "rgba(255,255,255,0.10)", borderColor: "rgba(255,255,255,0.18)" }]}
-            >
-              <Text style={{ color: "#FFFFFF", fontSize: 18, lineHeight: 18 }}>⋯</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
     </TouchableOpacity>
   );
 }
@@ -140,45 +187,158 @@ export default function ActivePlanCard(props: Props) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: 18,
-    borderWidth: 1,
+    overflow: "hidden",
+    minHeight: 200,
+  },
+  overlay: {
+    backgroundColor: "rgba(0,0,0,0.40)",
+  },
+  content: {
+    padding: 16,
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  typePill: {
+    backgroundColor: "rgba(255,255,255,0.20)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  typePillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  title: {
+    marginTop: 14,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 24,
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  metaText: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.80)",
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    marginTop: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
     overflow: "hidden",
   },
-  normalPad: { padding: 16 },
-  compactPad: { padding: 12 },
-
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  badgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-
-  pill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  pillText: { fontSize: 12, fontWeight: "700" },
-
-  title: { marginTop: 10, fontSize: 18, fontWeight: "800", lineHeight: 22 },
-
-  subRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  subText: { fontSize: 12, fontWeight: "600" },
-  subDot: { fontSize: 12, fontWeight: "700" },
-
-  progressTrack: { height: 8, borderRadius: 999, marginTop: 12, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 999 },
-
-  ctaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.75)",
+  },
+  bottomRow: {
+    marginTop: 12,
+    gap: 10,
+  },
+  bottomMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  bottomMetaText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.75)",
+  },
+  statusDot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  greenDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+  },
+  ctaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   ctaBtn: {
-    paddingHorizontal: 14,
+    flex: 1,
     paddingVertical: 10,
     borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.18)",
     borderWidth: 1,
-    flexGrow: 1,
+    borderColor: "rgba(255,255,255,0.20)",
     alignItems: "center",
   },
-  ctaText: { fontSize: 13, fontWeight: "800" },
-
+  ctaText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
   menuBtn: {
-    marginLeft: 10,
     width: 42,
     height: 42,
     borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  menuBtnText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    lineHeight: 18,
+  },
+  // Workout timer row
+  timerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#EF4444",
+  },
+  timerLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.7)",
+  },
+  timerValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    fontVariant: ["tabular-nums"] as any,
+    flex: 1,
+  },
+  resumePill: {
+    backgroundColor: "rgba(255,255,255,0.20)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  resumeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

@@ -2,15 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { setPendingImage } from "src/features/profile/imagePickerBridge";
 
 type AssetItem = {
   id: string;
@@ -23,6 +24,7 @@ type MediaLibraryModule = typeof import("expo-media-library");
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const { target } = useLocalSearchParams<{ target?: string }>();
 
   // ✅ 动态加载 expo-media-library，避免 native module 缺失时启动即崩
   const [ml, setMl] = useState<MediaLibraryModule | null>(null);
@@ -179,7 +181,12 @@ export default function LibraryScreen() {
           style={[styles.iconBtn, !canDone && { opacity: 0.35 }]}
           disabled={!canDone}
           onPress={() => {
-            // 先不回传，暂时直接返回
+            if (selected) {
+              setPendingImage({
+                uri: selected.uri,
+                target: target === "cover" ? "cover" : "avatar",
+              });
+            }
             router.back();
           }}
         >
@@ -199,8 +206,10 @@ export default function LibraryScreen() {
             </View>
           )}
 
-          {/* 圆形裁切框（静态） */}
-          <View pointerEvents="none" style={styles.cropCircle} />
+          {/* 圆形裁切框（仅 avatar） */}
+          {target !== "cover" && (
+            <View pointerEvents="none" style={styles.cropCircle} />
+          )}
         </View>
       </View>
 

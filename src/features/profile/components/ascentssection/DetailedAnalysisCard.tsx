@@ -9,7 +9,7 @@ export default function DetailedAnalysisCard() {
   return (
     <TouchableOpacity
       style={s.card}
-      onPress={() => router.push("/(tabs)/analysis")}
+      onPress={() => router.push("/analysis")}
       activeOpacity={0.85}
     >
       <View style={s.left}>

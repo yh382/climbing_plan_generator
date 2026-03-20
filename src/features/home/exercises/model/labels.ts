@@ -10,10 +10,20 @@ export const BLOCK_LABELS: Record<string, { zh: string; en: string }> = {
   main_power: { zh: "爆发力", en: "Power" },
   main_power_endurance: { zh: "力量耐力", en: "Power Endurance" },
   main_technique: { zh: "技术", en: "Technique" },
+  main_strength: { zh: "力量", en: "Strength" },
+  main_finger_strength: { zh: "指力", en: "Finger Strength" },
+  finger_strength: { zh: "指力", en: "Finger Strength" },
   cooldown: { zh: "放松", en: "Cooldown" },
   warmup: { zh: "热身", en: "Warm-up" },
+  warmup_general: { zh: "通用热身", en: "General Warm-up" },
+  warmup_specific: { zh: "专项热身", en: "Specific Warm-up" },
+  test: { zh: "测试", en: "Tests" },
+  regen: { zh: "恢复", en: "Regeneration" },
   strength: { zh: "力量", en: "Strength" },
   mobility: { zh: "灵活性", en: "Mobility" },
+  accessory_antagonist: { zh: "拮抗肌", en: "Antagonist" },
+  accessory_core: { zh: "核心", en: "Core" },
+  accessory_mobility: { zh: "灵活性", en: "Mobility" },
 };
 
 export function formatBlockTypeFallback(bt: string) {

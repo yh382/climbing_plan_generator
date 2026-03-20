@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import useLogsStore from "../../store/useLogsStore";
+import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
 import ActiveSessionFloat from "./ActiveSessionFloat";
 
 type Props = {
@@ -27,9 +28,12 @@ export default function FloatingActiveSessionTimer({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { activeSession } = useLogsStore();
+  const { isActive: workoutActive, isMinimized: workoutMinimized } = useActiveWorkoutStore();
 
   const hideOn = new Set(["calendar", "coach", "journal"]);
-  const shouldShow = !!activeSession && !hideOn.has(currentRouteName ?? "");
+  const hasLog = !!activeSession;
+  const hasWorkout = workoutActive && workoutMinimized;
+  const shouldShow = (hasLog || hasWorkout) && !hideOn.has(currentRouteName ?? "");
 
   if (!shouldShow) return null;
 

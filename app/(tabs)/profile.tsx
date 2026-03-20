@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, StyleSheet } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+// Native tab bar height constant (UITabBarController default)
+const NATIVE_TAB_BAR_HEIGHT = 49;
 
 import Animated, {
   useSharedValue,
@@ -13,19 +13,20 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from "react-native-reanimated";
-import { TrainingPlan } from "../../src/components/plancard";
 import { api } from "../../src/lib/apiClient";
 
 import ShareProfileModal from "src/features/profile/components/ShareProfileModal";
 import PostsSection from "../../src/features/profile/components/fivecorefunction/PostsSection";
-import BasicInfoSection from "../../src/features/profile/components/fivecorefunction/BasicInfoSection";
-import AscentsSection from "../../src/features/profile/components/fivecorefunction/AscentsSection";
-import PlansSection from "../../src/features/profile/components/fivecorefunction/PlansSection";
 import BadgesSection from "../../src/features/profile/components/fivecorefunction/BadgesSection";
+import StatsSection from "../../src/features/profile/components/StatsSection";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
+import useLogsStore from "../../src/store/useLogsStore";
+import { calculateKPIs } from "../../src/services/stats";
 
-import { BlurView } from "expo-blur";
-import { GlassView } from "expo-glass-effect";
+import ProfileTopBar from "../../src/components/shared/ProfileTopBar";
+import ProfileHeader from "../../src/components/shared/ProfileHeader";
+import ProfileTabBar from "../../src/components/shared/ProfileTabBar";
+
 type Units = "imperial" | "metric";
 type FollowCounts = { followers: number; following: number };
 
@@ -34,6 +35,7 @@ type UserMe = {
   email: string;
   username?: string | null;
   avatar_url?: string | null;
+  cover_url?: string | null;
   units: Units;
   locale?: string | null;
 
@@ -85,23 +87,7 @@ type HeaderViewModel = {
   };
 };
 
-const { width } = Dimensions.get("window");
-const COLUMN_COUNT = 3;
-const ITEM_WIDTH = width / COLUMN_COUNT;
-
-// 跟你 home 那套手感一致：标题在这个阈值附近完成“隐->显”切换
 const SCROLL_THRESHOLD = 44;
-
-// 主题绿色（你后续如果有 theme token，可替换）
-const BRAND_GREEN = "#2BB673"; // 柔和一点的主题绿
-
-const PROFILE_TABS = [
-  { key: "posts", icon: "grid-outline", iconActive: "grid" },
-  { key: "basic", icon: "body-outline", iconActive: "body" },
-  { key: "ascents", icon: "trending-up-outline", iconActive: "trending-up" },
-  { key: "plans", icon: "calendar-outline", iconActive: "calendar" },
-  { key: "badges", icon: "ribbon-outline", iconActive: "ribbon" },
-] as const;
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -109,14 +95,13 @@ export default function ProfileScreen() {
 
   const viewedUserId = typeof params.userId === "string" ? params.userId : undefined;
   const isOwnProfile = !viewedUserId;
-  const isOwner = isOwnProfile;
 
   const profile = useProfileStore((s) => s.profile);
   const headerVM = useProfileStore((s) => s.headerVM);
   const fetchMeProfile = useProfileStore((s) => s.fetchMe);
 
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = NATIVE_TAB_BAR_HEIGHT;
   const scrollBottomPadding = Math.max(insets.bottom, 0) + tabBarHeight + 12;
 
   const [shareOpen, setShareOpen] = useState(false);
@@ -129,92 +114,7 @@ export default function ProfileScreen() {
     following: 0,
   });
 
-  const [myPlans, setMyPlans] = useState<TrainingPlan[]>([]);
-  const [otherPlans, setOtherPlans] = useState<TrainingPlan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
-  const [loadingOtherPlans, setLoadingOtherPlans] = useState(false);
-
-  // --------------------- data loads (不改你原逻辑) ---------------------
-  const loadMyPlans = useCallback(async () => {
-    if (!isOwnProfile) return;
-    setLoadingPlans(true);
-    try {
-      const res = await api.get<TrainingPlan[]>("/plans/me");
-      setMyPlans(Array.isArray(res) ? res : []);
-    } catch (e) {
-      console.warn("LOAD MY PLANS ERROR =>", e);
-      setMyPlans([]);
-    } finally {
-      setLoadingPlans(false);
-    }
-  }, [isOwnProfile]);
-
-  const loadOtherPlans = useCallback(async () => {
-    if (isOwnProfile) return;
-    if (!viewedUserId) return;
-
-    setLoadingOtherPlans(true);
-    try {
-      let res: any = null;
-      try {
-        res = await api.get<TrainingPlan[]>(`/profiles/${viewedUserId}/plans`);
-      } catch {
-        res = await api.get<TrainingPlan[]>(`/users/${viewedUserId}/plans`);
-      }
-      setOtherPlans(Array.isArray(res) ? res : []);
-    } catch (e) {
-      console.warn("LOAD OTHER PLANS ERROR =>", e);
-      setOtherPlans([]);
-    } finally {
-      setLoadingOtherPlans(false);
-    }
-  }, [isOwnProfile, viewedUserId]);
-
-  const patchPlan = async (planId: string, payload: any) => api.patch(`/plans/${planId}`, payload);
-
-  const onManagePlan = (plan: TrainingPlan) => {
-    Alert.alert(plan.title, "Manage visibility / archive", [
-      {
-        text: "Set Public",
-        onPress: async () => {
-          setMyPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, visibility: "public" } : p)));
-          try {
-            await patchPlan(plan.id, { visibility: "public" });
-            await loadMyPlans();
-          } catch (e: any) {
-            Alert.alert("Update failed", String(e?.message ?? e));
-          }
-        },
-      },
-      {
-        text: "Set Private",
-        onPress: async () => {
-          setMyPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, visibility: "private" } : p)));
-          try {
-            await patchPlan(plan.id, { visibility: "private" });
-            await loadMyPlans();
-          } catch (e: any) {
-            Alert.alert("Update failed", String(e?.message ?? e));
-          }
-        },
-      },
-      {
-        text: "Archive",
-        style: "destructive",
-        onPress: async () => {
-          setMyPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, status: "completed" } : p)));
-          try {
-            await patchPlan(plan.id, { status: "completed" });
-            await loadMyPlans();
-          } catch (e: any) {
-            Alert.alert("Update failed", String(e?.message ?? e));
-          }
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
+  // --------------------- data loads ---------------------
   const loadHeader = useCallback(async () => {
     try {
       const [u] = await Promise.all([api.get<UserMe>("/users/me"), fetchMeProfile()]);
@@ -241,10 +141,12 @@ export default function ProfileScreen() {
     useCallback(() => {
       loadHeader();
       loadFollowCounts();
-      if (isOwnProfile) loadMyPlans();
-      else loadOtherPlans();
-    }, [loadHeader, loadFollowCounts, isOwnProfile, loadMyPlans, loadOtherPlans])
+    }, [loadHeader, loadFollowCounts])
   );
+
+  // --------------------- log stats from store ---------------------
+  const { logs, sessions: logSessions } = useLogsStore();
+  const kpis = useMemo(() => calculateKPIs(logs, logSessions), [logs, logSessions]);
 
   // --------------------- view model ---------------------
   const user: HeaderViewModel = useMemo(() => {
@@ -252,8 +154,12 @@ export default function ProfileScreen() {
     const fallbackName = me?.email ?? "Profile";
     const displayName = username ? username : fallbackName;
 
-    const boulderGrade = profile?.performance?.boulder_grade?.value ?? "—";
-    const routeGrade = profile?.performance?.lead_grade?.value ?? "—";
+    const boulderGrade = kpis.maxBoulder !== "—"
+      ? kpis.maxBoulder
+      : profile?.performance?.boulder_grade?.value ?? "—";
+    const routeGrade = kpis.maxRope !== "—"
+      ? kpis.maxRope
+      : profile?.performance?.lead_grade?.value ?? "—";
 
     const height = profile?.anthropometrics?.height ?? null;
     const weight = profile?.anthropometrics?.weight ?? null;
@@ -284,7 +190,7 @@ export default function ProfileScreen() {
       stats: {
         boulderGrade,
         routeGrade,
-        totalSends: 0,
+        totalSends: kpis.totalSends,
       },
 
       bodyMetrics: { height, weight, apeIndex },
@@ -304,48 +210,15 @@ export default function ProfileScreen() {
       },
 
       logStats: {
-        maxBoulder: "—",
-        maxRoute: "—",
-        maxFlash: "—",
-        totalLogged: 0,
+        maxBoulder: kpis.maxBoulder,
+        maxRoute: kpis.maxRope,
+        maxFlash: kpis.maxFlash || "—",
+        totalLogged: kpis.totalSends,
       },
     };
-  }, [me, profile]);
+  }, [me, profile, kpis]);
 
-  const posts = useMemo(
-    () =>
-      Array.from({ length: 9 }).map((_, i) => ({
-        id: i,
-        image: `https://picsum.photos/400/400?random=${i}`,
-      })),
-    []
-  );
-
-  const tabsSelf = useMemo(
-    () => [
-      { key: "posts", label: "Posts" },
-      { key: "basic", label: "Basic Info" },
-      { key: "ascents", label: "Ascents" },
-      { key: "plans", label: "Plans" },
-      { key: "badges", label: "Badges" },
-    ],
-    []
-  );
-
-  const tabsOther = useMemo(
-    () => [
-      { key: "posts", label: "Posts" },
-      { key: "ascents", label: "Ascents" },
-      { key: "plans", label: "Plans" },
-      { key: "badges", label: "Badges" },
-    ],
-    []
-  );
-
-  const currentTabs = isOwnProfile ? tabsSelf : tabsOther;
-  const [activeTab, setActiveTab] = useState<string>(currentTabs[0].key);
-  const [ascentType, setAscentType] = useState<"bouldering" | "routes">("bouldering");
-  const plansForSection = isOwner ? myPlans : otherPlans;
+  const [activeTab, setActiveTab] = useState<string>("posts");
 
   // --------------------- Home-like animations ---------------------
   const scrollY = useSharedValue(0);
@@ -354,14 +227,12 @@ export default function ProfileScreen() {
     scrollY.value = event.contentOffset.y;
   });
 
-  // Topbar 白底淡入
   const topbarBgStyle = useAnimatedStyle(() => {
     return {
       opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [0, 1], Extrapolate.CLAMP),
     };
   });
 
-  // Topbar 中间标题渐显 + 轻微上移
   const topbarTitleStyle = useAnimatedStyle(() => {
     return {
       opacity: interpolate(scrollY.value, [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD + 10], [0, 1], Extrapolate.CLAMP),
@@ -378,7 +249,6 @@ export default function ProfileScreen() {
     };
   });
 
-  // header 内的大标题区域：上移 + 缩小 + 渐隐（保留你的需求）
   const headerTitleAnimStyle = useAnimatedStyle(() => {
     return {
       opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0], Extrapolate.CLAMP),
@@ -389,201 +259,21 @@ export default function ProfileScreen() {
     };
   });
 
+  const gradeDisplay = `${user.stats.boulderGrade}/${user.stats.routeGrade}`;
+
   // --------------------- render ---------------------
-  const renderTopbar = () => {
-    return (
-      <View style={[styles.fixedHeader, { height: insets.top + 44 }]}>
-        <Animated.View style={[StyleSheet.absoluteFill, topbarBgStyle]}>
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#FFFFFF" }]} />
-        </Animated.View>
-
-        <View style={[styles.headerContent, { marginTop: insets.top }]}>
-          <View style={{ width: 80, alignItems: "flex-start" }}>
-            {!isOwnProfile ? (
-              <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={24} color="#111" />
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 40 }} />
-            )}
-          </View>
-
-          <Animated.View style={[styles.headerTitleContainer, topbarTitleStyle]} pointerEvents="none">
-            <Text style={styles.headerTitleText} numberOfLines={1}>
-              {user.name}
-            </Text>
-          </Animated.View>
-
-          <View style={styles.headerRightRow}>
-            {/* 手稿：myself 右上角 gear + dots；other user 顶部也有 gear + dots（保留样式，不改功能逻辑） */}
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => {
-                // gear 指向你之前的“设置按钮”
-                router.push("/settings");
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="settings-outline" size={22} color="#111" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => {
-                // dots：myself 打开 share（你原逻辑）
-                // other user：目前保留为同样入口（如果你后续要改为 report/menu，再说）
-                setShareOpen(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="ellipsis-horizontal" size={22} color="#111" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderHeader = () => {
-    const avatarUri = user.avatar;
-    const addressText = [user.homeGym, user.location].filter(Boolean).join(" • ");
-    const bioText = user.bio?.trim();
-    const showAddress = Boolean(addressText);
-    const showBio = Boolean(bioText);
-
-    return (
-      <View style={styles.headerBlock}>
-            {/* ✅ 背景材质层：iOS 玻璃；其他平台 blur 或纯色 */}
-        {Platform.OS === "ios" ? (
-          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
-        ) : (
-          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
-        )}
-        {/* 头像 + username 同行；头像对齐大标题左边 */}
-        <View style={[styles.titleRow, !isOwnProfile && styles.titleRowOther]}>
-          <Animated.View style={[styles.titleColumn, headerTitleAnimStyle]}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarTitle} />
-            ) : (
-              <View style={[styles.avatarTitle, styles.avatarPlaceholder]}>
-                <Ionicons name="person" size={18} color="#9CA3AF" />
-              </View>
-            )}
-
-            <View style={styles.titleRight}>
-              <Text style={styles.bigTitle} numberOfLines={1}>
-                {user.name}
-              </Text>
-
-              {showAddress ? (
-                <View style={styles.addressLine}>
-                  <Ionicons name="location-sharp" size={13} color="#6B7280" />
-                  <Text style={styles.addressText} numberOfLines={1}>
-                    {addressText}
-                  </Text>
-                </View>
-              ) : null}
-
-              {showBio ? (
-                <Text style={styles.bioInline} numberOfLines={2}>
-                  {bioText}
-                </Text>
-              ) : null}
-            </View>
-          </Animated.View>
-        </View>
-
-        {/* followers/following + Edit/Follow */}
-        <View style={styles.followActionRow}>
-          <View style={styles.followInline}>
-            <View style={styles.followInlineItem}>
-              <Text style={styles.followNum}>{followCounts.followers}</Text>
-              <Text style={styles.followLabel}>Followers</Text>
-            </View>
-
-            <View style={styles.followInlineDivider} />
-
-            <View style={styles.followInlineItem}>
-              <Text style={styles.followNum}>{followCounts.following}</Text>
-              <Text style={styles.followLabel}>Following</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.primaryGreenBtn}
-            onPress={() => {
-              // 不改功能：myself 仍然去 edit；other user 仍然 follow（你后续接 follow api 再说）
-              if (isOwnProfile) router.push("/profile/edit");
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryGreenText}>{isOwnProfile ? "Edit" : "Follow"}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Stats card（灰底，可点击进入统计页） */}
-        <TouchableOpacity
-          style={styles.statsCard}
-          activeOpacity={0.85}
-          onPress={() => {
-            // 仅 UI 导航入口，不改后端/功能逻辑
-            router.push("/profile/stats");
-          }}
-        >
-          <View style={styles.statsHeaderRow}>
-            <Text style={styles.statsHeaderText}>2026 Stats</Text>
-            <Ionicons name="chevron-forward" size={18} color="#6B7280" />
-          </View>
-
-          <View style={styles.yearstatsRow}>
-            <View style={styles.yearstatItem}>
-              <Text style={styles.yearstatVal}>{user.stats.boulderGrade}</Text>
-              <Text style={styles.yearstatLabel}>Boulder</Text>
-            </View>
-
-            <View style={styles.statDivider} />
-
-            <View style={styles.yearstatItem}>
-              <Text style={styles.yearstatVal}>{user.stats.routeGrade}</Text>
-              <Text style={styles.yearstatLabel}>Route</Text>
-            </View>
-
-            <View style={styles.statDivider} />
-
-            <View style={styles.yearstatItem}>
-              <Text style={styles.yearstatVal}>{user.stats.totalSends}</Text>
-              <Text style={styles.yearstatLabel}>Sends</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderTabBar = () => (
-    <View style={styles.tabBarStickyWrap}>
-      <View style={styles.tabBar}>
-        {PROFILE_TABS.map((t) => {
-          const isActive = activeTab === t.key;
-          return (
-            <TouchableOpacity key={t.key} style={styles.tabItem} onPress={() => setActiveTab(t.key)} activeOpacity={0.7}>
-              <Ionicons
-                // @ts-ignore
-                name={isActive ? t.iconActive : t.icon}
-                size={22}
-                color={isActive ? "#111827" : "#9CA3AF"}
-              />
-              {isActive && <View style={styles.activeDot} />}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
-
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      {renderTopbar()}
+      <ProfileTopBar
+        title={user.name}
+        isOwnProfile={isOwnProfile}
+        topbarBgStyle={topbarBgStyle}
+        topbarTitleStyle={topbarTitleStyle}
+        insetTop={insets.top}
+        onBackPress={() => router.back()}
+        onSettingsPress={() => router.push("/settings")}
+        onMorePress={() => setShareOpen(true)}
+      />
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -591,31 +281,37 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
         contentContainerStyle={{
-          paddingTop: insets.top + 10,
           paddingBottom: scrollBottomPadding,
-          backgroundColor: "#FFFFFF",
         }}
       >
-        {renderHeader()}
-        {renderTabBar()}
+        {/* [0] Cover/gradient + header — scrolls with content */}
+        <ProfileHeader
+          name={user.name}
+          username={user.username}
+          avatarUrl={user.avatar}
+          coverUrl={me?.cover_url ?? null}
+          bio={user.bio || null}
+          location={user.location || null}
+          homeGym={user.homeGym || null}
+          followersCount={followCounts.followers}
+          followingCount={followCounts.following}
+          gradeDisplay={gradeDisplay}
+          totalSends={user.stats.totalSends}
+          isOwnProfile={isOwnProfile}
+          onEditPress={() => router.push("/profile/edit")}
+          onFollowersPress={() => router.push("/profile/followers" as any)}
+          onFollowingPress={() => router.push("/profile/following" as any)}
+          headerTitleAnimStyle={headerTitleAnimStyle}
+          topPadding={insets.top + 44}
+        />
+
+        {/* [1] Tab bar (sticky) */}
+        <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
 
         <View style={styles.contentArea}>
-          {activeTab === "posts" && <PostsSection posts={posts} styles={styles} />}
+          {activeTab === "posts" && <PostsSection />}
 
-          {activeTab === "basic" && headerVM ? <BasicInfoSection user={headerVM} styles={styles} /> : null}
-
-          {activeTab === "ascents" && (
-            <AscentsSection user={user} styles={styles} ascentType={ascentType} setAscentType={setAscentType} />
-          )}
-
-          {activeTab === "plans" && (
-            <PlansSection
-              styles={styles}
-              isOwner={isOwner}
-              plans={plansForSection}
-              onManagePlan={isOwner ? onManagePlan : undefined}
-            />
-          )}
+          {activeTab === "stats" && headerVM ? <StatsSection user={headerVM} styles={styles} /> : null}
 
           {activeTab === "badges" && <BadgesSection styles={styles} />}
         </View>
@@ -627,182 +323,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ---------------- fixed topbar ----------------
-  fixedHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    backgroundColor: "transparent",
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  headerTitleContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  headerTitleText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111",
-  },
-  headerRightRow: {
-    width: 80,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 6,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  // ---------------- header block ----------------
-  headerBlock: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-
-  // 头像+大标题同行（手稿：重心更下）
-  titleRow: {
-    marginTop: 18,
-    marginBottom: 10,
-    paddingTop: 10,
-  },
-  // other user：顶部有 back，占位更明显，所以整体再下移一点
-  titleRowOther: {
-    marginTop: 26,
-  },
-  titleRowInner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-
-  avatarTitle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 10,
-  },
-  avatarPlaceholder: {
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#E5E7EB",
-  },
-
-  titleRight: {
-    flex: 1,
-    paddingTop: 10,
-  },
-  bigTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#111",
-    lineHeight: 38,
-  },
-
-  addressLine: {
-    marginTop: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-
-  addressText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: "#6B7280",
-  },
-  bioInline: {
-    marginTop: 6,
-    fontSize: 14,
-    color: "#111827",
-    lineHeight: 19,
-  },
-
-  // followers/following + edit/follow
-  followActionRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  followInline: { flexDirection: "row", alignItems: "center" },
-  followInlineItem: { flexDirection: "row", alignItems: "baseline" },
-  followNum: { fontSize: 14, fontWeight: "800", marginRight: 4, color: "#111827" },
-  followLabel: { fontSize: 12, color: "#6B7280" },
-  followInlineDivider: { width: 1, height: 16, backgroundColor: "#E5E7EB", marginHorizontal: 12 },
-
-  primaryGreenBtn: {
-    height: 34,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: BRAND_GREEN,
-  },
-  primaryGreenText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#fff",
-  },
-
-  // Stats card
-  statsCard: {
-    marginTop: 14,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  statsHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  statsHeaderText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  yearstatsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  yearstatItem: { flex: 1, alignItems: "center" },
-  yearstatVal: { fontSize: 18, fontWeight: "800", color: "#111827" },
-  yearstatLabel: { marginTop: 2, fontSize: 11, color: "#6B7280" },
-  statDivider: { width: 1, height: 20, backgroundColor: "#E5E7EB" },
-
-  // ---------------- Tabs ----------------
-  tabBarStickyWrap: {
-    backgroundColor: "#FFFFFF",
-    zIndex: 20,
-    elevation: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E5E7EB",
-  },
-  tabBar: { flexDirection: "row", height: 52 },
-  tabItem: { flex: 1, alignItems: "center", justifyContent: "center" },
-  activeDot: { position: "absolute", bottom: 6, width: 4, height: 4, borderRadius: 2, backgroundColor: "#111827" },
-
   contentArea: { minHeight: 300, backgroundColor: "#FFFFFF" },
-
-  // Posts grid styles for PostsSection
-  postsGrid: { flexDirection: "row", flexWrap: "wrap" },
-  gridImageContainer: { width: ITEM_WIDTH, height: ITEM_WIDTH, borderWidth: 0.5, borderColor: "#fff" },
-  gridImage: { width: "100%", height: "100%" },
 
   // keep existing styles for sub sections
   basicInfoContainer: { padding: 16, backgroundColor: "#FFFFFF" },
@@ -851,19 +372,5 @@ const styles = StyleSheet.create({
   logVal: { fontSize: 20, fontWeight: "bold" },
   logLabel: { fontSize: 12, color: "#666" },
 
-  plansContainer: { padding: 16 },
-  planCard: { backgroundColor: "#000", borderRadius: 12, padding: 20, marginBottom: 20 },
-  planHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
-  planTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  planStatus: { color: "#10B981", fontWeight: "bold" },
-  planSub: { color: "#ccc", marginBottom: 16 },
-  progressBarBg: { height: 6, backgroundColor: "#333", borderRadius: 3 },
-  progressBarFill: { height: "100%", backgroundColor: "#fff", borderRadius: 3 },
-
   badgesContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
-  
-  titleColumn: {
-  alignItems: "flex-start",
-  },
-
 });

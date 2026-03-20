@@ -1,54 +1,61 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocalSearchParams } from "expo-router";
-
-import {
-  MOCK_CHALLENGES_DETAIL,
-  MOCK_LEADERBOARD,
-  MOCK_GALLERY,
-  type ChallengeDetail,
-  type RankingUser,
-  type GalleryItem,
-} from "./mockChallengeDetail";
+import { challengeApi } from "../api";
+import type { ChallengeOut, ChallengeLeaderboardEntry } from "../types";
 
 export type PeopleFilter = "all" | "following";
 export type GenderFilter = "all" | "male" | "female";
 
-export function useChallengeDetailData(): {
-  challenge: ChallengeDetail;
-  leaderboard: RankingUser[];
-  gallery: GalleryItem[];
-
-  peopleFilter: PeopleFilter;
-  genderFilter: GenderFilter;
-  setPeopleFilter: (v: PeopleFilter) => void;
-  setGenderFilter: (v: GenderFilter) => void;
-} {
+export function useChallengeDetailData() {
   const params = useLocalSearchParams<{ challengeId?: string }>();
+  const challengeId = params.challengeId;
 
-  const challenge = useMemo(() => {
-    const byId = params.challengeId
-      ? MOCK_CHALLENGES_DETAIL.find((c) => c.id === params.challengeId)
-      : undefined;
-    return byId ?? MOCK_CHALLENGES_DETAIL[0];
-  }, [params.challengeId]);
+  const [challenge, setChallenge] = useState<ChallengeOut | null>(null);
+  const [leaderboard, setLeaderboard] = useState<ChallengeLeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [joined, setJoined] = useState(false);
 
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("all");
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
 
-  const leaderboard = useMemo(() => {
-    let list = MOCK_LEADERBOARD;
+  // Fetch challenge detail + leaderboard
+  useEffect(() => {
+    if (!challengeId) return;
+    setLoading(true);
 
-    if (peopleFilter === "following") list = list.filter((u) => u.isFollowing);
-    if (genderFilter !== "all") list = list.filter((u) => u.gender === genderFilter);
+    Promise.all([
+      challengeApi.getDetail(challengeId),
+      challengeApi.getLeaderboard(challengeId),
+    ]).then(([c, lb]) => {
+      setChallenge(c);
+      setJoined(c.isJoined);
+      setLeaderboard(lb);
+    }).finally(() => setLoading(false));
+  }, [challengeId]);
 
-    return [...list].sort((a, b) => b.points - a.points);
-  }, [peopleFilter, genderFilter]);
+  // Join / Leave
+  const onToggleJoin = useCallback(async () => {
+    if (!challengeId) return;
+    if (joined) {
+      await challengeApi.leave(challengeId);
+      setJoined(false);
+    } else {
+      await challengeApi.join(challengeId);
+      setJoined(true);
+    }
+  }, [challengeId, joined]);
+
+  // Filtered leaderboard (client-side placeholder for future gender/people filter)
+  const filteredLeaderboard = useMemo(() => {
+    return leaderboard;
+  }, [leaderboard]);
 
   return {
     challenge,
-    leaderboard,
-    gallery: MOCK_GALLERY,
-
+    leaderboard: filteredLeaderboard,
+    loading,
+    joined,
+    onToggleJoin,
     peopleFilter,
     genderFilter,
     setPeopleFilter,
