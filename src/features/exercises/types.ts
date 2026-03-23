@@ -17,6 +17,8 @@ export interface ExerciseDetail {
   contraindications: string[];
   protocol: Record<string, any> | null;
   protocol_variants: Record<string, any> | null;
+  short_desc_en: string | null;
+  short_desc_zh: string | null;
   cues_zh: string | null;
   cues_en: string | null;
   rpe_range: number[] | null;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   View,
@@ -8,6 +8,8 @@ import {
   Platform,
   StyleSheet,
 } from "react-native";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 type Props = {
   visible: boolean;
@@ -24,6 +26,8 @@ export default function ExpandableEditCardModal({
   onRequestClose,
   children,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mounted, setMounted] = useState(visible);
   const backdrop = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
@@ -109,19 +113,20 @@ export default function ExpandableEditCardModal({
             },
           ]}
         >
+          <View style={styles.dragIndicator} />
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
 
-          <View style={styles.body}>{children}</View>
+          {children}
         </Animated.View>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
@@ -132,37 +137,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   card: {
-    borderRadius: 18,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#EAEAEA",
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-    overflow: "hidden",
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 32,
+    minHeight: 280,
+  },
+  dragIndicator: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: "center",
+    marginBottom: 16,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    marginBottom: 4,
   },
   title: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#111",
+    color: colors.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   subtitle: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#666",
-  },
-  body: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
+    fontSize: 13,
+    color: colors.textTertiary,
+    marginBottom: 20,
   },
 });

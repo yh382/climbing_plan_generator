@@ -1,22 +1,24 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useThemeColors } from "../../lib/useThemeColors";
 import Svg, { Rect, Circle, Line, Text as SvgText } from "react-native-svg";
 import type { CSMState, CSMHistoryPoint } from "../../services/stats/csmAnalyzer";
+import { CSM_QUADRANT_COLORS } from "../../lib/theme";
 
 const CHART_SIZE = 260;
 const PAD = 32; // padding for axis labels
 const PLOT = CHART_SIZE - PAD * 2;
 
-// Quadrant background colours (very light)
+// Quadrant background colours — earth-tone fills (v2 spec §14)
 const Q_COLORS = {
-  push: "#DCFCE7",      // green
-  challenge: "#FEF3C7", // amber
-  develop: "#DBEAFE",   // blue
-  rebuild: "#FEE2E2",   // red
+  push:      CSM_QUADRANT_COLORS.push,
+  challenge: CSM_QUADRANT_COLORS.challenge,
+  develop:   CSM_QUADRANT_COLORS.develop,
+  rebuild:   CSM_QUADRANT_COLORS.rebuild,
 };
 
-const CURRENT_COLOR = "#4F46E5";
-const HISTORY_COLOR = "#94A3B8";
+const CURRENT_COLOR = "#306E6F";
+const HISTORY_COLOR = "#888888";
 
 function toXY(lp: number, ss: number) {
   return {
@@ -31,6 +33,8 @@ interface Props {
 }
 
 export default function ClimbStateMap({ current, history }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const mid = PLOT / 2 + PAD;
 
   return (
@@ -46,26 +50,26 @@ export default function ClimbStateMap({ current, history }: Props) {
           <Rect x={mid} y={mid} width={PLOT / 2} height={PLOT / 2} fill={Q_COLORS.challenge} />
 
           {/* Grid lines (center cross) */}
-          <Line x1={mid} y1={PAD} x2={mid} y2={PAD + PLOT} stroke="#D1D5DB" strokeWidth={1} strokeDasharray="4,3" />
-          <Line x1={PAD} y1={mid} x2={PAD + PLOT} y2={mid} stroke="#D1D5DB" strokeWidth={1} strokeDasharray="4,3" />
+          <Line x1={mid} y1={PAD} x2={mid} y2={PAD + PLOT} stroke={colors.gridLine} strokeWidth={1} strokeDasharray="4,3" />
+          <Line x1={PAD} y1={mid} x2={PAD + PLOT} y2={mid} stroke={colors.gridLine} strokeWidth={1} strokeDasharray="4,3" />
 
           {/* Border */}
-          <Rect x={PAD} y={PAD} width={PLOT} height={PLOT} fill="none" stroke="#E5E7EB" strokeWidth={1} rx={4} />
+          <Rect x={PAD} y={PAD} width={PLOT} height={PLOT} fill="none" stroke={colors.cardBorder} strokeWidth={1} rx={4} />
 
           {/* Quadrant labels */}
-          <SvgText x={PAD + PLOT * 0.25} y={PAD + 14} fontSize={9} fill="#64748B" fontWeight="600" textAnchor="middle">Develop</SvgText>
-          <SvgText x={PAD + PLOT * 0.75} y={PAD + 14} fontSize={9} fill="#64748B" fontWeight="600" textAnchor="middle">Push</SvgText>
-          <SvgText x={PAD + PLOT * 0.25} y={PAD + PLOT - 6} fontSize={9} fill="#64748B" fontWeight="600" textAnchor="middle">Rebuild</SvgText>
-          <SvgText x={PAD + PLOT * 0.75} y={PAD + PLOT - 6} fontSize={9} fill="#64748B" fontWeight="600" textAnchor="middle">Challenge</SvgText>
+          <SvgText x={PAD + PLOT * 0.25} y={PAD + 14} fontSize={9} fill={colors.chartLabel} fontWeight="600" textAnchor="middle">Develop</SvgText>
+          <SvgText x={PAD + PLOT * 0.75} y={PAD + 14} fontSize={9} fill={colors.chartLabel} fontWeight="600" textAnchor="middle">Push</SvgText>
+          <SvgText x={PAD + PLOT * 0.25} y={PAD + PLOT - 6} fontSize={9} fill={colors.chartLabel} fontWeight="600" textAnchor="middle">Rebuild</SvgText>
+          <SvgText x={PAD + PLOT * 0.75} y={PAD + PLOT - 6} fontSize={9} fill={colors.chartLabel} fontWeight="600" textAnchor="middle">Challenge</SvgText>
 
           {/* Axis labels */}
-          <SvgText x={CHART_SIZE / 2} y={CHART_SIZE - 4} fontSize={10} fill="#64748B" fontWeight="600" textAnchor="middle">LP</SvgText>
-          <SvgText x={8} y={CHART_SIZE / 2} fontSize={10} fill="#64748B" fontWeight="600" textAnchor="middle" rotation={-90} originX={8} originY={CHART_SIZE / 2}>SS</SvgText>
+          <SvgText x={CHART_SIZE / 2} y={CHART_SIZE - 4} fontSize={10} fill={colors.chartLabel} fontWeight="600" textAnchor="middle">LP</SvgText>
+          <SvgText x={8} y={CHART_SIZE / 2} fontSize={10} fill={colors.chartLabel} fontWeight="600" textAnchor="middle" rotation={-90} originX={8} originY={CHART_SIZE / 2}>SS</SvgText>
 
           {/* Axis tick labels */}
-          <SvgText x={PAD} y={PAD + PLOT + 14} fontSize={8} fill="#9CA3AF" textAnchor="middle">0</SvgText>
-          <SvgText x={mid} y={PAD + PLOT + 14} fontSize={8} fill="#9CA3AF" textAnchor="middle">0.5</SvgText>
-          <SvgText x={PAD + PLOT} y={PAD + PLOT + 14} fontSize={8} fill="#9CA3AF" textAnchor="middle">1</SvgText>
+          <SvgText x={PAD} y={PAD + PLOT + 14} fontSize={8} fill={colors.textSecondary} textAnchor="middle">0</SvgText>
+          <SvgText x={mid} y={PAD + PLOT + 14} fontSize={8} fill={colors.textSecondary} textAnchor="middle">0.5</SvgText>
+          <SvgText x={PAD + PLOT} y={PAD + PLOT + 14} fontSize={8} fill={colors.textSecondary} textAnchor="middle">1</SvgText>
 
           {/* History trajectory */}
           {history.map((pt, i) => {
@@ -125,23 +129,18 @@ export default function ClimbStateMap({ current, history }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0.5,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontFamily: "DMSans_700Bold",
+    color: colors.chartTitle,
     marginBottom: 12,
   },
   chartWrap: {
@@ -165,7 +164,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    color: "#64748B",
+    color: colors.chartLabel,
     fontWeight: "500",
   },
 });

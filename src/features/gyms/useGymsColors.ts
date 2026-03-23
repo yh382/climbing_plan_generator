@@ -31,7 +31,7 @@ export function useGymsColors() {
 
   const overlayTint = scheme === "dark" ? "rgba(15,23,42,0.72)" : "rgba(248,250,252,0.82)";
   const primary = colors.iconActive;
-  const primaryBg = scheme === "dark" ? "rgba(48,110,111,0.22)" : "rgba(22,163,74,0.24)";
+  const primaryBg = scheme === "dark" ? "rgba(48,110,111,0.22)" : "rgba(48,110,111,0.15)";
 
   return { colors, overlayTint, primary, primaryBg, scheme };
 }

@@ -54,14 +54,24 @@ function GridItem({
               <Ionicons name="copy-outline" size={14} color="#FFF" />
             </View>
           )}
+          {/* Attachment type badge — bottom-left */}
+          {post.attachment && (
+            <View style={styles.attachTypeBadge}>
+              <Ionicons
+                name={post.attachment.type === "plan" ? "flash" : "trophy-outline"}
+                size={10}
+                color="#fff"
+              />
+            </View>
+          )}
         </>
       ) : hasAttachment ? (
         <View style={styles.textCell}>
           <Ionicons
             name={
-              post.attachment!.type === "shared_plan"
+              post.attachment!.type === "plan"
                 ? "flash"
-                : post.attachment!.type === "finished_session"
+                : post.attachment!.type === "session"
                 ? "checkmark-done"
                 : "trophy"
             }
@@ -146,6 +156,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 4,
     padding: 2,
+  },
+  attachTypeBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 4,
+    padding: 3,
   },
   textCell: {
     flex: 1,

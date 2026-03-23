@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useCallback, useRef } from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { View, StyleSheet, StatusBar } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 // Native tab bar height constant (UITabBarController default)
 const NATIVE_TAB_BAR_HEIGHT = 49;
 
@@ -90,8 +92,10 @@ type HeaderViewModel = {
 const SCROLL_THRESHOLD = 44;
 
 export default function ProfileScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const params = useLocalSearchParams<{ userId?: string }>();
+  const params = useLocalSearchParams<{ userId?: string; initialTab?: string; expandBody?: string }>();
 
   const viewedUserId = typeof params.userId === "string" ? params.userId : undefined;
   const isOwnProfile = !viewedUserId;
@@ -139,8 +143,10 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      StatusBar.setBarStyle("light-content");
       loadHeader();
       loadFollowCounts();
+      return () => StatusBar.setBarStyle("dark-content");
     }, [loadHeader, loadFollowCounts])
   );
 
@@ -219,6 +225,19 @@ export default function ProfileScreen() {
   }, [me, profile, kpis]);
 
   const [activeTab, setActiveTab] = useState<string>("posts");
+  const [expandBody, setExpandBody] = useState(false);
+
+  // React to navigation params (tab may already be mounted)
+  useEffect(() => {
+    if (params.initialTab === "stats" || params.initialTab === "badges") {
+      setActiveTab(params.initialTab);
+    }
+    if (params.expandBody === "true") {
+      setExpandBody(true);
+    }
+  }, [params.initialTab, params.expandBody]);
+
+  const scrollRef = useRef<Animated.ScrollView>(null);
 
   // --------------------- Home-like animations ---------------------
   const scrollY = useSharedValue(0);
@@ -263,7 +282,7 @@ export default function ProfileScreen() {
 
   // --------------------- render ---------------------
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ProfileTopBar
         title={user.name}
         isOwnProfile={isOwnProfile}
@@ -276,6 +295,7 @@ export default function ProfileScreen() {
       />
 
       <Animated.ScrollView
+        ref={scrollRef}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -303,6 +323,7 @@ export default function ProfileScreen() {
           onFollowingPress={() => router.push("/profile/following" as any)}
           headerTitleAnimStyle={headerTitleAnimStyle}
           topPadding={insets.top + 44}
+          scrollY={scrollY}
         />
 
         {/* [1] Tab bar (sticky) */}
@@ -311,7 +332,7 @@ export default function ProfileScreen() {
         <View style={styles.contentArea}>
           {activeTab === "posts" && <PostsSection />}
 
-          {activeTab === "stats" && headerVM ? <StatsSection user={headerVM} styles={styles} /> : null}
+          {activeTab === "stats" && headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef} /> : null}
 
           {activeTab === "badges" && <BadgesSection styles={styles} />}
         </View>
@@ -322,55 +343,54 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  contentArea: { minHeight: 300, backgroundColor: "#FFFFFF" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  contentArea: { minHeight: 300, backgroundColor: colors.background },
 
-  // keep existing styles for sub sections
-  basicInfoContainer: { padding: 16, backgroundColor: "#FFFFFF" },
+  basicInfoContainer: { padding: 16, backgroundColor: colors.background },
   analysisCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    padding: theme.spacing.cardPadding,
+    borderRadius: theme.borderRadius.cardSmall,
     marginBottom: 12,
   },
-  analysisText: { fontSize: 14, fontWeight: "600", marginLeft: 8 },
+  analysisText: { fontSize: 14, fontWeight: "600", fontFamily: theme.fonts.medium, marginLeft: 8 },
   radarCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.backgroundSecondary,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: theme.borderRadius.cardSmall,
     marginBottom: 12,
     alignItems: "center",
   },
-  cardTitle: { fontSize: 15, fontWeight: "bold" },
+  cardTitle: { fontSize: 15, fontWeight: "bold", fontFamily: theme.fonts.bold },
   radarPlaceholder: { width: 200, height: 180, justifyContent: "center", alignItems: "center", marginTop: 10, position: "relative" },
 
   bodyMetricsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  metricCard: { flex: 1, backgroundColor: "#fff", padding: 12, borderRadius: 12, alignItems: "center", marginHorizontal: 4 },
-  metricLabel: { fontSize: 10, color: "#999", marginBottom: 4 },
-  metricValue: { fontSize: 16, fontWeight: "bold", color: "#000" },
-  metricUnit: { fontSize: 12, fontWeight: "normal", color: "#666" },
+  metricCard: { flex: 1, backgroundColor: colors.backgroundSecondary, padding: 12, borderRadius: theme.borderRadius.cardSmall, alignItems: "center", marginHorizontal: 4 },
+  metricLabel: { fontSize: theme.typography.label.fontSize, fontFamily: theme.fonts.regular, color: colors.textTertiary, marginBottom: 4 },
+  metricValue: { fontSize: 16, fontWeight: "bold", fontFamily: theme.fonts.monoMedium, color: colors.textPrimary },
+  metricUnit: { fontSize: 12, fontWeight: "normal", fontFamily: theme.fonts.regular, color: colors.textSecondary },
 
-  statCard: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 12 },
+  statCard: { backgroundColor: colors.backgroundSecondary, padding: 16, borderRadius: theme.borderRadius.cardSmall, marginBottom: 12 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   statRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
-  statKey: { color: "#666", fontSize: 14 },
-  statVal: { fontWeight: "600", fontSize: 14 },
-  divider: { height: 1, backgroundColor: "#eee" },
+  statKey: { color: colors.textSecondary, fontSize: 14, fontFamily: theme.fonts.regular },
+  statVal: { fontWeight: "600", fontSize: 14, fontFamily: theme.fonts.monoMedium },
+  divider: { height: 1, backgroundColor: colors.border },
 
   ascentsContainer: { padding: 16 },
-  toggleContainer: { flexDirection: "row", backgroundColor: "#f0f0f0", borderRadius: 8, padding: 2, marginBottom: 20 },
+  toggleContainer: { flexDirection: "row", backgroundColor: colors.backgroundSecondary, borderRadius: 8, padding: 2, marginBottom: 20 },
   toggleBtn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 6 },
-  toggleBtnActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  toggleText: { fontSize: 13, color: "#666" },
-  toggleTextActive: { color: "#000", fontWeight: "600" },
+  toggleBtnActive: { backgroundColor: colors.background },
+  toggleText: { fontSize: 13, fontFamily: theme.fonts.medium, color: colors.textSecondary },
+  toggleTextActive: { color: colors.textPrimary, fontWeight: "600", fontFamily: theme.fonts.bold },
 
   logStatsRow: { flexDirection: "row", justifyContent: "space-around", marginBottom: 20 },
   logItem: { alignItems: "center" },
-  logVal: { fontSize: 20, fontWeight: "bold" },
-  logLabel: { fontSize: 12, color: "#666" },
+  logVal: { fontSize: 20, fontWeight: "bold", fontFamily: theme.fonts.monoMedium },
+  logLabel: { fontSize: 12, fontFamily: theme.fonts.regular, color: colors.textSecondary },
 
   badgesContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
 });

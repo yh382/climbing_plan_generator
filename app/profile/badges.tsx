@@ -34,9 +34,6 @@ const DISPLAY_GROUPS = [
   { key: "rope_solid", title: "Rope Solid", filter: (b: Badge) => b.id.startsWith("solid_rope_") },
   { key: "lifetime", title: "Lifetime", filter: (b: Badge) => b.section === "lifetime" },
   { key: "monthly", title: "Monthly", filter: (b: Badge) => b.section === "monthly" },
-  { key: "milestone", title: "Milestone", filter: (b: Badge) => b.section === "milestone" },
-  { key: "influence", title: "Influence", filter: (b: Badge) => b.section === "influence" },
-  { key: "special", title: "Special", filter: (b: Badge) => b.section === "special" },
 ];
 
 export default function AllBadgesPage() {

@@ -1,6 +1,7 @@
 // app/contexts/SettingsContext.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useMemo, useState} from "react";
+import { Platform, NativeModules } from "react-native";
 
 type Lang = "zh" | "en";
 type UnitSystem = "imperial" | "metric";
@@ -48,7 +49,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           AsyncStorage.getItem(BOULDER_KEY),
           AsyncStorage.getItem(ROPE_KEY),
         ]);
-        if (l === "zh" || l === "en") _setLang(l);
+        if (l === "zh" || l === "en") {
+          _setLang(l);
+        } else {
+          // First launch: detect system language
+          const deviceLocale =
+            Platform.OS === "ios"
+              ? NativeModules.SettingsManager?.settings?.AppleLocale ||
+                NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] ||
+                "en"
+              : NativeModules.I18nManager?.localeIdentifier || "en";
+          const systemLang: Lang = deviceLocale.startsWith("zh") ? "zh" : "en";
+          _setLang(systemLang);
+          await AsyncStorage.setItem(LANG_KEY, systemLang);
+        }
         if (u === "imperial" || u === "metric") _setUnit(u);
         if (bs === "V" || bs === "Font") _setBoulderScale(bs);
         if (rs === "YDS" || rs === "French") _setRopeScale(rs);

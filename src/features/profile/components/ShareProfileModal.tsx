@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '@/lib/useThemeColors';
 
 type Props = {
   visible: boolean;
@@ -25,13 +26,15 @@ type Props = {
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export default function ShareProfileModal({ visible, onClose, username }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const profileUrl = `https://climmate.app/u/${username}`;
   const [copied, setCopied] = useState(false);
-  
+
   // 动画值：控制面板的垂直位移
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  
+
   // 记录是否正在显示，用于处理关闭动画
   const [showModal, setShowModal] = useState(visible);
 
@@ -107,7 +110,7 @@ export default function ShareProfileModal({ visible, onClose, username }: Props)
         url: profileUrl,
       });
       // 系统分享弹出后，建议保留当前弹窗，或者根据需求关闭
-      // closeWithAnimation(); 
+      // closeWithAnimation();
     } catch (error) {
       console.log('Error sharing:', error);
     }
@@ -115,7 +118,7 @@ export default function ShareProfileModal({ visible, onClose, username }: Props)
 
   return (
     <Modal
-      // 1. 修改动画类型为 fade，这样背景阴影是渐现的，不会跟着内容一起“拉起来”
+      // 1. 修改动画类型为 fade，这样背景阴影是渐现的，不会跟着内容一起"拉起来"
       animationType="fade"
       transparent={true}
       visible={showModal}
@@ -123,7 +126,7 @@ export default function ShareProfileModal({ visible, onClose, username }: Props)
     >
       {/* 点击背景关闭 */}
       <Pressable style={styles.overlay} onPress={closeWithAnimation}>
-        
+
         {/* 内容面板 */}
         <Animated.View
           style={[
@@ -138,37 +141,40 @@ export default function ShareProfileModal({ visible, onClose, username }: Props)
         >
           {/* 阻止点击内容区域穿透到背景关闭 */}
           <Pressable onPress={(e) => e.stopPropagation()}>
-            
+
             {/* 顶部指示条 (也是手势的最佳触发区) */}
             <View style={styles.dragHandleArea}>
                <View style={styles.dragIndicator} />
             </View>
-            
+
             <Text style={styles.title}>Share Profile</Text>
 
-            <View style={styles.gridContainer}>
-              <ShareOption 
-                icon={copied ? "checkmark-circle" : "link-outline"} 
-                label={copied ? "Copied!" : "Copy Link"} 
-                onPress={handleCopyLink}
-                color={copied ? "#10B981" : "#1E293B"}
-              />
+            {/* Copy Link */}
+            <TouchableOpacity style={styles.actionRow} onPress={handleCopyLink} activeOpacity={0.7}>
+              <View style={styles.actionIcon}>
+                <Ionicons name={copied ? "checkmark-circle" : "link-outline"} size={17} color={copied ? "#10B981" : colors.textPrimary} />
+              </View>
+              <Text style={styles.actionText}>{copied ? "Copied!" : "Copy Link"}</Text>
+            </TouchableOpacity>
 
-              <ShareOption 
-                icon="share-social-outline" 
-                label="More Options" 
-                onPress={handleSystemShare} 
-              />
+            {/* More Options */}
+            <TouchableOpacity style={[styles.actionRow, styles.actionRowBorder]} onPress={handleSystemShare} activeOpacity={0.7}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="share-social-outline" size={17} color={colors.textPrimary} />
+              </View>
+              <Text style={styles.actionText}>More Options</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
 
-              <ShareOption 
-                icon="qr-code-outline" 
-                label="QR Code" 
-                onPress={() => console.log('QR Code logic')} 
-              />
-            </View>
+            {/* QR Code */}
+            <TouchableOpacity style={styles.actionRow} onPress={() => console.log('QR Code logic')} activeOpacity={0.7}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="qr-code-outline" size={17} color={colors.textPrimary} />
+              </View>
+              <Text style={styles.actionText}>QR Code</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
 
-            {/* 3. 已移除 Cancel 按钮，整体布局更紧凑 */}
-            
           </Pressable>
         </Animated.View>
       </Pressable>
@@ -176,77 +182,65 @@ export default function ShareProfileModal({ visible, onClose, username }: Props)
   );
 }
 
-const ShareOption = ({ icon, label, onPress, color = "#1E293B" }: any) => (
-  <TouchableOpacity style={styles.optionBtn} onPress={onPress} activeOpacity={0.7}>
-    <View style={styles.iconCircle}>
-      <Ionicons name={icon} size={28} color={color} />
-    </View>
-    <Text style={styles.optionLabel}>{label}</Text>
-  </TouchableOpacity>
-);
-
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)', // 背景阴影
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24, // 圆角稍微加大一点
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    // 阴影效果 (iOS/Android)
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 32,
+    minHeight: 220,
   },
   dragHandleArea: {
     width: '100%',
-    height: 30, // 增加可触摸区域
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dragIndicator: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-    marginBottom: 28, // 增加一点间距替代原来的布局
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: 20,
     marginTop: 4,
   },
-  gridContainer: {
+  actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10, // 底部留白
-  },
-  optionBtn: {
     alignItems: 'center',
-    width: 80,
+    gap: 14,
+    paddingVertical: 14,
   },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  actionRowBorder: {
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  actionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
   },
-  optionLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
+  actionText: {
+    fontSize: 15,
     fontWeight: '500',
+    color: colors.textPrimary,
+    flex: 1,
   },
 });

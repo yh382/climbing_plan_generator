@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BarChart, LineChart } from "react-native-gifted-charts";
+import { useThemeColors } from "../../lib/useThemeColors";
 import SmartBottomSheet from "../community/components/SmartBottomSheet";
 import useLogsStore from "../../store/useLogsStore";
 import { toDateString } from "../../store/usePlanStore";
@@ -10,16 +11,16 @@ import { backfillIntensityData } from "../../services/stats/intensityCalculator"
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Category colors for stacked bars
-const BOULDER_COLORS = { easy: "#FCD34D", mid: "#F97316", hard: "#EF4444", elite: "#EC4899" };
+// Category colors for stacked bars — grayscale palette
+const BOULDER_COLORS = { easy: "#BBBBBB", mid: "#888888", hard: "#555555", elite: "#1C1C1E" };
 const ROPE_COLORS = {
-  beginner: "#22C55E",
-  intermediate: "#3B82F6",
-  advanced: "#A855F7",
-  expert: "#111827",
-  elite: "#9CA3AF",
+  beginner: "#BBBBBB",
+  intermediate: "#888888",
+  advanced: "#555555",
+  expert: "#333333",
+  elite: "#1C1C1E",
 };
-const INTENSITY_COLOR = "#8B5CF6";
+const INTENSITY_COLOR = "#306E6F";
 
 const TIME_RANGES = ["W", "M", "Y"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
@@ -52,34 +53,42 @@ function categorizeRope(grade: string): "beginner" | "intermediate" | "advanced"
   return "beginner";
 }
 
-const CurrentIndicator = () => (
-  <View style={{ alignItems: "center", marginBottom: 4 }}>
-    <View
-      style={{
-        width: 0,
-        height: 0,
-        backgroundColor: "transparent",
-        borderStyle: "solid",
-        borderLeftWidth: 4,
-        borderRightWidth: 4,
-        borderBottomWidth: 6,
-        borderLeftColor: "transparent",
-        borderRightColor: "transparent",
-        borderBottomColor: "#306E6F",
-        transform: [{ rotate: "180deg" }],
-      }}
-    />
-  </View>
-);
+const CurrentIndicator = () => {
+  const colors = useThemeColors();
+  return (
+    <View style={{ alignItems: "center", marginBottom: 4 }}>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          backgroundColor: "transparent",
+          borderStyle: "solid",
+          borderLeftWidth: 4,
+          borderRightWidth: 4,
+          borderBottomWidth: 6,
+          borderLeftColor: "transparent",
+          borderRightColor: "transparent",
+          borderBottomColor: colors.accent,
+          transform: [{ rotate: "180deg" }],
+        }}
+      />
+    </View>
+  );
+};
 
-const LegendDot = ({ color, label }: { color: string; label: string }) => (
-  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
-    <Text style={{ fontSize: 10, color: "#64748B" }}>{label}</Text>
-  </View>
-);
+const LegendDot = ({ color, label }: { color: string; label: string }) => {
+  const colors = useThemeColors();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+      <Text style={{ fontSize: 10, color: colors.chartLabel }}>{label}</Text>
+    </View>
+  );
+};
 
 export default function TrainingVolumeChart() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [timeRange, setTimeRange] = useState<TimeRange>("W");
   const [selectedTypes, setSelectedTypes] = useState<LogType[]>(["boulder"]);
   const { logs } = useLogsStore();
@@ -152,7 +161,7 @@ export default function TrainingVolumeChart() {
     // Dashed vertical line props (Apple Fitness style grid)
     const vLineProps = {
       showVerticalLine: true as const,
-      verticalLineColor: "#E5E7EB",
+      verticalLineColor: colors.gridLine,
       verticalLineStrokeDashArray: [3, 3],
       verticalLineThickness: 1,
     };
@@ -238,7 +247,7 @@ export default function TrainingVolumeChart() {
         <View style={{ alignItems: "center", ...(shift ? { marginLeft: shift } : {}) }}>
           {isCurrent && <CurrentIndicator />}
           {showValue && total > 0 && (
-            <Text style={{ fontSize: 9, fontWeight: "700", color: "#374151" }}>{total}</Text>
+            <Text style={{ fontSize: 9, fontWeight: "700", color: colors.chartValue }}>{total}</Text>
           )}
         </View>
       );
@@ -252,8 +261,8 @@ export default function TrainingVolumeChart() {
       isFuture: boolean = false
     ) => {
       const labelStyle = isCurrent
-        ? { color: "#306E6F", fontWeight: "700" as const }
-        : { color: "#64748B", fontSize: 10 };
+        ? { color: colors.accent, fontWeight: "700" as const }
+        : { color: colors.chartLabel, fontSize: 10 };
 
       const boulderStacks = showBoulder ? buildBoulderStack(logsForUnit) : [];
       const ropeStacks = showRope ? buildRopeStack(logsForUnit) : [];
@@ -380,13 +389,13 @@ export default function TrainingVolumeChart() {
               onPress={() => toggleType("boulder")}
               style={[styles.typePill, selectedTypes.includes("boulder") ? styles.typePillActive : styles.typePillInactive]}
             >
-              <Text style={[styles.typePillText, selectedTypes.includes("boulder") && { color: "#fff" }]}>Boulder</Text>
+              <Text style={[styles.typePillText, selectedTypes.includes("boulder") && { color: colors.toggleActiveText }]}>Boulder</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => toggleType("rope")}
               style={[styles.typePill, selectedTypes.includes("rope") ? styles.typePillActive : styles.typePillInactive]}
             >
-              <Text style={[styles.typePillText, selectedTypes.includes("rope") && { color: "#fff" }]}>Rope</Text>
+              <Text style={[styles.typePillText, selectedTypes.includes("rope") && { color: colors.toggleActiveText }]}>Rope</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -403,7 +412,7 @@ export default function TrainingVolumeChart() {
             ))}
           </View>
           <TouchableOpacity onPress={() => setHelpOpen(true)} style={styles.helpBtn}>
-            <Ionicons name="help-circle-outline" size={20} color="#64748B" />
+            <Ionicons name="help-circle-outline" size={20} color={colors.chartLabel} />
           </TouchableOpacity>
         </View>
       </View>
@@ -451,7 +460,7 @@ export default function TrainingVolumeChart() {
             hideRules
             xAxisThickness={0}
             yAxisThickness={0}
-            xAxisLabelTextStyle={{ color: "#64748B", fontSize: 10, textAlign: "center" }}
+            xAxisLabelTextStyle={{ color: colors.chartLabel, fontSize: 10, textAlign: "center" }}
             yAxisLabelWidth={Y_AXIS_WIDTH}
             scrollAnimation={false}
             isAnimated
@@ -489,14 +498,14 @@ export default function TrainingVolumeChart() {
       <SmartBottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} mode="list" title="Training Volume">
         <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 14 }}>
           <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#111", marginBottom: 4 }}>📊 训练量柱状图</Text>
-            <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>📊 训练量柱状图</Text>
+            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
               展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。
             </Text>
           </View>
           <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#111", marginBottom: 4 }}>📈 费劲程度（紫色虚线, 0-1）</Text>
-            <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>📈 费劲程度（紫色虚线, 0-1）</Text>
+            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
               综合反映每次训练的费劲程度，基于：{"\n"}
               • 你对路线难度的主观感受（soft / solid / hard）{"\n"}
               • 每条路线的尝试次数{"\n"}
@@ -505,8 +514,8 @@ export default function TrainingVolumeChart() {
             </Text>
           </View>
           <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#111", marginBottom: 4 }}>💡 怎么看？</Text>
-            <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>💡 怎么看？</Text>
+            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
               对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。
             </Text>
           </View>
@@ -516,18 +525,13 @@ export default function TrainingVolumeChart() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   chartCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0.5,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0,
   },
   cardHeader: {
     flexDirection: "row",
@@ -535,23 +539,19 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 10,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
-  segmentContainer: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 8, padding: 2 },
+  cardTitle: { fontSize: 16, fontFamily: "DMSans_700Bold", color: colors.chartTitle },
+  segmentContainer: { flexDirection: "row", backgroundColor: colors.toggleBackground, borderRadius: 8, padding: 2 },
   segmentBtn: { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 6 },
   segmentBtnActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    backgroundColor: colors.toggleActiveBackground,
   },
-  segmentText: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
-  segmentTextActive: { color: "#111827" },
-  typePill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, borderWidth: 0.5, borderColor: "#E5E7EB" },
-  typePillActive: { backgroundColor: "#111" },
-  typePillInactive: { backgroundColor: "#F3F4F6" },
-  typePillText: { fontSize: 11, fontWeight: "600", color: "#4B5563" },
+  segmentText: { fontSize: 12, fontFamily: "DMSans_500Medium", color: colors.toggleInactiveText },
+  segmentTextActive: { color: colors.toggleActiveText },
+  typePill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, borderWidth: 0 },
+  typePillActive: { backgroundColor: colors.toggleActiveBackground },
+  typePillInactive: { backgroundColor: colors.toggleBackground },
+  typePillText: { fontSize: 11, fontFamily: "DMSans_500Medium", color: colors.toggleInactiveText },
   helpBtn: { padding: 2 },
   legendRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "center" },
-  legendTitle: { fontSize: 11, fontWeight: "700", color: "#374151", marginRight: 4 },
+  legendTitle: { fontSize: 11, fontWeight: "700", color: colors.chartValue, marginRight: 4 },
 });

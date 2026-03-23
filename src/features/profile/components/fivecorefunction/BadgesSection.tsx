@@ -44,9 +44,6 @@ const DISPLAY_GROUPS: { key: string; title: string; filter: (b: Badge) => boolea
   { key: "rope", title: "Rope", filter: (b) => b.id.startsWith("limit_rope_") || b.id.startsWith("solid_rope_"), dedupe: true },
   { key: "lifetime", title: "Lifetime", filter: (b) => b.section === "lifetime" },
   { key: "monthly", title: "Monthly", filter: (b) => b.section === "monthly" },
-  { key: "milestone", title: "Milestone", filter: (b) => b.section === "milestone" },
-  { key: "influence", title: "Influence", filter: (b) => b.section === "influence" },
-  { key: "special", title: "Special", filter: (b) => b.section === "special" },
 ];
 
 export default function BadgesSection({ styles: externalStyles }: { styles: any }) {

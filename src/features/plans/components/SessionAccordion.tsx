@@ -1,9 +1,10 @@
 // src/features/plans/components/SessionAccordion.tsx
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useThemeColors } from "../../../lib/useThemeColors";
 import { ExerciseItemCard, type ExerciseItemData, type ExerciseItemMode } from "../../../components/shared/ExerciseItemCard";
 import type { PlanV3Session, PlanV3SessionItem } from "../../../types/plan";
 
@@ -47,6 +48,9 @@ export function SessionAccordion({
   onStartSession,
   defaultOpen = false,
 }: Props) {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
+
   const [open, setOpen] = useState(defaultOpen);
   const [menuIndex, setMenuIndex] = useState<number | null>(null);
 
@@ -81,7 +85,7 @@ export function SessionAccordion({
               {session.est_duration_min ? ` · ${session.est_duration_min}m` : ""}
               {` · ${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"}`}
               {completedCount === exerciseCount && exerciseCount > 0 ? (
-                <Text style={{ color: "#10B981", fontWeight: "700" }}> · Completed</Text>
+                <Text style={{ color: "#306E6F", fontWeight: "700" }}> · Completed</Text>
               ) : null}
             </Text>
           </View>
@@ -89,7 +93,7 @@ export function SessionAccordion({
         <View style={s.headerRight}>
           {mode === "execution" && exerciseCount > 0 ? (
             completedCount === exerciseCount ? (
-              <Ionicons name="checkmark-circle" size={22} color="#10B981" />
+              <Ionicons name="checkmark-circle" size={22} color="#306E6F" />
             ) : (
               <View style={s.progressPill}>
                 <Text style={s.progressText}>{completedCount}/{exerciseCount}</Text>
@@ -171,7 +175,7 @@ export function SessionAccordion({
           ))}
           {mode === "builder" && onAddExercise ? (
             <TouchableOpacity style={s.addBtn} onPress={onAddExercise} activeOpacity={0.7}>
-              <Ionicons name="add-circle-outline" size={18} color="#4F46E5" />
+              <Ionicons name="add-circle-outline" size={18} color={colors.textSecondary} />
               <Text style={s.addText}>
                 {locale === "zh" ? "添加动作" : "Add Exercise"}
               </Text>
@@ -191,7 +195,7 @@ export function SessionAccordion({
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     backgroundColor: "#FFF",
     borderRadius: 16,
@@ -216,15 +220,15 @@ const s = StyleSheet.create({
   sub: { fontSize: 13, color: "#6B7280", marginTop: 3 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressPill: {
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "rgba(48,110,111,0.12)",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
-  progressText: { fontSize: 12, fontWeight: "700", color: "#10B981" },
+  progressText: { fontSize: 12, fontWeight: "700", color: "#306E6F" },
   progressBarContainer: { paddingHorizontal: 16, paddingBottom: 12 },
   progressBarTrack: { height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" },
-  progressBarFill: { height: "100%", backgroundColor: "#10B981", borderRadius: 2 },
+  progressBarFill: { height: "100%", backgroundColor: "#306E6F", borderRadius: 2 },
 
   body: {
     paddingHorizontal: 16,
@@ -244,13 +248,13 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderStyle: "dashed",
   },
-  addText: { fontSize: 14, fontWeight: "600", color: "#4F46E5" },
+  addText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
   startSessionBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1C1C1E",
     borderRadius: 14,
     paddingVertical: 12,
     marginTop: 8,

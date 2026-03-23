@@ -1,6 +1,7 @@
 // src/features/community/challenges/JoinedChallengeChip.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 export default function JoinedChallengeChip({
   title,
@@ -11,6 +12,9 @@ export default function JoinedChallengeChip({
   color?: string;
   onPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.85} onPress={onPress}>
       <View style={[styles.icon, { backgroundColor: color }]} />
@@ -21,26 +25,22 @@ export default function JoinedChallengeChip({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   wrap: {
-    width: 120,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   },
   icon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginBottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
-  text: { fontSize: 13, fontWeight: "800", color: "#111" },
+  text: { fontSize: 13, fontWeight: "600", color: colors.textPrimary },
 });

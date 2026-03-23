@@ -274,6 +274,13 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                   </View>
                 </View>
 
+                <Text style={styles.hintText}>
+                  {t(
+                    "记录尝试次数和体感可以让训练分析更精准",
+                    "Logging attempts & feel improves your training insights"
+                  )}
+                </Text>
+
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>{t("备注", "Note")}</Text>
                   <TextInput
@@ -331,11 +338,12 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: "800", color: COLORS.primary },
   cardHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   stepperRowCompact: { flexDirection: "row", alignItems: "center", gap: 12 },
-  stepBtnCompact: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.inputBg, alignItems: "center", justifyContent: "center" },
+  stepBtnCompact: { width: 32, height: 32, borderRadius: 16, borderWidth: 0.5, borderColor: '#E2E8F0', backgroundColor: 'transparent', alignItems: "center", justifyContent: "center" },
   stepValueCompact: { fontSize: 17, fontWeight: "800", color: COLORS.primary, minWidth: 24, textAlign: "center" },
   feelRowCompact: { flexDirection: "row", alignItems: "center", gap: 12 },
   feelPillCompact: { width: 100, height: 36, borderRadius: 18, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 3 },
   feelText: { color: "#fff", fontWeight: "800", fontSize: 13, letterSpacing: 1 },
+  hintText: { fontSize: 11, color: COLORS.muted, textAlign: "center", marginBottom: 12 },
   doneBtn: { marginTop: 12, height: 58, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   doneText: { color: "#fff", fontSize: 17, fontWeight: "800" },
 });

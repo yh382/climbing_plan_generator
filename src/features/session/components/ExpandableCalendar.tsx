@@ -10,6 +10,8 @@ import {
   UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import {
   format,
   startOfWeek,
@@ -50,6 +52,9 @@ function parseDurationToMin(dur: string): number {
 export default function ExpandableCalendar({
   onDateSelect,
 }: ExpandableCalendarProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [expanded, setExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMonth, setViewMonth] = useState(new Date());
@@ -136,7 +141,7 @@ export default function ExpandableCalendar({
               onPress={() => navigateMonth(-1)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-back" size={20} color="#111" />
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.monthLabel}>
               {format(viewMonth, "MMMM yyyy")}
@@ -145,7 +150,7 @@ export default function ExpandableCalendar({
               onPress={() => navigateMonth(1)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-forward" size={20} color="#111" />
+              <Ionicons name="chevron-forward" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
         )}
@@ -192,7 +197,7 @@ export default function ExpandableCalendar({
           <Ionicons
             name={expanded ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#9CA3AF"
+            color={colors.textTertiary}
           />
         </TouchableOpacity>
       </View>
@@ -200,18 +205,12 @@ export default function ExpandableCalendar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
-    backgroundColor: "#FFF",
-    margin: 16,
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 0.6,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: colors.backgroundSecondary,
+    margin: theme.spacing.screenPadding,
+    borderRadius: theme.borderRadius.card,
+    padding: theme.spacing.cardPadding,
   },
   grid: { gap: 8 },
   monthNav: {
@@ -224,7 +223,8 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   row: {
     flexDirection: "row",
@@ -234,7 +234,8 @@ const styles = StyleSheet.create({
     width: "14%" as any,
     textAlign: "center",
     fontSize: 12,
-    color: "#9CA3AF",
+    fontFamily: theme.fonts.medium,
+    color: colors.textTertiary,
     fontWeight: "600",
   },
   datesContainer: { flexDirection: "row", flexWrap: "wrap" },
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     paddingTop: 2,
     borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
+    borderTopColor: colors.border,
   },
   expandBtn: { padding: 2 },
 });

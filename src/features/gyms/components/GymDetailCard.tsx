@@ -1,9 +1,11 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, Platform, StyleSheet, Alert, Linking, ActionSheetIOS, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { GymPlace } from "../../../../lib/poi/types";
 import { gymCommunityApi } from "../api";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "../../../contexts/SettingsContext";
 
 interface GymDetailCardProps {
   gym: GymPlace;
@@ -20,19 +22,42 @@ interface GymDetailCardProps {
 }
 
 export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymDetailCardProps) {
+  const themeColors = useThemeColors();
+  const { tr } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors), [themeColors]);
   const [navigating, setNavigating] = useState(false);
 
   const handleViewProfile = useCallback(async () => {
     setNavigating(true);
     try {
       const result = await gymCommunityApi.ensureGym(gym.place_id);
-      router.push(`/gyms/${result.gym_id}`);
+      Alert.alert(
+        tr('加入岩馆社区', 'Join Gym Community'),
+        tr(`确定加入 ${gym.name} 的社区吗？`, `Join ${gym.name}'s community?`),
+        [
+          { text: tr('取消', 'Cancel'), style: 'cancel' },
+          {
+            text: tr('加入', 'Join'),
+            onPress: async () => {
+              try {
+                await gymCommunityApi.favoriteGym(result.gym_id);
+              } catch {
+                // Already favorited — ignore
+              }
+              router.push({
+                pathname: '/(tabs)/community',
+                params: { tab: 'gyms', gymId: result.gym_id },
+              });
+            },
+          },
+        ]
+      );
     } catch {
       Alert.alert("Error", "Could not load gym page");
     } finally {
       setNavigating(false);
     }
-  }, [gym.place_id]);
+  }, [gym.place_id, gym.name, tr]);
 
   const handleNavigate = useCallback(async () => {
     const { lat, lng } = gym.location;
@@ -97,41 +122,37 @@ export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymD
         <TouchableOpacity
           onPress={handleNavigate}
           activeOpacity={0.9}
-          style={[styles.actionBase, styles.actionPrimary, { backgroundColor: primaryBg, borderColor: primaryBg }]}
+          style={[styles.actionBase, { flex: 1, backgroundColor: "#1C1C1E" }]}
         >
-          <Ionicons name="navigate" size={18} color={primary} style={{ marginRight: 8 }} />
-          <Text style={[styles.actionPrimaryText, { color: primary }]}>Directions</Text>
+          <Ionicons name="navigate" size={14} color="#FFF" style={{ marginRight: 6 }} />
+          <Text style={{ fontSize: 13, fontWeight: "600", color: "#FFF" }}>Directions</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={handleViewProfile}
           activeOpacity={0.9}
           disabled={navigating}
-          style={[styles.actionBase, styles.actionGhost, { borderColor: primary }]}
+          style={[styles.actionBase, { flex: 1, borderWidth: 0.5, borderColor: themeColors.border }]}
         >
           {navigating ? (
-            <ActivityIndicator size="small" color={primary} />
+            <ActivityIndicator size="small" color={themeColors.textSecondary} />
           ) : (
             <>
-              <Ionicons name="people-outline" size={16} color={primary} style={{ marginRight: 6 }} />
-              <Text style={[styles.actionGhostText, { color: primary }]}>Community</Text>
+              <Ionicons name="people-outline" size={14} color={themeColors.textSecondary} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, fontWeight: "500", color: themeColors.textSecondary }}>Community</Text>
             </>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={onClose}
-          activeOpacity={0.9}
-          style={[styles.actionBase, styles.actionGhost, { borderColor: colors.shellBorder }]}
-        >
-          <Text style={[styles.actionGhostText, { color: colors.iconInactive }]}>Close</Text>
+        <TouchableOpacity onPress={onClose} activeOpacity={0.9} style={styles.closeBtn}>
+          <Ionicons name="close" size={14} color={themeColors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (themeColors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   detailCard: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
@@ -140,20 +161,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   detailCardHighlight: {
-    borderColor: "#93c5fd",
+    borderColor: themeColors.border,
     shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: Platform.OS === "android" ? 6 : 0,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: Platform.OS === "android" ? 3 : 0,
   },
   detailStripe: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
-    opacity: 0.9,
+    width: 3,
   },
   detailTitle: { fontSize: 17, fontWeight: "800" },
   detailMeta: { fontSize: 13, marginTop: 2 },
@@ -170,11 +190,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     height: 40,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingHorizontal: 12,
   },
   actionPrimary: { borderWidth: StyleSheet.hairlineWidth },
   actionPrimaryText: { fontSize: 14, fontWeight: "800" },
   actionGhost: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth },
   actionGhostText: { fontSize: 14, fontWeight: "700" },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: themeColors.backgroundSecondary, alignItems: "center", justifyContent: "center" },
 });

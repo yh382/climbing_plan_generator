@@ -1,9 +1,8 @@
 // components/CollapsibleLargeHeaderFlatList.tsx
 import React, { ReactNode } from "react";
-import { View, Text, StyleSheet, StyleProp, ViewStyle, Platform } from "react-native";
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
-import { GlassView } from "expo-glass-effect";
 import Animated, {
   Extrapolate,
   interpolate,
@@ -112,11 +111,7 @@ export default function CollapsibleLargeHeaderFlatList<ItemT>({
       {/* Fixed header */}
       <View style={[styles.fixedHeader, { height: insets.top + headerHeight }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          {Platform.OS === "ios" ? (
-            <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
-          ) : (
-            <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
-          )}
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View style={styles.headerBorder} />
         </Animated.View>
 

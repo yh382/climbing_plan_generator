@@ -87,16 +87,25 @@ export interface UserPost {
 }
 
 // ---- Badges ----
+let _badgeCache: { data: BadgeProgress[]; timestamp: number } | null = null;
+const BADGE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export function useBadgesProgress() {
-  const [badges, setBadges] = useState<BadgeProgress[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [badges, setBadges] = useState<BadgeProgress[]>(_badgeCache?.data ?? []);
+  const [loading, setLoading] = useState(!_badgeCache);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchBadges = useCallback(async () => {
+  const fetchBadges = useCallback(async (force = false) => {
+    if (!force && _badgeCache && Date.now() - _badgeCache.timestamp < BADGE_CACHE_TTL) {
+      setBadges(_badgeCache.data);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = await api.get<BadgeProgress[]>('/badges/my/progress');
+      _badgeCache = { data, timestamp: Date.now() };
       setBadges(data);
     } catch (e: any) {
       setError(e);
@@ -106,7 +115,7 @@ export function useBadgesProgress() {
   }, []);
 
   useEffect(() => { fetchBadges(); }, [fetchBadges]);
-  return { badges, loading, error, refresh: fetchBadges };
+  return { badges, loading, error, refresh: () => fetchBadges(true) };
 }
 
 // ---- Notifications ----
@@ -222,22 +231,32 @@ export interface PublicBadge {
   sourceId?: string | null;
 }
 
+export interface PublicDailySummary {
+  date: string;
+  climbs: number;
+  sends: number;
+  bestGrade: string | null;
+  durationMinutes: number | null;
+}
+
 export function usePublicProfile(userId: string | null) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<FeedPostType[]>([]);
   const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [badges, setBadges] = useState<PublicBadge[]>([]);
+  const [dailySummary, setDailySummary] = useState<PublicDailySummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      const [raw, postsData, plansData, badgesData] = await Promise.all([
+      const [raw, postsData, plansData, badgesData, summaryData] = await Promise.all([
         api.get<any>(`/profiles/${userId}`),
         api.get<any[]>(`/posts/user/${userId}?limit=20`),
         api.get<any[]>(`/plans/user/${userId}`).catch(() => []),
         api.get<any[]>(`/badges/user/${userId}`).catch(() => []),
+        api.get<any[]>(`/climb-logs/daily-summary/user/${userId}?limit=20`).catch(() => []),
       ]);
       const mapped: PublicProfile = {
         id: raw.user_id ?? raw.id,
@@ -262,12 +281,21 @@ export function usePublicProfile(userId: string | null) {
       setPosts(feedPosts);
       setPlans(plansData || []);
       setBadges(badgesData || []);
+      setDailySummary(
+        (summaryData || []).map((d: any) => ({
+          date: d.date,
+          climbs: d.climbs ?? 0,
+          sends: d.sends ?? 0,
+          bestGrade: d.best_grade ?? null,
+          durationMinutes: d.duration_minutes ?? null,
+        })),
+      );
     } catch (_e) { /* swallow */ }
     finally { setLoading(false); }
   }, [userId]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
-  return { profile, posts, plans, badges, loading, refresh: fetchProfile };
+  return { profile, posts, plans, badges, dailySummary, loading, refresh: fetchProfile };
 }
 
 // ---- Search Users ----

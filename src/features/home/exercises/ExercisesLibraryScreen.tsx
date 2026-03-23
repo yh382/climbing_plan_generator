@@ -9,6 +9,7 @@ import CollapsibleLargeHeaderFlatList from "../../../components/CollapsibleLarge
 import type { ActionSummary, BlockInventorySummary, LocaleKey } from "./model/types";
 import { GOAL_LABEL, LEVEL_LABEL } from "./model/labels";
 import { getBlockListing, getLibrarySummary } from "./api/libraryApi";
+import { useFavoriteIds } from "./favoritesApi";
 
 import {
   USER_TAXONOMY,
@@ -78,6 +79,7 @@ function mapActionToCardProps(action: ActionSummary, locale: LocaleKey) {
 export default function ExercisesLibraryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ big?: string }>();
+  const { isFavorite, toggle: toggleFavorite } = useFavoriteIds();
 
   const locale = useMemo(() => detectLocale(), []);
   const [blocks, setBlocks] = useState<BlockInventorySummary[]>([]);
@@ -265,6 +267,8 @@ export default function ExercisesLibraryScreen() {
           <ExerciseLibraryCard
             {...cardProps}
             locale={locale}
+            isFavorite={isFavorite(item.id)}
+            onToggleFavorite={() => toggleFavorite(item.id)}
             onPress={() =>
               router.push({
                 pathname: "/library/exercise-detail",

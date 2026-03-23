@@ -1,6 +1,7 @@
 // src/features/community/events/MineEventChip.tsx
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { theme } from "@/lib/theme";
 import type { EventOut } from "./types";
 
 function formatDateShort(iso: string): string {
@@ -19,37 +20,46 @@ export default function MineEventChip({
 }) {
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.85} onPress={onPress}>
-      <View style={[styles.logo, { backgroundColor: "#111" }]} />
-      <Text style={styles.title} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={styles.meta} numberOfLines={1}>
-        {formatDateShort(item.start_at)}
-      </Text>
-      <Text style={styles.gym} numberOfLines={1}>
-        {item.publisher.name}
-      </Text>
+      {/* 图片区 — 预留 Image 接口 */}
+      <View style={styles.imageArea} />
+
+      {/* 信息区 */}
+      <View style={styles.info}>
+        <Text style={styles.title} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {formatDateShort(item.start_at)} · {item.publisher.name}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    width: 180,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 1,
+    width: 160,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#1C1C1E",
   },
-  logo: { width: 34, height: 34, borderRadius: 12, marginBottom: 10 },
-  title: { fontSize: 13, fontWeight: "900", color: "#111" },
-  meta: { marginTop: 4, fontSize: 12, fontWeight: "800", color: "#9CA3AF" },
-  gym: { marginTop: 2, fontSize: 12, fontWeight: "800", color: "#6B7280" },
+  imageArea: {
+    height: 80,
+    backgroundColor: "#272727",
+  },
+  info: {
+    padding: 10,
+  },
+  title: {
+    fontSize: 12,
+    fontFamily: theme.fonts.bold,
+    color: "#fff",
+    lineHeight: 16,
+  },
+  meta: {
+    fontSize: 10,
+    fontFamily: theme.fonts.regular,
+    color: "rgba(255,255,255,0.40)",
+    marginTop: 3,
+  },
 });

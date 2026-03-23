@@ -50,15 +50,15 @@ export default function WeeklyMiniRings({ days, selectedDate, onSelect, style }:
             <View
               style={[
                 styles.halo,
-                selected && { borderColor: "rgba(37,99,235,0.28)" },
+                selected && { borderColor: "rgba(48,110,111,0.28)" },
               ]}
             >
               <View
                 style={[
                   styles.ring,
                   { borderColor: track },
-                  selected && { borderColor: "#2563EB", borderWidth: 2 },
-                  isToday && !selected && { borderColor: "#93C5FD" }, // 今天（未选中）：浅蓝描边
+                  selected && { borderColor: "#306E6F", borderWidth: 2 },
+                  isToday && !selected && { borderColor: "rgba(48,110,111,0.4)" }, // 今天（未选中）：浅 accent 描边
                 ]}
               >
                 {/* 有记录就显示一个蓝色内点；无记录不显示 */}
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#306E6F",
   },
   dayText: {
     fontSize: 11,

@@ -25,10 +25,18 @@ import CollapsibleLargeHeader from "../src/components/CollapsibleLargeHeader";
 import LogSendModal, { LogSendDraft } from "../src/features/journal/LogSendModal";
 import QuickLogCard from "../src/features/journal/QuickLogCard";
 import { TodayDetailsList } from "../src/features/journal/loglist";
+import { invalidateRecentClimbsCache } from "../src/features/profile/components/RecentClimbsList";
 import type { LocalDayLogItem } from "../src/features/journal/loglist/types";
 import { enqueueLogEvent } from "../src/features/journal/sync/logsOutbox";
+import FirstLogTooltip from "../src/features/home/components/FirstLogTooltip";
 import { flushLogsOutbox } from "../src/features/journal/sync/logsOutbox";
 import { readAllServerIds, setServerId } from "../src/features/journal/sync/serverIdMap";
+import { flushSessionsOutbox } from "../src/features/journal/sync/sessionsOutbox";
+import {
+  readAllSessionServerIds,
+  setSessionServerId as setSessionSId,
+} from "../src/features/journal/sync/sessionServerIdMap";
+import { syncAllLocalSessions } from "../src/features/journal/sync/syncAllLocalSessions";
 import { useAuthStore } from "../src/store/useAuthStore";
 import { readDayList } from "../src/features/journal/loglist/storage";
 import { computeDailyIntensity, saveIntensityForDate } from "../src/services/stats/intensityCalculator";
@@ -117,14 +125,14 @@ export default function Journal() {
   const lastSubmitAtRef = useRef<number>(0);
   const submitSeqRef = useRef<number>(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [mode, setMode] = useState<"boulder" | "toprope" | "lead">("boulder");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [sessionDetailCount, setSessionDetailCount] = useState(0);
 
-  
+
   const { logs, upsertCount, activeSession, endSession } = useLogsStore();
+  const mode = activeSession?.discipline ?? "boulder";
   const { monthMap } = usePlanStore();
 
   // timer
@@ -161,6 +169,30 @@ export default function Journal() {
             saveServerId: async (localId, serverId) => {
               await setServerId(localId, serverId);
             },
+          }).catch(() => {});
+        });
+
+        // Flush sessions outbox on focus too
+        readAllSessionServerIds().then((sMap) => {
+          flushSessionsOutbox({
+            resolveServerId: (k) => sMap[k] ?? null,
+            saveServerId: async (k, id) => {
+              await setSessionSId(k, id);
+              sMap[k] = id;
+            },
+          }).then(() => {
+            // After outbox flush, sync any remaining unsynced local sessions
+            syncAllLocalSessions({
+              getSessions: () => useLogsStore.getState().sessions,
+              updateSession: (sessionKey, patch) => {
+                const { sessions } = useLogsStore.getState();
+                useLogsStore.setState({
+                  sessions: sessions.map((s) =>
+                    s.sessionKey === sessionKey ? { ...s, ...patch } : s
+                  ),
+                });
+              },
+            });
           }).catch(() => {});
         });
       }
@@ -248,7 +280,7 @@ export default function Journal() {
           outerValue={outerPct}
           innerValue={innerVal}
           outerColor="#A5D23D"
-          innerColor="#3B82F6"
+          innerColor="#306E6F"
           outerThickness={3}
           innerThickness={3}
           gap={2}
@@ -297,6 +329,7 @@ export default function Journal() {
 
             // 3) 再真正结束 session（写入 storage / 后端）
             const newSession = await endSession();
+            invalidateRecentClimbsCache();
 
             // 4) Compute & save intensity for today (fire-and-forget)
             const intensityDate = todayKey;
@@ -321,6 +354,16 @@ export default function Journal() {
                 },
               }).catch(() => {}); // best-effort; retries on next flush
             }
+
+            // Flush sessions outbox (fire-and-forget)
+            const sMap = await readAllSessionServerIds();
+            flushSessionsOutbox({
+              resolveServerId: (k) => sMap[k] ?? null,
+              saveServerId: async (k, id) => {
+                await setSessionSId(k, id);
+                sMap[k] = id;
+              },
+            }).catch(() => {});
 
             if (newSession) {
               router.replace({
@@ -386,11 +429,9 @@ export default function Journal() {
     if (!isFeel(feelRaw)) return null;
     if (feelRaw === "solid") return null;
     const text = feelRaw === "soft" ? "SOFT" : "HARD";
-    const bg = feelRaw === "soft" ? "#EEF2FF" : "#FEF2F2";
-    const fg = feelRaw === "soft" ? "#3730A3" : "#991B1B";
     return (
-      <View style={[styles.feelPill, { backgroundColor: bg }]}>
-        <Text style={[styles.feelPillText, { color: fg }]}>{text}</Text>
+      <View style={[styles.feelPill, { backgroundColor: '#1C1C1E' }]}>
+        <Text style={[styles.feelPillText, { color: '#FFFFFF' }]}>{text}</Text>
       </View>
     );
   };
@@ -472,10 +513,10 @@ export default function Journal() {
         }
       >
         <View style={{ marginTop: 12 }}>
+          <FirstLogTooltip />
           <View style={styles.quickLogWrapper}>
             <QuickLogCard
               mode={mode}
-              onChangeMode={setMode}
               tr={tr}
               labelOf={labelOf}
               onPickGrade={openForGrade}
@@ -592,29 +633,28 @@ const styles = StyleSheet.create({
 
   timerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" },
-  timerText: { fontSize: 16, fontWeight: "700", color: VISUAL.primary, fontVariant: ["tabular-nums"] },
-  dateText: { fontSize: 16, fontWeight: "700", color: VISUAL.primary },
+  timerText: { fontSize: 16, fontFamily: "DMSans_500Medium", color: VISUAL.primary, fontVariant: ["tabular-nums"] },
+  dateText: { fontSize: 16, fontFamily: "DMSans_500Medium", color: VISUAL.primary },
 
   endBtn: {
     height: 38,
     paddingHorizontal: 18,
     borderRadius: 19,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#1C1C1E",
     alignItems: "center",
     justifyContent: "center",
-    ...VISUAL.shadowSmall,
   },
   endBtnSecondary: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "rgba(0,0,0,0.08)",
   },
-  endText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-  endTextSecondary: { color: "#64748B" },
+  endText: { color: "#fff", fontSize: 14, fontFamily: "DMSans_700Bold" },
+  endTextSecondary: { color: "#888888" },
 
   largeTitle: {
     fontSize: 26,
-    fontWeight: "900",
+    fontFamily: "DMSans_900Black",
     color: VISUAL.primary,
     letterSpacing: -0.5,
   },
@@ -627,7 +667,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 14
   },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: VISUAL.primary, letterSpacing: -0.5 },
+  sectionTitle: { fontSize: 18, fontFamily: "DMSans_900Black", color: VISUAL.primary, letterSpacing: -0.5 },
   countBadge: {
     backgroundColor: "#E2E8F0",
     paddingHorizontal: 10,
@@ -649,12 +689,12 @@ const styles = StyleSheet.create({
   },
   detailImageWrap: { width: 96, height: 96 },
   detailImage: { width: "100%", height: "100%" },
-  noImage: { backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
-  noImageText: { fontSize: 16, fontWeight: "900", color: "#E5E7EB" },
+  noImage: { backgroundColor: "#272727", alignItems: "center", justifyContent: "center" },
+  noImageText: { fontSize: 16, fontFamily: "DMMono_500Medium", color: "#888888" },
 
   detailInfo: { flex: 1, padding: 12, justifyContent: "center" },
   detailTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
-  routeName: { flex: 1, fontSize: 15, fontWeight: "900", color: "#111", letterSpacing: -0.2 },
+  routeName: { flex: 1, fontSize: 15, fontFamily: "DMSans_900Black", color: "#000000", letterSpacing: -0.2 },
 
   feelPill: {
     paddingHorizontal: 10,

@@ -42,4 +42,12 @@ export const plansApi = {
   /** Update a single progress entry */
   updateProgress: (planId: string, progressId: string, data: { status: string; actual_session_id?: string; notes?: string }) =>
     api.patch<PlanProgressOut>(`/plans/${planId}/progress/${progressId}`, data),
+
+  /** Clone a public plan into current user's plans */
+  clonePlan: (planId: string) =>
+    api.post(`/plans/${planId}/clone`),
+
+  /** Mark a plan session as completed (creates PlanProgress + checks auto-archive) */
+  completePlanSession: (planId: string, data: { planned_session_id: string; planned_session_type: string }) =>
+    api.post<{ ok: boolean; planCompleted: boolean; progress: any }>(`/plans/${planId}/complete-session`, data),
 };

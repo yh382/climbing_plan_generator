@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useThemeColors } from "../../lib/useThemeColors";
 import { scoreToGrade } from "../../lib/gradeSystem";
 import type { CSMState } from "../../services/stats/csmAnalyzer";
+import { CSM_STATE_COLORS } from "../../lib/theme";
 
 const QUADRANT_LABELS: Record<string, { title: string; color: string }> = {
-  push: { title: "Push", color: "#10B981" },
-  challenge: { title: "Challenge", color: "#F59E0B" },
-  develop: { title: "Develop", color: "#3B82F6" },
-  rebuild: { title: "Rebuild", color: "#EF4444" },
+  push:      { title: "Push",      color: CSM_STATE_COLORS.push },
+  challenge: { title: "Challenge", color: CSM_STATE_COLORS.challenge },
+  develop:   { title: "Develop",   color: CSM_STATE_COLORS.develop },
+  rebuild:   { title: "Rebuild",   color: CSM_STATE_COLORS.rebuild },
 };
 
 function formatPI(pi: number, discipline: "boulder" | "rope"): string {
@@ -25,10 +27,12 @@ function formatPI(pi: number, discipline: "boulder" | "rope"): string {
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const pct = Math.min(Math.max(value, 0), 1) * 100;
   return (
-    <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: color }]} />
+    <View style={s.progressTrack}>
+      <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: color }]} />
     </View>
   );
 }
@@ -38,6 +42,8 @@ interface Props {
 }
 
 export default function CSMSummary({ state }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const q = QUADRANT_LABELS[state.quadrant] || QUADRANT_LABELS.rebuild;
 
   return (
@@ -75,32 +81,27 @@ export default function CSMSummary({ state }: Props) {
             <Text style={styles.axisLabel}>LP</Text>
             <Text style={styles.axisValue}>{state.lp.toFixed(2)}</Text>
           </View>
-          <ProgressBar value={state.lp} color="#6366F1" />
+          <ProgressBar value={state.lp} color="#306E6F" />
         </View>
         <View style={styles.axisItem}>
           <View style={styles.axisHeader}>
             <Text style={styles.axisLabel}>SS</Text>
             <Text style={styles.axisValue}>{state.ss.toFixed(2)}</Text>
           </View>
-          <ProgressBar value={state.ss} color="#8B5CF6" />
+          <ProgressBar value={state.ss} color="#306E6F" />
         </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0.5,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0,
   },
   headerRow: {
     flexDirection: "row",
@@ -110,15 +111,15 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontFamily: "DMSans_700Bold",
+    color: colors.chartTitle,
   },
   quadrantBadge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 999,
     gap: 6,
   },
   quadrantDot: {
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
   },
   quadrantText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: "DMSans_700Bold",
   },
   kpiRow: {
     flexDirection: "row",
@@ -142,17 +143,17 @@ const styles = StyleSheet.create({
   kpiDivider: {
     width: 1,
     height: 28,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.divider,
   },
   kpiVal: {
     fontSize: 18,
-    fontWeight: "800",
-    color: "#111827",
+    fontFamily: "DMMono_500Medium",
+    color: colors.chartTitle,
   },
   kpiLabel: {
     fontSize: 9,
-    color: "#9CA3AF",
-    fontWeight: "600",
+    color: colors.toggleInactiveText,
+    fontFamily: "DMSans_500Medium",
     textTransform: "uppercase",
     letterSpacing: 0.3,
     marginTop: 2,
@@ -171,16 +172,16 @@ const styles = StyleSheet.create({
   axisLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.chartLabel,
   },
   axisValue: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#374151",
+    color: colors.chartValue,
   },
   progressTrack: {
     height: 6,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.progressTrack,
     borderRadius: 3,
     overflow: "hidden",
   },

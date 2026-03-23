@@ -153,13 +153,12 @@ export default function GymsScreen() {
     [store, flyTo],
   );
 
-  const mapStyleURL = useMemo(
-    () =>
-      styleId === "outdoors"
-        ? "mapbox://styles/mapbox/outdoors-v12"
-        : "mapbox://styles/mapbox/satellite-streets-v12",
-    [styleId],
-  );
+  const mapStyleURL = useMemo(() => {
+    if (styleId === "satellite") return "mapbox://styles/mapbox/satellite-streets-v12";
+    return scheme === "dark"
+      ? "mapbox://styles/mapbox/dark-v11"
+      : "mapbox://styles/mapbox/outdoors-v12";
+  }, [styleId, scheme]);
 
   const searchPlaceholder = tr("搜索附近的岩馆…", "Search nearby climbing gyms…");
   const emptyText = center

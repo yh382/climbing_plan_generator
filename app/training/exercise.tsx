@@ -114,7 +114,7 @@ export default function ExerciseTrainingScreen() {
           <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
-            <Ionicons name="barbell-outline" size={32} color="#D1D5DB" />
+            <Ionicons name="barbell-outline" size={32} color="#888888" />
           </View>
         )}
       </View>
@@ -220,10 +220,10 @@ export default function ExerciseTrainingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FAFAFA" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { fontSize: 16, color: "#6B7280", textAlign: "center" },
-  linkText: { fontSize: 16, color: "#4F46E5", textAlign: "center" },
+  errorText: { fontSize: 16, color: "#888888", textAlign: "center" },
+  linkText: { fontSize: 16, color: "#306E6F", textAlign: "center" },
 
   // Header
   header: {
@@ -233,10 +233,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#FFF",
     borderBottomWidth: 0.5,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: "rgba(0,0,0,0.08)",
   },
   backBtn: { padding: 8, width: 40 },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: "600", color: "#111", textAlign: "center" },
+  headerTitle: { flex: 1, fontSize: 17, fontFamily: "DMSans_700Bold", color: "#000000", textAlign: "center" },
 
   // Image
   imageContainer: {
@@ -247,10 +247,10 @@ const styles = StyleSheet.create({
   image: {
     width: 120,
     height: 120,
-    borderRadius: 16,
+    borderRadius: 14,
   },
   imagePlaceholder: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#272727",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -274,9 +274,8 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: "#FFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    backgroundColor: "#F7F7F7",
+    borderTopWidth: 0,
   },
   logBtnDefault: {
     flexDirection: "row",
@@ -285,18 +284,18 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
     backgroundColor: "#FFF",
   },
   logBtnDefaultText: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#6B7280",
+    fontFamily: "DMSans_500Medium",
+    color: "#888888",
   },
   logHint: {
     fontSize: 11,
-    color: "#9CA3AF",
+    color: "#BBBBBB",
   },
   logBtnComplete: {
     flexDirection: "row",
@@ -305,16 +304,11 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#10B981",
-    shadowColor: "#10B981",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    backgroundColor: "#1C1C1E",
   },
   logBtnCompleteText: {
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: "DMSans_700Bold",
     color: "#FFF",
   },
 

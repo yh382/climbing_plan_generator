@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useGymFavoriteToggle } from './hooks';
 import GymDashboardTab from './components/GymDashboardTab';
 import GymActivityFeed from './components/GymActivityFeed';
 import GymMemberList from './components/GymMemberList';
+import { theme } from '@/lib/theme';
+import { useThemeColors } from '@/lib/useThemeColors';
 
 type Tab = 'dashboard' | 'activity' | 'members';
 
@@ -23,6 +25,8 @@ interface Props {
 }
 
 export default function GymDetailScreen({ gymId }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<Tab>('activity');
 
   const selectedGym = useGymsStore((s) => s.selectedGym);
@@ -68,7 +72,7 @@ export default function GymDetailScreen({ gymId }: Props) {
           <Ionicons
             name={t.icon as any}
             size={16}
-            color={activeTab === t.key ? '#306E6F' : '#9CA3AF'}
+            color={activeTab === t.key ? '#FFFFFF' : colors.textTertiary}
           />
           <Text
             style={[
@@ -94,7 +98,7 @@ export default function GymDetailScreen({ gymId }: Props) {
         smallTitle={gymName}
         leftActions={
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={25} color="#111" />
+            <Ionicons name="arrow-back" size={25} color={colors.textPrimary} />
           </TouchableOpacity>
         }
         rightActions={
@@ -111,7 +115,7 @@ export default function GymDetailScreen({ gymId }: Props) {
             <Ionicons
               name={isFav ? 'star' : 'star-outline'}
               size={22}
-              color={isFav ? '#F59E0B' : '#9CA3AF'}
+              color={isFav ? '#F59E0B' : colors.textTertiary}
             />
           </TouchableOpacity>
         }
@@ -127,12 +131,13 @@ export default function GymDetailScreen({ gymId }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   largeTitle: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#111',
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
     lineHeight: 34,
+    letterSpacing: -0.5,
   },
   headerBtn: {
     width: 40,
@@ -142,12 +147,12 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.background,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     marginBottom: 12,
   },
   tab: {
@@ -160,14 +165,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabActive: {
-    backgroundColor: 'rgba(48,110,111,0.1)',
+    backgroundColor: colors.cardDark,
   },
   tabText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.bold,
+    color: colors.textTertiary,
   },
   tabTextActive: {
-    color: '#306E6F',
+    color: '#FFFFFF',
   },
 });

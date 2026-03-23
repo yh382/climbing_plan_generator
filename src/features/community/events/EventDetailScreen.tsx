@@ -11,6 +11,7 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -20,7 +21,7 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from "react-native-reanimated";
-import { GlassView } from "expo-glass-effect";
+import { BlurView } from "expo-blur";
 
 import GlassIconButton from "./component/GlassIconButton";
 import CategoryChip from "./component/CategoryChip";
@@ -28,6 +29,8 @@ import EventDynamicCards from "./component/EventDynamicCards";
 import EventDetailsModal from "./EventDetailsModal";
 
 import { useEventDetailData } from "./data/useEventDetailData";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 // === Constants (Align with Challenge) ===
 const COVER_H = 280;
@@ -82,10 +85,12 @@ function InfoRow({
   isLast?: boolean;
   onPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const Content = (
     <View style={[styles.infoRow as ViewStyle, isLast && { borderBottomWidth: 0 }]}>
       <View style={styles.infoIconWrap}>
-        <Ionicons name={icon} size={22} color="#374151" />
+        <Ionicons name={icon} size={22} color={colors.textSecondary} />
       </View>
       <View style={styles.infoContent}>
         <View style={{ flex: 1, paddingRight: 8, justifyContent: "center" }}>
@@ -110,6 +115,8 @@ function InfoRow({
 }
 
 export default function EventDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -137,6 +144,17 @@ export default function EventDetailScreen() {
         [0, 0.05],
         Extrapolate.CLAMP
       ),
+    };
+  });
+
+  const coverParallaxStyle = useAnimatedStyle(() => {
+    if (scrollY.value >= 0) return {};
+    const absScroll = -scrollY.value;
+    return {
+      transform: [
+        { scale: 1 + absScroll / COVER_H },
+        { translateY: scrollY.value / 2 },
+      ],
     };
   });
 
@@ -185,10 +203,11 @@ export default function EventDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       {/* ===== Header (Glass Fade) ===== */}
       <View style={[styles.headerContainer, { height: insets.top + 50 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerStyle]}>
-          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View
             style={[
               StyleSheet.absoluteFill,
@@ -217,30 +236,32 @@ export default function EventDetailScreen() {
       >
         {/* ===== Hero Area ===== */}
         <View style={styles.heroWrap}>
-          <View style={[styles.coverWrap, { height: COVER_H }]}>
-            {event.coverImage ? (
-              <Image
-                source={event.coverImage}
-                style={styles.coverImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <View
-                style={[styles.coverImg, { backgroundColor: "#0B1220" }]}
-              />
-            )}
-            {/* Dark Scrim */}
-            <View style={styles.coverScrim} />
+          <Animated.View style={coverParallaxStyle}>
+            <View style={[styles.coverWrap, { height: COVER_H }]}>
+              {event.coverImage ? (
+                <Image
+                  source={event.coverImage}
+                  style={styles.coverImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View
+                  style={[styles.coverImg, { backgroundColor: "#0B1220" }]}
+                />
+              )}
+              {/* Dark Scrim */}
+              <View style={styles.coverScrim} />
 
-            {/* Chips (Bottom Right) */}
-            <View style={styles.coverChipsRow}>
-              {event.tags?.slice(0, 3).map((t) => (
-                <View key={t} style={styles.chipShadow}>
-                  <CategoryChip text={t} />
-                </View>
-              ))}
+              {/* Chips (Bottom Right) */}
+              <View style={styles.coverChipsRow}>
+                {event.tags?.slice(0, 3).map((t) => (
+                  <View key={t} style={styles.chipShadow}>
+                    <CategoryChip text={t} />
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Organizer Bar (Text next to floating thumb) */}
           <View style={styles.organizerBar}>
@@ -381,9 +402,8 @@ export default function EventDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  // 背景色改为更柔和的浅灰，使白色卡片更突出
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   // === Header ===
   headerContainer: {
@@ -406,7 +426,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: colors.border,
   },
 
   // === Hero ===
@@ -415,7 +435,7 @@ const styles = StyleSheet.create({
   coverImg: { width: "100%", height: "100%" },
   coverScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.1)",
+    backgroundColor: "rgba(0,0,0,0.25)",
   },
   coverChipsRow: {
     position: "absolute",
@@ -425,26 +445,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipShadow: {
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    backgroundColor: "transparent", 
+    backgroundColor: "transparent",
   },
 
   // Organizer Bar
   organizerBar: {
     height: 72,
     paddingTop: 16,
-    // 左侧留出头像宽度: Padding + Thumb + Gap
     paddingLeft: SIDE_PADDING + THUMB_SIZE + 10,
     paddingRight: SIDE_PADDING,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.background,
   },
-  organizerOneLine: { fontSize: 15, fontWeight: "700", color: "#1F2937" },
-  organizerPrefix: { fontWeight: "400", color: "#6B7280" },
+  organizerOneLine: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+  organizerPrefix: { fontWeight: "400", color: colors.textSecondary },
 
-  // Floating Thumbnail (Challenge Style)
+  // Floating Thumbnail
   thumbFloating: {
     position: "absolute",
     left: SIDE_PADDING,
@@ -454,20 +469,18 @@ const styles = StyleSheet.create({
   thumbOuter: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    borderRadius: 24, // Consistent squircle
+    borderRadius: 24,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   thumbImg: {
     width: THUMB_SIZE - 6,
     height: THUMB_SIZE - 6,
     borderRadius: 21,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.backgroundSecondary,
   },
 
   // === Main Content ===
@@ -476,9 +489,9 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   title: {
-    fontSize: 30, // Aligned with Challenge
-    fontWeight: "800",
-    color: "#111827",
+    fontSize: 30,
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
     letterSpacing: -0.5,
     marginBottom: 20,
     marginTop: -10,
@@ -487,25 +500,19 @@ const styles = StyleSheet.create({
 
   // Join Button
   joinBtn: {
-    height: 52, // Challenge height
-    borderRadius: 16,
-    backgroundColor: "#22C55E",
+    height: 52,
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: colors.cardDark,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#22C55E",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
     marginBottom: 20,
   },
   joinBtnJoined: {
-    backgroundColor: "#111827",
-    shadowColor: "#111827",
+    backgroundColor: colors.accent,
   },
-  joinBtnText: { fontSize: 17, fontWeight: "800", color: "#FFFFFF" },
+  joinBtnText: { fontSize: 17, fontFamily: theme.fonts.bold, color: "#FFFFFF" },
 
-  // Info List (Minimalist)
+  // Info List
   infoListContainer: {
     marginTop: 0,
     marginBottom: 10,
@@ -515,7 +522,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+    borderBottomColor: colors.border,
   },
   infoIconWrap: {
     width: 28,
@@ -529,25 +536,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   infoRight: { marginLeft: 8 },
-  
+
   // Info Text Styles
   infoValue: {
     fontSize: 14,
-    color: "#1F2937",
-    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
     lineHeight: 20,
   },
   infoSubValue: {
     fontSize: 13,
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
     marginTop: 2,
-    fontWeight: "500",
   },
   pillText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-    backgroundColor: "#F3F4F6",
+    fontFamily: theme.fonts.monoMedium,
+    color: "#FFFFFF",
+    backgroundColor: colors.cardDark,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
@@ -560,24 +567,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   bottomCardSection: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.card,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
   sectionHeader: {
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
     paddingBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "800",
-    color: "#111",
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
   },
 });

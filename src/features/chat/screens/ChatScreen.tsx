@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useChatStore } from "../../../store/useChatStore";
 import { useUserStore } from "../../../store/useUserStore";
 import ChatBubble from "../components/ChatBubble";
@@ -10,6 +11,8 @@ import ChatInput from "../components/ChatInput";
 import type { ChatMessageOut } from "../types";
 
 export default function ChatScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
@@ -70,7 +73,7 @@ export default function ChatScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {headerTitle}
@@ -99,21 +102,21 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F6F7F8" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.backgroundSecondary },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
     borderBottomWidth: 0.8,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: colors.border,
   },
   backBtn: { width: 40, alignItems: "flex-start" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#111827", flex: 1, textAlign: "center" },
+  headerTitle: { fontSize: 17, fontWeight: "700", color: colors.textPrimary, flex: 1, textAlign: "center" },
   listContent: { paddingVertical: 8 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
-  emptyText: { fontSize: 15, color: "#9CA3AF" },
+  emptyText: { fontSize: 15, color: colors.textTertiary },
 });

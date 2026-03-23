@@ -10,6 +10,8 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useLeaderboard, LeaderboardItem } from "../hooks";
 import { useProfileStore } from "../../profile/store/useProfileStore";
 import { useUserStore } from "../../../store/useUserStore";
@@ -27,6 +29,8 @@ export default function RankTab({
   discipline = "all",
   onPressUser,
 }: RankTabProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [scope, setScope] = useState<Scope>("all");
   const [selectedGymId, setSelectedGymId] = useState<string | null>(null);
   const [selectedGymName, setSelectedGymName] = useState<string>("Gym");
@@ -104,7 +108,7 @@ export default function RankTab({
           <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={18} color="#9CA3AF" />
+            <Ionicons name="person" size={18} color={colors.textTertiary} />
           </View>
         )}
 
@@ -161,7 +165,7 @@ export default function RankTab({
           <Ionicons
             name="location-outline"
             size={14}
-            color={scope === "gym" ? "#FFF" : "#6B7280"}
+            color={scope === "gym" ? "#FFF" : colors.textSecondary}
             style={{ marginRight: 4 }}
           />
           <Text
@@ -188,11 +192,11 @@ export default function RankTab({
       {/* Leaderboard list */}
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="small" color="#111" />
+          <ActivityIndicator size="small" color={colors.textPrimary} />
         </View>
       ) : items.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="trophy-outline" size={40} color="#D1D5DB" />
+          <Ionicons name="trophy-outline" size={40} color={colors.textTertiary} />
           <Text style={styles.emptyText}>
             {scope === "following"
               ? "No ranked friends yet"
@@ -227,10 +231,10 @@ export default function RankTab({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingHorizontal: theme.spacing.screenPadding,
+    paddingBottom: theme.spacing.sectionGap,
   },
   scopeRow: {
     flexDirection: "row",
@@ -240,18 +244,18 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: colors.backgroundSecondary,
   },
   pillActive: {
-    backgroundColor: "#111",
+    backgroundColor: colors.cardDark,
   },
   pillText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
     maxWidth: 120,
   },
   pillTextActive: {
@@ -269,12 +273,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#374151",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 13,
-    color: "#9CA3AF",
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
     textAlign: "center",
   },
   row: {
@@ -282,11 +288,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
+    backgroundColor: colors.background,
+    borderRadius: theme.borderRadius.cardSmall,
     marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderWidth: 0.4,
+    borderColor: colors.border,
   },
   rankCol: {
     width: 36,
@@ -296,7 +302,8 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.monoMedium,
+    color: colors.textSecondary,
   },
   medal: {
     width: 28,
@@ -308,6 +315,7 @@ const styles = StyleSheet.create({
   medalText: {
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: theme.fonts.monoMedium,
     color: "#FFF",
   },
   avatar: {
@@ -317,7 +325,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatarPlaceholder: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -325,30 +333,30 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
-    color: "#111",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   score: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.monoMedium,
+    color: colors.textSecondary,
     marginLeft: 8,
   },
   rowHighlight: {
-    backgroundColor: "#F0FDF4",
-    borderColor: "#BBF7D0",
+    backgroundColor: colors.backgroundSecondary,
+    borderColor: colors.border,
   },
   myRankCard: {
-    backgroundColor: "#F0FDF4",
-    borderRadius: 16,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.card,
     padding: 16,
     marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#BBF7D0",
   },
-  myRankLabel: { fontSize: 14, fontWeight: "600", color: "#166534" },
-  myRankNumber: { fontSize: 24, fontWeight: "800", color: "#166534" },
-  myRankPoints: { fontSize: 13, color: "#4ADE80" },
+  myRankLabel: { fontSize: 14, fontWeight: "600", fontFamily: theme.fonts.medium, color: colors.textSecondary },
+  myRankNumber: { fontSize: 24, fontWeight: "800", fontFamily: theme.fonts.monoMedium, color: colors.textPrimary },
+  myRankPoints: { fontSize: 13, fontFamily: theme.fonts.monoMedium, color: colors.textSecondary },
 });

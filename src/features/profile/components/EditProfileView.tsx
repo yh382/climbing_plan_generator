@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   formGroup: { paddingHorizontal: 16, paddingBottom: 24 },
 
   inputItem: { marginBottom: 14 },
-  inputLabel: { fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 8 },
+  inputLabel: { fontSize: 13, fontWeight: "600", color: "#888888", marginBottom: 8 },
 
   inputBox: {
     minHeight: 44,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   placeholderText: { color: "#94A3B8" },
 
   coverSection: { paddingHorizontal: 16, marginBottom: 8 },
-  coverLabel: { fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 8 },
+  coverLabel: { fontSize: 13, fontWeight: "600", color: "#888888", marginBottom: 8 },
   coverPreview: { width: "100%", height: 120, borderRadius: 12, overflow: "hidden" },
   coverImage: { borderRadius: 12 },
   coverOverlay: {

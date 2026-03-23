@@ -70,7 +70,7 @@ export default function CollapsibleCalendarOverlay({
     () => ({
       [selectedStr]: {
         selected: true,
-        selectedColor: "#2563EB",
+        selectedColor: "#306E6F",
         selectedTextColor: "#FFFFFF",
       },
     }),
@@ -170,7 +170,7 @@ export default function CollapsibleCalendarOverlay({
                             width: 26,
                             height: 26,
                             borderRadius: 13,
-                            backgroundColor: "#2563EB",
+                            backgroundColor: "#306E6F",
                           }}
                         />
                       )}
@@ -191,8 +191,8 @@ export default function CollapsibleCalendarOverlay({
           }}
 
           theme={{
-            todayTextColor: "#2563EB",
-            selectedDayBackgroundColor: "#2563EB",
+            todayTextColor: "#306E6F",
+            selectedDayBackgroundColor: "#306E6F",
             selectedDayTextColor: "#FFFFFF",
             textSectionTitleColor: "#6B7280",
             monthTextColor: "#111827",

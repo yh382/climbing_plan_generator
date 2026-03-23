@@ -14,10 +14,14 @@ import Animated, {
 import { GlassTopBar } from "./component/GlassTopBar";
 import { MOCK_BLOGS } from "./component/mockBlogs";
 import { GlassIconButton } from "./component/GlassTopBar";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const SCROLL_THRESHOLD = 40;
 
 export default function BlogDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { blogId } = useLocalSearchParams<{ blogId: string }>();
@@ -47,7 +51,7 @@ export default function BlogDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
         <GlassTopBar
         scrollY={scrollY}
         smallTitle="Blog"
@@ -81,14 +85,14 @@ export default function BlogDetailScreen() {
             </View>
           </Animated.View>
           {/* 这里原本是用来占位的，现在由于有了 paddingTop，其实这个占位View的作用主要是为了右侧不顶到边，或者可以保留 */}
-          <View style={{ width: 40 }} /> 
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* cover（预留 image 接口，mock 用 home icon） */}
-        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+        {/* cover — full bleed, no border radius */}
+        <View style={{ marginTop: 8 }}>
           <View style={styles.cover}>
             <View style={styles.coverIcon}>
-              <Ionicons name="home" size={18} color="#111" />
+              <Ionicons name="home" size={18} color={colors.textPrimary} />
             </View>
           </View>
         </View>
@@ -106,10 +110,10 @@ export default function BlogDetailScreen() {
 
             if (block.type === "img") {
               return (
-                <View key={idx} style={{ marginTop: 12, marginBottom: 8 }}>
+                <View key={idx} style={{ marginTop: 16, marginBottom: 16, marginHorizontal: -16 }}>
                   <View style={styles.inlineImg}>
                     <View style={styles.inlineImgIcon}>
-                      <Ionicons name="image-outline" size={18} color="#111" />
+                      <Ionicons name="image-outline" size={18} color={colors.textPrimary} />
                     </View>
                   </View>
                   {block.caption ? <Text style={styles.caption}>{block.caption}</Text> : null}
@@ -129,7 +133,7 @@ export default function BlogDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   iconBtn: {
     width: 40,
     height: 36,
@@ -149,11 +153,11 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: "#111",
-    lineHeight: 32,
-    letterSpacing: -0.2,
+    fontSize: 28,
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
+    lineHeight: 34,
+    letterSpacing: -1,
   },
   metaRow: {
     marginTop: 10,
@@ -161,23 +165,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   metaText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "700",
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
   },
   dot: {
     width: 3,
     height: 3,
     borderRadius: 2,
-    backgroundColor: "#9CA3AF",
+    backgroundColor: colors.textTertiary,
     marginHorizontal: 8,
   },
   cover: {
-    height: 180,
-    borderRadius: 18,
-    backgroundColor: "#F3F4F6",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(17,17,17,0.08)",
+    height: 200,
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -190,28 +191,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(17,17,17,0.12)",
+    borderColor: colors.border,
   },
   h2: {
-    marginTop: 14,
+    marginTop: 24,
     marginBottom: 8,
     fontSize: 18,
-    fontWeight: "900",
-    color: "#111",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   p: {
     marginTop: 10,
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#111",
-    fontWeight: "500",
+    fontSize: 16,
+    lineHeight: 28,
+    color: colors.textPrimary,
+    fontFamily: theme.fonts.regular,
   },
   inlineImg: {
-    height: 180,
-    borderRadius: 18,
-    backgroundColor: "#F3F4F6",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(17,17,17,0.08)",
+    height: 200,
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -224,12 +222,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(17,17,17,0.12)",
+    borderColor: colors.border,
   },
   caption: {
     marginTop: 8,
-    fontSize: 12,
-    color: "#6B7280",
-    fontWeight: "600",
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    paddingHorizontal: 16,
   },
 });

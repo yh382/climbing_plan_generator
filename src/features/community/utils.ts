@@ -25,6 +25,8 @@ export function mapRawPost(d: any): UserPostOut {
     isLiked: d.is_liked ?? false,
     isSaved: d.is_saved ?? false,
     createdAt: d.created_at,
+    gymId: d.gym_id,
+    gymName: d.gym_name,
   };
 }
 
@@ -40,11 +42,14 @@ export function toFeedPost(post: UserPostOut): FeedPost {
     timestamp: post.createdAt,
     content: post.contentText || '',
     images: post.media?.filter(m => m.type === 'image').map(m => m.url),
+    gymId: post.gymId,
+    gymName: post.gymName,
     attachment: post.attachmentType ? {
-      type: post.attachmentType as 'shared_plan' | 'finished_session' | 'log',
+      type: post.attachmentType as 'plan' | 'session' | 'log',
       id: post.attachmentId || '',
       title: post.attachmentMeta?.title || '',
       subtitle: post.attachmentMeta?.subtitle || '',
+      metrics: post.attachmentMeta?.metrics || undefined,
     } : undefined,
     likes: post.likeCount,
     comments: post.commentCount,

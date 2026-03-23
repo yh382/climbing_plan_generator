@@ -13,7 +13,7 @@ export interface UserProfile {
 
 // 附件类型：帖子挂载的“干货”
 export interface PostAttachment {
-  type: 'finished_session' | 'shared_plan' | 'log'; // 是“晒成绩”还是“分享计划”
+  type: 'plan' | 'session' | 'log'; // plan=分享计划, session=完成训练, log=攀岩日志
   id: string;        // 对应的 session_id 或 plan_id
   title: string;     // 计划标题，如 "Finger Power V2"
   subtitle: string;  // 描述，如 "60m · Hard · 5 exercises"
@@ -33,6 +33,10 @@ export interface FeedPost {
   images?: string[];  // 图片/视频
   
   attachment?: PostAttachment; // [核心] 关联的计划/记录
+
+  // Gym association
+  gymId?: string;
+  gymName?: string;
 
   // 互动数据
   likes: number;

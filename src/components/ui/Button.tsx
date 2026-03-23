@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import { Pressable, Text, StyleSheet, ViewStyle } from 'react-native'
 import { theme } from '@/lib/theme'
+import { useThemeColors } from '@/lib/useThemeColors'
 
 type Props = {
   title: string
@@ -18,6 +20,9 @@ export function Button({
   fullWidth = false,
   style,
 }: Props) {
+  const colors = useThemeColors()
+  const styles = useMemo(() => createStyles(colors), [colors])
+
   const isSolid = variant === 'solid'
   return (
     <Pressable
@@ -44,41 +49,42 @@ export function Button({
   )
 }
 
-const styles = StyleSheet.create({
-  base: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: theme.borderRadius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  solid: {
-    backgroundColor: theme.colors.cardDark,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: theme.colors.cardDark,
-  },
-  disabled: {
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderColor: 'transparent',
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  text: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  textSolid: {
-    color: '#FFFFFF',
-  },
-  textOutline: {
-    color: theme.colors.textPrimary,
-  },
-  textDisabled: {
-    color: theme.colors.textTertiary,
-  },
-})
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    base: {
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: theme.borderRadius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    solid: {
+      backgroundColor: colors.cardDark,
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: colors.cardDark,
+    },
+    disabled: {
+      backgroundColor: colors.backgroundSecondary,
+      borderColor: 'transparent',
+    },
+    fullWidth: {
+      width: '100%',
+    },
+    text: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    textSolid: {
+      color: '#FFFFFF',
+    },
+    textOutline: {
+      color: colors.textPrimary,
+    },
+    textDisabled: {
+      color: colors.textTertiary,
+    },
+  })

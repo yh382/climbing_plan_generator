@@ -10,6 +10,7 @@ export interface UserPostCreateIn {
   attachment_id?: string;
   attachment_meta?: Record<string, any>;
   visibility?: 'public' | 'followers' | 'private';
+  gym_id?: string;
 }
 
 // --- Response types (camelCase, matching backend serializers) ---
@@ -30,6 +31,8 @@ export interface UserPostOut {
   isLiked: boolean;
   isSaved: boolean;
   createdAt: string;
+  gymId?: string;
+  gymName?: string;
 }
 
 export interface RankOut {

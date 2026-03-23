@@ -1,11 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function DailyLogHeader({
   ring,
   displayDate,
   gymName,
+  gymId,
   totalSends,
   isPublicView,
   sidePad = 16,
@@ -13,10 +15,12 @@ export default function DailyLogHeader({
   ring: React.ReactNode;
   displayDate: string;
   gymName?: string;
+  gymId?: string;
   totalSends: number;
   isPublicView: boolean;
   sidePad?: number;
 }) {
+  const router = useRouter();
   return (
     <View style={{ paddingBottom: 10 }}>
       <View style={{ paddingHorizontal: sidePad, paddingTop: 10, paddingBottom: 12, alignItems: "center" }}>
@@ -27,7 +31,16 @@ export default function DailyLogHeader({
         <View style={styles.summaryHeader}>
           <View>
             <Text style={styles.dateTitle}>{displayDate}</Text>
-            <Text style={styles.locationSub}>📍 {gymName || "Gym"}</Text>
+            {gymId ? (
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/(tabs)/community', params: { tab: 'gyms', gymId } })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.locationSub, { color: '#306E6F' }]}>📍 {gymName || "Gym"}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.locationSub}>📍 {gymName || "Gym"}</Text>
+            )}
           </View>
 
           <View style={styles.summaryStats}>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "../../../contexts/SettingsContext";
+import { useThemeColors } from "@/lib/useThemeColors";
 import type { CoachConversation } from "../types";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -46,6 +47,8 @@ export default function ConversationListSheet({
   onSelect,
   onDelete,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { tr } = useSettings();
 
@@ -154,7 +157,7 @@ export default function ConversationListSheet({
                       hitSlop={10}
                       activeOpacity={0.5}
                     >
-                      <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
+                      <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 );
@@ -167,22 +170,17 @@ export default function ConversationListSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
   },
   dragHandleArea: {
     width: "100%",
@@ -193,13 +191,13 @@ const styles = StyleSheet.create({
   dragIndicator: {
     width: 40,
     height: 5,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.cardBorder,
     borderRadius: 3,
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
     marginBottom: 12,
     marginTop: 4,
   },
@@ -218,11 +216,11 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   rowMeta: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: colors.textSecondary,
     marginTop: 2,
   },
 });

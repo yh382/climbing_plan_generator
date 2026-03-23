@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { challengeApi } from "@/features/community/challenges/api";
 import type { ChallengeOut } from "@/features/community/challenges/types";
 import { getChallengeStatus } from "@/features/community/challenges/types";
 import { useRouter } from "expo-router";
-import { GlassView } from "expo-glass-effect";
+import { BlurView } from "expo-blur";
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -21,6 +22,8 @@ import { HomeBlogBannerCarousel, type HomeBlogBannerItem } from "@/features/home
 import useLogsStore from "@/store/useLogsStore";
 import { getMaxGrade } from "../../src/services/stats/gradeAnalyzer";
 import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
 
 // ===== Banner data (mock — can be replaced by backend later) =====
 const BLOG_BANNERS: HomeBlogBannerItem[] = [
@@ -62,6 +65,8 @@ function getWeekEnd(weekStart: string): string {
 
 // --- This Week Snapshot ---
 function ThisWeekSnapshot() {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const weekStart = useMemo(getWeekStart, []);
   const weekEnd = useMemo(() => getWeekEnd(weekStart), [weekStart]);
@@ -110,24 +115,10 @@ function ThisWeekSnapshot() {
   );
 }
 
-// --- Plan Library: minimal entry ---
-function PlanLibraryMinimal() {
-  const router = useRouter();
-  return (
-    <View style={s.planSection}>
-      <View style={s.sectionHeaderRow}>
-        <Text style={s.sectionTitle}>Plan Library</Text>
-        <TouchableOpacity onPress={() => router.push("/library/plans" as any)} hitSlop={8}>
-          <Text style={s.ctaText}>Browse →</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={s.divider} />
-    </View>
-  );
-}
-
 // --- Challenges: dark skewed cards ---
 function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
   return (
@@ -175,7 +166,7 @@ function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
           ))}
         </ScrollView>
       ) : (
-        <Text style={{ paddingHorizontal: theme.spacing.screenPadding, color: theme.colors.textTertiary, fontSize: 13 }}>
+        <Text style={{ paddingHorizontal: theme.spacing.screenPadding, color: colors.textTertiary, fontSize: 13 }}>
           No active challenges
         </Text>
       )}
@@ -185,6 +176,8 @@ function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
 
 // ===== Main Home Screen =====
 export default function HomeScreen() {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const bootstrap = useAuthStore((s) => s.bootstrap);
@@ -235,11 +228,12 @@ export default function HomeScreen() {
   }));
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style="dark" />
       {/* --- Fixed Header --- */}
       <View style={[s.fixedHeader, { height: insets.top + 44 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View style={s.headerBorder} />
         </Animated.View>
 
@@ -252,10 +246,10 @@ export default function HomeScreen() {
 
           <View style={s.headerRightRow}>
             <TouchableOpacity style={s.iconBtn} onPress={() => router.push("/gyms")}>
-              <Ionicons name="map" size={24} color={theme.colors.textPrimary} />
+              <Ionicons name="map" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
             <TouchableOpacity style={s.iconBtn} onPress={() => router.push("/search" as any)}>
-              <Ionicons name="search" size={24} color={theme.colors.textPrimary} />
+              <Ionicons name="search" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -280,6 +274,9 @@ export default function HomeScreen() {
           <View style={{ width: 80 }} />
         </View>
 
+        {/* Setup Climmate */}
+        <SetupClimmateCard />
+
         {/* This Week Snapshot */}
         <ThisWeekSnapshot />
 
@@ -301,9 +298,6 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Plan Library — minimal */}
-        <PlanLibraryMinimal />
-
         {/* Challenges — dark skewed cards */}
         <ChallengesSection challenges={featuredChallenges} />
       </Animated.ScrollView>
@@ -311,7 +305,7 @@ export default function HomeScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   // Header
   fixedHeader: {
     position: "absolute",
@@ -326,7 +320,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   headerContent: {
     flex: 1,
@@ -346,7 +340,7 @@ const s = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     fontFamily: theme.fonts.bold,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   headerRightRow: {
     flexDirection: "row",
@@ -373,7 +367,7 @@ const s = StyleSheet.create({
     fontSize: 33,
     fontWeight: "900",
     fontFamily: theme.fonts.black,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: 38,
     letterSpacing: -1.5,
   },
@@ -381,7 +375,7 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
     fontFamily: theme.fonts.regular,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
 
@@ -396,7 +390,7 @@ const s = StyleSheet.create({
   },
   snapshotCard: {
     flex: 1,
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: theme.borderRadius.cardSmall,
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -406,21 +400,21 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: "400",
     fontFamily: theme.fonts.regular,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   snapshotValue: {
     fontSize: 22,
     fontWeight: "700",
     fontFamily: theme.fonts.monoMedium,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: -0.5,
   },
   snapshotCaption: {
     fontSize: 10,
     fontWeight: "400",
     fontFamily: theme.fonts.regular,
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
     marginTop: 2,
   },
   snapshotLink: {
@@ -431,7 +425,7 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     fontFamily: theme.fonts.medium,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   // Section shared
@@ -444,37 +438,26 @@ const s = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
     fontFamily: theme.fonts.black,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: -0.5,
   },
   ctaText: {
     fontSize: 13,
     fontWeight: "500",
     fontFamily: theme.fonts.medium,
-    color: theme.colors.textSecondary,
-  },
-
-  // Plan Library minimal
-  planSection: {
-    paddingHorizontal: theme.spacing.screenPadding,
-    marginBottom: theme.spacing.sectionGap,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginTop: 12,
+    color: colors.textSecondary,
   },
 
   // Challenges — dark skewed cards
   challengeCard: {
     width: 150,
-    backgroundColor: theme.colors.cardDark,
+    backgroundColor: colors.cardDark,
     borderRadius: theme.borderRadius.card,
     overflow: "hidden",
   },
   challengeImageArea: {
     height: 80,
-    backgroundColor: theme.colors.cardDarkImage,
+    backgroundColor: colors.cardDarkImage,
     overflow: "hidden",
   },
   challengeSkew: {

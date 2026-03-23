@@ -10,8 +10,10 @@ import type { ClimbLog } from '../../types/climbLog';
 export interface EdgeGradeStat {
   gradeScore: number;
   gradeText: string;
-  attempts: number;
+  logCount: number;       // number of log entries at this grade
   sends: number;
+  totalTries: number;     // sum of log.attempts across all logs
+  avgTries: number;       // average log.attempts for sends
   sendRate: number;
 }
 
@@ -23,6 +25,8 @@ export interface EdgeZone {
   sufficient: boolean;
   sendRate: number;
   grades: EdgeGradeStat[];
+  qsr: number;            // Quick Send Rate (attempts <= 2)
+  pr: number;             // Project Rate (attempts >= 5)
 }
 
 export type Quadrant = 'push' | 'challenge' | 'develop' | 'rebuild';
@@ -122,6 +126,7 @@ function computeCE(
   logs: ClimbLog[],
   pi: number,
   edgeWidth: number,
+  today: Date,
 ): { ce: number; grades: EdgeGradeStat[] } {
   const lower = pi - edgeWidth;
   const edgeLogs = logs.filter(
@@ -129,35 +134,63 @@ function computeCE(
   );
   if (!edgeLogs.length) return { ce: 0, grades: [] };
 
-  const gradeMap = new Map<number, EdgeGradeStat>();
+  // Per-grade aggregation
+  const gradeAgg = new Map<number, {
+    gradeScore: number; gradeText: string;
+    logCount: number; sends: number;
+    totalTries: number; sendTriesList: number[];
+  }>();
+
   for (const l of edgeLogs) {
     const gs = l.gradeScore;
-    if (!gradeMap.has(gs)) {
-      gradeMap.set(gs, {
-        gradeScore: gs,
-        gradeText: l.gradeText || String(gs),
-        attempts: 0,
-        sends: 0,
-        sendRate: 0,
+    if (!gradeAgg.has(gs)) {
+      gradeAgg.set(gs, {
+        gradeScore: gs, gradeText: l.gradeText || String(gs),
+        logCount: 0, sends: 0, totalTries: 0, sendTriesList: [],
       });
     }
-    const stat = gradeMap.get(gs)!;
-    stat.attempts += 1;
-    if (SEND_RESULTS.has(l.result)) stat.sends += 1;
+    const stat = gradeAgg.get(gs)!;
+    const att = l.attempts || 1;
+    stat.logCount += 1;
+    stat.totalTries += att;
+    if (SEND_RESULTS.has(l.result)) {
+      stat.sends += 1;
+      stat.sendTriesList.push(att);
+    }
   }
 
-  let totalAttempts = 0;
-  let totalSends = 0;
+  // CE: weighted sum of 1/sqrt(attempts) for send logs
+  let numerator = 0;
+  let denominator = 0;
+  for (const l of edgeLogs) {
+    if (!SEND_RESULTS.has(l.result)) continue;
+    const daysAgo = daysBetween(today, toDate(l.date));
+    const w = Math.exp(-RECENCY_DECAY * daysAgo);
+    const att = l.attempts || 1;
+    numerator += w * (1.0 / Math.sqrt(att));
+    denominator += w;
+  }
+  const ce = denominator > 0 ? numerator / denominator : 0;
+
+  // Build grade stats
   const grades: EdgeGradeStat[] = [];
-  for (const stat of gradeMap.values()) {
-    stat.sendRate = stat.attempts > 0 ? stat.sends / stat.attempts : 0;
-    totalAttempts += stat.attempts;
-    totalSends += stat.sends;
-    grades.push(stat);
+  for (const data of gradeAgg.values()) {
+    const triesList = data.sendTriesList;
+    const avg = triesList.length > 0
+      ? triesList.reduce((a, b) => a + b, 0) / triesList.length
+      : 0;
+    grades.push({
+      gradeScore: data.gradeScore,
+      gradeText: data.gradeText,
+      logCount: data.logCount,
+      sends: data.sends,
+      totalTries: data.totalTries,
+      avgTries: Math.round(avg * 10) / 10,
+      sendRate: data.logCount > 0 ? data.sends / data.logCount : 0,
+    });
   }
   grades.sort((a, b) => b.gradeScore - a.gradeScore);
 
-  const ce = totalAttempts > 0 ? totalSends / totalAttempts : 0;
   return { ce, grades };
 }
 
@@ -227,9 +260,24 @@ export function computeCSM(
 
   const el = computeEL(filtered, pi);
   const edgeWidth = Math.max(config.minWidth, Math.round(pi * config.ratio));
-  const { ce, grades } = computeCE(filtered, pi, edgeWidth);
+  const { ce, grades } = computeCE(filtered, pi, edgeWidth, now);
 
-  const edgeSample = grades.reduce((s, g) => s + g.attempts, 0);
+  const edgeSample = grades.reduce((s, g) => s + g.logCount, 0);
+
+  // QSR / PR from edge zone send logs
+  const lower = pi - edgeWidth;
+  const edgeSendLogs = filtered.filter(
+    (l) => l.gradeScore > 0 && l.gradeScore >= lower
+      && l.gradeScore <= pi + 0.5 && SEND_RESULTS.has(l.result),
+  );
+  const totalEdgeSends = edgeSendLogs.length;
+  const qsr = totalEdgeSends > 0
+    ? edgeSendLogs.filter((l) => (l.attempts || 1) <= 2).length / totalEdgeSends
+    : 0;
+  const pr = totalEdgeSends > 0
+    ? edgeSendLogs.filter((l) => (l.attempts || 1) >= 5).length / totalEdgeSends
+    : 0;
+
   const edgeZone: EdgeZone = {
     lower: pi - edgeWidth,
     upper: pi,
@@ -238,6 +286,8 @@ export function computeCSM(
     sufficient: edgeSample >= MIN_EDGE_SAMPLES,
     sendRate: ce,
     grades,
+    qsr: Math.round(qsr * 1000) / 1000,
+    pr: Math.round(pr * 1000) / 1000,
   };
 
   const lp = computeLP(filtered, pi, edgeWidth);

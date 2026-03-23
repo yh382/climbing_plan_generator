@@ -2,6 +2,8 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, type ViewStyle, type TextStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import type { EventInfoCardModel } from "../data/types";
 
 type Styles = {
@@ -21,6 +23,8 @@ type Styles = {
 };
 
 export default function EventListCard({ card }: { card: EventInfoCardModel }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const rows = useMemo(() => {
     const list = card.items ?? [];
     if (!card.showRank) return list;
@@ -69,7 +73,7 @@ export default function EventListCard({ card }: { card: EventInfoCardModel }) {
   );
 }
 
-const styles = StyleSheet.create<Styles>({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create<Styles>({
   wrap: {
     borderRadius: 18,
     backgroundColor: "#FFFFFF",
@@ -84,23 +88,23 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  title: { fontSize: 16, fontWeight: "900", color: "#111827" },
+  title: { fontSize: 16, fontFamily: theme.fonts.black, color: colors.textPrimary },
 
   list: { gap: 10 },
-  empty: { color: "#9CA3AF", fontWeight: "800" },
+  empty: { color: colors.textTertiary, fontFamily: theme.fonts.medium },
 
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   rankPill: {
     width: 28,
     height: 28,
     borderRadius: 999,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
-  rankText: { fontWeight: "900", color: "#111827" },
+  rankText: { fontFamily: theme.fonts.black, color: colors.textPrimary },
 
-  primary: { fontSize: 14, fontWeight: "900", color: "#111827" },
-  secondary: { marginTop: 2, fontSize: 12, fontWeight: "800", color: "#6B7280" },
-  trailing: { fontSize: 12, fontWeight: "900", color: "#111827" },
+  primary: { fontSize: 14, fontFamily: theme.fonts.black, color: colors.textPrimary },
+  secondary: { marginTop: 2, fontSize: 12, fontFamily: theme.fonts.bold, color: colors.textSecondary },
+  trailing: { fontSize: 12, fontFamily: theme.fonts.black, color: colors.textPrimary },
 });

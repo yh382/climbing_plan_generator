@@ -10,6 +10,7 @@ import SelfAssessment, { type SelfAssessmentData } from "../../src/features/sess
 import { useI18N } from "../../lib/i18n";
 import { PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
 import useActiveWorkoutStore from "../../src/store/useActiveWorkoutStore";
+import { plansApi } from "../../src/features/plans/api";
 
 // Fallback mock data (only used when no sessionJson param)
 const MOCK_SESSION: PlanV3Session = {
@@ -87,6 +88,7 @@ export default function PlanViewRoute() {
   }, []);
 
   const planId = Array.isArray(params.planId) ? params.planId[0] : params.planId;
+  const planSessionId = Array.isArray(params.planSessionId) ? params.planSessionId[0] : params.planSessionId;
 
   const handleAssessmentSubmit = useCallback(async (assessment: SelfAssessmentData) => {
     const { sessionData, seconds } = useActiveWorkoutStore.getState();
@@ -105,6 +107,16 @@ export default function PlanViewRoute() {
       }
     }
 
+    // Sync plan session completion to backend
+    if (planId && planSessionId) {
+      try {
+        await plansApi.completePlanSession(planId, {
+          planned_session_id: planSessionId,
+          planned_session_type: todaySession.type || "train",
+        });
+      } catch { /* best-effort — don't block navigation */ }
+    }
+
     finishWorkout();
     setShowAssessment(false);
 
@@ -118,7 +130,7 @@ export default function PlanViewRoute() {
         feeling: String(assessment.feeling),
       },
     } as any);
-  }, [finishWorkout, router, planId]);
+  }, [finishWorkout, router, planId, planSessionId, todaySession.type]);
 
   const handleMinimize = useCallback(() => {
     minimizeWorkout();

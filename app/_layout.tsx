@@ -121,7 +121,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <SettingsProvider>
-          {/* ✅ 关键：设置状态栏为透明沉浸式，配合 iOS 26 的顶部渐隐效果 */}
+          {/* 状态栏透明沉浸式，style auto 跟随系统深色模式 */}
           <StatusBar style="auto" translucent backgroundColor="transparent" />
 
           <View style={{ flex: 1 }}>

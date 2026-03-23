@@ -1,5 +1,6 @@
 import { View } from 'react-native'
 import { theme } from '@/lib/theme'
+import { useThemeColors } from '@/lib/useThemeColors'
 
 type Props = {
   width?: number | string
@@ -14,6 +15,8 @@ export function ImagePlaceholder({
   borderRadius = theme.borderRadius.card,
   variant = 'light',
 }: Props) {
+  const colors = useThemeColors()
+
   return (
     <View
       style={{
@@ -22,8 +25,8 @@ export function ImagePlaceholder({
         borderRadius,
         backgroundColor:
           variant === 'dark'
-            ? theme.colors.cardDarkImage
-            : theme.colors.backgroundSecondary,
+            ? colors.cardDarkImage
+            : colors.backgroundSecondary,
       }}
     />
   )

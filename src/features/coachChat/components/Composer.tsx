@@ -1,29 +1,41 @@
 // src/features/coachChat/components/Composer.tsx
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+
+const NATIVE_TAB_BAR_HEIGHT = 49;
 
 function QuickChip({ label, onPress }: { label: string; onPress: () => void }) {
+  const colors = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        paddingHorizontal: 12,
+        paddingHorizontal: 14,
         paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 0.8,
-        borderColor: "#E5E7EB",
-        backgroundColor: pressed ? "#F3F4F6" : "#FFFFFF",
+        borderRadius: theme.borderRadius.pill,
+        backgroundColor: pressed ? colors.border : colors.backgroundSecondary,
         marginRight: 10,
       })}
     >
-      <Text style={{ fontSize: 12, fontWeight: "800", color: "#374151" }}>{label}</Text>
+      <Text
+        style={{
+          fontFamily: theme.fonts.regular,
+          fontSize: 13,
+          color: colors.textPrimary,
+        }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 export default function Composer({ onSend, disabled }: { onSend: (t: string) => void; disabled?: boolean }) {
   const [text, setText] = useState("");
+  const colors = useThemeColors();
 
   const quick = useMemo(
     () => [
@@ -46,7 +58,7 @@ export default function Composer({ onSend, disabled }: { onSend: (t: string) => 
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={{ borderTopWidth: 0.8, borderTopColor: "#E5E7EB", backgroundColor: "rgba(255,255,255,0.96)" }}>
+      <View style={{ borderTopWidth: 0.8, borderTopColor: colors.border, backgroundColor: "rgba(255,255,255,0.96)", paddingBottom: NATIVE_TAB_BAR_HEIGHT }}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -62,19 +74,26 @@ export default function Composer({ onSend, disabled }: { onSend: (t: string) => 
             style={{
               flex: 1,
               borderWidth: 0.8,
-              borderColor: "#E5E7EB",
-              borderRadius: 18,
-              paddingHorizontal: 12,
+              borderColor: colors.border,
+              borderRadius: theme.borderRadius.pill,
+              paddingHorizontal: 14,
               paddingVertical: 10,
-              backgroundColor: "#FFFFFF",
+              backgroundColor: colors.background,
             }}
           >
             <TextInput
               value={text}
               onChangeText={setText}
               placeholder="Message AI Coach…"
+              placeholderTextColor={colors.textTertiary}
               multiline
-              style={{ fontSize: 15, lineHeight: 18, maxHeight: 110 }}
+              style={{
+                fontFamily: theme.fonts.regular,
+                fontSize: 15,
+                lineHeight: 18,
+                maxHeight: 110,
+                color: colors.textPrimary,
+              }}
             />
           </View>
 
@@ -87,11 +106,11 @@ export default function Composer({ onSend, disabled }: { onSend: (t: string) => 
               borderRadius: 22,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: disabled ? "#E5E7EB" : "#111827",
+              backgroundColor: disabled ? colors.backgroundSecondary : colors.cardDark,
               opacity: pressed ? 0.9 : 1,
             })}
           >
-            <Ionicons name="arrow-up" size={20} color={disabled ? "#9CA3AF" : "#FFF"} />
+            <Ionicons name="arrow-up" size={20} color={disabled ? colors.textTertiary : "#FFF"} />
           </Pressable>
         </View>
       </View>

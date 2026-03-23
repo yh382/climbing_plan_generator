@@ -190,12 +190,12 @@ export default function ExerciseTimer({
 
   const getPhaseColor = () => {
     switch (phase) {
-      case "PREPARE": return "#F59E0B";
-      case "WORK": return "#22C55E";
-      case "REST_REP": return "#3B82F6";
-      case "REST_SET": return "#6366F1";
-      case "COMPLETE": return "#10B981";
-      default: return "#E5E7EB";
+      case "PREPARE": return "#888888";
+      case "WORK": return "#1C1C1E";
+      case "REST_REP": return "#888888";
+      case "REST_SET": return "#888888";
+      case "COMPLETE": return "#306E6F";
+      default: return "#BBBBBB";
     }
   };
 
@@ -248,7 +248,7 @@ export default function ExerciseTimer({
       {/* Main control */}
       <View style={styles.controls}>
         {phase === "IDLE" || phase === "COMPLETE" ? (
-          <TouchableOpacity style={[styles.mainBtn, { backgroundColor: "#22C55E" }]} onPress={start}>
+          <TouchableOpacity style={[styles.mainBtn, { backgroundColor: "#1C1C1E" }]} onPress={start}>
             <Ionicons name="play" size={28} color="#FFF" />
             <Text style={styles.mainBtnText}>
               {phase === "COMPLETE" ? (isZH ? "重来" : "Restart") : (isZH ? "开始" : "Start")}
@@ -257,14 +257,14 @@ export default function ExerciseTimer({
         ) : (
           <>
             <TouchableOpacity
-              style={[styles.controlBtn, { backgroundColor: isPaused ? "#22C55E" : "#F59E0B" }]}
+              style={[styles.controlBtn, { backgroundColor: isPaused ? "#1C1C1E" : "#1C1C1E" }]}
               onPress={isPaused ? start : pause}
             >
               <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#FFF" />
             </TouchableOpacity>
 
             {(phase === "REST_REP" || phase === "REST_SET" || phase === "PREPARE") && (
-              <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#6B7280" }]} onPress={skip}>
+              <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#888888" }]} onPress={skip}>
                 <Ionicons name="play-skip-forward" size={22} color="#FFF" />
               </TouchableOpacity>
             )}
@@ -278,8 +278,8 @@ export default function ExerciseTimer({
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#E5E7EB" }]} onPress={reset}>
-              <Ionicons name="refresh" size={22} color="#475569" />
+            <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#F7F7F7" }]} onPress={reset}>
+              <Ionicons name="refresh" size={22} color="#888888" />
             </TouchableOpacity>
           </>
         )}
@@ -337,25 +337,25 @@ export default function ExerciseTimer({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 20,
+    backgroundColor: "#F7F7F7",
+    borderRadius: 16,
     borderWidth: 0,
     padding: 24,
     alignItems: "center",
   },
   phaseLabel: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 11,
+    fontFamily: "DMSans_700Bold",
     textTransform: "uppercase",
     letterSpacing: 1.5,
     marginBottom: 4,
   },
   timerDisplay: {
-    fontSize: 68,
-    fontWeight: "900",
-    color: "#0F172A",
+    fontSize: 64,
+    fontFamily: "DMSans_900Black",
+    color: "#000000",
     fontVariant: ["tabular-nums"],
-    lineHeight: 80,
+    lineHeight: 76,
     marginBottom: 12,
   },
   progressRow: {
@@ -369,19 +369,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   progressLabel: {
-    fontSize: 14,
-    color: "#94A3B8",
-    fontWeight: "700",
+    fontSize: 11,
+    color: "#888888",
+    fontFamily: "DMSans_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   progressValue: {
     fontSize: 28,
-    color: "#334155",
-    fontWeight: "800",
+    color: "#000000",
+    fontFamily: "DMMono_500Medium",
   },
   progressTotal: {
     fontSize: 18,
-    color: "#CBD5E1",
-    fontWeight: "500",
+    color: "#BBBBBB",
+    fontFamily: "DMMono_400Regular",
   },
   controls: {
     flexDirection: "row",
@@ -400,7 +402,7 @@ const styles = StyleSheet.create({
   mainBtnText: {
     color: "#FFF",
     fontSize: 18,
-    fontWeight: "700",
+    fontFamily: "DMSans_700Bold",
   },
   controlBtn: {
     width: 50,
@@ -413,7 +415,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#22C55E",
+    backgroundColor: "#1C1C1E",
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 25,
@@ -421,7 +423,7 @@ const styles = StyleSheet.create({
   completeSetText: {
     color: "#FFF",
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: "DMSans_700Bold",
   },
   // Navigation row
   navRow: {
@@ -433,22 +435,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: "#FFF",
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "rgba(0,0,0,0.08)",
   },
   navBtnDisabled: {
     opacity: 0.4,
   },
   navText: {
     fontSize: 11,
-    fontWeight: "600",
-    color: "#374151",
+    fontFamily: "DMSans_500Medium",
+    color: "#000000",
   },
   navTextDisabled: {
-    color: "#D1D5DB",
+    color: "#BBBBBB",
   },
 });

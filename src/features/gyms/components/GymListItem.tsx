@@ -35,8 +35,8 @@ export function GymListItem({ gym, onPress, colors }: GymListItemProps) {
 }
 
 const styles = StyleSheet.create({
-  rowItem: { paddingVertical: 10 },
-  rowTitle: { fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  rowItem: { paddingVertical: 14, paddingHorizontal: 22, borderBottomWidth: 0.5, borderBottomColor: "rgba(0,0,0,0.04)" },
+  rowTitle: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
   rowMeta: { fontSize: 13, marginBottom: 2 },
-  rowAddr: { fontSize: 13 },
+  rowAddr: { fontSize: 12 },
 });

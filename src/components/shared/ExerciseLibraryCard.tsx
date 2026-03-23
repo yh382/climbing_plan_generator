@@ -1,8 +1,10 @@
 // src/components/shared/ExerciseLibraryCard.tsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 type LocaleKey = "zh" | "en";
 
@@ -15,6 +17,8 @@ interface Props {
   imageUrl?: string | null;
   onPress?: () => void;
   locale: LocaleKey;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 export default function ExerciseLibraryCard({
@@ -26,39 +30,43 @@ export default function ExerciseLibraryCard({
   imageUrl,
   onPress,
   locale,
+  isFavorite,
+  onToggleFavorite,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.cardImgWrap}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.cardImg} />
         ) : (
-          <View style={styles.cardImgPlaceholder}>
-            <Ionicons name="image-outline" size={22} color="#9CA3AF" />
-          </View>
+          <View style={styles.cardImgPlaceholder} />
         )}
-        <View style={styles.heartBtn}>
-          <Ionicons name="heart-outline" size={18} color="#111" />
-        </View>
       </View>
 
       <View style={styles.cardRight}>
         <View style={styles.cardTitleRow}>
-          <View style={styles.blueBar} />
-          <Text style={styles.cardTitle} numberOfLines={1}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
             {title}
           </Text>
+          {onToggleFavorite && (
+            <TouchableOpacity onPress={onToggleFavorite} hitSlop={8}>
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={18}
+                color={isFavorite ? colors.accent : colors.textTertiary}
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         {description ? (
-          <Text style={styles.cardDesc} numberOfLines={2}>
+          <Text style={styles.cardSubtitle} numberOfLines={2}>
             {description}
           </Text>
-        ) : (
-          <Text style={[styles.cardDesc, { color: "#9CA3AF" }]} numberOfLines={2}>
-            {locale === "zh" ? "暂无简介" : "No description yet"}
-          </Text>
-        )}
+        ) : null}
 
         <Text style={styles.cardMeta} numberOfLines={1}>
           {goal} · {level}
@@ -67,18 +75,18 @@ export default function ExerciseLibraryCard({
         <View style={styles.cardBottomRow}>
           <View style={styles.iconRow}>
             <View style={styles.miniIconPill}>
-              <Ionicons name="pricetag-outline" size={14} color="#111" />
+              <Ionicons name="pricetag-outline" size={14} color={colors.textTertiary} />
             </View>
             <View style={styles.miniIconPill}>
-              <Ionicons name="construct-outline" size={14} color="#111" />
+              <Ionicons name="construct-outline" size={14} color={colors.textTertiary} />
             </View>
             <View style={styles.miniIconPill}>
-              <Ionicons name="fitness-outline" size={14} color="#111" />
+              <Ionicons name="fitness-outline" size={14} color={colors.textTertiary} />
             </View>
           </View>
 
           <View style={styles.timePill}>
-            <Ionicons name="time-outline" size={14} color="#111" />
+            <Ionicons name="time-outline" size={14} color={colors.textTertiary} />
             <Text style={styles.timeText}>{minutes ? `${minutes}` : "--"}</Text>
           </View>
         </View>
@@ -87,44 +95,35 @@ export default function ExerciseLibraryCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     flexDirection: "row",
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 10,
-    marginBottom: 12,
+    alignItems: "stretch",
     gap: 12,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    minHeight: 100,
   },
   cardImgWrap: {
-    width: 120,
-    height: 110,
-    borderRadius: 14,
+    width: 88,
+    borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "#F3F4F6",
   },
-  cardImg: { width: "100%", height: "100%" },
+  cardImg: { width: "100%", height: "100%", resizeMode: "cover" as const },
   cardImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  heartBtn: {
-    position: "absolute",
-    left: 10,
-    bottom: 10,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  cardRight: { flex: 1, minHeight: 110, paddingRight: 2 },
+  cardRight: { flex: 1, paddingRight: 2 },
   cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  blueBar: { width: 6, height: 22, borderRadius: 3, backgroundColor: "#2563EB" },
 
-  cardTitle: { fontSize: 16, fontWeight: "800", color: "#111", flexShrink: 1 },
-  cardDesc: { marginTop: 6, fontSize: 12.5, color: "#374151", lineHeight: 16 },
-  cardMeta: { marginTop: 6, fontSize: 11.5, color: "#6B7280" },
+  cardTitle: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary, flexShrink: 1 },
+  cardSubtitle: { marginTop: 3, fontSize: 13, color: colors.textSecondary, fontFamily: theme.fonts.regular, lineHeight: 18 },
+  cardMeta: { marginTop: 3, fontSize: 11.5, color: "#6B7280" },
 
   cardBottomRow: {
     marginTop: "auto",
@@ -135,10 +134,10 @@ const styles = StyleSheet.create({
 
   iconRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   miniIconPill: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -146,11 +145,7 @@ const styles = StyleSheet.create({
   timePill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#F3F4F6",
+    gap: 4,
   },
-  timeText: { fontSize: 13, fontWeight: "800", color: "#111" },
+  timeText: { fontSize: 13, fontFamily: theme.fonts.monoMedium, color: colors.textSecondary },
 });

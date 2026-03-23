@@ -5,10 +5,13 @@ import { Ionicons } from "@expo/vector-icons";
 import useLogsStore from "../../store/useLogsStore";
 import SmartBottomSheet from "../community/components/SmartBottomSheet";
 import { buildFixedGradePyramid } from "../../services/stats";
+import { useThemeColors } from "../../lib/useThemeColors";
 
 type TabType = "boulder" | "rope";
 
 export default function GradePyramid() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { logs } = useLogsStore();
   const [activeTab, setActiveTab] = useState<TabType>("boulder");
 
@@ -46,7 +49,7 @@ export default function GradePyramid() {
           </View>
 
           <TouchableOpacity onPress={() => setHelpOpen(true)} style={styles.helpBtn}>
-            <Ionicons name="help-circle-outline" size={20} color="#64748B" />
+            <Ionicons name="help-circle-outline" size={20} color={colors.chartLabel} />
           </TouchableOpacity>
         </View>
       </View>
@@ -84,20 +87,42 @@ export default function GradePyramid() {
 
       <SmartBottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} mode="list" title="Grade Pyramid">
         <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 14 }}>
-          <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
             能力金字塔反映了你的攀爬基础结构。
           </Text>
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#111", marginBottom: 4 }}>✅ 健康结构：正三角形（底宽顶尖）</Text>
-            <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
-              意味着你有扎实的中低难度积累来支撑高难度的突破。
-            </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{
+              width: 20, height: 20, borderRadius: 4,
+              backgroundColor: 'rgba(48,110,111,0.15)',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name="checkmark" size={12} color="#306E6F" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>
+                健康结构：正三角形
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
+                底宽顶尖，说明有扎实的中低难度积累来支撑高难度突破。
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#111", marginBottom: 4 }}>⚠️ 不健康结构：倒T型或柱状</Text>
-            <Text style={{ fontSize: 13, color: "#374151", lineHeight: 20 }}>
-              说明基础不稳，强行磕红线更容易导致受伤。建议多积累金字塔中下层的路线来加固基础。
-            </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{
+              width: 20, height: 20, borderRadius: 4,
+              backgroundColor: 'rgba(139,111,92,0.15)',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name="warning-outline" size={12} color="#8B6F5C" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>
+                不健康结构：倒 T 型或柱状
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
+                基础不稳，强行碰红线更容易导致受伤。建议多积累金字塔中下层路线。
+              </Text>
+            </View>
           </View>
         </View>
       </SmartBottomSheet>
@@ -105,18 +130,13 @@ export default function GradePyramid() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   chartCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0.5,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0,
   },
   cardHeader: {
     flexDirection: "row",
@@ -126,8 +146,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontFamily: "DMSans_700Bold",
+    color: colors.chartTitle,
   },
   headerControls: {
     flexDirection: "row",
@@ -139,7 +159,7 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: "row",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.toggleBackground,
     borderRadius: 8,
     padding: 2,
   },
@@ -149,19 +169,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   toggleBtnActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    backgroundColor: colors.toggleActiveBackground,
   },
   toggleText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
+    fontFamily: "DMSans_500Medium",
+    color: colors.toggleInactiveText,
   },
   toggleTextActive: {
-    color: "#111827",
+    color: colors.toggleActiveText,
   },
   container: {
     width: "100%",
@@ -177,7 +193,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyText: {
-    color: "#9CA3AF",
+    color: colors.textSecondary,
     fontSize: 13,
     fontStyle: "italic",
   },
@@ -192,7 +208,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 11,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.chartLabel,
     marginRight: 8,
   },
   barTrack: {
@@ -215,6 +231,6 @@ const styles = StyleSheet.create({
     height: 22,
     width: 4,
     borderRadius: 2,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.emptyBarColor,
   },
 });

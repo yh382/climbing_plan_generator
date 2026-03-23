@@ -1,6 +1,7 @@
 import React from "react";
 import { View, TextInput, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 export function BlogSearchBar({
   value,
@@ -11,16 +12,18 @@ export function BlogSearchBar({
   onChange: (t: string) => void;
   placeholder?: string;
 }) {
+  const colors = useThemeColors();
+
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { backgroundColor: colors.backgroundSecondary }]}>
       <View style={styles.iconWrap}>
-        <Ionicons name="search" size={18} color="#6B7280" />
+        <Ionicons name="search" size={16} color={colors.textTertiary} />
       </View>
       <TextInput
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor={colors.textTertiary}
         style={styles.input}
         autoCapitalize="none"
         autoCorrect={false}
@@ -32,22 +35,20 @@ export function BlogSearchBar({
 
 const styles = StyleSheet.create({
   wrap: {
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(17,17,17,0.08)",
-    paddingHorizontal: 12,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     flexDirection: "row",
     alignItems: "center",
   },
   iconWrap: {
-    width: 28,
+    width: 24,
     alignItems: "flex-start",
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: "#111",
+    padding: 0,
   },
 });

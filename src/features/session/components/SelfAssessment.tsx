@@ -16,10 +16,10 @@ interface Props {
 }
 
 const FEELINGS = [
-  { value: 1, icon: "battery-dead-outline" as const, color: "#EF4444", zhLabel: "很累", enLabel: "Exhausted" },
-  { value: 2, icon: "remove-circle-outline" as const, color: "#F59E0B", zhLabel: "一般", enLabel: "Okay" },
-  { value: 3, icon: "happy-outline" as const, color: "#10B981", zhLabel: "不错", enLabel: "Good" },
-  { value: 4, icon: "flame-outline" as const, color: "#F97316", zhLabel: "超棒", enLabel: "Great" },
+  { value: 1, icon: "battery-dead-outline" as const, zhLabel: "很累", enLabel: "Exhausted" },
+  { value: 2, icon: "remove-circle-outline" as const, zhLabel: "一般", enLabel: "Okay" },
+  { value: 3, icon: "happy-outline" as const, zhLabel: "不错", enLabel: "Good" },
+  { value: 4, icon: "flame-outline" as const, zhLabel: "超棒", enLabel: "Great" },
 ];
 
 export default function SelfAssessment({ onSubmit, isZH }: Props) {
@@ -46,10 +46,6 @@ export default function SelfAssessment({ onSubmit, isZH }: Props) {
             style={[
               styles.rpeBtn,
               rpe === n && styles.rpeBtnActive,
-              n <= 3 && rpe === n && { backgroundColor: "#22C55E" },
-              n >= 4 && n <= 6 && rpe === n && { backgroundColor: "#F59E0B" },
-              n >= 7 && n <= 8 && rpe === n && { backgroundColor: "#F97316" },
-              n >= 9 && rpe === n && { backgroundColor: "#EF4444" },
             ]}
             onPress={() => setRpe(n)}
           >
@@ -71,16 +67,15 @@ export default function SelfAssessment({ onSubmit, isZH }: Props) {
             style={[
               styles.feelingBtn,
               feeling === f.value && styles.feelingBtnActive,
-              feeling === f.value && { borderColor: f.color },
             ]}
             onPress={() => setFeeling(f.value)}
           >
             <Ionicons
               name={f.icon}
               size={24}
-              color={feeling === f.value ? f.color : "#9CA3AF"}
+              color={feeling === f.value ? "#FFFFFF" : "#888888"}
             />
-            <Text style={[styles.feelingLabel, feeling === f.value && { color: f.color, fontWeight: "700" }]}>
+            <Text style={[styles.feelingLabel, feeling === f.value && styles.feelingLabelActive]}>
               {isZH ? f.zhLabel : f.enLabel}
             </Text>
           </TouchableOpacity>
@@ -91,7 +86,7 @@ export default function SelfAssessment({ onSubmit, isZH }: Props) {
       <TextInput
         style={styles.input}
         placeholder={isZH ? "备注 (可选)" : "Notes (optional)"}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor="#BBBBBB"
         value={notes}
         onChangeText={setNotes}
         multiline
@@ -108,57 +103,57 @@ export default function SelfAssessment({ onSubmit, isZH }: Props) {
 
 const styles = StyleSheet.create({
   container: { padding: 20 },
-  title: { fontSize: 20, fontWeight: "700", color: "#111", textAlign: "center", marginBottom: 24 },
-  label: { fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 10, marginTop: 16 },
+  title: { fontSize: 20, fontFamily: "DMSans_900Black", color: "#000000", textAlign: "center", marginBottom: 24 },
+  label: { fontSize: 14, fontFamily: "DMSans_500Medium", color: "#000000", marginBottom: 10, marginTop: 16 },
   // RPE
   rpeRow: { flexDirection: "row", justifyContent: "space-between", gap: 4 },
   rpeBtn: {
     width: 30,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F7F7F7",
     alignItems: "center",
     justifyContent: "center",
   },
-  rpeBtnActive: { backgroundColor: "#111827" },
-  rpeText: { fontSize: 14, fontWeight: "600", color: "#6B7280" },
+  rpeBtnActive: { backgroundColor: "#1C1C1E" },
+  rpeText: { fontSize: 14, fontFamily: "DMMono_500Medium", color: "#888888" },
   rpeTextActive: { color: "#FFF" },
   rpeLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
-  rpeLabelText: { fontSize: 11, color: "#9CA3AF" },
+  rpeLabelText: { fontSize: 11, color: "#BBBBBB", fontFamily: "DMSans_400Regular" },
   // Feeling
   feelingRow: { flexDirection: "row", gap: 8, justifyContent: "center" },
   feelingBtn: {
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    backgroundColor: "#F7F7F7",
+    borderWidth: 0,
     minWidth: 70,
   },
-  feelingBtnActive: { borderColor: "#111827", backgroundColor: "#F3F4F6" },
-  feelingLabel: { fontSize: 12, color: "#6B7280", fontWeight: "500", marginTop: 4 },
+  feelingBtnActive: { backgroundColor: "#1C1C1E" },
+  feelingLabel: { fontSize: 12, color: "#888888", fontFamily: "DMSans_500Medium", marginTop: 4 },
+  feelingLabelActive: { color: "#FFFFFF", fontFamily: "DMSans_700Bold" },
   // Input
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F7F7F7",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderWidth: 0,
     padding: 12,
     fontSize: 14,
-    color: "#111",
+    fontFamily: "DMSans_400Regular",
+    color: "#000000",
     minHeight: 56,
     marginTop: 16,
     textAlignVertical: "top",
   },
   // Submit
   submitBtn: {
-    backgroundColor: "#111827",
+    backgroundColor: "#1C1C1E",
     borderRadius: 28,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 24,
   },
-  submitText: { fontSize: 16, fontWeight: "700", color: "#FFF" },
+  submitText: { fontSize: 16, fontFamily: "DMSans_700Bold", color: "#FFF" },
 });

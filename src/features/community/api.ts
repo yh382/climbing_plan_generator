@@ -25,6 +25,9 @@ export const communityApi = {
   getUserPosts: (userId: string, skip = 0, limit = 20) =>
     api.get<UserPostOut[]>(`/posts/user/${userId}?skip=${skip}&limit=${limit}`),
 
+  getGymPosts: (gymId: string, skip = 0, limit = 20) =>
+    api.get<any[]>(`/posts?gym_id=${gymId}&skip=${skip}&limit=${limit}`),
+
   getPost: (postId: string) =>
     api.get<any>(`/posts/${postId}`),
 

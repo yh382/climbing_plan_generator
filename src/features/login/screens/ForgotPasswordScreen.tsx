@@ -1,84 +1,223 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, useColorScheme } from "react-native";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, Pressable, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { authApi } from "../api";
+import { theme } from "../../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const t = (en: string) => en;
 
 export default function ForgotPasswordScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
   const [email, setEmail] = useState("");
-  const canSubmit = useMemo(() => email.trim().length > 0, [email]);
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const canSubmit = useMemo(
+    () => email.trim().length > 0 && !loading && cooldown === 0,
+    [email, loading, cooldown],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const startCooldown = () => {
+    setCooldown(60);
+    timerRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const onSend = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+    try {
+      await authApi.forgotPassword(email.trim());
+      setSent(true);
+      startCooldown();
+    } catch {
+      // Silently handle — still show sent state to prevent email enumeration
+      setSent(true);
+      startCooldown();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    if (cooldown > 0 || loading) return;
+    setLoading(true);
+    try {
+      await authApi.forgotPassword(email.trim());
+      startCooldown();
+    } catch {} finally {
+      setLoading(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* 返回按钮 */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ position: 'absolute', top: 60, left: 22, zIndex: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingBottom: 80 }}>
+          <View style={styles.checkCircle}>
+            <Ionicons name="checkmark" size={32} color="#FFFFFF" />
+          </View>
+          <Text style={{
+            fontSize: 26, fontFamily: theme.fonts.black, color: colors.textPrimary,
+            letterSpacing: -1, textAlign: 'center', marginBottom: 8,
+          }}>
+            Check your email
+          </Text>
+          <Text style={{
+            fontSize: 14, color: colors.textSecondary,
+            textAlign: 'center', lineHeight: 22,
+          }}>
+            {t("We sent a reset link to")} {email.trim()}
+          </Text>
+
+          <Pressable
+            disabled={cooldown > 0 || loading}
+            onPress={onResend}
+            style={({ pressed }) => [
+              styles.darkPill,
+              { opacity: cooldown > 0 || loading ? 0.5 : pressed ? 0.9 : 1, marginTop: 28, alignSelf: 'stretch' },
+            ]}
+          >
+            <Text style={styles.darkPillText}>
+              {cooldown > 0 ? `${t("Resend")} (${cooldown}s)` : t("Resend")}
+            </Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textTertiary }}>
+              {t("Back to login")}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? "#0B1220" : "#FFFFFF" }]}>
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={22} color={isDark ? "#E5E7EB" : "#0F172A"} />
-        <Text style={[styles.backText, { color: isDark ? "#E5E7EB" : "#0F172A" }]}>{t("Back")}</Text>
-      </Pressable>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* 返回按钮 (绝对定位) */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={{ position: 'absolute', top: 60, left: 22, zIndex: 10 }}
+      >
+        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+      </TouchableOpacity>
 
-      <Text style={[styles.title, { color: isDark ? "#E5E7EB" : "#0F172A" }]}>{t("Forgot password")}</Text>
-      <Text style={[styles.subtitle, { color: isDark ? "#94A3B8" : "#64748B" }]}>
-        {t("Enter your email and we’ll send a reset link. (Coming soon)")}
-      </Text>
+      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
+        {/* 锁图标圆圈 */}
+        <View style={{ alignItems: 'center', marginBottom: 24 }}>
+          <View style={{
+            width: 64, height: 64, borderRadius: 32,
+            backgroundColor: 'rgba(48,110,111,0.12)',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="lock-closed" size={28} color="#306E6F" />
+          </View>
+        </View>
 
-      <View style={{ marginTop: 18 }}>
-        <Text style={[styles.label, { color: isDark ? "#CBD5E1" : "#334155" }]}>{t("Email")}</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-          style={[
-            styles.input,
-            { color: isDark ? "#E5E7EB" : "#0F172A", borderColor: isDark ? "#1F2A44" : "#E2E8F0" },
-          ]}
-        />
+        {/* 标题 */}
+        <Text style={{
+          fontSize: 26, fontFamily: theme.fonts.black, color: colors.textPrimary,
+          letterSpacing: -1, textAlign: 'center', marginBottom: 8,
+        }}>
+          Forgot password?
+        </Text>
+        <Text style={{
+          fontSize: 14, color: colors.textSecondary,
+          textAlign: 'center', lineHeight: 22, marginBottom: 32,
+        }}>
+          Enter your email and we'll send you a reset link
+        </Text>
 
+        {/* 输入框 (无边框填充) */}
+        <View style={styles.inputWrap}>
+          <TextInput
+            value={email} onChangeText={setEmail}
+            autoCapitalize="none" keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.inputText}
+          />
+        </View>
+
+        {/* 发送按钮 (深色胶囊) */}
         <Pressable
           disabled={!canSubmit}
-          onPress={() => Alert.alert(t("Coming soon"), t("Reset password API is not ready yet."))}
+          onPress={onSend}
           style={({ pressed }) => [
-            styles.button,
+            styles.darkPill,
             { opacity: !canSubmit ? 0.5 : pressed ? 0.9 : 1 },
           ]}
         >
-          <Text style={styles.buttonText}>{t("Send reset link")}</Text>
+          <Text style={styles.darkPillText}>
+            {loading ? t("Sending...") : t("Send reset link")}
+          </Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 60 },
-  backRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  backText: { fontSize: 14, fontWeight: "600" },
-
-  title: { fontSize: 26, fontWeight: "900", marginTop: 8 },
-  subtitle: { marginTop: 8, fontSize: 14, lineHeight: 20 },
-
-  label: { fontSize: 12, fontWeight: "700", marginBottom: 8, marginTop: 18 },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontSize: 15,
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  inputWrap: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 11,
   },
-
-  button: {
+  inputText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontFamily: theme.fonts.regular,
+  },
+  darkPill: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
     marginTop: 20,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#00665E",
   },
-  buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
+  darkPillText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  checkCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#306E6F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
 });

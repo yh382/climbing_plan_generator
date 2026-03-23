@@ -33,8 +33,8 @@ export default function DualActivityRing({
   climbCount = 0,
   climbGoal = 10,
   parts = [],
-  outerColor = "#A5D23D",
-  innerColor = "#3B82F6",
+  outerColor = "#A08060",
+  innerColor = "#306E6F",
   bgColor = "#F3F4F6",
   style,
 }: Props) {
@@ -185,8 +185,8 @@ export default function DualActivityRing({
 const styles = StyleSheet.create({
   container: { alignItems: "center" },
   centerText: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" },
-  totalLabel: { fontSize: 12, color: "#9CA3AF", fontWeight: "700", letterSpacing: 0.5, marginBottom: 2 },
-  totalCount: { fontSize: 36, fontWeight: "800", color: "#111827", lineHeight: 40 },
+  totalLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", letterSpacing: 1.2, marginBottom: 2 },
+  totalCount: { fontSize: 36, fontFamily: "DMSans_900Black", color: "#111111", lineHeight: 40 },
   planLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
   
   barWrapper: {

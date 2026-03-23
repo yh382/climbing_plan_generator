@@ -10,7 +10,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import { GlassView } from "expo-glass-effect";
-import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   Extrapolate,
   interpolate,
@@ -73,29 +72,7 @@ export function GlassTopBar({
         style={[StyleSheet.absoluteFill, glassOpacity]}
         pointerEvents="none"
       >
-        {Platform.OS === "ios" ? (
-          <GlassView
-            glassEffectStyle="regular"
-            style={StyleSheet.absoluteFill}
-          />
-        ) : (
-          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
-        )}
-
-        {/* 轻微 tint：减少纯白背景下的“收口线” */}
-        <View style={styles.tintOverlay} />
-
-        {/* 底部溶解：把材质自然过渡到透明（无硬分界线） */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[
-            "rgba(255,255,255,0.55)",
-            "rgba(255,255,255,0.18)",
-            "rgba(255,255,255,0.00)",
-          ]}
-          locations={[0, 0.55, 1]}
-          style={styles.bottomDissolve}
-        />
+        <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
       </Animated.View>
 
       {/* 内容层（按钮位置不变） */}
@@ -204,18 +181,6 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
-  tintOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.20)",
-  },
-
-  bottomDissolve: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -18,
-    height: 34,
-  },
 });
 
 const btn = StyleSheet.create({

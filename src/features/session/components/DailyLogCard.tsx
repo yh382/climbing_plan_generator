@@ -1,6 +1,9 @@
 // src/features/session/components/DailyLogCard.tsx
+import { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { getColorForGrade } from "../../../../lib/gradeColors";
 
 interface Props {
@@ -13,13 +16,15 @@ interface Props {
 }
 
 export default function DailyLogCard({ dateLabel, duration, climbs, sends, maxGrade, onPress }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const gc = getColorForGrade(maxGrade);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.header}>
         <Text style={styles.dateText}>{dateLabel}</Text>
-        <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
       </View>
 
       <View style={styles.grid}>
@@ -50,27 +55,21 @@ export default function DailyLogCard({ dateLabel, duration, climbs, sends, maxGr
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
-    backgroundColor: "#FFF",
-    marginHorizontal: 16,
+    backgroundColor: colors.backgroundSecondary,
+    marginHorizontal: theme.spacing.screenPadding,
     marginBottom: 12,
-    borderRadius: 16,
+    borderRadius: theme.borderRadius.card,
     padding: 16,
-    borderWidth: 0.6,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
   header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  dateText: { fontSize: 14, fontWeight: "600", color: "#374151" },
+  dateText: { fontSize: 14, fontWeight: "600", fontFamily: theme.fonts.medium, color: colors.textPrimary },
   grid: { flexDirection: "row", alignItems: "center" },
   item: { flex: 1, alignItems: "center" },
-  val: { fontSize: 18, fontWeight: "800", color: "#111" },
-  label: { fontSize: 11, color: "#9CA3AF", marginTop: 2 },
-  divider: { width: 1, height: 24, backgroundColor: "#F3F4F6" },
+  val: { fontSize: 18, fontWeight: "800", fontFamily: theme.fonts.monoMedium, color: colors.textPrimary },
+  label: { fontSize: theme.typography.caption.fontSize, fontFamily: theme.fonts.regular, color: colors.textTertiary, marginTop: 2 },
+  divider: { width: 1, height: 24, backgroundColor: colors.border },
   gradeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   gradeDot: { width: 6, height: 6, borderRadius: 3 },
 });

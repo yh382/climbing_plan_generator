@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -29,7 +30,9 @@ import { useChallengeDetailData } from "./data/useChallengeDetailData";
 import { useUserStore } from "@/store/useUserStore";
 
 import ChallengeDetailsModal from "./ChallengeDetailsModal";
-import { GlassView } from "expo-glass-effect";
+import { BlurView } from "expo-blur";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const COVER_H = 280;
 const SIDE_PADDING = 12;
@@ -58,6 +61,8 @@ function daysLeft(endISO?: string) {
 
 // Category chip
 function CategoryChip({ text }: { text: string }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.chip as ViewStyle}>
       <Text style={styles.chipText as TextStyle}>{text}</Text>
@@ -79,10 +84,12 @@ function InfoRow({
   isLast?: boolean;
   onPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const Content = (
     <View style={[styles.infoRow as ViewStyle, isLast && { borderBottomWidth: 0 }]}>
       <View style={styles.infoIconWrap}>
-        <Ionicons name={icon} size={22} color="#374151" />
+        <Ionicons name={icon} size={22} color={colors.textSecondary} />
       </View>
       <View style={styles.infoContent}>
         <View style={{ flex: 1, paddingRight: 8, justifyContent: "center" }}>{children}</View>
@@ -102,6 +109,8 @@ function InfoRow({
 }
 
 export default function ChallengeDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -120,6 +129,17 @@ export default function ChallengeDetailScreen() {
     return {
       opacity,
       shadowOpacity: interpolate(scrollY.value, [0, COVER_H], [0, 0.05], "clamp"),
+    };
+  });
+
+  const coverParallaxStyle = useAnimatedStyle(() => {
+    if (scrollY.value >= 0) return {};
+    const absScroll = -scrollY.value;
+    return {
+      transform: [
+        { scale: 1 + absScroll / COVER_H },
+        { translateY: scrollY.value / 2 },
+      ],
     };
   });
 
@@ -170,14 +190,12 @@ export default function ChallengeDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
 
       {/* === Animated Header Background & Buttons === */}
       <View style={[styles.headerContainer, { height: insets.top + 50 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerStyle]}>
-          <GlassView
-            glassEffectStyle="regular"
-            style={StyleSheet.absoluteFill}
-          />
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.65)" }]} />
           <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(0,0,0,0.05)" }} />
         </Animated.View>
@@ -196,16 +214,18 @@ export default function ChallengeDetailScreen() {
       >
         {/* === Hero === */}
         <View style={styles.heroWrap}>
-          <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: "#111827" }]}>
-            {challenge.coverUrl ? <Image source={{ uri: challenge.coverUrl }} style={styles.coverImg} /> : null}
-            <View style={styles.coverScrim} />
+          <Animated.View style={coverParallaxStyle}>
+            <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: "#0F0E0C" }]}>
+              {challenge.coverUrl ? <Image source={{ uri: challenge.coverUrl }} style={styles.coverImg} /> : null}
+              <View style={styles.coverScrim} />
 
-            <View style={styles.coverChips}>
-              {chipTexts.map((c) => (
-                <CategoryChip key={c} text={c} />
-              ))}
+              <View style={styles.coverChips}>
+                {chipTexts.map((c) => (
+                  <CategoryChip key={c} text={c} />
+                ))}
+              </View>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Badge/Trophy Center (Strava style) */}
           <View style={styles.badgeCenterWrap}>
@@ -249,7 +269,7 @@ export default function ChallengeDetailScreen() {
           <View style={styles.infoListContainer}>
             <InfoRow icon="business-outline">
               <Text style={styles.infoValue}>
-                <Text style={{ fontWeight: "400", color: "#6B7280" }}>Hosted by </Text>
+                <Text style={{ fontWeight: "400", color: colors.textSecondary }}>Hosted by </Text>
                 {organizerName}
               </Text>
             </InfoRow>
@@ -286,68 +306,70 @@ export default function ChallengeDetailScreen() {
           </View>
         </View>
 
-        {/* === Leaderboard === */}
-        <View style={styles.leaderboardSection}>
-          <View style={styles.leaderboardCard}>
+        {/* === Leaderboard (hidden for lifetime/skill challenges) === */}
+        {challenge.category !== "lifetime" && challenge.category !== "skill" && (
+          <View style={styles.leaderboardSection}>
+            <View style={styles.leaderboardCard}>
 
-            <View style={styles.leaderHeaderRow}>
-              <Text style={styles.cardTitle}>Leaderboard</Text>
-              <View style={styles.participantsBadge}>
-                <Ionicons name="people" size={12} color="#4B5563" style={{marginRight:4}}/>
-                <Text style={styles.participantsText}>{participantsText}</Text>
-              </View>
-            </View>
-
-            {/* Controls Row */}
-            <View style={styles.controlsRow}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <SegmentedTabs
-                  value={tab}
-                  options={[
-                    { key: "leaderboard", label: "Ranking" },
-                  ]}
-                  onChange={setTab}
-                />
-              </View>
-
-              <View style={{ zIndex: 10 }}>
-                <LeaderboardFilters
-                  people={peopleFilter}
-                  gender={genderFilter}
-                  onChangePeople={setPeopleFilter}
-                  onChangeGender={setGenderFilter}
-                />
-              </View>
-            </View>
-
-            {/* Leaderboard content */}
-            <View style={{ marginTop: 4 }}>
-              {leaderboard.length === 0 ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <Text style={{ color: "#9CA3AF", fontSize: 14 }}>No rankings yet.</Text>
+              <View style={styles.leaderHeaderRow}>
+                <Text style={styles.cardTitle}>Leaderboard</Text>
+                <View style={styles.participantsBadge}>
+                  <Ionicons name="people" size={12} color="#4B5563" style={{marginRight:4}}/>
+                  <Text style={styles.participantsText}>{participantsText}</Text>
                 </View>
-              ) : (
-                <View style={{ gap: 8 }}>
-                  {leaderboard.map((u) => (
-                    <RankingRowCard
-                      key={u.userId}
-                      rank={u.rank}
-                      user={{
-                        userId: u.userId,
-                        name: u.username || "Unknown",
-                        points: u.score,
-                        gender: "other",
-                        isFollowing: false,
-                      }}
-                      onPress={() => router.push(`/community/u/${u.userId}`)}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
+              </View>
 
+              {/* Controls Row */}
+              <View style={styles.controlsRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <SegmentedTabs
+                    value={tab}
+                    options={[
+                      { key: "leaderboard", label: "Ranking" },
+                    ]}
+                    onChange={setTab}
+                  />
+                </View>
+
+                <View style={{ zIndex: 10 }}>
+                  <LeaderboardFilters
+                    people={peopleFilter}
+                    gender={genderFilter}
+                    onChangePeople={setPeopleFilter}
+                    onChangeGender={setGenderFilter}
+                  />
+                </View>
+              </View>
+
+              {/* Leaderboard content */}
+              <View style={{ marginTop: 4 }}>
+                {leaderboard.length === 0 ? (
+                  <View style={{ padding: 20, alignItems: "center" }}>
+                    <Text style={{ color: colors.textTertiary, fontSize: 14 }}>No rankings yet.</Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {leaderboard.map((u) => (
+                      <RankingRowCard
+                        key={u.userId}
+                        rank={u.rank}
+                        user={{
+                          userId: u.userId,
+                          name: u.username || "Unknown",
+                          points: u.score,
+                          gender: "other",
+                          isFollowing: false,
+                        }}
+                        onPress={() => router.push(`/community/u/${u.userId}`)}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+
+            </View>
           </View>
-        </View>
+        )}
       </Animated.ScrollView>
 
       <ChallengeDetailsModal
@@ -360,8 +382,8 @@ export default function ChallengeDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   headerContainer: {
     position: "absolute",
@@ -383,7 +405,7 @@ const styles = StyleSheet.create({
   coverImg: { width: "100%", height: "100%" },
   coverScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: "rgba(15,14,12,0.35)",
   },
 
   coverChips: {
@@ -397,14 +419,10 @@ const styles = StyleSheet.create({
     height: 26,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: colors.cardDark,
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  chipText: { fontSize: 12, fontWeight: "700", color: "#111" },
+  chipText: { fontSize: 12, fontFamily: theme.fonts.bold, color: "#FFFFFF" },
 
   badgeCenterWrap: {
     alignItems: "center",
@@ -419,18 +437,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
     borderWidth: 3,
     borderColor: "#FEF3C7",
   },
   badgeSubtext: {
     fontSize: 12,
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
     marginTop: 6,
-    fontWeight: "500",
   },
 
   mainBlock: {
@@ -440,8 +454,8 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 30,
-    fontWeight: "800",
-    color: "#111827",
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
     letterSpacing: -0.5,
     marginBottom: 20,
     marginTop: 4,
@@ -453,24 +467,19 @@ const styles = StyleSheet.create({
     height: 48,
     width: 200,
     alignSelf: "center",
-    borderRadius: 24,
-    backgroundColor: "#22C55E",
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: colors.cardDark,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#22C55E",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
     marginBottom: 20,
   },
-  joinBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF" },
+  joinBtnText: { fontSize: 15, fontFamily: theme.fonts.bold, color: "#FFFFFF" },
 
   joinedPanel: {
-    borderRadius: 16,
-    backgroundColor: "#F0FDF4",
+    borderRadius: theme.borderRadius.card,
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: "#BBF7D0",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 20,
   },
@@ -480,9 +489,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   joinedStat: { flex: 1, alignItems: "center" },
-  joinedStatValue: { fontSize: 24, fontWeight: "800", color: "#15803D" },
-  joinedStatLabel: { fontSize: 12, color: "#4B5563", marginTop: 2 },
-  joinedDivider: { width: 1, height: 32, backgroundColor: "#BBF7D0", marginHorizontal: 16 },
+  joinedStatValue: { fontSize: 24, fontFamily: theme.fonts.monoMedium, color: colors.textPrimary },
+  joinedStatLabel: { fontSize: 12, fontFamily: theme.fonts.medium, color: colors.textSecondary, marginTop: 2 },
+  joinedDivider: { width: 1, height: 32, backgroundColor: colors.border, marginHorizontal: 16 },
 
   infoListContainer: {
     marginTop: 0,
@@ -493,7 +502,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+    borderBottomColor: colors.border,
   },
   infoIconWrap: {
     width: 28,
@@ -508,22 +517,22 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 14,
-    color: "#1F2937",
-    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
     lineHeight: 22,
   },
   infoMuted: {
     fontSize: 15,
-    color: "#9CA3AF",
-    fontWeight: "500",
+    fontFamily: theme.fonts.medium,
+    color: colors.textTertiary,
   },
   infoRight: { marginLeft: 8 },
 
   daysLeftPill: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-    backgroundColor: "#F3F4F6",
+    fontFamily: theme.fonts.monoMedium,
+    color: "#FFFFFF",
+    backgroundColor: colors.cardDark,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
@@ -535,14 +544,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   leaderboardCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.card,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
     zIndex: 1,
   },
 
@@ -561,15 +565,15 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
 
-  cardTitle: { fontSize: 18, fontWeight: "800", color: "#111" },
+  cardTitle: { fontSize: 18, fontFamily: theme.fonts.black, color: colors.textPrimary },
 
   participantsBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.border,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  participantsText: { fontSize: 12, fontWeight: "700", color: "#4B5563" },
+  participantsText: { fontSize: 12, fontFamily: theme.fonts.bold, color: colors.textSecondary },
 });

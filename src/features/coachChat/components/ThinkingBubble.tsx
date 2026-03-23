@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { View } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,10 +11,10 @@ import Animated, {
 } from "react-native-reanimated";
 
 const DOT_SIZE = 8;
-const DOT_COLOR = "#9CA3AF";
 const DURATION = 400;
 
 function PulsingDot({ delay }: { delay: number }) {
+  const colors = useThemeColors();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.4);
 
@@ -44,7 +45,7 @@ function PulsingDot({ delay }: { delay: number }) {
     width: DOT_SIZE,
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
-    backgroundColor: DOT_COLOR,
+    backgroundColor: colors.textSecondary,
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
@@ -53,6 +54,7 @@ function PulsingDot({ delay }: { delay: number }) {
 }
 
 export default function ThinkingBubble() {
+  const colors = useThemeColors();
   return (
     <View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: "flex-start" }}>
       <View
@@ -60,9 +62,9 @@ export default function ThinkingBubble() {
           borderRadius: 18,
           paddingHorizontal: 18,
           paddingVertical: 14,
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.bubbleAI,
           borderWidth: 0.8,
-          borderColor: "#E5E7EB",
+          borderColor: colors.bubbleAIBorder,
           flexDirection: "row",
           gap: 6,
         }}

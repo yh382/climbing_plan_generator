@@ -1,6 +1,6 @@
 // app/library/plan-overview.tsx
 import { useState, useMemo, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Dimensions, Share } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,13 +8,23 @@ import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
 
 import { usePlanDetail } from "../../src/features/plans/hooks";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
+import SmartBottomSheet from "../../src/features/community/components/SmartBottomSheet";
 import { TRAINING_TYPE_GRADIENTS } from "../../src/components/plancard/PlanCard.gradients";
 import type { TrainingType } from "../../src/components/plancard/PlanCard.types";
 import type { PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
+
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+} from "react-native-reanimated";
+import { theme } from "../../src/lib/theme";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const HERO_HEIGHT = SCREEN_WIDTH * 0.65; // ~65% width for hero image
@@ -31,12 +41,31 @@ function detectLocale(): "zh" | "en" {
 export default function PlanOverviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { planId, source } = useLocalSearchParams<{ planId: string; source: string }>();
   const { plan, loading, refresh } = usePlanDetail(planId ?? null);
 
   const locale = useMemo(() => detectLocale(), []);
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [planMenuVisible, setPlanMenuVisible] = useState(false);
+
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  const heroParallaxStyle = useAnimatedStyle(() => {
+    if (scrollY.value >= 0) return {};
+    const absScroll = -scrollY.value;
+    return {
+      transform: [
+        { scale: 1 + absScroll / HERO_HEIGHT },
+        { translateY: scrollY.value / 2 },
+      ],
+    };
+  });
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   // Derive weeks and sessions from planJson
@@ -128,18 +157,18 @@ export default function PlanOverviewScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FAFAFA", justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#111" />
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.cardDark} />
       </View>
     );
   }
 
   if (!plan) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FAFAFA", justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ color: "#9CA3AF", fontSize: 15 }}>Plan not found</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Plan not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-          <Text style={{ color: "#4F46E5", fontWeight: "700" }}>Go Back</Text>
+          <Text style={{ color: colors.cardDark, fontWeight: "700" }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -153,37 +182,22 @@ export default function PlanOverviewScreen() {
   const gradient = TRAINING_TYPE_GRADIENTS[(plan.trainingType as TrainingType) || "mixed"] ?? TRAINING_TYPE_GRADIENTS.mixed;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style="light" />
       {/* Floating TopBar (overlays hero) */}
       <View style={[styles.floatingTopBar, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.floatingBtn}>
           <Ionicons name="chevron-back" size={22} color="#FFF" />
         </TouchableOpacity>
 
-        {source === "user" ? (
-          <TouchableOpacity
-            onPress={() => {
-              const sl = plan?.status === "active"
-                ? (locale === "zh" ? "暂停计划" : "Pause Plan")
-                : (locale === "zh" ? "激活计划" : "Activate Plan");
-              Alert.alert(
-                locale === "zh" ? "计划操作" : "Plan Actions",
-                undefined,
-                [
-                  { text: sl, onPress: handleStatusToggle },
-                  { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" },
-                ]
-              );
-            }}
-            style={styles.floatingBtn}
-          >
-            <Ionicons name="ellipsis-horizontal" size={22} color="#FFF" />
-          </TouchableOpacity>
-        ) : null}
+        <TouchableOpacity onPress={() => setPlanMenuVisible(true)} style={styles.floatingBtn}>
+          <Ionicons name="ellipsis-horizontal" size={22} color="#FFF" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView stickyHeaderIndices={[2]} contentContainerStyle={{ paddingBottom: 120 }}>
+      <Animated.ScrollView onScroll={scrollHandler} scrollEventThrottle={16} stickyHeaderIndices={[2]} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero Image */}
+        <Animated.View style={heroParallaxStyle}>
         <View style={[styles.heroContainer, { height: HERO_HEIGHT }]}>
           {coverUrl ? (
             <Image
@@ -201,9 +215,9 @@ export default function PlanOverviewScreen() {
             />
           )}
 
-          {/* Bottom gradient overlay */}
+          {/* Bottom gradient overlay — cool black #0D0F10 */}
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.65)"]}
+            colors={["transparent", "#0D0F10"]}
             style={styles.heroGradient}
           />
 
@@ -216,6 +230,7 @@ export default function PlanOverviewScreen() {
             </Text>
           </View>
         </View>
+        </Animated.View>
 
         {/* Meta tags + progress */}
         <View style={styles.metaSection}>
@@ -304,7 +319,11 @@ export default function PlanOverviewScreen() {
                   onStartSession={source === "user" ? () => {
                     router.push({
                       pathname: "/library/plan-view",
-                      params: { sessionJson: JSON.stringify(item), planId: planId ?? "" },
+                      params: {
+                        sessionJson: JSON.stringify(item),
+                        planId: planId ?? "",
+                        planSessionId: item.session_id || "",
+                      },
                     } as any);
                   } : undefined}
                 />
@@ -316,7 +335,7 @@ export default function PlanOverviewScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Bottom action */}
       {showAddButton && (
@@ -331,11 +350,116 @@ export default function PlanOverviewScreen() {
         </View>
       )}
 
+      {/* Plan menu bottom sheet */}
+      <SmartBottomSheet visible={planMenuVisible} onClose={() => setPlanMenuVisible(false)} mode="menu">
+        {/* Share to Post */}
+        <TouchableOpacity style={styles.menuRow} onPress={() => {
+          setPlanMenuVisible(false);
+          router.push({
+            pathname: '/community/create',
+            params: {
+              prefillAttachType: 'plan',
+              prefillAttachId: planId,
+              prefillAttachTitle: plan?.title || '',
+              prefillAttachSubtitle: `${totalWeeks} weeks · ${sessionsPerWeek || '—'} sessions/wk · ${plan?.trainingType || ''}`,
+            },
+          });
+        }}>
+          <Ionicons name="create-outline" size={20} color={colors.textPrimary} />
+          <Text style={styles.menuRowText}>Share to Post</Text>
+        </TouchableOpacity>
+
+        {/* Share via... */}
+        <TouchableOpacity style={styles.menuRow} onPress={async () => {
+          setPlanMenuVisible(false);
+          await Share.share({ message: `Check out "${plan?.title}" training plan on ClimMate!` });
+        }}>
+          <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
+          <Text style={styles.menuRowText}>Share via...</Text>
+        </TouchableOpacity>
+
+        {/* Pause/Activate (only for user's own plan) */}
+        {source === "user" && plan && plan.status !== "completed" && (
+          <TouchableOpacity style={styles.menuRow} onPress={() => {
+            setPlanMenuVisible(false);
+            handleStatusToggle();
+          }}>
+            <Ionicons name={plan.status === "active" ? "pause-outline" : "play-outline"} size={20} color={colors.textPrimary} />
+            <Text style={styles.menuRowText}>
+              {plan.status === "active"
+                ? (locale === "zh" ? "暂停计划" : "Pause Plan")
+                : (locale === "zh" ? "激活计划" : "Activate Plan")}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Complete Plan */}
+        {source === "user" && plan && plan.status !== "completed" && (
+          <TouchableOpacity style={styles.menuRow} onPress={() => {
+            setPlanMenuVisible(false);
+            Alert.alert(
+              locale === "zh" ? "完成计划" : "Complete Plan",
+              locale === "zh" ? "标记为已完成？" : "Mark this plan as completed?",
+              [
+                { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
+                {
+                  text: locale === "zh" ? "确认" : "Confirm",
+                  onPress: async () => {
+                    try {
+                      await plansApi.updatePlanStatus(plan.id, "completed");
+                      router.back();
+                    } catch {
+                      Alert.alert("Error", "Failed to complete plan.");
+                    }
+                  },
+                },
+              ]
+            );
+          }}>
+            <Ionicons name="checkmark-done-outline" size={20} color={colors.textPrimary} />
+            <Text style={styles.menuRowText}>
+              {locale === "zh" ? "完成计划" : "Complete Plan"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Delete Plan */}
+        {source === "user" && plan && (
+          <TouchableOpacity style={styles.menuRow} onPress={() => {
+            setPlanMenuVisible(false);
+            Alert.alert(
+              locale === "zh" ? "删除计划" : "Delete Plan",
+              locale === "zh" ? "删除后无法恢复" : "This cannot be undone.",
+              [
+                { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
+                {
+                  text: locale === "zh" ? "删除" : "Delete",
+                  style: "destructive" as const,
+                  onPress: async () => {
+                    try {
+                      await plansApi.deletePlan(plan.id);
+                      router.back();
+                    } catch {
+                      Alert.alert("Error", "Failed to delete plan.");
+                    }
+                  },
+                },
+              ]
+            );
+          }}>
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            <Text style={[styles.menuRowText, { color: "#EF4444" }]}>
+              {locale === "zh" ? "删除计划" : "Delete Plan"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </SmartBottomSheet>
+
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   // Floating top bar
   floatingTopBar: {
     position: "absolute",
@@ -374,28 +498,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
+    padding: theme.spacing.screenPadding,
     paddingBottom: 16,
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 28,
+    fontFamily: theme.fonts.black,
     color: "#FFFFFF",
-    lineHeight: 28,
-    textShadowColor: "rgba(0,0,0,0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    lineHeight: 32,
+    letterSpacing: -1,
   },
   heroMeta: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.85)",
-    marginTop: 4,
+    fontFamily: theme.fonts.regular,
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 6,
   },
 
   // Meta section below hero
   metaSection: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     padding: 16,
     paddingTop: 14,
   },
@@ -405,49 +527,49 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metaPill: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.cardDark,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
+    borderRadius: theme.borderRadius.pill,
   },
   metaPillText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
+    fontFamily: theme.fonts.bold,
+    color: "#FFFFFF",
   },
   activePill: {
-    backgroundColor: "#D1FAE5",
+    backgroundColor: colors.accent,
   },
   activePillText: {
-    color: "#065F46",
+    color: "#FFFFFF",
   },
 
-  progressLabel: { fontSize: 12, fontWeight: "600", color: "#374151" },
-  progressVal: { fontSize: 12, fontWeight: "700", color: "#111" },
-  progressTrack: { height: 6, backgroundColor: "#F3F4F6", borderRadius: 3, marginTop: 4 },
-  progressFill: { height: "100%", backgroundColor: "#10B981", borderRadius: 3 },
+  progressLabel: { fontSize: 12, fontFamily: theme.fonts.medium, color: colors.textSecondary },
+  progressVal: { fontSize: 12, fontFamily: theme.fonts.monoMedium, color: colors.textPrimary },
+  progressTrack: { height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4 },
+  progressFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 2 },
 
-  navWrapper: { backgroundColor: "#FAFAFA", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  navWrapper: { backgroundColor: colors.background, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   navContent: { paddingHorizontal: 16, gap: 10 },
   weekCard: {
     width: 80, height: 60,
-    backgroundColor: "#FFF", borderRadius: 12, padding: 8,
+    backgroundColor: colors.backgroundSecondary, borderRadius: theme.borderRadius.cardSmall, padding: 8,
     justifyContent: "space-between", alignItems: "center",
-    borderWidth: 1, borderColor: "#F3F4F6",
+    borderWidth: 1, borderColor: colors.border,
   },
-  weekCardActive: { backgroundColor: "#111", borderColor: "#111", transform: [{ scale: 1.05 }] },
-  weekNum: { fontSize: 12, color: "#9CA3AF", fontWeight: "600" },
-  weekNumActive: { color: "#FFF" },
+  weekCardActive: { backgroundColor: colors.cardDark, borderColor: colors.cardDark },
+  weekNum: { fontSize: 12, color: colors.textTertiary, fontFamily: theme.fonts.bold },
+  weekNumActive: { color: "#FFFFFF" },
   dotsRow: { flexDirection: "row", gap: 3 },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB" },
-  dotActive: { backgroundColor: "#34D399" },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  dotActive: { backgroundColor: colors.accent },
 
   listContainer: { paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
   weekHeader: { marginBottom: 16 },
-  weekHeaderTitle: { fontSize: 16, fontWeight: "700", color: "#374151" },
+  weekHeaderTitle: { fontSize: 16, fontFamily: theme.fonts.bold, color: colors.textPrimary },
 
   emptyBox: { padding: 40, alignItems: "center" },
-  emptyText: { color: "#9CA3AF" },
+  emptyText: { color: colors.textSecondary },
 
   bottomFloat: {
     position: "absolute", bottom: 0, left: 0, right: 0,
@@ -456,14 +578,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mainBtn: {
-    backgroundColor: "#111",
+    backgroundColor: colors.cardDark,
     width: "100%",
     height: 54,
-    borderRadius: 27,
+    borderRadius: theme.borderRadius.pill,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
   },
-  mainBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  mainBtnText: { color: "#FFF", fontFamily: theme.fonts.bold, fontSize: 16 },
+
+  menuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  menuRowText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: colors.textPrimary,
+  },
 });

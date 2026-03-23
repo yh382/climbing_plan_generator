@@ -149,10 +149,10 @@ export default function ActionDetailModal({ visible, onClose, item, isZH }: Prop
   // --- UI 辅助函数 ---
   const getPhaseColor = () => {
     switch (phase) {
-      case "PREPARE": return "#f59e0b"; // 黄色 (准备)
-      case "WORK": return "#22c55e";    // 绿色 (训练)
-      case "REST_REP": return "#3b82f6"; // 蓝色 (小休)
-      case "REST_SET": return "#6366f1"; // 紫色 (大休)
+      case "PREPARE": return "#8B6F5C"; // 暖棕 (准备)
+      case "WORK": return "#306E6F";    // accent (训练)
+      case "REST_REP": return "#888888"; // 灰 (小休)
+      case "REST_SET": return "#BBBBBB"; // 浅灰 (大休)
       case "COMPLETE": return "#10b981"; // 深绿 (完成)
       default: return "#f8fafc";
     }
@@ -230,7 +230,7 @@ export default function ActionDetailModal({ visible, onClose, item, isZH }: Prop
               
               {/* 左侧：大倒计时 */}
               <View style={styles.timerInfo}>
-                <Text style={[styles.timerLabel, { color: phase === 'WORK' ? '#16a34a' : '#64748b' }]}>
+                <Text style={[styles.timerLabel, { color: phase === 'WORK' ? '#306E6F' : '#64748b' }]}>
                   {getPhaseLabel()}
                 </Text>
                 <Text style={[styles.timerValue, { color: phase === 'IDLE' ? '#94a3b8' : '#0f172a' }]}>

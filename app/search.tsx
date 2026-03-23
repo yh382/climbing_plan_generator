@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,10 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { searchApi, type SearchUserResult } from "@/features/search/api";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { searchApi, type SearchUserResult, type RecommendedUser } from "@/features/search/api";
+import UserRecommendCard from "@/features/search/UserRecommendCard";
 import type { ChallengeOut } from "@/features/community/challenges/types";
 import type { EventOut } from "@/features/community/events/types";
 
@@ -25,6 +28,8 @@ const TABS: { key: SearchTab; label: string; icon: keyof typeof Ionicons.glyphMa
 ];
 
 export default function UniversalSearchScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
@@ -36,6 +41,10 @@ export default function UniversalSearchScreen() {
   const [challenges, setChallenges] = useState<ChallengeOut[]>([]);
   const [events, setEvents] = useState<EventOut[]>([]);
 
+  // Recommended users for Community tab
+  const [recommended, setRecommended] = useState<RecommendedUser[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+
   // Recommended content for Activity tab (no query)
   const [recChallenge, setRecChallenge] = useState<ChallengeOut | null>(null);
   const [recEvent, setRecEvent] = useState<EventOut | null>(null);
@@ -44,6 +53,11 @@ export default function UniversalSearchScreen() {
 
   // Load recommended content on mount
   useEffect(() => {
+    setRecLoading(true);
+    searchApi.getRecommendedUsers()
+      .then(setRecommended)
+      .catch(() => {})
+      .finally(() => setRecLoading(false));
     searchApi.searchChallenges("").then((all) => {
       if (all.length > 0) setRecChallenge(all[0]);
     }).catch(() => {});
@@ -110,7 +124,7 @@ export default function UniversalSearchScreen() {
   const hasQuery = query.trim().length > 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -169,9 +183,24 @@ export default function UniversalSearchScreen() {
           {activeTab === "community" && (
             <>
               {!hasQuery ? (
-                <View style={styles.hintBox}>
-                  <Ionicons name="search" size={32} color="#E5E7EB" />
-                  <Text style={styles.hintText}>Search for climbers by name</Text>
+                <View style={{ gap: 8 }}>
+                  <Text style={styles.sectionLabel}>Suggested Climbers</Text>
+                  {recLoading ? (
+                    <ActivityIndicator size="small" color="#111" style={{ marginTop: 20 }} />
+                  ) : recommended.length > 0 ? (
+                    recommended.map((u) => (
+                      <UserRecommendCard
+                        key={u.user_id}
+                        user={u}
+                        onPress={(id) => router.push(`/community/u/${id}`)}
+                      />
+                    ))
+                  ) : (
+                    <View style={styles.hintBox}>
+                      <Ionicons name="search" size={32} color="#E5E7EB" />
+                      <Text style={styles.hintText}>Search for climbers by name</Text>
+                    </View>
+                  )}
                 </View>
               ) : users.length === 0 ? (
                 <View style={styles.hintBox}>
@@ -352,7 +381,7 @@ export default function UniversalSearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -364,12 +393,18 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     height: 40,
-    borderRadius: 20,
+    borderRadius: theme.borderRadius.pill,
     paddingHorizontal: 12,
   },
-  input: { flex: 1, marginLeft: 8, fontSize: 16, height: "100%" },
+  input: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    height: "100%",
+  },
 
   // Tabs
   tabRow: {
@@ -385,10 +420,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
   },
-  tabChipActive: { backgroundColor: "#111" },
-  tabChipText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  tabChipActive: { backgroundColor: colors.cardDark },
+  tabChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
+  },
   tabChipTextActive: { color: "#FFF" },
 
   center: {
@@ -397,7 +437,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
   },
-  emptyText: { color: "#9CA3AF", fontSize: 15, textAlign: "center" },
+  emptyText: {
+    color: colors.textTertiary,
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    textAlign: "center",
+  },
 
   hintBox: {
     alignItems: "center",
@@ -405,14 +450,19 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     gap: 12,
   },
-  hintText: { color: "#9CA3AF", fontSize: 15 },
+  hintText: {
+    color: colors.textTertiary,
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+  },
 
   // Result sections
   section: { marginTop: 16 },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.bold,
+    color: colors.textTertiary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -427,7 +477,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
   },
   avatarPlaceholder: {
     alignItems: "center",
@@ -439,8 +489,18 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
   },
-  rowTitle: { fontSize: 15, fontWeight: "600", color: "#111" },
-  rowSub: { fontSize: 13, color: "#6B7280", marginTop: 1 },
+  rowTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+  },
+  rowSub: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
 
   // Coming soon
   comingSoon: {
@@ -449,6 +509,15 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     gap: 10,
   },
-  comingSoonText: { fontSize: 16, fontWeight: "700", color: "#9CA3AF" },
-  comingSoonSub: { fontSize: 13, color: "#D1D5DB" },
+  comingSoonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.textTertiary,
+  },
+  comingSoonSub: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+  },
 });

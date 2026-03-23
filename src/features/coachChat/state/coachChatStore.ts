@@ -417,8 +417,9 @@ export const useCoachChatStore = create<CoachChatStore>((set, get) => ({
 
         const updatedConversations = cur.conversations.map((c) => (c.id === id ? updatedConv : c));
 
+        const hasUserMessages = finalMessages.some((m) => m.role === "user");
         set({
-          state: { ...cur, isBusy: false, streamingMsgId: null, messages: finalMessages, conversations: updatedConversations },
+          state: { ...cur, isBusy: false, streamingMsgId: null, taskBarVisible: !hasUserMessages, messages: finalMessages, conversations: updatedConversations },
         });
       })
       .catch((err) => {

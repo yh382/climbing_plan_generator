@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Pressable } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useRouter } from "expo-router";
 
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
@@ -21,13 +23,18 @@ import type { HeaderViewModel } from "./basicinfo/types";
 type Props = {
   user: HeaderViewModel;
   styles: any;
+  initialExpandBody?: boolean;
+  scrollRef?: React.RefObject<Animated.ScrollView | null>;
 };
 
-export default function StatsSection({ user, styles: parentStyles }: Props) {
+export default function StatsSection({ user, styles: parentStyles, initialExpandBody, scrollRef }: Props) {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
   const { logs, sessions } = useLogsStore();
   const [bodyExpanded, setBodyExpanded] = useState(false);
+  const bodyInfoRef = useRef<View>(null);
 
   const now = new Date();
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
@@ -53,6 +60,21 @@ export default function StatsSection({ user, styles: parentStyles }: Props) {
 
   const bodyHeight = useSharedValue(0);
   const bodyOpacity = useSharedValue(0);
+
+  // Auto-expand body info when navigated from setup checklist
+  useEffect(() => {
+    if (initialExpandBody && !bodyExpanded) {
+      setBodyExpanded(true);
+      bodyHeight.value = withTiming(1, { duration: 300 });
+      bodyOpacity.value = withTiming(1, { duration: 250 });
+      // Scroll to body info section after expand animation
+      setTimeout(() => {
+        bodyInfoRef.current?.measureInWindow((_x, y) => {
+          (scrollRef?.current as any)?.scrollTo?.({ y: Math.max(0, y - 60), animated: true });
+        });
+      }, 350);
+    }
+  }, [initialExpandBody]);
 
   const toggleBody = () => {
     const next = !bodyExpanded;
@@ -99,11 +121,11 @@ export default function StatsSection({ user, styles: parentStyles }: Props) {
       <View style={s.card}>
         <View style={s.monthHeader}>
           <TouchableOpacity onPress={goToPrevMonth} hitSlop={8}>
-            <Ionicons name="chevron-back" size={20} color="#6B7280" />
+            <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
           <Text style={s.monthTitle}>{monthLabel}</Text>
           <TouchableOpacity onPress={goToNextMonth} hitSlop={8}>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -128,12 +150,12 @@ export default function StatsSection({ user, styles: parentStyles }: Props) {
       </View>
 
       {/* 2) Body Info (collapsible, includes radar + body cards) */}
-      <Pressable onPress={toggleBody} style={s.collapseHeader}>
+      <Pressable ref={bodyInfoRef} onPress={toggleBody} style={s.collapseHeader}>
         <Text style={s.collapseTitle}>Body Info</Text>
         <Ionicons
           name={bodyExpanded ? "chevron-up" : "chevron-down"}
           size={18}
-          color="#6B7280"
+          color={colors.textSecondary}
         />
       </Pressable>
 
@@ -150,15 +172,17 @@ export default function StatsSection({ user, styles: parentStyles }: Props) {
 
       {/* 3) Recent Climbs */}
       <Text style={s.recentTitle}>Recent Climbs</Text>
-      <RecentClimbsList />
+      <View style={{ marginHorizontal: -16 }}>
+        <RecentClimbsList />
+      </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -169,16 +193,18 @@ const s = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   viewAnalysisBtn: {
     fontSize: 13,
-    color: "#2BB673",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
     fontWeight: "600",
   },
   card: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 16,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.card,
     padding: 16,
     marginBottom: 16,
   },
@@ -191,7 +217,8 @@ const s = StyleSheet.create({
   monthTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   kpiRow: {
     flexDirection: "row",
@@ -203,31 +230,35 @@ const s = StyleSheet.create({
   kpiVal: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#111827",
+    fontFamily: theme.fonts.monoMedium,
+    color: colors.textPrimary,
   },
   kpiLabel: {
-    fontSize: 11,
-    color: "#6B7280",
+    fontSize: theme.typography.caption.fontSize,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   collapseHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.cardSmall,
     padding: 14,
     marginBottom: 8,
   },
   collapseTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#374151",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   recentTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
     marginTop: 16,
     marginBottom: 8,
   },

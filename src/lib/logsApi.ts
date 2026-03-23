@@ -22,6 +22,7 @@ async function authedFetch(path: string, token: string, init?: RequestInit) {
 
 // Frontend payload format (stored in outbox)
 export type CreateLogPayload = {
+  session_id?: string | null;
   date: string; // YYYY-MM-DD
   log_type: "boulder" | "toprope" | "lead";
   grade_text: string;
@@ -49,6 +50,7 @@ function toBackendPayload(p: CreateLogPayload) {
   const result = STYLE_TO_RESULT[p.style] || "send";
 
   return {
+    session_id: p.session_id || null,
     date: p.date,
     wall_type,
     grade_system,

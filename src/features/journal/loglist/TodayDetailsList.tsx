@@ -6,6 +6,8 @@ import LogItemCard from "./LogItemCard";
 import { LocalDayLogItem } from "./types";
 import { readNotesByRoutes, readSessionList, writeSessionList } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
+import useLogsStore from "../../../store/useLogsStore";
+import { getSessionServerId } from "../sync/sessionServerIdMap";
 
 type Props = {
   /** Stable id for the current session (recommended: String(activeSession.startTime)) */
@@ -107,10 +109,17 @@ function TodayDetailsList({
         const routeName = (item.name || "").trim() || item.grade;
         const note = (item.note || "").trim();
 
+        // Resolve session server ID for backend association
+        const sessionServerId =
+          useLogsStore.getState().activeSession?.serverId ||
+          (await getSessionServerId(sessionKey)) ||
+          null;
+
         await enqueueLogEvent({
           type: "create",
           localId: item.id,
           payload: {
+            session_id: sessionServerId,
             date: item.date,
             log_type: item.type,
             grade_text: item.grade,

@@ -68,10 +68,14 @@ function transformEdgeZone(ez: any) {
     grades: (ez.grades || []).map((g: any) => ({
       gradeScore: g.grade_score,
       gradeText: g.grade_text,
-      attempts: g.attempts,
+      logCount: g.log_count,
       sends: g.sends,
+      totalTries: g.total_tries,
+      avgTries: g.avg_tries,
       sendRate: g.send_rate,
     })),
+    qsr: ez.qsr ?? 0,
+    pr: ez.pr ?? 0,
   };
 }
 

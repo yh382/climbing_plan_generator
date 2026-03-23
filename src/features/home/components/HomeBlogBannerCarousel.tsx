@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, NativeScrollEvent, Nat
 import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 export type HomeBannerAction =
   | { type: "route" }
@@ -30,6 +31,8 @@ export function HomeBlogBannerCarousel({
   onPressBlog: (blogId: string) => void;
   onViewAll: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const [active, setActive] = useState(0);
 
@@ -125,18 +128,18 @@ export function HomeBlogBannerCarousel({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_H,
     borderRadius: theme.borderRadius.card,
     overflow: "hidden",
-    backgroundColor: theme.colors.cardDark,
+    backgroundColor: colors.cardDark,
   },
 
   coverWrap: {
     height: 100,
-    backgroundColor: theme.colors.cardDarkImage,
+    backgroundColor: colors.cardDarkImage,
   },
   coverImg: {
     width: "100%",
@@ -185,7 +188,7 @@ const styles = StyleSheet.create({
     width: CARD_W,
     height: CARD_H,
     borderRadius: theme.borderRadius.card,
-    backgroundColor: theme.colors.cardDark,
+    backgroundColor: colors.cardDark,
     paddingHorizontal: 16,
     paddingVertical: 14,
     justifyContent: "space-between",
@@ -234,6 +237,6 @@ const styles = StyleSheet.create({
   dotActive: {
     width: 18,
     borderRadius: 3,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: colors.accent,
   },
 });

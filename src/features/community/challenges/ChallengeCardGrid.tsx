@@ -4,7 +4,7 @@ import { getChallengeStatus } from "./types";
 import type { ChallengeOut } from "./types";
 
 const SCREEN_W = Dimensions.get("window").width;
-const CARD_W = (SCREEN_W - 48) / 2; // 16 padding each side + 16 gap
+const CARD_W = (SCREEN_W - 22 * 2 - 10) / 2;
 
 const DISCIPLINE_ICON: Record<string, string> = {
   boulder: "cube",
@@ -53,12 +53,7 @@ export default function ChallengeCardGrid({
           style={[
             styles.cover,
             {
-              backgroundColor:
-                uiStatus === "active"
-                  ? "#059669"
-                  : uiStatus === "upcoming"
-                  ? "#D97706"
-                  : "#6B7280",
+              backgroundColor: "#272727",
               borderTopLeftRadius: 14,
               borderTopRightRadius: 14,
             },
@@ -83,20 +78,8 @@ export default function ChallengeCardGrid({
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
-        {item.description ? (
-          <Text style={styles.desc} numberOfLines={1}>
-            {item.description}
-          </Text>
-        ) : null}
 
         <View style={styles.bottom}>
-          <View style={styles.chipsRow}>
-            {item.challengeKind ? (
-              <View style={styles.kindChip}>
-                <Text style={styles.kindText}>{item.challengeKind}</Text>
-              </View>
-            ) : null}
-          </View>
           <Text style={styles.joined}>{item.participantCount} joined</Text>
         </View>
       </View>
@@ -108,18 +91,11 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_W,
     borderRadius: 14,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    backgroundColor: "#1C1C1E",
     overflow: "hidden",
   },
   cover: {
-    height: 80,
+    height: 110,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -148,20 +124,11 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   info: {
-    padding: 10,
+    padding: 11,
     flex: 1,
     justifyContent: "space-between",
   },
-  title: { fontSize: 14, fontWeight: "700", color: "#111", lineHeight: 18 },
-  desc: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  bottom: { marginTop: 8 },
-  chipsRow: { flexDirection: "row", gap: 4, flexWrap: "wrap" },
-  kindChip: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "#F3F4F6",
-  },
-  kindText: { fontSize: 10, fontWeight: "700", color: "#374151", textTransform: "capitalize" },
-  joined: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", marginTop: 4 },
+  title: { fontSize: 13, fontWeight: "800", color: "#FFF", letterSpacing: -0.3, lineHeight: 18 },
+  bottom: {},
+  joined: { fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 },
 });

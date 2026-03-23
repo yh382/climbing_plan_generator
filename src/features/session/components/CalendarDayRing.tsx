@@ -45,12 +45,12 @@ function CalendarDayRing({
   const hasOuter = outerRatio > 0;
   const hasInner = innerRatio > 0;
 
-  // Center dot: none / blue (in progress) / red (complete)
+  // Center dot: none / accent (in progress) / red (complete)
   const dotColor =
     planProgress >= 100
-      ? "#EF4444"
+      ? "#A08060"
       : planProgress > 0
-        ? "#3B82F6"
+        ? "#306E6F"
         : null;
 
   return (
@@ -83,7 +83,7 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_OUTER}
-                stroke={outerRatio >= 1 ? "#10B981" : "#2BB673"}
+                stroke={outerRatio >= 1 ? "#8B6914" : "#A08060"}
                 strokeWidth={THICKNESS}
                 fill="none"
                 strokeDasharray={`${outerDash} ${C_OUTER - outerDash}`}
@@ -101,13 +101,13 @@ function CalendarDayRing({
                 fill="none"
               />
             )}
-            {/* Inner ring progress (blue - sends) */}
+            {/* Inner ring progress (accent - sends) */}
             {hasInner && (
               <Circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke={innerRatio >= 1 ? "#2563EB" : "#3B82F6"}
+                stroke={innerRatio >= 1 ? "#265858" : "#306E6F"}
                 strokeWidth={THICKNESS}
                 fill="none"
                 strokeDasharray={`${innerDash} ${C_INNER - innerDash}`}
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   },
   cellToday: {
     borderWidth: 1,
-    borderColor: "#4F46E5",
+    borderColor: "#306E6F",
     borderRadius: 8,
   },
   ringWrap: {

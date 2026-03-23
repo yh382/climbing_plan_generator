@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Keyboard, Text, View } from "react-native";
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GlassView } from "expo-glass-effect";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { useScrollEdgeEffect } from "../../../components/native/ScrollEdgeContainer";
 import GlassIconButton from "../../community/challenges/component/GlassIconButton";
+import { useAuthStore } from "../../../store/useAuthStore";
+
+const NATIVE_TAB_BAR_HEIGHT = 49;
 
 import type { ChatMessage, CoachMode } from "../types";
 import ModeIndicator from "../components/ModeIndicator";
@@ -19,12 +27,16 @@ const MODE_STARTER_PROMPTS: Record<Exclude<CoachMode, "none">, { zh: string; en:
   analysis: { zh: "分析我最近的训练数据", en: "Analyze my recent training data" },
 };
 
-export default function CoachChatScreen() {
+export default function CoachChatScreen({ embedded }: { embedded?: boolean }) {
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const containerRef = useRef<View>(null);
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [inputText, setInputText] = useState("");
 
   const coach = useCoachChatStore((s) => s.state);
   const createConversation = useCoachChatStore((s) => s.createConversation);
@@ -37,10 +49,14 @@ export default function CoachChatScreen() {
 
   const { tr } = useSettings();
 
-  // Load conversations from backend on mount
+  // iOS 26 native edge blur effect
+  useScrollEdgeEffect(containerRef);
+
+  // Load conversations from backend on mount (skip if not authenticated)
+  const accessToken = useAuthStore((s) => s.accessToken);
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+    if (accessToken) loadConversations();
+  }, [accessToken, loadConversations]);
 
   const mode = coach.mode;
 
@@ -118,27 +134,37 @@ export default function CoachChatScreen() {
     [setMode, sendFromDock, tr],
   );
 
+  const handleSendMessage = useCallback(() => {
+    const t = inputText.trim();
+    if (!t || coach.isBusy) return;
+    setInputText("");
+    Keyboard.dismiss();
+    sendFromDock(t);
+  }, [inputText, coach.isBusy, sendFromDock]);
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#F6F7F8" }}>
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: 54,
-          paddingHorizontal: 16,
-          paddingBottom: 8,
-          flexDirection: "row",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-        }}
-      >
-        <View>
-          <Text style={{ fontSize: 34, fontWeight: "900", color: "#111827" }}>Coach</Text>
-          <Text style={{ marginTop: 6, fontSize: 14, color: "#6B7280" }}>
-            {tr("对话制定你的训练计划", "Chat to build your plan")}
-          </Text>
+    <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary }}>
+      {/* Header — hidden when embedded in Climmate tab */}
+      {!embedded && (
+        <View
+          style={{
+            paddingTop: 54,
+            paddingHorizontal: 16,
+            paddingBottom: 8,
+            flexDirection: "row",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+          }}
+        >
+          <View>
+            <Text style={{ fontSize: 34, fontWeight: "900", color: colors.textPrimary }}>Coach</Text>
+            <Text style={{ marginTop: 6, fontSize: 14, color: colors.textSecondary }}>
+              {tr("对话制定你的训练计划", "Chat to build your plan")}
+            </Text>
+          </View>
+          <GlassIconButton icon="ellipsis-horizontal" onPress={handleOpenMenu} />
         </View>
-        <GlassIconButton icon="ellipsis-horizontal" onPress={handleOpenMenu} />
-      </View>
+      )}
 
       {/* Mode indicator — compact bar, clickable to expand */}
       {mode !== "none" && (
@@ -152,15 +178,47 @@ export default function CoachChatScreen() {
         keyExtractor={(m) => m.id}
         renderItem={({ item }) => <MessageBubble msg={item} />}
         ListFooterComponent={showThinking ? <ThinkingBubble /> : null}
-        contentContainerStyle={{ paddingTop: 6, paddingBottom: 164 }}
+        contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 180 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!previewOpen}
         style={{ flex: 1 }}
       />
 
-      {/* Task bar — fixed above dock, fades away after mode selection or first message */}
+      {/* Task bar — fixed above input, fades away after mode selection or first message */}
       <TaskBar currentMode={mode} onToggleMode={handleToggleMode} visible={coach.taskBarVisible} />
+
+      {/* Chat input — between TaskBar and native tab bar */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+        keyboardVerticalOffset={0}
+      >
+        <View ref={containerRef} style={{ paddingBottom: insets.bottom + NATIVE_TAB_BAR_HEIGHT + 12 }}>
+          <View style={{ borderRadius: 22, overflow: "hidden", marginHorizontal: 18, borderWidth: 0.3, borderColor: colors.border }}>
+            <GlassView glassEffectStyle="regular" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            <TextInput
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask Paddi"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              returnKeyType="send"
+              submitBehavior="blurAndSubmit"
+              onSubmitEditing={handleSendMessage}
+              style={{
+                fontFamily: theme.fonts.regular,
+                fontSize: 15,
+                lineHeight: 20,
+                maxHeight: 110,
+                color: colors.textPrimary,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              }}
+            />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Mode detail overlay (modal) */}
       <ModeDetailOverlay

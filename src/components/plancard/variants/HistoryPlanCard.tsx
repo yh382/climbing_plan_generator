@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { sourceLabel } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
+import { theme } from "../../../lib/theme";
 
 function formatDate(iso?: string) {
   if (!iso) return null;
@@ -127,6 +128,7 @@ const styles = StyleSheet.create({
   typePillText: {
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
   ratingPill: {
@@ -137,12 +139,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  star: { color: "#FBBF24", fontSize: 11, fontWeight: "900", marginRight: 4 },
-  ratingText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  star: { color: "#FBBF24", fontSize: 11, fontWeight: "900", fontFamily: theme.fonts.black, marginRight: 4 },
+  ratingText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", fontFamily: theme.fonts.bold },
 
   title: {
     fontSize: 18,
     fontWeight: "800",
+    fontFamily: theme.fonts.black,
     color: "#FFFFFF",
     lineHeight: 22,
     textShadowColor: "rgba(0,0,0,0.3)",
@@ -164,11 +167,13 @@ const styles = StyleSheet.create({
   completedText: {
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "rgba(255,255,255,0.85)",
   },
   bottomText: {
     fontSize: 11,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.70)",
   },
 });

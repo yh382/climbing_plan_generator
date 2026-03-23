@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { theme } from '../../../lib/theme';
+import { useThemeColors } from '@/lib/useThemeColors';
 import type { CommentOut } from '../types';
 import { communityApi } from '../api';
 
@@ -57,6 +59,8 @@ export default function CommentItem({
   onReply,
   onPressUser,
 }: CommentItemProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [replies, setReplies] = useState<CommentOut[]>([]);
   const [repliesExpanded, setRepliesExpanded] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
@@ -215,7 +219,7 @@ export default function CommentItem({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     paddingVertical: 10,
@@ -239,21 +243,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   authorName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111',
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   time: {
     fontSize: 12,
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
   },
   commentText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#374151',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
   },
   viewRepliesBtn: {
     flexDirection: 'row',
@@ -270,7 +277,8 @@ const styles = StyleSheet.create({
   viewRepliesText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
   },
   replyContainer: {
     flexDirection: 'row',
@@ -288,11 +296,13 @@ const styles = StyleSheet.create({
   replyAuthorName: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#111',
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   replyText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#374151',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
   },
 });

@@ -12,9 +12,38 @@ import {
   TextLayoutEventData,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { FeedPost as FeedPostType, PostAttachment } from "../../../types/community";
 import MediaCarousel from "../../../components/shared/MediaCarousel";
 import ImageViewer from "../../../components/shared/ImageViewer";
+import { PostAttachmentCard } from "../../../components/shared/PostAttachmentCard";
+
+function buildAttachmentProps(att: PostAttachment) {
+  if (att.type === "plan") {
+    return {
+      type: "plan" as const,
+      data: {
+        name: att.title,
+        totalWeeks: att.metrics?.find((m) => m.label === "Weeks")?.value || "—",
+        sessionsPerWeek:
+          att.metrics?.find((m) => m.label === "Sessions/wk")?.value || "—",
+        type: att.metrics?.find((m) => m.label === "Type")?.value || "—",
+      },
+    };
+  }
+  return {
+    type: "routeLog" as const,
+    data: {
+      gymName: att.metrics?.find((m) => m.label === "Gym")?.value || "—",
+      date: att.metrics?.find((m) => m.label === "Date")?.value || "—",
+      sends: att.metrics?.find((m) => m.label === "Sends")?.value || "—",
+      bestGrade: att.metrics?.find((m) => m.label === "Best")?.value || "—",
+      duration: att.metrics?.find((m) => m.label === "Duration")?.value || "—",
+    },
+  };
+}
 
 const { width } = Dimensions.get("window");
 
@@ -38,6 +67,8 @@ function ExpandableText({
   text: string;
   numberOfLines?: number;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
@@ -75,50 +106,6 @@ function ExpandableText({
   );
 }
 
-// 附件组件保持不变
-const AttachmentCard = ({
-  attachment,
-  onPress,
-}: {
-  attachment: PostAttachment;
-  onPress: () => void;
-}) => {
-  const getStyle = () => {
-    switch (attachment.type) {
-      case "shared_plan":
-        return { color: "#4F46E5", icon: "flash", label: "SHARED PLAN" };
-      case "finished_session":
-        return { color: "#10B981", icon: "checkmark-done", label: "WORKOUT RECORD" };
-      case "log":
-        return { color: "#0EA5E9", icon: "trophy", label: "CLIMBING LOG" };
-      default:
-        return { color: "#6B7280", icon: "document", label: "ATTACHMENT" };
-    }
-  };
-
-  const styleConfig = getStyle();
-
-  return (
-    <TouchableOpacity style={styles.attachContainer} activeOpacity={0.7} onPress={onPress}>
-      <View style={[styles.attachBar, { backgroundColor: styleConfig.color }]} />
-      <View style={styles.attachContent}>
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <Ionicons name={styleConfig.icon as any} size={14} color={styleConfig.color} />
-            <Text style={[styles.attachLabel, { color: styleConfig.color }]}>{styleConfig.label}</Text>
-          </View>
-          <Text style={styles.attachTitle} numberOfLines={1}>
-            {attachment.title}
-          </Text>
-          <Text style={styles.attachSub} numberOfLines={1}>
-            {attachment.subtitle}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-      </View>
-    </TouchableOpacity>
-  );
-};
 
 export default function FeedPost({
   post,
@@ -130,6 +117,9 @@ export default function FeedPost({
   onThreeDot,
   simpleMode = false, // 默认为 false
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const router = useRouter();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
 
@@ -154,8 +144,8 @@ export default function FeedPost({
           {post.user.avatar ? (
             <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
           ) : (
-            <View style={[styles.avatar, { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }]}>
-              <Ionicons name="person" size={18} color="#9CA3AF" />
+            <View style={[styles.avatar, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="person" size={18} color={colors.textTertiary} />
             </View>
           )}
           <View style={styles.headerText}>
@@ -163,9 +153,22 @@ export default function FeedPost({
             <Text style={styles.time}>
               {new Date(post.timestamp).toLocaleDateString()} · {post.user?.homeGym || "Climber"}
             </Text>
+            {post.gymName && (
+              <TouchableOpacity
+                onPress={() => router.push({
+                  pathname: '/(tabs)/community',
+                  params: { tab: 'gyms', gymId: post.gymId },
+                })}
+                style={styles.gymTag}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="location" size={11} color={colors.textTertiary} />
+                <Text style={styles.gymTagText}>{post.gymName}</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <TouchableOpacity style={{ padding: 4 }} onPress={onThreeDot}>
-            <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </TouchableOpacity>
       )}
@@ -179,13 +182,21 @@ export default function FeedPost({
             height={width}
             onPressImage={openViewer}
           />
+          {post.images.length > 1 && (
+            <View style={styles.mediaBadge}>
+              <Text style={styles.mediaBadgeText}>+{post.images.length - 1}</Text>
+            </View>
+          )}
         </View>
       ) : null}
 
       {/* 3. Attachment (shared card) - 图片下面 */}
       {post.attachment ? (
         <View style={styles.attachmentBlock}>
-          <AttachmentCard attachment={post.attachment} onPress={() => onPressAttachment(post)} />
+          <PostAttachmentCard
+            {...buildAttachmentProps(post.attachment)}
+            onPress={() => onPressAttachment(post)}
+          />
         </View>
       ) : null}
 
@@ -198,19 +209,19 @@ export default function FeedPost({
           <Ionicons
             name={post.isLiked ? "heart" : "heart-outline"}
             size={22}
-            color={post.isLiked ? "#EF4444" : "#111"}
+            color={post.isLiked ? "#EF4444" : colors.textPrimary}
           />
           <Text style={styles.iconText}>{post.likes}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.iconRow} onPress={() => onPressComment(post.id)}>
-          <Ionicons name="chatbubble-outline" size={20} color="#111" />
+          <Ionicons name="chatbubble-outline" size={20} color={colors.textPrimary} />
           <Text style={styles.iconText}>{post.comments}</Text>
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => onSave(post.id)}>
-          <Ionicons name={post.isSaved ? "bookmark" : "bookmark-outline"} size={20} color="#111" />
+          <Ionicons name={post.isSaved ? "bookmark" : "bookmark-outline"} size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -227,63 +238,58 @@ export default function FeedPost({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     marginBottom: 16,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
   },
-  // 简易模式下，去掉底部粗分割线，改用细线或者无边框，这里稍微减小 margin
   containerSimple: {
     marginBottom: 0,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
     paddingBottom: 16,
   },
 
   header: { flexDirection: "row", alignItems: "center", padding: 16 },
-  simpleHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }, // 简易头部
+  simpleHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F3F4F6" },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundSecondary },
   headerText: { flex: 1, marginLeft: 12 },
-  username: { fontSize: 15, fontWeight: "700", color: "#111" },
-  time: { fontSize: 12, color: "#9CA3AF" },
+  username: { fontSize: 15, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.textPrimary },
+  time: { fontSize: theme.typography.caption.fontSize, fontFamily: theme.fonts.regular, color: colors.textTertiary },
 
-  // ✅ 新布局块
   mediaBlock: { marginBottom: 12 },
   attachmentBlock: { paddingHorizontal: 16, marginBottom: 10 },
 
   // Expandable text
   textBlock: { paddingHorizontal: 16, marginBottom: 12 },
-  contentText: { fontSize: 15, lineHeight: 22, color: "#374151" },
+  contentText: { fontSize: theme.typography.body.fontSize, lineHeight: 22, fontFamily: theme.fonts.regular, color: colors.textPrimary },
   moreHit: { alignSelf: "flex-start", paddingTop: 6, paddingBottom: 2 },
-  moreText: { fontSize: 13, fontWeight: "700", color: "#111" },
+  moreText: { fontSize: 13, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.textSecondary },
 
-  // Attachment
-  attachContainer: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
+  // Media badge
+  mediaBadge: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
   },
-  attachBar: { width: 6 },
-  attachContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    justifyContent: "space-between",
+  mediaBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
-  attachLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  attachTitle: { fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 2 },
-  attachSub: { fontSize: 12, color: "#6B7280" },
-
 
   footer: { flexDirection: "row", paddingHorizontal: 16, marginTop: 4, alignItems: "center", gap: 20 },
   iconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  iconText: { fontSize: 13, fontWeight: "600", color: "#4B5563" },
+  iconText: { fontSize: 13, fontWeight: "600", fontFamily: theme.fonts.medium, color: colors.textSecondary },
+
+  gymTag: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  gymTagText: { fontSize: 12, fontFamily: theme.fonts.regular, color: colors.textSecondary },
 });

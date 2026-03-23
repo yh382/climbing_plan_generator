@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useThemeColors } from "../../lib/useThemeColors";
 import { scoreToGrade } from "../../lib/gradeSystem";
 import type { CSMState } from "../../services/stats/csmAnalyzer";
 import type { GradeSystem } from "../../types/climbLog";
@@ -68,6 +69,8 @@ interface Props {
 }
 
 export default function ActionAdvice({ state }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tmpl = TEMPLATES[state.quadrant] || TEMPLATES.rebuild;
   const lowerGrade = gradeText(state.edgeZone.lower, state.discipline);
   const upperGrade = gradeText(state.pi, state.discipline);
@@ -98,18 +101,14 @@ export default function ActionAdvice({ state }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 20,
     padding: 16,
     marginBottom: 16,
     borderWidth: 0.5,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: colors.cardBorder,
   },
   headerRow: {
     flexDirection: "row",
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1E293B",
+    color: colors.chartTitle,
   },
   badge: {
     paddingHorizontal: 10,
@@ -133,7 +132,7 @@ const styles = StyleSheet.create({
   },
   summary: {
     fontSize: 13,
-    color: "#374151",
+    color: colors.chartValue,
     lineHeight: 20,
     marginBottom: 14,
   },
@@ -154,7 +153,7 @@ const styles = StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 12,
-    color: "#4B5563",
+    color: colors.chartValue,
     lineHeight: 18,
   },
 });

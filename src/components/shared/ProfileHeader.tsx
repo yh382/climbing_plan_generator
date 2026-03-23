@@ -1,6 +1,6 @@
 // src/components/shared/ProfileHeader.tsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
@@ -10,27 +10,29 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated from "react-native-reanimated";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import type { SharedValue } from "react-native-reanimated";
 
-// Eased white fade — many stops avoid the ugly dark band of a simple 3-stop gradient
+// Eased light-grey fade — subtle darkening to enhance white text readability
 const FADE_COLORS = [
-  "rgba(255,255,255,0)",
-  "rgba(255,255,255,0.02)",
-  "rgba(255,255,255,0.06)",
-  "rgba(255,255,255,0.12)",
-  "rgba(255,255,255,0.20)",
-  "rgba(255,255,255,0.32)",
-  "rgba(255,255,255,0.46)",
-  "rgba(255,255,255,0.62)",
-  "rgba(255,255,255,0.78)",
-  "rgba(255,255,255,0.90)",
-  "rgba(255,255,255,0.97)",
-  "#FFFFFF",
+  "rgba(200,200,200,0)",
+  "rgba(200,200,200,0.02)",
+  "rgba(200,200,200,0.06)",
+  "rgba(200,200,200,0.12)",
+  "rgba(200,200,200,0.20)",
+  "rgba(200,200,200,0.32)",
+  "rgba(200,200,200,0.46)",
+  "rgba(200,200,200,0.62)",
+  "rgba(200,200,200,0.78)",
+  "rgba(200,200,200,0.90)",
+  "rgba(200,200,200,0.97)",
+  "rgba(200,200,200,1)",
 ] as readonly string[];
-const FADE_ZONE_HEIGHT = 80;
-const BRAND_GREEN = "#2BB673";
-const DEFAULT_GRADIENT: [string, string, string] = ["#0F766E", "#2DD4BF", "#A7F3D0"];
+const FADE_ZONE_HEIGHT = 100;
+const DEFAULT_GRADIENT: [string, string, string] = ["#7A9E8E", "#A8C0B4", "#C8D4C8"];
 
 export interface ProfileHeaderProps {
   name: string;
@@ -56,6 +58,7 @@ export interface ProfileHeaderProps {
   onYearInReviewPress?: () => void;
   headerTitleAnimStyle: any;
   topPadding: number;
+  scrollY?: SharedValue<number>;
 }
 
 export default function ProfileHeader({
@@ -82,7 +85,23 @@ export default function ProfileHeader({
   onYearInReviewPress,
   headerTitleAnimStyle,
   topPadding,
+  scrollY,
 }: ProfileHeaderProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const PROFILE_COVER_H = 300;
+  const bgParallaxStyle = useAnimatedStyle(() => {
+    if (!scrollY || scrollY.value >= 0) return {};
+    const absScroll = -scrollY.value;
+    return {
+      transform: [
+        { scale: 1 + absScroll / PROFILE_COVER_H },
+        { translateY: scrollY.value / 2 },
+      ],
+    };
+  });
+
   const bioText = bio?.trim();
   const showBio = Boolean(bioText);
 
@@ -125,7 +144,9 @@ export default function ProfileHeader({
 
   return (
     <View>
-      {renderBackground()}
+      <Animated.View style={[StyleSheet.absoluteFill, bgParallaxStyle]}>
+        {renderBackground()}
+      </Animated.View>
 
       <View style={{ paddingTop: topPadding }}>
         <View style={styles.headerBlock}>
@@ -252,7 +273,7 @@ export default function ProfileHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   blurZone: {
     position: "absolute",
     bottom: 0,
@@ -263,8 +284,8 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     backgroundColor: "transparent",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: theme.spacing.screenPadding,
+    paddingBottom: 20,
   },
   avatarRow: {
     flexDirection: "row",
@@ -290,8 +311,12 @@ const styles = StyleSheet.create({
   bigTitle: {
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
     lineHeight: 24,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   addressLine: {
     marginTop: 4,
@@ -301,13 +326,21 @@ const styles = StyleSheet.create({
   addressText: {
     marginLeft: 5,
     fontSize: 12,
+    fontFamily: theme.fonts.regular,
     color: "rgba(255,255,255,0.75)",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   bioInline: {
     marginTop: 8,
     fontSize: 13,
+    fontFamily: theme.fonts.regular,
     color: "rgba(255,255,255,0.85)",
     lineHeight: 18,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // Stats rows
@@ -324,8 +357,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statFieldItem: { flexDirection: "row", alignItems: "baseline" },
-  statFieldNum: { fontSize: 14, fontWeight: "800", marginRight: 4, color: "#FFFFFF" },
-  statFieldLabel: { fontSize: 12, color: "rgba(255,255,255,0.7)" },
+  statFieldNum: { fontSize: 14, fontWeight: "800", fontFamily: theme.fonts.monoMedium, marginRight: 4, color: "#FFFFFF", textShadowColor: "rgba(0,0,0,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  statFieldLabel: { fontSize: 12, fontFamily: theme.fonts.regular, color: "rgba(255,255,255,0.7)", textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   statFieldDivider: {
     width: 1,
     height: 16,
@@ -340,11 +373,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: BRAND_GREEN,
+    backgroundColor: colors.cardDark,
   },
   primaryGreenText: {
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     color: "#fff",
   },
 
@@ -359,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: BRAND_GREEN,
+    backgroundColor: colors.cardDark,
   },
   followBtnActive: {
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -369,6 +403,7 @@ const styles = StyleSheet.create({
   followBtnText: {
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     color: "#fff",
   },
   followBtnTextActive: {
@@ -388,8 +423,8 @@ const styles = StyleSheet.create({
   // Year in review bar
   yearBar: {
     marginTop: 12,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.cardSmall,
     paddingVertical: 10,
     paddingHorizontal: 14,
     flexDirection: "row",
@@ -399,6 +434,7 @@ const styles = StyleSheet.create({
   yearBarText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#111827",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
 });

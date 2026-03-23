@@ -1,7 +1,26 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, useColorScheme } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Alert,
+  Platform,
+  Image,
+  TouchableOpacity,
+  StatusBar,
+  ScrollView,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { authApi } from "../api";
+import { useAuthStore } from "../../../store/useAuthStore";
+import { theme } from "../../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+
+const mascotImg = require("../../../../assets/images/mascot.png");
 
 const t = (en: string) => en;
 
@@ -12,14 +31,16 @@ function isValidUsername(u: string) {
 }
 
 export default function SignupScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const setToken = useAuthStore((s) => s.setToken);
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const usernameTrim = username.trim();
   const emailTrim = email.trim();
@@ -36,124 +57,236 @@ export default function SignupScreen() {
     return true;
   }, [usernameTrim, emailTrim, password, confirm, usernameOk]);
 
-  const onCreate = () => {
-    Alert.alert(t("Coming soon"), t("Signup API is not ready yet."));
+  const onAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const identityToken = credential.identityToken;
+      if (!identityToken) throw new Error("No identity token");
+
+      const fullName =
+        [credential.fullName?.givenName, credential.fullName?.familyName]
+          .filter(Boolean)
+          .join(" ") || undefined;
+
+      const res = await authApi.appleSignIn(identityToken, fullName);
+      if (!res?.access_token) throw new Error("Missing access_token");
+
+      await setToken(res.access_token, res.refresh_token ?? null);
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      if (e?.code === "ERR_REQUEST_CANCELED") return;
+      Alert.alert(t("Apple Sign In failed"), e?.message ?? t("Unknown error"));
+    }
+  };
+
+  const onCreate = async () => {
+    if (!canSubmit || loading) return;
+    setLoading(true);
+    try {
+      const res = await authApi.register({
+        username: usernameTrim,
+        email: emailTrim,
+        password,
+      });
+      if (!res?.access_token) throw new Error('Missing access_token');
+      await setToken(res.access_token, res.refresh_token ?? null);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      const msg = e?.message ?? 'Unknown error';
+      if (msg.includes('409') || msg.includes('already')) {
+        Alert.alert(t('Registration failed'), t('Email or username already taken.'));
+      } else {
+        Alert.alert(t('Registration failed'), msg);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? "#0B1220" : "#FFFFFF" }]}>
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={22} color={isDark ? "#E5E7EB" : "#0F172A"} />
-        <Text style={[styles.backText, { color: isDark ? "#E5E7EB" : "#0F172A" }]}>{t("Back")}</Text>
-      </Pressable>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle="dark-content" />
 
-      <Text style={[styles.title, { color: isDark ? "#E5E7EB" : "#0F172A" }]}>{t("Create account")}</Text>
-      <Text style={[styles.subtitle, { color: isDark ? "#94A3B8" : "#64748B" }]}>
-        {t("Sign up is coming soon. We’ll enable it after backend is ready.")}
-      </Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 80 }} keyboardShouldPersistTaps="handled">
+        {/* Mascot */}
+        <View style={{ alignItems: 'center', marginBottom: 14 }}>
+          <View style={{
+            width: 80, height: 80, borderRadius: 40,
+            backgroundColor: colors.background, borderWidth: 3, borderColor: colors.border,
+            alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            <Image source={mascotImg} style={{ width: 74, height: 74 }} resizeMode="cover" />
+          </View>
+        </View>
 
-      <View style={{ marginTop: 18 }}>
-        <Text style={[styles.label, { color: isDark ? "#CBD5E1" : "#334155" }]}>{t("Username")}</Text>
-        <TextInput
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          placeholder="e.g. TestUser_01"
-          placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-          style={[
-            styles.input,
-            { color: isDark ? "#E5E7EB" : "#0F172A", borderColor: isDark ? "#1F2A44" : "#E2E8F0" },
-          ]}
-        />
-        <Text style={[styles.hint, { color: isDark ? "#94A3B8" : "#64748B" }]}>
-          {t("3–20 characters. Letters, numbers, underscore. Case is allowed.")}
+        <Text style={{
+          fontSize: 28, fontFamily: theme.fonts.black, color: colors.textPrimary,
+          letterSpacing: -1.2, textAlign: 'center', marginBottom: 5,
+        }}>
+          Create account
+        </Text>
+        <Text style={{
+          fontSize: 13, color: colors.textTertiary, textAlign: 'center', marginBottom: 22,
+        }}>
+          Start your climbing journey
+        </Text>
+
+        {/* Username */}
+        <Text style={styles.label}>{t("Username")}</Text>
+        <View style={[styles.inputWrap, usernameTrim.length > 0 && !usernameOk && styles.inputError]}>
+          <TextInput
+            value={username} onChangeText={setUsername}
+            autoCapitalize="none"
+            placeholder="e.g. TestUser_01"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.inputText}
+          />
+        </View>
+        <Text style={styles.hint}>
+          {t("3–20 characters. Letters, numbers, underscore.")}
         </Text>
         {usernameTrim.length > 0 && !usernameOk ? (
           <Text style={styles.errorText}>{t("Invalid username format")}</Text>
         ) : null}
 
-        <Text style={[styles.label, { color: isDark ? "#CBD5E1" : "#334155" }]}>{t("Email")}</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-          style={[
-            styles.input,
-            { color: isDark ? "#E5E7EB" : "#0F172A", borderColor: isDark ? "#1F2A44" : "#E2E8F0" },
-          ]}
-        />
+        {/* Email */}
+        <Text style={styles.label}>{t("Email")}</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            value={email} onChangeText={setEmail}
+            autoCapitalize="none" keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.inputText}
+          />
+        </View>
 
-        <Text style={[styles.label, { color: isDark ? "#CBD5E1" : "#334155" }]}>{t("Password")}</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-          style={[
-            styles.input,
-            { color: isDark ? "#E5E7EB" : "#0F172A", borderColor: isDark ? "#1F2A44" : "#E2E8F0" },
-          ]}
-        />
+        {/* Password */}
+        <Text style={styles.label}>{t("Password")}</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            value={password} onChangeText={setPassword}
+            secureTextEntry placeholder="••••••••"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.inputText}
+          />
+        </View>
 
-        <Text style={[styles.label, { color: isDark ? "#CBD5E1" : "#334155" }]}>{t("Confirm password")}</Text>
-        <TextInput
-          value={confirm}
-          onChangeText={setConfirm}
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
-          style={[
-            styles.input,
-            { color: isDark ? "#E5E7EB" : "#0F172A", borderColor: isDark ? "#1F2A44" : "#E2E8F0" },
-          ]}
-        />
+        {/* Confirm password */}
+        <Text style={styles.label}>{t("Confirm password")}</Text>
+        <View style={[styles.inputWrap, confirm.length > 0 && !passwordsMatch && styles.inputError]}>
+          <TextInput
+            value={confirm} onChangeText={setConfirm}
+            secureTextEntry placeholder="••••••••"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.inputText}
+          />
+        </View>
         {confirm.length > 0 && !passwordsMatch ? (
           <Text style={styles.errorText}>{t("Passwords do not match")}</Text>
         ) : null}
 
+        {/* Create account 按钮 */}
         <Pressable
-          disabled={!canSubmit}
+          disabled={!canSubmit || loading}
           onPress={onCreate}
-          style={({ pressed }) => [styles.button, { opacity: !canSubmit ? 0.5 : pressed ? 0.9 : 1 }]}
+          style={({ pressed }) => [styles.darkPill, { opacity: !canSubmit || loading ? 0.5 : pressed ? 0.9 : 1 }]}
         >
-          <Text style={styles.buttonText}>{t("Create account")}</Text>
+          <Text style={styles.darkPillText}>{loading ? t("Creating...") : t("Create account")}</Text>
         </Pressable>
-      </View>
+
+        {/* 分割线 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 }}>
+          <View style={{ flex: 1, height: 0.5, backgroundColor: colors.border }} />
+          <Text style={{ fontSize: 12, color: colors.textTertiary }}>or</Text>
+          <View style={{ flex: 1, height: 0.5, backgroundColor: colors.border }} />
+        </View>
+
+        {/* Apple 按钮 */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity onPress={onAppleSignIn} style={styles.applePill}>
+            <Ionicons name="logo-apple" size={18} color={colors.textPrimary} />
+            <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textPrimary }}>
+              Sign up with Apple
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 登录入口 */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, marginBottom: 40 }}>
+          <Text style={{ fontSize: 13, color: colors.textTertiary }}>Already have an account? </Text>
+          <Pressable onPress={() => router.back()}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Log in</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 60 },
-  backRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  backText: { fontSize: 14, fontWeight: "600" },
-
-  title: { fontSize: 26, fontWeight: "900", marginTop: 8 },
-  subtitle: { marginTop: 8, fontSize: 14, lineHeight: 20 },
-
-  label: { fontSize: 12, fontWeight: "700", marginBottom: 8, marginTop: 14 },
-  input: {
-    height: 48,
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
+    color: colors.textSecondary,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  inputWrap: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  inputError: {
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontSize: 15,
+    borderColor: '#E24B4A',
   },
-  hint: { marginTop: 8, fontSize: 12, lineHeight: 16 },
-
-  errorText: { marginTop: 8, color: "#B91C1C", fontSize: 12, fontWeight: "600" },
-
-  button: {
+  inputText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontFamily: theme.fonts.regular,
+  },
+  hint: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textTertiary,
+  },
+  errorText: {
+    marginTop: 6,
+    color: '#E24B4A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  darkPill: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
     marginTop: 20,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#00665E",
   },
-  buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
+  darkPillText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  applePill: {
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
 });

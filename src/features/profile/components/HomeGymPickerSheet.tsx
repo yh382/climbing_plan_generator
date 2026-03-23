@@ -265,13 +265,13 @@ export default function HomeGymPickerSheet({ visible, onClose, onSelect, title =
                 </View>
               ) : (
                 <View style={styles.list}>
-                  {items.map((it) => {
+                  {items.map((it, index) => {
                     const secondary = formatSecondary(it);
                     const distance = formatDistance(it.distance_m);
 
                     return (
                       <TouchableOpacity
-                        key={it.id}
+                        key={it.id ?? `gym-${index}`}
                         activeOpacity={0.75}
                         style={styles.row}
                         onPress={() => {

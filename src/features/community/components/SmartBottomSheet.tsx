@@ -1,11 +1,12 @@
 // src/features/community/components/SmartBottomSheet.tsx
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Modal, ScrollView,
   Animated, Dimensions, PanResponder, LayoutAnimation,
   Platform, UIManager, Pressable
 } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 // 开启 LayoutAnimation (Android 需要)
 if (Platform.OS === 'android') {
@@ -31,6 +32,8 @@ export default function SmartBottomSheet({
   title,
   children
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const [showModal, setShowModal] = useState(false);
 
@@ -140,11 +143,11 @@ export default function SmartBottomSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
-  handleBarContainer: { alignItems: 'center', paddingTop: 12, paddingBottom: 8, width: '100%', backgroundColor: '#FFF' },
-  handleBar: { width: 40, height: 5, backgroundColor: '#E5E7EB', borderRadius: 2.5 },
-  modalHeader: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: '#FFF' },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111', textAlign: 'center' },
+  modalContent: { backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  handleBarContainer: { alignItems: 'center', paddingTop: 12, paddingBottom: 8, width: '100%', backgroundColor: colors.background },
+  handleBar: { width: 40, height: 5, backgroundColor: colors.cardBorder, borderRadius: 2.5 },
+  modalHeader: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.cardBorder, backgroundColor: colors.background },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
 });

@@ -1,10 +1,13 @@
 // src/features/community/CommunityScreen.tsx
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Pressable } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, useLocalSearchParams } from "expo-router";
 import { communityApi } from "./api";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import Animated, {
   Extrapolate,
   interpolate,
@@ -16,24 +19,26 @@ import Animated, {
 import FeedPost from "./components/FeedPost";
 import PostActionSheet from "./components/PostActionSheet";
 import CommentSheet from "./components/CommentSheet";
-import SmartBottomSheet from "./components/SmartBottomSheet";
+// SmartBottomSheet removed — replaced by inline popover
 import { useCommunityStore } from "../../store/useCommunityStore";
 import { useUserStore } from "../../store/useUserStore";
+import useLogsStore from "../../store/useLogsStore";
 import { useChatStore } from "../../store/useChatStore";
 import { RankTab } from "./rank";
 import GymsTab from "./gyms/GymsTab";
-import { GlassView } from "expo-glass-effect";
+import EventsTab from "./events/EventsTab";
+import { BlurView } from "expo-blur";
 
-type TopTab = "Post" | "Rank" | "Gyms";
-type PostFilter = "all" | "shared_plan" | "workout_record" | "nearby";
+type TopTab = "Post" | "Rank" | "Gyms" | "Events";
+type PostFilter = "all" | "plan" | "session" | "nearby";
 type RankDiscipline = "all" | "boulder" | "rope";
 
 const SCROLL_THRESHOLD = 40;
 
 const POST_FILTERS: Array<{ key: PostFilter; label: string }> = [
   { key: "all", label: "All" },
-  { key: "shared_plan", label: "Shared Plan" },
-  { key: "workout_record", label: "Workout Record" },
+  { key: "plan", label: "Shared Plan" },
+  { key: "session", label: "Workout Record" },
   { key: "nearby", label: "Nearby" },
 ];
 
@@ -44,6 +49,8 @@ const RANK_FILTERS: Array<{ key: RankDiscipline; label: string }> = [
 ];
 
 export default function CommunityScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -108,6 +115,14 @@ export default function CommunityScreen() {
     fetchFeed();
   }, [fetchFeed]);
   const [topTab, setTopTab] = useState<TopTab>("Post");
+  const routeParams = useLocalSearchParams<{ tab?: string; gymId?: string }>();
+
+  // Auto-switch to Gyms tab when navigated with tab=gyms param
+  useEffect(() => {
+    if (routeParams.tab === 'gyms') {
+      setTopTab('Gyms');
+    }
+  }, [routeParams.tab]);
 
     // --- top tabs underline animation ---
   const tabLayoutsRef = React.useRef<Record<string, { x: number; width: number }>>({});
@@ -145,6 +160,19 @@ export default function CommunityScreen() {
   const [postFilter, setPostFilter] = useState<PostFilter>("all");
   const [rankDiscipline, setRankDiscipline] = useState<RankDiscipline>("all");
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [filterPopoverPos, setFilterPopoverPos] = useState({ top: 0, right: 16 });
+  const filterBtnRef = useRef<React.ComponentRef<typeof TouchableOpacity>>(null);
+
+  const handleFilterPress = useCallback(() => {
+    if (filterSheetVisible) {
+      setFilterSheetVisible(false);
+      return;
+    }
+    filterBtnRef.current?.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+      setFilterPopoverPos({ top: y + h + 6, right: 16 });
+      setFilterSheetVisible(true);
+    });
+  }, [filterSheetVisible]);
 
   // Check if any filter is active for the current tab
   const isFilterActive =
@@ -194,10 +222,10 @@ export default function CommunityScreen() {
     if (postFilter === "all") return posts;
     return posts.filter((p: any) => {
       const attType = p?.attachment?.type;
-      return postFilter === "shared_plan"
-        ? attType === "shared_plan"
-        : postFilter === "workout_record"
-          ? attType === "workout_record"
+      return postFilter === "plan"
+        ? attType === "plan"
+        : postFilter === "session"
+          ? attType === "session"
           : true;
     });
   }, [posts, postFilter]);
@@ -219,10 +247,10 @@ export default function CommunityScreen() {
       </View>
 
     {/* Post / Rank / Gyms */}
-    <View style={{ paddingHorizontal: 16 }}>
+    <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
     <View style={styles.topTabsWrap}>
         <View style={styles.topTabsRow}>
-        {(["Post", "Rank", "Gyms"] as TopTab[]).map((t) => {
+        {(["Post", "Rank", "Gyms", "Events"] as TopTab[]).map((t) => {
             const active = topTab === t;
             return (
             <TouchableOpacity
@@ -248,13 +276,14 @@ export default function CommunityScreen() {
             );
         })}
 
-          {topTab !== "Gyms" && (
+          {topTab !== "Gyms" && topTab !== "Events" && (
             <TouchableOpacity
-              style={styles.tabRowFilterBtn}
-              onPress={() => setFilterSheetVisible(true)}
+              ref={filterBtnRef}
+              style={[styles.tabRowFilterBtn, filterSheetVisible && styles.tabRowFilterBtnActive]}
+              onPress={handleFilterPress}
               activeOpacity={0.8}
             >
-              <Ionicons name="options-outline" size={18} color={isFilterActive ? "#111" : "#9CA3AF"} />
+              <Ionicons name="options-outline" size={18} color={filterSheetVisible ? "#FFF" : isFilterActive ? colors.textPrimary : colors.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -294,7 +323,7 @@ export default function CommunityScreen() {
               onPress={() => setFeedSort("hot")}
               activeOpacity={0.8}
             >
-              <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : "#6B7280"} />
+              <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : colors.textSecondary} />
               <Text style={feedSort === "hot" ? styles.sortTextActive : styles.sortText}>Hot</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -302,7 +331,7 @@ export default function CommunityScreen() {
               onPress={() => setFeedSort("latest")}
               activeOpacity={0.8}
             >
-              <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : "#6B7280"} />
+              <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : colors.textSecondary} />
               <Text style={feedSort === "latest" ? styles.sortTextActive : styles.sortText}>Latest</Text>
             </TouchableOpacity>
           </View>
@@ -328,25 +357,41 @@ export default function CommunityScreen() {
         onThreeDot={() => setActionPost(item)}
         onPressAttachment={(post: any) => {
           const att = post?.attachment;
+          if (!att?.id) return;
 
-          if (att?.type === "shared_plan") {
+          if (att.type === "plan") {
             router.push({
-              pathname: "/library/plan-overview",
-              params: { planId: att.id, source: "market" },
+              pathname: "/community/public-plan",
+              params: { planId: att.id },
             });
             return;
           }
 
-          // ✅ NEW: workout record -> community read-only daily log
-          if (att?.type === "workout_record") {
+          // Route log / session
+          if (att.type === "log" || att.type === "session") {
+            // If own post, navigate to local log-detail (has full local data)
+            const isOwn = item.user?.id === currentUserId;
+            if (isOwn) {
+              const localSession = useLogsStore.getState().sessions.find(
+                (s) => s.serverId === att.id
+              );
+              if (localSession) {
+                router.push({
+                  pathname: "/library/log-detail",
+                  params: {
+                    date: localSession.date,
+                    sessionKey: localSession.sessionKey,
+                    gymName: localSession.gymName,
+                    mode: localSession.discipline,
+                    origin: "community",
+                  },
+                });
+                return;
+              }
+            }
             router.push({
-              pathname: "/community/workout-record",
-              params: {
-                attachment: JSON.stringify(att),
-                // 兜底：有些 attachment 可能把 date/gymName 放在顶层
-                date: String(att?.date || ""),
-                gymName: String(att?.gymName || ""),
-              },
+              pathname: "/community/public-route-log",
+              params: { sessionId: att.id },
             });
             return;
           }
@@ -357,17 +402,18 @@ export default function CommunityScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" />
       {/* Fixed header (align with Home) */}
       <View style={[styles.fixedHeader, { height: insets.top + 44 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill}/>
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View style={styles.headerBorder} />
         </Animated.View>
 
         <View style={[styles.headerContent, { marginTop: insets.top }]}>
           <View style={styles.headerLeftRow}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/create")}>
-              <Ionicons name="add-circle" size={30} color="#111" />
+              <Ionicons name="add-circle" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -378,7 +424,7 @@ export default function CommunityScreen() {
           <View style={styles.headerRightRow}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/chat" as any)}>
               <View>
-                <Ionicons name="chatbubbles-outline" size={24} color="#111" />
+                <Ionicons name="chatbubbles-outline" size={24} color={colors.textPrimary} />
                 {totalUnread > 0 && (
                   <View style={styles.chatBadge}>
                     <Text style={styles.chatBadgeText}>
@@ -391,13 +437,13 @@ export default function CommunityScreen() {
 
             <TouchableOpacity style={styles.iconBtn} onPress={() => { setUnreadNotifCount(0); router.push("/community/notifications"); }}>
               <View>
-                <Ionicons name="notifications" size={26} color="#111" />
+                <Ionicons name="notifications" size={24} color={colors.textPrimary} />
                 {unreadNotifCount > 0 && <View style={styles.badge} />}
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/community/search")}>
-              <Ionicons name="search" size={24} color="#111" />
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/search" as any)}>
+              <Ionicons name="search" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -409,7 +455,9 @@ export default function CommunityScreen() {
     renderItem={renderItem}
     ListHeaderComponent={ListHeader()}
     ListFooterComponent={
-        topTab === "Rank" ? (
+        topTab === "Events" ? (
+              <EventsTab />
+            ) : topTab === "Rank" ? (
               <RankTab
                 discipline={rankDiscipline}
                 onPressUser={(userId) => {
@@ -417,7 +465,7 @@ export default function CommunityScreen() {
                 }}
               />
             ) : topTab === "Gyms" ? (
-              <GymsTab />
+              <GymsTab initialGymId={routeParams.tab === 'gyms' ? routeParams.gymId : undefined} />
             ) : null
     }
     onScroll={scrollHandler}
@@ -429,9 +477,9 @@ export default function CommunityScreen() {
       topTab === "Post" ? (
         <View style={{ padding: 40, alignItems: "center" }}>
           {feedLoading ? (
-            <ActivityIndicator size="small" color="#111" />
+            <ActivityIndicator size="small" color={colors.textPrimary} />
           ) : (
-            <Text style={{ color: "#9CA3AF", fontSize: 14 }}>No posts yet. Pull to refresh.</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 14, fontFamily: theme.fonts.regular }}>No posts yet. Pull to refresh.</Text>
           )}
         </View>
       ) : null
@@ -490,63 +538,66 @@ export default function CommunityScreen() {
         }}
       />
 
-      {/* Unified Filter Bottom Sheet — content changes per active tab */}
-      <SmartBottomSheet
-        visible={filterSheetVisible}
-        onClose={() => setFilterSheetVisible(false)}
-        mode="list"
-        title="Filter"
-      >
-        <View style={{ padding: 16, paddingBottom: 24 }}>
-          {(topTab === "Post" ? POST_FILTERS : RANK_FILTERS
-          ).map((f: { key: string; label: string }) => {
-            const currentValue =
-              topTab === "Post" ? postFilter : rankDiscipline;
-
-            const active = currentValue === f.key;
-
-            return (
-              <TouchableOpacity
-                key={f.key}
-                style={styles.filterRow}
-                onPress={() => {
-                  if (topTab === "Post") setPostFilter(f.key as PostFilter);
-                  else setRankDiscipline(f.key as RankDiscipline);
-                  setFilterSheetVisible(false);
-                }}
-              >
-                <Text style={styles.filterLabel}>{f.label}</Text>
-                {active ? <Ionicons name="checkmark" size={18} color="#111" /> : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </SmartBottomSheet>
+      {/* Filter popover — rendered at root level for correct z-index */}
+      {filterSheetVisible && (
+        <>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setFilterSheetVisible(false)}
+          />
+          <View style={[styles.filterPopover, { top: filterPopoverPos.top, right: filterPopoverPos.right }]}>
+            <Text style={styles.popoverGroupTitle}>
+              {topTab === "Post" ? "Filter Posts" : "Filter by Discipline"}
+            </Text>
+            <View style={styles.popoverPillRow}>
+              {(topTab === "Post" ? POST_FILTERS : RANK_FILTERS).map((f) => {
+                const currentValue = topTab === "Post" ? postFilter : rankDiscipline;
+                const active = currentValue === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[styles.popoverPill, active && styles.popoverPillActive]}
+                    onPress={() => {
+                      if (topTab === "Post") setPostFilter(f.key as PostFilter);
+                      else setRankDiscipline(f.key as RankDiscipline);
+                      setFilterSheetVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.popoverPillText, active && styles.popoverPillTextActive]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
   fixedHeader: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 100 },
-  headerBorder: { position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(0,0,0,0.05)" },
-  headerContent: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
+  headerBorder: { position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: colors.border },
+  headerContent: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: theme.spacing.screenPadding },
   headerTitleContainer: { position: "absolute", left: 0, right: 0, alignItems: "center", pointerEvents: "none" },
-  headerTitleText: { fontSize: 17, fontWeight: "700", color: "#111" },
-  headerLeftRow: { flexDirection: "row", alignItems: "center", width: 80 },
+  headerTitleText: { fontSize: 17, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.textPrimary },
+  headerLeftRow: { flexDirection: "row", alignItems: "center", width: 80, marginLeft: -8 },
   headerRightRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 20, marginBottom: 14 },
-  bigHeaderArea: { flex: 1, paddingTop: 35, },
-  greeting: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  subtitle: { fontSize: 15, color: "#6B7280", marginTop: 2 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: theme.spacing.screenPadding, marginBottom: 14 },
+  bigHeaderArea: { flex: 1, paddingTop: 35 },
+  greeting: { fontSize: 32, fontWeight: "900", fontFamily: theme.fonts.black, color: colors.textPrimary, lineHeight: 38, letterSpacing: -1 },
+  subtitle: { fontSize: 15, fontFamily: theme.fonts.regular, color: colors.textSecondary, marginTop: 2 },
 
   // Top tabs (text-only) with sliding underline
   topTabsWrap: {
     position: "relative",
-    paddingBottom: 10, // 给 underline 留空间
+    paddingBottom: 10,
     marginBottom: 8,
   },
   topTabsRow: {
@@ -558,20 +609,16 @@ const styles = StyleSheet.create({
   topTabItem: {
     paddingVertical: 6,
   },
-  topTabItemActive: {
-    transform: [{ scale: 1.1 }],
-  },
+  topTabItemActive: {},
   topTabText: {
     fontSize: 14,
-    letterSpacing: 0.2,
+    fontFamily: theme.fonts.medium,
   },
   topTabTextActive: {
-    color: "#111",
-    fontWeight: "800",
+    color: colors.textPrimary,
   },
   topTabTextInactive: {
-    color: "#9CA3AF",
-    fontWeight: "700",
+    color: colors.textSecondary,
   },
   topTabsUnderline: {
     position: "absolute",
@@ -579,33 +626,69 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 2,
     borderRadius: 2,
-    backgroundColor: "#111",
+    backgroundColor: colors.textPrimary,
   },
-
 
   tabRowFilterBtn: {
     marginLeft: "auto",
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  filterRow: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#F9FAFB",
-    paddingHorizontal: 14,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
+  tabRowFilterBtnActive: {
+    backgroundColor: "#111",
   },
-  filterLabel: { fontSize: 14, fontWeight: "700", color: "#111" },
+
+  filterPopover: {
+    position: "absolute",
+    width: 260,
+    zIndex: 200,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
+  },
+  popoverGroupTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  popoverPillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  popoverPill: {
+    paddingHorizontal: 14,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  popoverPillActive: {
+    backgroundColor: "#111827",
+  },
+  popoverPillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  popoverPillTextActive: {
+    color: "#FFF",
+  },
 
   feedScopeRow: {
     flexDirection: "row",
@@ -615,18 +698,18 @@ const styles = StyleSheet.create({
   feedPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: colors.backgroundSecondary,
   },
   feedPillActive: {
-    backgroundColor: "#111",
+    backgroundColor: colors.cardDark,
   },
   feedPillText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
   },
   feedPillTextActive: {
     color: "#FFF",
@@ -644,19 +727,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
   },
   sortPillActive: {
-    backgroundColor: "#111",
+    backgroundColor: colors.cardDark,
   },
   sortText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
   },
   sortTextActive: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: theme.fonts.medium,
     color: "#FFF",
   },
 
@@ -689,6 +772,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 9,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     lineHeight: 12,
   },
 });

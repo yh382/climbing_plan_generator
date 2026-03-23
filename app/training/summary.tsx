@@ -33,14 +33,8 @@ export default function SessionSummaryScreen() {
     return `${h}h ${rm}m`;
   };
 
-  const getFeelingIcon = (f: number): { name: string; color: string; label: string } => {
-    switch (f) {
-      case 1: return { name: "battery-dead-outline", color: "#EF4444", label: "Exhausted" };
-      case 2: return { name: "remove-circle-outline", color: "#F59E0B", label: "Okay" };
-      case 3: return { name: "happy-outline", color: "#10B981", label: "Good" };
-      case 4: return { name: "flame-outline", color: "#F97316", label: "Great" };
-      default: return { name: "happy-outline", color: "#10B981", label: "Good" };
-    }
+  const getFeelingIcon = (_f: number): { name: string; color: string; label: string } => {
+    return { name: "checkmark-outline", color: "#306E6F", label: "Complete" };
   };
 
   const handleDone = () => {
@@ -57,13 +51,7 @@ export default function SessionSummaryScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
       {/* Celebration */}
       <View style={styles.celebrationSection}>
-        <View style={[styles.celebrationIconWrap, { backgroundColor: getFeelingIcon(stats.feeling).color + "15" }]}>
-          <Ionicons
-            name={getFeelingIcon(stats.feeling).name as any}
-            size={40}
-            color={getFeelingIcon(stats.feeling).color}
-          />
-        </View>
+        <Ionicons name="checkmark-outline" size={48} color="#306E6F" />
         <Text style={styles.celebrationTitle}>
           {tr("训练完成!", "Session Complete!")}
         </Text>
@@ -75,29 +63,21 @@ export default function SessionSummaryScreen() {
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <StatCard
-          icon="time-outline"
           label={tr("总时长", "Duration")}
           value={formatDuration(stats.duration)}
-          color="#3B82F6"
         />
         <StatCard
-          icon="barbell-outline"
           label={tr("动作完成", "Exercises")}
           value={`${stats.completed}/${stats.total}`}
-          color="#10B981"
         />
         <StatCard
-          icon="speedometer-outline"
           label={tr("完成度", "Completion")}
           value={`${completionPercent}%`}
-          color="#F59E0B"
         />
         {stats.rpe > 0 && (
           <StatCard
-            icon="flash-outline"
             label="RPE"
             value={`${stats.rpe}/10`}
-            color="#EF4444"
           />
         )}
       </View>
@@ -116,12 +96,9 @@ export default function SessionSummaryScreen() {
   );
 }
 
-function StatCard({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <View style={statStyles.card}>
-      <View style={[statStyles.iconCircle, { backgroundColor: color + "15" }]}>
-        <Ionicons name={icon as any} size={22} color={color} />
-      </View>
       <Text style={statStyles.value}>{value}</Text>
       <Text style={statStyles.label}>{label}</Text>
     </View>
@@ -129,19 +106,11 @@ function StatCard({ icon, label, value, color }: { icon: string; label: string; 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FAFAFA", paddingHorizontal: 20 },
+  container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 20 },
   // Celebration
   celebrationSection: { alignItems: "center", marginBottom: 32, marginTop: 20 },
-  celebrationIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  celebrationTitle: { fontSize: 24, fontWeight: "800", color: "#111" },
-  celebrationSub: { fontSize: 15, color: "#6B7280", marginTop: 4 },
+  celebrationTitle: { fontSize: 24, fontFamily: "DMSans_900Black", color: "#000000", marginTop: 12 },
+  celebrationSub: { fontSize: 15, color: "#888888", marginTop: 4, fontFamily: "DMSans_400Regular" },
   // Stats
   statsGrid: {
     flexDirection: "row",
@@ -154,46 +123,33 @@ const styles = StyleSheet.create({
   actions: { marginTop: "auto", gap: 12 },
   secondaryBtn: {
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: "rgba(0,0,0,0.08)",
     borderRadius: 28,
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#FFF",
+    backgroundColor: "#FFFFFF",
   },
-  secondaryBtnText: { fontSize: 16, fontWeight: "700", color: "#374151" },
+  secondaryBtnText: { fontSize: 16, fontFamily: "DMSans_700Bold", color: "#000000" },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#111827",
+    backgroundColor: "#1C1C1E",
     borderRadius: 28,
     paddingVertical: 16,
   },
-  primaryBtnText: { fontSize: 16, fontWeight: "700", color: "#FFF" },
+  primaryBtnText: { fontSize: 16, fontFamily: "DMSans_700Bold", color: "#FFF" },
 });
 
 const statStyles = StyleSheet.create({
   card: {
     width: "46%",
-    backgroundColor: "#FFF",
-    borderRadius: 16,
+    backgroundColor: "#F7F7F7",
+    borderRadius: 14,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  value: { fontSize: 22, fontWeight: "800", color: "#111", marginBottom: 2 },
-  label: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
+  value: { fontSize: 28, fontFamily: "DMMono_500Medium", color: "#000000", marginBottom: 2 },
+  label: { fontSize: 11, color: "#888888", fontFamily: "DMSans_400Regular", textTransform: "uppercase", letterSpacing: 0.3 },
 });

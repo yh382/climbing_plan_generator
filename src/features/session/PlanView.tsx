@@ -174,7 +174,7 @@ export default function PlanView(props: Props) {
   if (!todaySession) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <PlanHeader
           paddingTop={insets.top}
@@ -203,7 +203,7 @@ export default function PlanView(props: Props) {
             style={[styles.pauseBtn, isPaused && styles.resumeBtn]}
             onPress={togglePause}
           >
-              <Ionicons name={isPaused ? "play" : "pause"} size={24} color={isPaused ? "#FFF" : "#F59E0B"} />
+              <Ionicons name={isPaused ? "play" : "pause"} size={24} color={isPaused ? "#FFF" : "#1C1C1E"} />
               <Text style={[styles.pauseText, isPaused && {color: '#FFF'}]}>
                  {isPaused ? (isZH ? "继续" : "RESUME") : (isZH ? "暂停" : "PAUSE")}
               </Text>
@@ -222,23 +222,23 @@ const styles = StyleSheet.create({
   // Header
   topBarContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12, height: 44 },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#111', flex: 1, textAlign: 'center' },
-  timerPill: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  timerText: { color: '#111', fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: 14 },
+  headerTitle: { fontSize: 17, fontFamily: 'DMSans_700Bold', color: '#111', flex: 1, textAlign: 'center' },
+  timerPill: { backgroundColor: '#F7F7F7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  timerText: { color: '#111', fontFamily: 'DMMono_500Medium', fontVariant: ['tabular-nums'], fontSize: 14 },
 
   // Progress
   progressContainer: { paddingHorizontal: 16 },
   progressTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressLabel: { fontSize: 12, fontWeight: '600', color: '#374151' },
-  progressValue: { fontSize: 12, fontWeight: '700', color: '#111' },
-  progressBarTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 4 },
+  progressLabel: { fontSize: 12, fontFamily: 'DMSans_500Medium', color: '#888888' },
+  progressValue: { fontSize: 12, fontFamily: 'DMMono_500Medium', color: '#111' },
+  progressBarTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#306E6F', borderRadius: 2 },
 
   // Bottom Bar
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 16, flexDirection: 'row', gap: 12 },
-  pauseBtn: { flex: 1, height: 56, borderRadius: 28, backgroundColor: '#FFF9E6', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: '#F59E0B' },
-  resumeBtn: { backgroundColor: '#F59E0B', borderColor: '#F59E0B' },
-  pauseText: { color: '#F59E0B', fontSize: 15, fontWeight: '700' },
-  finishBtn: { flex: 2, height: 56, borderRadius: 28, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10 },
-  finishText: { color: '#FFF', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 }
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.08)', padding: 16, flexDirection: 'row', gap: 12 },
+  pauseBtn: { flex: 1, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1.5, borderColor: '#1C1C1E' },
+  resumeBtn: { backgroundColor: '#1C1C1E', borderColor: '#1C1C1E' },
+  pauseText: { color: '#1C1C1E', fontSize: 15, fontFamily: 'DMSans_700Bold' },
+  finishBtn: { flex: 2, height: 56, borderRadius: 28, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  finishText: { color: '#FFF', fontSize: 15, fontFamily: 'DMSans_700Bold', letterSpacing: 0.5 }
 });

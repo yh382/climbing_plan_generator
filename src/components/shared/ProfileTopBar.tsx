@@ -1,8 +1,10 @@
 // src/components/shared/ProfileTopBar.tsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import Animated from "react-native-reanimated";
 
 export interface ProfileTopBarProps {
@@ -26,10 +28,13 @@ export default function ProfileTopBar({
   onSettingsPress,
   onMorePress,
 }: ProfileTopBarProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={[styles.fixedHeader, { height: insetTop + 44 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, topbarBgStyle]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#FFFFFF" }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
       </Animated.View>
 
       <View style={[styles.headerContent, { marginTop: insetTop }]}>
@@ -66,7 +71,7 @@ export default function ProfileTopBar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   fixedHeader: {
     position: "absolute",
     top: 0,
@@ -91,7 +96,8 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#111",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   headerRightRow: {
     width: 80,

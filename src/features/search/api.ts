@@ -12,6 +12,15 @@ export interface SearchUserResult {
   bio?: string;
 }
 
+export interface RecommendedUser {
+  user_id: string;
+  username: string | null;
+  avatar_url: string | null;
+  boulder_max: string | null;
+  total_sends: number;
+  mutual_count: number;
+}
+
 export const searchApi = {
   searchUsers: async (q: string, limit = 5): Promise<SearchUserResult[]> => {
     return api.get<SearchUserResult[]>(
@@ -25,6 +34,10 @@ export const searchApi = {
     return all
       .filter((c) => c.title.toLowerCase().includes(lower))
       .slice(0, 5);
+  },
+
+  getRecommendedUsers: async (): Promise<RecommendedUser[]> => {
+    return api.get<RecommendedUser[]>('/profiles/recommended');
   },
 
   searchEvents: async (q: string): Promise<EventOut[]> => {

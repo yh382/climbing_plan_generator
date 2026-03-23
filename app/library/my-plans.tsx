@@ -9,6 +9,7 @@ import TopBar from "../../components/TopBar";
 import { TrainingPlanCard } from "../../src/components/plancard";
 import { useMyPlans } from "../../src/features/plans/hooks";
 import { planSummaryToTrainingPlan } from "../../src/features/plans/adapters";
+import { plansApi } from "../../src/features/plans/api";
 
 type TabKey = "Others" | "Custom";
 
@@ -19,10 +20,13 @@ export default function MyPlansScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>("Custom");
   const [fabOpen, setFabOpen] = useState(false);
 
-  const { plans, loading } = useMyPlans();
+  const { plans, loading, refresh } = useMyPlans();
 
   const data = useMemo(() => {
-    const uiPlans = plans.map(planSummaryToTrainingPlan);
+    // Filter out completed plans — they belong in Plan History
+    const uiPlans = plans
+      .filter((p) => p.status !== "completed")
+      .map(planSummaryToTrainingPlan);
     if (activeTab === "Custom") {
       return uiPlans.filter((p) => p.source === "ai" || p.source === "custom");
     }
@@ -41,12 +45,50 @@ export default function MyPlansScreen() {
     }
   };
 
+  const handleManageAction = async (plan: any, action: string) => {
+    try {
+      switch (action) {
+        case "Pause Plan":
+          await plansApi.updatePlanStatus(plan.id, "paused");
+          break;
+        case "Activate Plan":
+          await plansApi.updatePlanStatus(plan.id, "active");
+          break;
+        case "Complete Plan":
+          await plansApi.updatePlanStatus(plan.id, "completed");
+          break;
+        case "Delete Plan":
+          Alert.alert("Delete Plan", `Delete "${plan.title}"? This cannot be undone.`, [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: async () => {
+                await plansApi.deletePlan(plan.id);
+                refresh();
+              },
+            },
+          ]);
+          return; // don't refresh yet — wait for confirm
+      }
+      refresh();
+    } catch {
+      Alert.alert("Error", "Failed to update plan.");
+    }
+  };
+
   const openManageMenu = (plan: any) => {
-    Alert.alert(
-      "Manage Plan",
-      `Plan: ${plan.title}\n\n(Next) Public / Private / Archive`,
-      [{ text: "OK" }]
-    );
+    const buttons: any[] = [];
+    if (plan.status === "active") {
+      buttons.push({ text: "Pause Plan", onPress: () => handleManageAction(plan, "Pause Plan") });
+    } else if (plan.status === "paused") {
+      buttons.push({ text: "Activate Plan", onPress: () => handleManageAction(plan, "Activate Plan") });
+    }
+    buttons.push({ text: "Complete Plan", onPress: () => handleManageAction(plan, "Complete Plan") });
+    buttons.push({ text: "Delete Plan", style: "destructive", onPress: () => handleManageAction(plan, "Delete Plan") });
+    buttons.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Manage Plan", plan.title, buttons);
   };
 
   return (

@@ -15,12 +15,15 @@ import CommentSheet from "../../../src/features/community/components/CommentShee
 import { communityApi } from "../../../src/features/community/api";
 import { mapRawPost, toFeedPost } from "../../../src/features/community/utils";
 import { useCommunityStore } from "../../../src/store/useCommunityStore";
+import { useUserStore } from "../../../src/store/useUserStore";
+import useLogsStore from "../../../src/store/useLogsStore";
 import { FeedPost as FeedPostType } from "../../../src/types/community";
 
 export default function SinglePostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const router = useRouter();
   const { toggleLike, toggleSave, updateCommentCount } = useCommunityStore();
+  const currentUserId = useUserStore((s) => s.user?.id);
 
   const [post, setPost] = useState<FeedPostType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,10 +78,37 @@ export default function SinglePostScreen() {
           }}
           onPressAttachment={(p) => {
             const att = p?.attachment;
-            if (att?.type === "shared_plan") {
+            if (!att?.id) return;
+            if (att.type === "plan") {
               router.push({
                 pathname: "/library/plan-overview",
                 params: { planId: att.id, source: "market" },
+              });
+              return;
+            }
+            if (att.type === "log" || att.type === "session") {
+              const isOwn = post?.user?.id === currentUserId;
+              if (isOwn) {
+                const localSession = useLogsStore.getState().sessions.find(
+                  (s) => s.serverId === att.id
+                );
+                if (localSession) {
+                  router.push({
+                    pathname: "/library/log-detail",
+                    params: {
+                      date: localSession.date,
+                      sessionKey: localSession.sessionKey,
+                      gymName: localSession.gymName,
+                      mode: localSession.discipline,
+                      origin: "community",
+                    },
+                  });
+                  return;
+                }
+              }
+              router.push({
+                pathname: "/community/public-route-log",
+                params: { sessionId: att.id },
               });
             }
           }}

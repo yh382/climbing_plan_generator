@@ -22,7 +22,7 @@ export default function DualMiniRings({
   outerValue = 0,
   innerValue = 0, 
   outerColor = "#A5D23D", 
-  innerColor = "#3B82F6", 
+  innerColor = "#306E6F",
   trackColor = "#E5E7EB",    
   outerThickness = 2.5,
   innerThickness = 2.5,

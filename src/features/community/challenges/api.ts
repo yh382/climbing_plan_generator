@@ -4,9 +4,10 @@ import { mapRawChallenge, mapRawLeaderboardEntry } from './types';
 
 export const challengeApi = {
   /** Get published challenges list */
-  getChallenges: async (opts?: { category?: string; limit?: number }): Promise<ChallengeOut[]> => {
+  getChallenges: async (opts?: { category?: string; discipline?: string; limit?: number }): Promise<ChallengeOut[]> => {
     const params = new URLSearchParams();
     if (opts?.category) params.set('category', opts.category);
+    if (opts?.discipline) params.set('discipline', opts.discipline);
     params.set('limit', String(opts?.limit ?? 50));
     const raw = await api.get<any[]>(`/challenges?${params.toString()}`);
     return raw.map(mapRawChallenge);

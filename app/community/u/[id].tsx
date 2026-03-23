@@ -28,6 +28,7 @@ import ProfileTopBar from "../../../src/components/shared/ProfileTopBar";
 import ProfileHeader from "../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
 import ProfilePostGrid from "../../../src/features/profile/components/ProfilePostGrid";
+import PublicStatsSection from "../../../src/features/profile/components/PublicStatsSection";
 import BadgeCard from "../../../src/features/profile/components/badgessection/BadgeCard";
 import type { Badge, BadgeSectionKey, BadgeTier } from "../../../src/features/profile/components/badgessection/types";
 import { usePublicProfile, PublicBadge } from "../../../src/features/community/hooks";
@@ -68,9 +69,6 @@ const BADGE_GROUPS: { key: string; title: string; filter: (b: Badge) => boolean;
   { key: "rope", title: "Rope", filter: (b) => b.id.startsWith("limit_rope_") || b.id.startsWith("solid_rope_"), dedupe: true },
   { key: "lifetime", title: "Lifetime", filter: (b) => b.section === "lifetime" },
   { key: "monthly", title: "Monthly", filter: (b) => b.section === "monthly" },
-  { key: "milestone", title: "Milestone", filter: (b) => b.section === "milestone" },
-  { key: "influence", title: "Influence", filter: (b) => b.section === "influence" },
-  { key: "special", title: "Special", filter: (b) => b.section === "special" },
 ];
 
 const SCROLL_THRESHOLD = 44;
@@ -81,7 +79,7 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { tt } = useI18N();
 
-  const { profile, posts, plans, badges, loading } = usePublicProfile(id ?? null);
+  const { profile, posts, plans, badges, dailySummary, loading } = usePublicProfile(id ?? null);
   const { width } = useWindowDimensions();
 
   const badgeCardSize = useMemo(() => (width - 24 - 12) / 3, [width]);
@@ -320,6 +318,7 @@ export default function PublicProfileScreen() {
           onMessagePress={handleMessage}
           headerTitleAnimStyle={headerTitleAnimStyle}
           topPadding={insets.top + 44}
+          scrollY={scrollY}
         />
 
         {/* [1] Tab bar (sticky) */}
@@ -345,14 +344,9 @@ export default function PublicProfileScreen() {
               <PrivateSection
                 message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
               />
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="stats-chart-outline" size={40} color="#E5E7EB" />
-                <Text style={styles.emptyText}>
-                  {tt({ zh: "暂无公开统计", en: "No public stats" })}
-                </Text>
-              </View>
-            )
+            ) : profile ? (
+              <PublicStatsSection profile={profile} dailySummary={dailySummary} />
+            ) : null
           )}
 
           {activeTab === "plans" && (

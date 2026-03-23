@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -30,6 +31,8 @@ type Props = {
 };
 
 export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { tr } = useSettings();
   const insets = useSafeAreaInsets();
 
@@ -48,7 +51,7 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
 
   return (
     <Animated.View
-      style={[styles.container, { bottom: insets.bottom + 72 }, animStyle]}
+      style={[styles.container, { bottom: insets.bottom + 113 }, animStyle]}
       pointerEvents={visible ? "auto" : "none"}
     >
       {TASKS.map((t) => {
@@ -67,7 +70,7 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
             <Ionicons
               name={t.icon as any}
               size={16}
-              color={active ? "#306E6F" : "#9CA3AF"}
+              color={active ? colors.accent : colors.textSecondary}
             />
             <Text style={[styles.label, active && styles.labelActive]}>
               {tr(t.zh, t.en)}
@@ -79,7 +82,7 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     position: "absolute",
     left: 0,
@@ -99,19 +102,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 0.8,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.cardBackground,
   },
   chipActive: {
-    borderColor: "#306E6F",
+    borderColor: colors.accent,
     backgroundColor: "rgba(48,110,111,0.08)",
   },
   label: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#9CA3AF",
+    color: colors.textSecondary,
   },
   labelActive: {
-    color: "#306E6F",
+    color: colors.accent,
   },
 });

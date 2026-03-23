@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  useColorScheme,
   Pressable,
   Platform,
   Share,
@@ -20,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { TabActions } from "@react-navigation/native";
 import { useNavigation, useRouter } from "expo-router";
 import { useUserStore } from "@/store/useUserStore";
+import { useThemeColors } from "@/lib/useThemeColors";
 import GlassIconButton from "@components/GlassIconButton";
 
 type Props = {
@@ -58,8 +58,7 @@ export default function TopBar({
   useSafeArea = true,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+  const colors = useThemeColors();
   const { tr } = useSettings();
   const navigation = useNavigation();
   const router = useRouter();
@@ -115,7 +114,7 @@ export default function TopBar({
           <Ionicons
             name="chevron-back"
             size={24}
-            color={isDark ? "#F8FAFC" : "#111827"}
+            color={colors.textPrimary}
           />
         </Pressable>
       );
@@ -142,7 +141,7 @@ export default function TopBar({
           <Ionicons
             name="chevron-back"
             size={22}
-            color={isDark ? "#F8FAFC" : "#111827"}
+            color={colors.textPrimary}
           />
         </Pressable>
       );
@@ -178,7 +177,7 @@ export default function TopBar({
             <Ionicons
               name="share-outline"
               size={18}
-              color={isDark ? "#F8FAFC" : "#111827"}
+              color={colors.textPrimary}
             />
           </GlassIconButton>
 
@@ -193,7 +192,7 @@ export default function TopBar({
             <Ionicons
               name="menu-outline"
               size={22}
-              color={isDark ? "#F8FAFC" : "#111827"}
+              color={colors.textPrimary}
             />
           </GlassIconButton>
         </View>
@@ -210,7 +209,7 @@ export default function TopBar({
         {
           paddingTop: useSafeArea ? insets.top : 0,
           // [核心修改] 浅色模式下改为纯白 "#FFFFFF"
-          backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
+          backgroundColor: colors.background,
         },
       ]}
     >
@@ -225,7 +224,7 @@ export default function TopBar({
           ) : (
             <Text
               numberOfLines={1}
-              style={[styles.title, { color: isDark ? "#F8FAFC" : "#111827" }]}
+              style={[styles.title, { color: colors.textPrimary }]}
             >
               {resolvedTitle}
             </Text>

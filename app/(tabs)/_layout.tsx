@@ -16,12 +16,13 @@ const isIOS = Platform.OS === "ios";
 export default function TabsLayout() {
   const { user, fetchMe } = useUserStore();
   const router = useRouter();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
   const handledRef = useRef(false);
 
   useEffect(() => {
-    if (!user) fetchMe();
-  }, [user, fetchMe]);
+    if (accessToken && !user) fetchMe();
+  }, [accessToken, user, fetchMe]);
 
   useEffect(() => {
     setOnAuthExpired(() => {

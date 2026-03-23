@@ -67,5 +67,5 @@ const s = StyleSheet.create({
   pillTextActive: { color: "#FFF" },
   dotsRow: { flexDirection: "row", gap: 3 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#D1D5DB" },
-  dotActive: { backgroundColor: "#34D399" },
+  dotActive: { backgroundColor: "#306E6F" },
 });

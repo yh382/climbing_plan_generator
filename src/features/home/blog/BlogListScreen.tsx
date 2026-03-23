@@ -15,10 +15,13 @@ import { GlassTopBar } from "./component/GlassTopBar";
 import { BlogSearchBar } from "./component/BlogSearchBar";
 import { BlogCard } from "./component/BlogCard";
 import { MOCK_BLOGS } from "./component/mockBlogs";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const SCROLL_THRESHOLD = 40;
 
 export default function BlogListScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -58,7 +61,7 @@ export default function BlogListScreen() {
   }, [q]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
         <GlassTopBar
         scrollY={scrollY}
         smallTitle="Blog"
@@ -116,7 +119,7 @@ export default function BlogListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   iconBtn: {
     width: 40,
     height: 36,
@@ -143,10 +146,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   bigSub: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 14,
-    color: "#6B7280",
-    fontWeight: "600",
+    color: colors.textSecondary,
+    fontWeight: "400",
   },
   empty: {
     paddingVertical: 36,

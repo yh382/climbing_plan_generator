@@ -1,13 +1,13 @@
 import type { LogEntry, LogType, StackedBarItem } from "./types";
 import { getGradeColor } from "./gradeAnalyzer";
 
-const BOULDER_COLORS = { easy: "#FCD34D", mid: "#F97316", hard: "#EF4444" };
+const BOULDER_COLORS = { easy: "#B8C8B8", mid: "#306E6F", hard: "#5A5050" };
 const ROPE_COLORS = {
-  beginner: "#22C55E",
-  intermediate: "#3B82F6",
-  advanced: "#A855F7",
-  expert: "#111827",
-  elite: "#9CA3AF",
+  beginner: "#B8C8B8",
+  intermediate: "#78A28C",
+  advanced: "#306E6F",
+  expert: "#5A5050",
+  elite: "#8B6F5C",
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");

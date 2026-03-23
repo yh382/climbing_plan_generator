@@ -29,7 +29,7 @@ export type UseDailyLogDetailResult = {
   displayDate: string;
 
   isPublicView: boolean;
-  modeParam?: "boulder" | "rope";
+  modeParam?: "boulder" | "toprope" | "lead" | "rope";
   gymName: string;
 
   dailyLogs: any[];
@@ -51,7 +51,7 @@ export function useDailyLogDetail(params: {
   origin?: string;
   readonly?: string;
   gymNameParam?: string;
-  modeParam?: "boulder" | "rope";
+  modeParam?: "boulder" | "toprope" | "lead" | "rope";
 }): UseDailyLogDetailResult {
   const { sessions } = useLogsStore();
   const { percentForDate } = usePlanStore();

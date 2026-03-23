@@ -1,8 +1,10 @@
 // src/components/shared/ProfileTabBar.tsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const PROFILE_TABS = [
   { key: "posts", icon: "grid-outline", iconActive: "grid" },
@@ -16,6 +18,9 @@ export interface ProfileTabBarProps {
 }
 
 export default function ProfileTabBar({ activeTab, onTabPress }: ProfileTabBarProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.tabBarStickyWrap}>
       <View style={styles.tabBar}>
@@ -32,7 +37,7 @@ export default function ProfileTabBar({ activeTab, onTabPress }: ProfileTabBarPr
                 // @ts-ignore — icon union type
                 name={isActive ? t.iconActive : t.icon}
                 size={22}
-                color={isActive ? "#111827" : "#9CA3AF"}
+                color={isActive ? colors.textPrimary : colors.textTertiary}
               />
               {isActive && <View style={styles.activeDot} />}
             </TouchableOpacity>
@@ -43,13 +48,13 @@ export default function ProfileTabBar({ activeTab, onTabPress }: ProfileTabBarPr
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   tabBarStickyWrap: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
     zIndex: 20,
     elevation: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: colors.border,
   },
   tabBar: { flexDirection: "row", height: 52 },
   tabItem: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -59,6 +64,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#111827",
+    backgroundColor: colors.accent,
   },
 });

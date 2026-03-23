@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
+import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { api } from "src/lib/apiClient";
 
@@ -11,8 +11,8 @@ import { api } from "src/lib/apiClient";
  * Expo Go / simulators will skip gracefully.
  */
 export async function registerForPushNotifications(): Promise<string | null> {
-  // Skip on Expo Go (no native push module) and simulators
-  if (!Constants.isDevice) {
+  // Skip on simulators (Device.isDevice is reliable across Expo SDK versions)
+  if (!Device.isDevice) {
     if (__DEV__) console.log("Push notifications require a physical device");
     return null;
   }
@@ -39,19 +39,20 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
   }
 
-  const token = await Notifications.getExpoPushTokenAsync({
-    projectId: "d4b98925-c856-48a8-9c93-e2bfa0cc4e24",
-  });
-
-  // Send token to backend
   try {
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId: "d4b98925-c856-48a8-9c93-e2bfa0cc4e24",
+    });
+
+    // Send token to backend
     await api.post("/users/me/push-token", {
       push_token: token.data,
       platform: Platform.OS,
     });
-  } catch (e) {
-    if (__DEV__) console.warn("Failed to send push token to backend:", e);
-  }
 
-  return token.data;
+    return token.data;
+  } catch (e) {
+    if (__DEV__) console.warn("Failed to register push token:", e);
+    return null;
+  }
 }

@@ -1,5 +1,5 @@
 // src/features/session/components/PreSessionModal.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,11 +17,15 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "src/lib/apiClient";
+import { theme } from "src/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
+
+type Discipline = "boulder" | "toprope" | "lead";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onStart: (gymName: string, discipline: "boulder" | "rope") => void;
+  onStart: (gymName: string, discipline: Discipline) => void;
 }
 
 type GymItem = {
@@ -62,8 +66,11 @@ async function getDeviceCoords(): Promise<{ lat: number; lng: number } | null> {
 
 export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [selectedGym, setSelectedGym] = useState<string | null>(null);
-  const [discipline, setDiscipline] = useState<"boulder" | "rope" | null>(null);
+  const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -373,7 +380,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
                       <Ionicons
                         name="checkmark-circle"
                         size={24}
-                        color="#10B981"
+                        color={colors.accent}
                       />
                     )}
                   </TouchableOpacity>
@@ -386,19 +393,27 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
           <Text style={[styles.sectionLabel, { marginTop: 16 }]}>DISCIPLINE</Text>
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TouchableOpacity
-              style={[styles.gymItem, { flex: 1 }, discipline === "boulder" && styles.gymItemActive]}
+              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "boulder" && styles.gymItemActive]}
               onPress={() => setDiscipline("boulder")}
             >
               <Text style={[styles.gymName, discipline === "boulder" && styles.gymNameActive]}>
-                Bouldering
+                Boulder
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.gymItem, { flex: 1 }, discipline === "rope" && styles.gymItemActive]}
-              onPress={() => setDiscipline("rope")}
+              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "toprope" && styles.gymItemActive]}
+              onPress={() => setDiscipline("toprope")}
             >
-              <Text style={[styles.gymName, discipline === "rope" && styles.gymNameActive]}>
-                Rope
+              <Text style={[styles.gymName, discipline === "toprope" && styles.gymNameActive]}>
+                Top Rope
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "lead" && styles.gymItemActive]}
+              onPress={() => setDiscipline("lead")}
+            >
+              <Text style={[styles.gymName, discipline === "lead" && styles.gymNameActive]}>
+                Lead
               </Text>
             </TouchableOpacity>
           </View>
@@ -418,7 +433,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -436,24 +451,19 @@ const styles = StyleSheet.create({
   },
 
   sheet: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
     paddingTop: 12,
     maxHeight: SCREEN_HEIGHT * 0.85,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
   },
 
   handleContainer: { alignItems: "center", marginBottom: 16 },
   handle: {
-    width: 40,
+    width: 36,
     height: 4,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#D1D5DB",
     borderRadius: 2,
   },
 
@@ -463,9 +473,23 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 24,
   },
-  title: { fontSize: 24, fontWeight: "800", color: "#111" },
-  subTitle: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  closeBtn: { padding: 4, backgroundColor: "#F3F4F6", borderRadius: 20 },
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
+  },
+  subTitle: {
+    fontSize: 14,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  closeBtn: {
+    padding: 4,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 20,
+  },
 
   actionRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
   actionBtn: {
@@ -474,42 +498,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     gap: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "transparent",
   },
   locateBtn: {},
-  locateText: { fontWeight: "600", color: "#374151", fontSize: 13 },
-  mapText: { fontWeight: "600", color: "#374151", fontSize: 13 },
+  locateText: {
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+    fontSize: 13,
+  },
+  mapText: {
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+    fontSize: 13,
+  },
 
-  divider: { height: 1, backgroundColor: "#F3F4F6", marginBottom: 16 },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: 16,
+  },
 
   searchWrap: {
     height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderRadius: theme.borderRadius.pill,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.backgroundSecondary,
     marginBottom: 16,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    color: "#111",
+    fontFamily: theme.fonts.regular,
+    color: colors.textPrimary,
     fontSize: 14,
   },
 
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#9CA3AF",
+    fontFamily: theme.fonts.bold,
+    color: colors.textTertiary,
     marginBottom: 12,
     letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
 
   loadingWrap: {
@@ -517,7 +556,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  loadingText: { fontSize: 13, color: "#9CA3AF" },
+  loadingText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+  },
 
   emptyWrap: {
     paddingVertical: 24,
@@ -527,12 +570,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#6B7280",
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 12,
-    color: "#9CA3AF",
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
     textAlign: "center",
   },
 
@@ -540,13 +585,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    borderRadius: 16,
-    backgroundColor: "#F9FAFB",
+    borderRadius: theme.borderRadius.card,
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: "transparent",
     gap: 12,
   },
-  gymItemActive: { backgroundColor: "#111827", borderColor: "#111827" },
+  gymItemActive: {
+    backgroundColor: colors.cardDark,
+    borderColor: colors.cardDark,
+  },
   gymIconWrap: {
     width: 40,
     height: 40,
@@ -555,29 +603,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  gymName: { fontSize: 16, fontWeight: "600", color: "#111" },
+  gymName: {
+    fontSize: 16,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+  },
   gymNameActive: { color: "#FFF" },
-  gymAddr: { fontSize: 12, color: "#6B7280" },
+  gymAddr: {
+    fontSize: 12,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+  },
 
   startBtn: {
     marginTop: 24,
     height: 56,
-    backgroundColor: "#10B981",
+    backgroundColor: colors.cardDark,
     borderRadius: 28,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#10B981",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
   },
-  startBtnDisabled: { backgroundColor: "#D1D5DB", shadowOpacity: 0 },
+  startBtnDisabled: { backgroundColor: "#D1D5DB" },
   startBtnText: {
     color: "#FFF",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
 });

@@ -41,7 +41,7 @@ export default function GymCard({
             <Ionicons
               name={isFavorited ? 'star' : 'star-outline'}
               size={18}
-              color={isFavorited ? '#F59E0B' : '#D1D5DB'}
+              color={isFavorited ? '#306E6F' : '#BBBBBB'}
             />
           </TouchableOpacity>
         )}
@@ -72,7 +72,7 @@ export default function GymCard({
             <Ionicons
               name={isFavorited ? 'star' : 'star-outline'}
               size={20}
-              color={isFavorited ? '#F59E0B' : '#D1D5DB'}
+              color={isFavorited ? '#306E6F' : '#BBBBBB'}
             />
           </TouchableOpacity>
         )}

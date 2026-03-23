@@ -3,7 +3,8 @@
 
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { parseExerciseName } from "../../lib/exerciseUtils";
+import { theme } from "../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 export type ExerciseItemMode = "builder" | "execution";
 
@@ -33,8 +34,10 @@ function getImgUrl(media: ExerciseItemData["media"]): string | null {
 }
 
 export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLongPress }: Props) {
+  const colors = useThemeColors();
+
   const rawTitle = item.name_override?.[locale] || item.name_override?.en || item.action_id;
-  const { shortName: title } = parseExerciseName(rawTitle);
+  const title = rawTitle;
   const imgUrl = getImgUrl(item.media);
 
   // Format: "3×8 90s rest"
@@ -64,7 +67,7 @@ export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLon
           <Ionicons
             name={completed ? "checkmark-circle" : "ellipse-outline"}
             size={24}
-            color={completed ? "#10B981" : "#D1D5DB"}
+            color={completed ? "#306E6F" : colors.border}
           />
         </View>
       ) : null}
@@ -82,7 +85,7 @@ export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLon
 
       {/* Title + protocol */}
       <View style={s.textWrap}>
-        <Text style={[s.title, completed && s.titleDone]} numberOfLines={1}>
+        <Text style={[s.title, completed && s.titleDone]} numberOfLines={2}>
           {title}
         </Text>
         {protocolText ? (

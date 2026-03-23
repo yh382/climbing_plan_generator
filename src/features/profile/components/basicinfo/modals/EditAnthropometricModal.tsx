@@ -4,6 +4,8 @@ import React, { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import ExpandableEditCardModal from "../ExpandableEditCardModal";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 export type EditField = "height" | "weight" | "arm_span";
 
@@ -28,6 +30,8 @@ export default function EditAnthropometricModal({
   current: { height: number | null; weight: number | null; arm_span: number | null };
   onClose: () => void;
 }) {
+  const colors = useThemeColors();
+  const local = useMemo(() => createStyles(colors), [colors]);
   const profile = useProfileStore((s) => s.profile);
   const updateMe = useProfileStore((s) => s.updateMe);
 
@@ -99,7 +103,7 @@ export default function EditAnthropometricModal({
     <ExpandableEditCardModal
       visible={visible}
       title="Body Metrics"
-      subtitle="Tap outside to close • Height/Arm span in cm, Weight in kg"
+      subtitle="Height & Arm span in cm · Weight in kg"
       onRequestClose={onClose}
     >
       <View style={local.block}>
@@ -164,14 +168,14 @@ export default function EditAnthropometricModal({
   );
 }
 
-const local = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   block: {
     marginTop: 10,
   },
   label: {
     fontSize: 13,
-    fontWeight: "800",
-    color: "#111",
+    fontWeight: "600",
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   inputRow: {
@@ -181,19 +185,18 @@ const local = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 44,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#EAEAEA",
-    paddingHorizontal: 12,
+    borderWidth: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     fontSize: 16,
-    color: "#111",
-    backgroundColor: "#fff",
+    fontFamily: theme.fonts.monoMedium,
+    color: colors.textPrimary,
   },
   unit: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#666",
+    fontSize: 13,
+    color: colors.textTertiary,
   },
   errorText: {
     marginTop: 10,

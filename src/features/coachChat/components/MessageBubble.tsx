@@ -2,10 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { ChatMessage } from "../types";
 import { useCoachChatStore } from "../state/coachChatStore";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const CHAR_INTERVAL = 5;
 
 export default function MessageBubble({ msg }: { msg: ChatMessage }) {
+  const colors = useThemeColors();
   const isUser = msg.role === "user";
   const streamingMsgId = useCoachChatStore((s) => s.state.streamingMsgId);
   const clearStreaming = useCoachChatStore((s) => s.clearStreaming);
@@ -71,12 +74,12 @@ export default function MessageBubble({ msg }: { msg: ChatMessage }) {
           borderRadius: 18,
           paddingHorizontal: 14,
           paddingVertical: 12,
-          backgroundColor: isUser ? "#306E6F" : "#FFFFFF",
+          backgroundColor: isUser ? colors.accent : colors.bubbleAI,
           borderWidth: isUser ? 0 : 0.8,
-          borderColor: isUser ? "transparent" : "#E5E7EB",
+          borderColor: isUser ? "transparent" : colors.bubbleAIBorder,
         }}
       >
-        <Text style={{ color: isUser ? "#FFF" : "#111827", lineHeight: 18 }}>
+        <Text style={{ color: isUser ? "#FFF" : colors.bubbleAIText, lineHeight: 18, fontFamily: theme.fonts.regular }}>
           {displayText}
           {isStreaming && displayLen < msg.text.length ? "\u258C" : ""}
         </Text>

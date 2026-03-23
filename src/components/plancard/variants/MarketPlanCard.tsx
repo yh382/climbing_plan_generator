@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { sourceLabel } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
+import { theme } from "../../../lib/theme";
 
 function formatRating(avg?: number) {
   if (typeof avg !== "number") return null;
@@ -143,6 +144,7 @@ const styles = StyleSheet.create({
   typePillText: {
     fontSize: 11,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
   ratingPill: {
@@ -153,12 +155,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  star: { color: "#FBBF24", fontSize: 12, fontWeight: "900", marginRight: 4 },
-  ratingText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  star: { color: "#FBBF24", fontSize: 12, fontWeight: "900", fontFamily: theme.fonts.black, marginRight: 4 },
+  ratingText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", fontFamily: theme.fonts.bold },
 
   title: {
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: theme.fonts.black,
     color: "#FFFFFF",
     lineHeight: 24,
     textShadowColor: "rgba(0,0,0,0.3)",
@@ -168,18 +171,21 @@ const styles = StyleSheet.create({
   author: {
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.75)",
     marginTop: 2,
   },
   metaText: {
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.80)",
   },
   hint: {
     marginTop: 4,
     fontSize: 11,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.55)",
   },
 });

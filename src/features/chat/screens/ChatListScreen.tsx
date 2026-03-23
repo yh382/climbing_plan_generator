@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../../../lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useChatStore } from "../../../store/useChatStore";
 import { useSettings } from "../../../contexts/SettingsContext";
 import type { ChatConversationOut } from "../types";
@@ -30,6 +32,8 @@ function relativeTime(iso?: string): string {
 }
 
 export default function ChatListScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { tr } = useSettings();
@@ -89,7 +93,7 @@ export default function ChatListScreen() {
         </TouchableOpacity>
       );
     },
-    [router, tr],
+    [router, tr, styles],
   );
 
   return (
@@ -123,47 +127,82 @@ export default function ChatListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderBottomWidth: 0.8,
-    borderBottomColor: "#E5E7EB",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   backBtn: { width: 40, alignItems: "flex-start" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#F3F4F6",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
-  avatarPlaceholder: { backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
+  avatarPlaceholder: {
+    backgroundColor: colors.backgroundSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   middle: { flex: 1, marginLeft: 12 },
-  name: { fontSize: 15, color: "#111827" },
-  nameBold: { fontWeight: "700" },
-  preview: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-  previewBold: { color: "#374151", fontWeight: "600" },
+  name: {
+    fontSize: 15,
+    fontFamily: theme.fonts.regular,
+    color: colors.textPrimary,
+  },
+  nameBold: { fontWeight: "700", fontFamily: theme.fonts.bold },
+  preview: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  previewBold: {
+    color: colors.textPrimary,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+  },
   right: { alignItems: "flex-end", marginLeft: 8 },
-  time: { fontSize: 12, color: "#9CA3AF" },
+  time: {
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+  },
   badge: {
     marginTop: 4,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#306E6F",
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
   },
-  badgeText: { fontSize: 11, fontWeight: "700", color: "#FFF" },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: "#FFF",
+  },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  emptyText: { fontSize: 15, color: "#9CA3AF" },
+  emptyText: {
+    fontSize: 15,
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+  },
 });

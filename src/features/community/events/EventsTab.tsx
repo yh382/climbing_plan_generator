@@ -1,6 +1,8 @@
 // src/features/community/events/EventsTab.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useRouter } from "expo-router";
 
 import { eventApi } from "./api";
@@ -32,6 +34,8 @@ export default function EventsTab({
   onPressEvent?: (item: EventOut) => void;
 }) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [events, setEvents] = useState<EventOut[]>([]);
   const [myEvents, setMyEvents] = useState<EventOut[]>([]);
@@ -87,7 +91,7 @@ export default function EventsTab({
       >
         {myEvents.length === 0 ? (
           <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-            <Text style={{ color: "#9CA3AF", fontWeight: "700" }}>No registered events yet.</Text>
+            <Text style={{ color: colors.textTertiary, fontFamily: theme.fonts.medium }}>No registered events yet.</Text>
           </View>
         ) : (
           myEvents.map((e, idx) => (
@@ -104,7 +108,7 @@ export default function EventsTab({
 
       <View style={{ paddingHorizontal: 16 }}>
         {filtered.length === 0 ? (
-          <Text style={{ color: "#9CA3AF", fontWeight: "700", paddingVertical: 10 }}>
+          <Text style={{ color: colors.textTertiary, fontFamily: theme.fonts.medium, paddingVertical: 10 }}>
             No events found.
           </Text>
         ) : (
@@ -117,7 +121,7 @@ export default function EventsTab({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   sectionHeaderRow: {
     paddingHorizontal: 16,
     flexDirection: "row",
@@ -125,8 +129,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "900", color: "#111" },
-  viewAll: { fontSize: 12, fontWeight: "800", color: "#9CA3AF" },
+  sectionTitle: { fontSize: 16, fontFamily: theme.fonts.black, color: colors.textPrimary },
+  viewAll: { fontSize: 12, fontFamily: theme.fonts.bold, color: colors.textTertiary },
   rowH: { paddingHorizontal: 16, paddingBottom: 2 },
   hSpacer: { marginLeft: 12 },
 });

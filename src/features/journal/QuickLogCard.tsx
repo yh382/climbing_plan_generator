@@ -16,7 +16,6 @@ type YdsGroupKey = keyof typeof YDS_GROUPS;
 
 type Props = {
   mode: "boulder" | "toprope" | "lead";
-  onChangeMode: (m: "boulder" | "toprope" | "lead") => void;
 
   // i18n
   tr: (zh: string, en: string) => string;
@@ -33,7 +32,6 @@ type Props = {
 
 export default function QuickLogCard({
   mode,
-  onChangeMode,
   tr,
   labelOf,
   onPickGrade,
@@ -99,39 +97,6 @@ export default function QuickLogCard({
 
   return (
     <View>
-      {/* Boulder / Top Rope / Lead toggle */}
-      <View style={styles.segmentWrap}>
-        <TouchableOpacity
-          onPress={() => onChangeMode("boulder")}
-          style={[styles.segmentBtn, mode === "boulder" && styles.segmentBtnActive]}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.segmentText, mode === "boulder" && styles.segmentTextActive]}>
-            {tr("抱石", "Boulder")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onChangeMode("toprope")}
-          style={[styles.segmentBtn, mode === "toprope" && styles.segmentBtnActive]}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.segmentText, mode === "toprope" && styles.segmentTextActive]}>
-            Top Rope
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onChangeMode("lead")}
-          style={[styles.segmentBtn, mode === "lead" && styles.segmentBtnActive]}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.segmentText, mode === "lead" && styles.segmentTextActive]}>
-            Lead
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Quick Log 卡片 */}
       <View style={[styles.card, { padding: cardPadding }]}>
         <Text style={styles.cardTitle}>{tr("快速记录", "Quick Log")}</Text>
@@ -187,46 +152,40 @@ export default function QuickLogCard({
 }
 
 const styles = StyleSheet.create({
-  segmentWrap: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 14, padding: 4 },
-  segmentBtn: { flex: 1, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  segmentBtnActive: { backgroundColor: "#fff", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" },
-  segmentText: { fontWeight: "800", color: "#9CA3AF" },
-  segmentTextActive: { color: "#111" },
-
   card: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#EEF2F7",
+    borderColor: "rgba(0,0,0,0.08)",
     marginTop: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: "900", color: "#111827" },
+  cardTitle: { fontSize: 16, fontFamily: "DMSans_900Black", color: "#000000" },
 
-  // ✅ 关键：不要 gap、不要 center，用 margin 控制列间距
+  // grid layout
   gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
 
   gridItem: {
     paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "rgba(0,0,0,0.08)",
     borderRadius: 12,
   },
   gridText: {
-    fontWeight: "900",
-    color: "#111827",
+    fontFamily: "DMMono_500Medium",
+    color: "#000000",
     fontSize: 13,
     textAlign: "center",
     includeFontPadding: false,
   },
 
   expandRow: { marginTop: 8, flexDirection: "row", alignItems: "center" },
-  expandLine: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
+  expandLine: { flex: 1, height: 1, backgroundColor: "rgba(0,0,0,0.08)" },
   expandIconHit: { paddingHorizontal: 14, paddingVertical: 8 },
 
-  groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#F3F4F6" },
-  groupTabActive: { backgroundColor: "#111827" },
-  groupText: { fontWeight: "800", color: "#6B7280", fontSize: 13 },
+  groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#F7F7F7" },
+  groupTabActive: { backgroundColor: "#1C1C1E" },
+  groupText: { fontFamily: "DMSans_700Bold", color: "#888888", fontSize: 13 },
 });

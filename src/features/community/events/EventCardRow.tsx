@@ -1,7 +1,9 @@
 // src/features/community/events/EventCardRow.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import type { EventOut } from "./types";
 import EventTypeIcons from "./EventTypeIcons";
 
@@ -21,12 +23,14 @@ export default function EventCardRow({
   item: EventOut;
   onPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const publisherLine = item.publisher.name + (item.location_text ? ` · ${item.location_text}` : "");
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
       {/* Left: publisher logo placeholder */}
-      <View style={[styles.logo, { backgroundColor: "#111" }]} />
+      <View style={styles.logo} />
 
       {/* Right content */}
       <View style={{ flex: 1 }}>
@@ -47,7 +51,7 @@ export default function EventCardRow({
 
           {item.publisher.verified ? (
             <View style={styles.verified}>
-              <Ionicons name="checkmark-circle" size={14} color="#111" />
+              <Ionicons name="checkmark-circle" size={14} color="#306E6F" />
             </View>
           ) : null}
         </View>
@@ -55,12 +59,12 @@ export default function EventCardRow({
         <EventTypeIcons type={item.category} venue={item.venue_type} discipline={item.discipline} />
       </View>
 
-      <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -70,19 +74,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderWidth: 1,
     borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 1,
     marginBottom: 12,
   },
 
-  logo: { width: 44, height: 44, borderRadius: 14, marginTop: 2 },
+  logo: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: colors.backgroundSecondary,
+    marginTop: 2,
+  },
 
-  title: { fontSize: 15, fontWeight: "900", color: "#111" },
+  title: { fontSize: 15, fontFamily: theme.fonts.black, color: colors.textPrimary },
 
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  metaText: { fontSize: 12, color: "#9CA3AF", fontWeight: "800", flexShrink: 1 },
+  metaText: { fontSize: 12, color: colors.textTertiary, fontFamily: theme.fonts.bold, flexShrink: 1 },
   verified: { marginLeft: 6 },
 });

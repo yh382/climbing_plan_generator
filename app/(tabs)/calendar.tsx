@@ -1,8 +1,11 @@
 // app/(tabs)/calendar.tsx
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, TouchableOpacity, StyleSheet, RefreshControl, Text } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useFocusEffect } from "@react-navigation/native";
 import { subDays, parseISO, format } from "date-fns";
 import { TrainingPlanCard } from "../../src/components/plancard";
@@ -18,16 +21,19 @@ import ActiveSessionFloat from "../../src/features/journal/ActiveSessionFloat";
 import { readDayList } from "../../src/features/journal/loglist/storage";
 import type { LocalDayLogItem } from "../../src/features/journal/loglist/types";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useI18N } from "../../lib/i18n";
-import useLogsStore from "../../src/store/useLogsStore";
+import useLogsStore, { type LogType } from "../../src/store/useLogsStore";
 import { usePlanStore } from "../../src/store/usePlanStore";
 import useActiveWorkoutStore from "../../src/store/useActiveWorkoutStore";
 
 export default function CalendarScreen() {
   const router = useRouter();
   const { isZH } = useI18N();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { sessions, startSession, activeSession } = useLogsStore();
+  const { sessions, startSession, activeSession, syncFromBackend, hasSyncedOnce, isSyncing } = useLogsStore();
   const { activePlan: activePlanData, fetchActivePlan } = usePlanStore();
   const { isActive: workoutActive, isMinimized: workoutMinimized, seconds: workoutSeconds, sessionJson: workoutSessionJson } = useActiveWorkoutStore();
 
@@ -78,13 +84,32 @@ export default function CalendarScreen() {
     }, [fetchActivePlan])
   );
 
+  // Sync from backend on first load (new device login)
+  useEffect(() => {
+    if (!hasSyncedOnce && !isSyncing) {
+      syncFromBackend();
+    }
+  }, [hasSyncedOnce, isSyncing, syncFromBackend]);
+
+  // Setup Climmate: auto-open PreSessionModal when navigated from Home setup
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem("setup_auto_open_presession").then((val) => {
+        if (val === "true") {
+          AsyncStorage.removeItem("setup_auto_open_presession");
+          setTimeout(() => setShowStartModal(true), 300);
+        }
+      });
+    }, [])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchActivePlan();
+    await Promise.all([fetchActivePlan(), syncFromBackend()]);
     setRefreshing(false);
   };
 
-  const handleStartSession = (gymName: string, discipline: "boulder" | "rope") => {
+  const handleStartSession = (gymName: string, discipline: LogType) => {
     startSession(gymName, discipline);
     setShowStartModal(false);
     router.push("/journal");
@@ -146,14 +171,15 @@ export default function CalendarScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <StatusBar style="dark" />
       <CollapsibleLargeHeader
-        backgroundColor="#ffffffff"
+        backgroundColor={colors.background}
         largeTitle={largeTitle}
         subtitle={subtitle}
         smallTitle={isZH ? "日程" : "Calendar"}
         rightActions={
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/analysis")}>
-            <Ionicons name="stats-chart" size={24} color="#111" />
+            <Ionicons name="stats-chart" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
         }
         scrollViewProps={{
@@ -168,7 +194,7 @@ export default function CalendarScreen() {
         </View>
 
         {activePlan ? (
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
             <TrainingPlanCard
               plan={activePlan}
               variant="active"
@@ -198,7 +224,7 @@ export default function CalendarScreen() {
         <View style={styles.logSectionHeader}>
           {selectedDate ? (
             <TouchableOpacity style={styles.filterBtn} onPress={() => setSelectedDate(null)}>
-              <Ionicons name="chevron-back" size={20} color="#111" />
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
               <Text style={styles.sectionTitle}>
                 {format(parseISO(selectedDate), "MMM dd")}
               </Text>
@@ -209,7 +235,7 @@ export default function CalendarScreen() {
               onPress={() => setShowFilterDropdown(!showFilterDropdown)}
             >
               <Text style={styles.sectionTitle}>{activeFilterLabel}</Text>
-              <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={16} color="#111" style={{ marginTop: 2 }} />
+              <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
             </TouchableOpacity>
           )}
 
@@ -232,7 +258,7 @@ export default function CalendarScreen() {
                 style={[styles.dropdownItem, timeFilter === opt.key && styles.dropdownItemActive]}
               >
                 <Text style={[styles.dropdownText, timeFilter === opt.key && styles.dropdownTextActive]}>{opt.label}</Text>
-                {timeFilter === opt.key && <Ionicons name="checkmark" size={16} color="#111" />}
+                {timeFilter === opt.key && <Ionicons name="checkmark" size={16} color={colors.textPrimary} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -282,8 +308,8 @@ export default function CalendarScreen() {
           </View>
         ) : (
           <View style={{ padding: 24, alignItems: "center", opacity: 0.5 }}>
-            <Ionicons name="document-text-outline" size={32} color="#9CA3AF" />
-            <Text style={{ color: "#9CA3AF", marginTop: 8 }}>
+            <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
+            <Text style={{ color: colors.textTertiary, fontFamily: theme.fonts.regular, marginTop: 8 }}>
               {isZH ? "暂无记录" : "No logs yet."}
             </Text>
           </View>
@@ -295,80 +321,81 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+    largeTitle: { fontSize: 32, fontWeight: "900", fontFamily: theme.fonts.black, color: colors.textPrimary, lineHeight: 38, letterSpacing: -1 },
+    largeSubtitle: { fontSize: 14, fontFamily: theme.fonts.regular, color: colors.textSecondary, marginTop: 2 },
 
-  sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10 },
-  sectionTitle: { fontSize: 20, fontWeight: "800", color: "#111" },
+    sectionHeader: { paddingHorizontal: theme.spacing.screenPadding, paddingTop: 10, paddingBottom: 10 },
+    sectionTitle: { fontSize: 20, fontWeight: "800", fontFamily: theme.fonts.black, color: colors.textPrimary },
 
-  emptyCard: {
-    marginHorizontal: 16,
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  emptyTitle: { fontSize: 16, fontWeight: "800", color: "#111" },
-  emptySub: { marginTop: 6, color: "#6B7280" },
-  createBtn: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  createBtnText: { color: "#FFF", fontWeight: "800" },
+    emptyCard: {
+      marginHorizontal: theme.spacing.screenPadding,
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: theme.borderRadius.card,
+      padding: 16,
+    },
+    emptyTitle: { fontSize: 16, fontWeight: "800", fontFamily: theme.fonts.bold, color: colors.textPrimary },
+    emptySub: { marginTop: 6, fontFamily: theme.fonts.regular, color: colors.textSecondary },
+    createBtn: {
+      marginTop: 12,
+      alignSelf: "flex-start",
+      backgroundColor: colors.cardDark,
+      borderRadius: theme.borderRadius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    createBtnText: { color: "#FFF", fontWeight: "800", fontFamily: theme.fonts.bold },
 
-  logSectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  filterBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
+    logSectionHeader: {
+      paddingHorizontal: theme.spacing.screenPadding,
+      paddingTop: 18,
+      paddingBottom: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    filterBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  startLogBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  startLogText: { color: "#FFF", fontWeight: "800" },
+    startLogBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.cardDark,
+      borderRadius: theme.borderRadius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    startLogText: { color: "#FFF", fontWeight: "800", fontFamily: theme.fonts.bold },
 
-  dropdown: {
-    marginHorizontal: 16,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    overflow: "hidden",
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dropdownItemActive: {
-    backgroundColor: "#F3F4F6",
-  },
-  dropdownText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  dropdownTextActive: {
-    color: "#111",
-    fontWeight: "800",
-  },
-});
+    dropdown: {
+      marginHorizontal: theme.spacing.screenPadding,
+      backgroundColor: colors.background,
+      borderRadius: theme.borderRadius.cardSmall,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: "hidden",
+    },
+    dropdownItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    dropdownItemActive: {
+      backgroundColor: colors.backgroundSecondary,
+    },
+    dropdownText: {
+      fontSize: 15,
+      fontWeight: "600",
+      fontFamily: theme.fonts.medium,
+      color: colors.textSecondary,
+    },
+    dropdownTextActive: {
+      color: colors.textPrimary,
+      fontWeight: "800",
+      fontFamily: theme.fonts.bold,
+    },
+  });

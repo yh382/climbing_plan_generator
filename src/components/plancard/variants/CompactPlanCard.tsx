@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { statusLabel } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
+import { theme } from "../../../lib/theme";
 
 export default function CompactPlanCard(props: TrainingPlanCardProps) {
   const { plan, handlers, context } = props;
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
   typePillText: {
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
   menuBtn: {
@@ -136,12 +138,14 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 14,
     fontWeight: "900",
+    fontFamily: theme.fonts.black,
     color: "#FFFFFF",
     lineHeight: 14,
   },
   title: {
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: theme.fonts.black,
     color: "#FFFFFF",
     lineHeight: 20,
     textShadowColor: "rgba(0,0,0,0.3)",
@@ -151,6 +155,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.75)",
     marginTop: 2,
   },
@@ -162,6 +167,7 @@ const styles = StyleSheet.create({
   bottomText: {
     fontSize: 11,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.70)",
   },
 });

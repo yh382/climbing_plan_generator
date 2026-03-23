@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useMemo } from "react";
 import {
   Text,
   View,
@@ -24,6 +24,8 @@ import { useSettings } from "src/contexts/SettingsContext";
 import { Card } from "@components/ui/Card";
 import { Segmented } from "@components/ui/Segmented";
 import { useAuthStore } from "src/store/useAuthStore";
+import { theme } from "src/lib/theme";
+import { useThemeColors } from "../src/lib/useThemeColors";
 
 // 类型定义
 type Lang = "zh" | "en";
@@ -33,10 +35,140 @@ type RopeScale = "YDS" | "French";
 
 const SCROLL_THRESHOLD = 44;
 
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
+
+  // Header (Home-like)
+  fixedHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  headerBorder: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  headerContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
+  headerTitleContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    pointerEvents: "none",
+  },
+  headerTitleText: {
+    fontSize: 17,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Big title area
+  bigTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  bigTitleArea: {
+    flex: 1,
+    paddingTop: 35,
+  },
+  bigTitle: {
+    fontSize: 32,
+    fontWeight: "800",
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
+    lineHeight: 38,
+  },
+  bigSubtitle: {
+    fontSize: 14,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+
+  contentWrap: {
+    paddingHorizontal: 16,
+  },
+
+  sectionTitle: {
+    fontSize: 11,
+    fontFamily: theme.fonts.bold,
+    color: colors.textTertiary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginLeft: 12,
+    marginTop: 16,
+  },
+
+  card: {
+    borderRadius: 14,
+    padding: 0,
+    overflow: "hidden",
+    backgroundColor: colors.background,
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E7EB",
+  },
+  navRowHeight: {
+    paddingVertical: 16,
+  },
+  displayRowHeight: {
+    paddingVertical: 11,
+  },
+  noBorder: {
+    borderBottomWidth: 0,
+  },
+  label: {
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    color: colors.textPrimary,
+  },
+});
+
 export default function Settings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const logout = useAuthStore((s) => s.logout);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const {
     ready,
@@ -149,7 +281,7 @@ export default function Settings() {
       {/* --- 1) Fixed Animated Header (like Home) --- */}
       <View style={[styles.fixedHeader, { height: insets.top + 44 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
           <View style={styles.headerBorder} />
         </Animated.View>
 
@@ -157,7 +289,7 @@ export default function Settings() {
           {/* 左侧返回键 */}
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.navigate("/(tabs)/profile")}
+            onPress={() => router.back()}
             hitSlop={10}
           >
             <Ionicons name="arrow-back" size={35} color="#111" />
@@ -201,6 +333,7 @@ export default function Settings() {
           <Card style={styles.card}>
             <NavRow label={tr("通知", "Notifications")} route="/settings/notifications" />
             <NavRow label={tr("隐私", "Privacy")} route="/settings/privacy" />
+            <NavRow label={tr("修改密码", "Change Password")} route="/change-password" />
             <NavRow label={tr("订阅计划", "Subscription Plan")} last />
           </Card>
 
@@ -297,124 +430,3 @@ export default function Settings() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-  },
-
-  // Header (Home-like)
-  fixedHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
-  headerBorder: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "rgba(0,0,0,0.05)",
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  headerTitleContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    pointerEvents: "none",
-  },
-  headerTitleText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111",
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  // Big title area
-  bigTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 20,
-    marginBottom: 14,
-  },
-  bigTitleArea: {
-    flex: 1,
-    paddingTop: 35, // ✅ 控制大标题纵向位置（更靠下/靠上就调这里）
-  },
-  bigTitle: {
-    fontSize: 32, // ✅ 控制字体大小
-    fontWeight: "800", // ✅ 控制粗细
-    color: "#111",
-    lineHeight: 38, // ✅ 控制行高（影响视觉“垂直重心”）
-  },
-  bigSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-
-  contentWrap: {
-    paddingHorizontal: 16,
-  },
-
-  sectionTitle: {
-    fontSize: 13,
-    color: "#6D6D72",
-    marginBottom: 6,
-    marginLeft: 12,
-    marginTop: 16,
-  },
-
-  card: {
-    borderRadius: 14,
-    padding: 0,
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E5E7EB",
-  },
-  navRowHeight: {
-    paddingVertical: 16,
-  },
-  displayRowHeight: {
-    paddingVertical: 11,
-  },
-  noBorder: {
-    borderBottomWidth: 0,
-  },
-  label: {
-    fontSize: 16,
-    color: "#111",
-  },
-});

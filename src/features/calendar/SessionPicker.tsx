@@ -79,9 +79,9 @@ export default function SessionPicker({ visible, onClose, planV3, onSelect, isZH
       .slice(0, 2)
       .join(" + ");
 
-    const accentColor = isClimb ? "#10B981" : "#3B82F6"; 
+    const accentColor = isClimb ? "#10B981" : "#306E6F";
     const iconName = isClimb ? "earth" : "barbell";
-    const bgLight = isClimb ? "#ECFDF5" : "#EFF6FF"; 
+    const bgLight = isClimb ? "#ECFDF5" : "rgba(48,110,111,0.08)";
 
     return (
       <TouchableOpacity

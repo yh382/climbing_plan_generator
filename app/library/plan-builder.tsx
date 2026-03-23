@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { theme } from "../../src/lib/theme";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 import TopBar from "../../components/TopBar";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
@@ -51,9 +53,103 @@ function createEmptySession(index: number): PlanV3Session {
 
 const INTENSITY_OPTIONS = ["Light", "Moderate", "Hard", "Max"];
 
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+
+  saveBtnWrap: {
+    backgroundColor: "#1C1C1E",
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+  },
+  saveBtn: { fontSize: 14, fontWeight: "600", color: "#FFFFFF" },
+
+  // Meta
+  metaSection: { backgroundColor: "#FFF", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 },
+  titleInput: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingBottom: 6,
+  },
+  metaRow: { flexDirection: "row", gap: 16 },
+  metaItem: { flex: 1 },
+  metaLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 4 },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepValue: {
+    fontFamily: theme.fonts.monoMedium,
+    fontSize: 17,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    minWidth: 40,
+    textAlign: "center" as const,
+  },
+  metaSummary: { fontSize: 13, fontWeight: "600", color: "#6B7280", paddingVertical: 2 },
+  collapseBtn: {
+    alignSelf: "flex-end",
+    padding: 2,
+    marginTop: -2,
+  },
+
+  intensityRow: { gap: 4 },
+  intensityOptions: { flexDirection: "row", gap: 6 },
+  intensityPill: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+  },
+  intensityPillActive: { backgroundColor: "#111" },
+  intensityText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  intensityTextActive: { color: "#FFF" },
+
+  // Sessions
+  sessionsContainer: { paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
+  weekTitle: { fontSize: 16, fontWeight: "700", color: "#374151", marginBottom: 16 },
+
+  deleteSessionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: -4,
+    marginBottom: 12,
+  },
+  deleteSessionText: { fontSize: 12, color: "#EF4444", fontWeight: "600" },
+
+  addSessionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderStyle: "dashed",
+  },
+  addSessionText: { fontSize: 14, fontWeight: "500", color: colors.textSecondary },
+});
+
 export default function PlanBuilderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const locale = useMemo(() => detectLocale(), []);
 
   const [title, setTitle] = useState(locale === "zh" ? "我的自定义计划" : "My Custom Plan");
@@ -261,18 +357,23 @@ export default function PlanBuilderScreen() {
   };
 
   return (
-    <View style={[st.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <TopBar
         routeName="plan_builder"
         title={locale === "zh" ? "自定义计划" : "Custom Plan"}
         useSafeArea={false}
         leftControls={{ mode: "back", onBack: () => router.back() }}
         rightAccessory={
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={saving}
+            style={styles.saveBtnWrap}
+            activeOpacity={0.7}
+          >
             {saving ? (
-              <ActivityIndicator size="small" color="#111" />
+              <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Text style={st.saveBtn}>{locale === "zh" ? "保存" : "Save"}</Text>
+              <Text style={styles.saveBtn}>{locale === "zh" ? "保存" : "Save"}</Text>
             )}
           </TouchableOpacity>
         }
@@ -280,9 +381,9 @@ export default function PlanBuilderScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Plan Meta — collapsible */}
-        <View style={st.metaSection}>
+        <View style={styles.metaSection}>
           <TextInput
-            style={st.titleInput}
+            style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
             placeholder={locale === "zh" ? "计划名称" : "Plan Title"}
@@ -292,45 +393,45 @@ export default function PlanBuilderScreen() {
           {metaOpen ? (
             <>
               {/* Weeks + Sess/Wk on same row */}
-              <View style={st.metaRow}>
-                <View style={st.metaItem}>
-                  <Text style={st.metaLabel}>Weeks</Text>
-                  <View style={st.stepper}>
-                    <TouchableOpacity onPress={() => setWeeks(Math.max(1, weeks - 1))} style={st.stepBtn}>
-                      <Ionicons name="remove" size={16} color="#111" />
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Weeks</Text>
+                  <View style={styles.stepper}>
+                    <TouchableOpacity onPress={() => setWeeks(Math.max(1, weeks - 1))} style={styles.stepBtn}>
+                      <Ionicons name="remove" size={16} color={colors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={st.stepValue}>{weeks}</Text>
-                    <TouchableOpacity onPress={() => setWeeks(weeks + 1)} style={st.stepBtn}>
-                      <Ionicons name="add" size={16} color="#111" />
+                    <Text style={styles.stepValue}>{weeks}</Text>
+                    <TouchableOpacity onPress={() => setWeeks(weeks + 1)} style={styles.stepBtn}>
+                      <Ionicons name="add" size={16} color={colors.textPrimary} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <View style={st.metaItem}>
-                  <Text style={st.metaLabel}>Sess/Wk</Text>
-                  <View style={st.stepper}>
-                    <TouchableOpacity onPress={() => setSessLow(Math.max(0, sessLow - 1))} style={st.stepBtn}>
-                      <Ionicons name="remove" size={16} color="#111" />
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Sess/Wk</Text>
+                  <View style={styles.stepper}>
+                    <TouchableOpacity onPress={() => setSessLow(Math.max(0, sessLow - 1))} style={styles.stepBtn}>
+                      <Ionicons name="remove" size={16} color={colors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={st.stepValue}>{sessLow}~{sessLow + 1}</Text>
-                    <TouchableOpacity onPress={() => setSessLow(Math.min(6, sessLow + 1))} style={st.stepBtn}>
-                      <Ionicons name="add" size={16} color="#111" />
+                    <Text style={styles.stepValue}>{sessLow}~{sessLow + 1}</Text>
+                    <TouchableOpacity onPress={() => setSessLow(Math.min(6, sessLow + 1))} style={styles.stepBtn}>
+                      <Ionicons name="add" size={16} color={colors.textPrimary} />
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
 
               {/* Intensity picker */}
-              <View style={st.intensityRow}>
-                <Text style={st.metaLabel}>Intensity</Text>
-                <View style={st.intensityOptions}>
+              <View style={styles.intensityRow}>
+                <Text style={styles.metaLabel}>Intensity</Text>
+                <View style={styles.intensityOptions}>
                   {INTENSITY_OPTIONS.map((opt) => (
                     <TouchableOpacity
                       key={opt}
-                      style={[st.intensityPill, intensity === opt && st.intensityPillActive]}
+                      style={[styles.intensityPill, intensity === opt && styles.intensityPillActive]}
                       onPress={() => setIntensity(opt)}
                     >
-                      <Text style={[st.intensityText, intensity === opt && st.intensityTextActive]}>
+                      <Text style={[styles.intensityText, intensity === opt && styles.intensityTextActive]}>
                         {opt}
                       </Text>
                     </TouchableOpacity>
@@ -340,14 +441,14 @@ export default function PlanBuilderScreen() {
             </>
           ) : (
             /* Collapsed summary */
-            <Text style={st.metaSummary}>
+            <Text style={styles.metaSummary}>
               {weeks}wk · {sessLow}~{sessLow + 1} sess/wk · {intensity}
             </Text>
           )}
 
           {/* Collapse / expand toggle */}
           <TouchableOpacity
-            style={st.collapseBtn}
+            style={styles.collapseBtn}
             onPress={() => setMetaOpen((v) => !v)}
             hitSlop={8}
           >
@@ -368,8 +469,8 @@ export default function PlanBuilderScreen() {
         />
 
         {/* Sessions for selected week */}
-        <View style={st.sessionsContainer}>
-          <Text style={st.weekTitle}>
+        <View style={styles.sessionsContainer}>
+          <Text style={styles.weekTitle}>
             Week {selectedWeek} · {currentSessions.length} {currentSessions.length === 1 ? "session" : "sessions"}
           </Text>
 
@@ -388,12 +489,12 @@ export default function PlanBuilderScreen() {
               />
               {currentSessions.length > 1 ? (
                 <TouchableOpacity
-                  style={st.deleteSessionBtn}
+                  style={styles.deleteSessionBtn}
                   onPress={() => removeSession(i)}
                   hitSlop={8}
                 >
                   <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                  <Text style={st.deleteSessionText}>
+                  <Text style={styles.deleteSessionText}>
                     {locale === "zh" ? "删除 Session" : "Remove Session"}
                   </Text>
                 </TouchableOpacity>
@@ -402,9 +503,9 @@ export default function PlanBuilderScreen() {
           ))}
 
           {/* Add session */}
-          <TouchableOpacity style={st.addSessionBtn} onPress={addSession} activeOpacity={0.7}>
-            <Ionicons name="add-circle-outline" size={20} color="#4F46E5" />
-            <Text style={st.addSessionText}>
+          <TouchableOpacity style={styles.addSessionBtn} onPress={addSession} activeOpacity={0.7}>
+            <Ionicons name="add-circle-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.addSessionText}>
               {locale === "zh" ? "新增 Session" : "Add Session"}
             </Text>
           </TouchableOpacity>
@@ -421,78 +522,3 @@ export default function PlanBuilderScreen() {
     </View>
   );
 }
-
-const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FAFAFA" },
-
-  saveBtn: { fontSize: 16, fontWeight: "700", color: "#4F46E5" },
-
-  // Meta
-  metaSection: { backgroundColor: "#FFF", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 },
-  titleInput: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#111",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingBottom: 6,
-  },
-  metaRow: { flexDirection: "row", gap: 16 },
-  metaItem: { flex: 1 },
-  metaLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 4 },
-  stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
-  stepBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepValue: { fontSize: 15, fontWeight: "700", color: "#111", minWidth: 34, textAlign: "center" },
-  metaSummary: { fontSize: 13, fontWeight: "600", color: "#6B7280", paddingVertical: 2 },
-  collapseBtn: {
-    alignSelf: "flex-end",
-    padding: 2,
-    marginTop: -2,
-  },
-
-  intensityRow: { gap: 4 },
-  intensityOptions: { flexDirection: "row", gap: 6 },
-  intensityPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-  },
-  intensityPillActive: { backgroundColor: "#111" },
-  intensityText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  intensityTextActive: { color: "#FFF" },
-
-  // Sessions
-  sessionsContainer: { paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
-  weekTitle: { fontSize: 16, fontWeight: "700", color: "#374151", marginBottom: 16 },
-
-  deleteSessionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    marginTop: -4,
-    marginBottom: 12,
-  },
-  deleteSessionText: { fontSize: 12, color: "#EF4444", fontWeight: "600" },
-
-  addSessionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 16,
-    borderStyle: "dashed",
-  },
-  addSessionText: { fontSize: 15, fontWeight: "600", color: "#4F46E5" },
-});

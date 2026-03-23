@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useThemeColors } from "@/lib/useThemeColors";
 import {
   Alert,
   Image,
@@ -26,17 +27,20 @@ import {
 } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
 import useLogsStore from "../../../store/useLogsStore";
+import { invalidateRecentClimbsCache } from "../../profile/components/RecentClimbsList";
 
 type Params = { id?: string; date?: string; logType?: "boulder" | "toprope" | "lead"; sessionKey?: string };
 
 function VideoPlayerModal({ uri, onClose }: { uri: string; onClose: () => void }) {
+  const colors = useThemeColors();
+  const vStyles = useMemo(() => createStyles(colors), [colors]);
   const player = useVideoPlayer({ uri }, (p) => { p.play(); });
   return (
-    <View style={styles.playerOverlay}>
-      <TouchableOpacity style={styles.playerClose} onPress={onClose} activeOpacity={0.85}>
+    <View style={vStyles.playerOverlay}>
+      <TouchableOpacity style={vStyles.playerClose} onPress={onClose} activeOpacity={0.85}>
         <Ionicons name="close" size={22} color="#fff" />
       </TouchableOpacity>
-      <View style={styles.playerBox}>
+      <View style={vStyles.playerBox}>
         <VideoView player={player} style={{ width: "100%", height: "100%" }} nativeControls contentFit="contain" />
       </View>
     </View>
@@ -68,6 +72,8 @@ function ensureMedia(item: LocalDayLogItem): LogMedia[] {
 }
 
 export default function LogItemDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
 
@@ -185,6 +191,7 @@ export default function LogItemDetailScreen() {
               delta: -sends,
             });
           }
+          invalidateRecentClimbsCache();
 
           // ✅ enqueue outbox event (offline-first; backend sync later)
           await enqueueLogEvent({ type: "delete", localId: item.id });
@@ -212,19 +219,19 @@ export default function LogItemDetailScreen() {
 
   if (!item) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FFF" }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ padding: 16, paddingTop: 52 }}>
           <TouchableOpacity onPress={() => router.back()} style={styles.topbarBtn}>
-            <Ionicons name="chevron-back" size={22} color="#111" />
+            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={{ marginTop: 12, color: "#64748B", fontWeight: "700" }}>Log not found.</Text>
+          <Text style={{ marginTop: 12, color: colors.chartLabel, fontWeight: "700" }}>Log not found.</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* ✅ 顶部媒体区域：可横滑 + dots */}
       <View style={styles.coverWrap}>
         {media.length > 0 ? (
@@ -279,13 +286,13 @@ export default function LogItemDetailScreen() {
         {/* ✅ topbar：左返回 / 右分享（中间无文字） */}
         <View style={styles.topbar}>
           <TouchableOpacity onPress={() => router.back()} activeOpacity={0.85} style={styles.topbarBtn}>
-            <Ionicons name="chevron-back" size={22} color="#111" />
+            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
 
           <View style={{ flex: 1 }} />
 
           <TouchableOpacity onPress={() => {}} activeOpacity={0.85} style={styles.topbarBtn}>
-            <Ionicons name="share-outline" size={20} color="#111" />
+            <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -351,14 +358,14 @@ export default function LogItemDetailScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity activeOpacity={0.85} style={styles.moreBtn} onPress={() => setMenuOpen((v) => !v)}>
-            <Ionicons name="ellipsis-horizontal" size={18} color="#111" />
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         {menuOpen ? (
           <View style={styles.menu}>
             <TouchableOpacity style={styles.menuItem} activeOpacity={0.85} onPress={handleAddMedia}>
-              <Ionicons name="add-circle-outline" size={18} color="#111" />
+              <Ionicons name="add-circle-outline" size={18} color={colors.textPrimary} />
               <Text style={styles.menuText}>Add media</Text>
             </TouchableOpacity>
 
@@ -402,8 +409,8 @@ export default function LogItemDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  coverWrap: { height: 340, backgroundColor: "#F1F5F9" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  coverWrap: { height: 340, backgroundColor: colors.backgroundSecondary },
   cover: { width: "100%", height: "100%" },
   defaultCover: { alignItems: "center", justifyContent: "center" },
 
@@ -453,13 +460,13 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: "rgba(255,255,255,0.92)" },
 
   infoBlock: { paddingHorizontal: 16, paddingTop: 14 },
-  routeName: { fontSize: 22, fontWeight: "900", color: "#0B1220", letterSpacing: -0.3 },
-  gradeText: { marginTop: 6, color: "#64748B", fontWeight: "800" },
+  routeName: { fontSize: 22, fontWeight: "900", color: colors.textPrimary, letterSpacing: -0.3 },
+  gradeText: { marginTop: 6, color: colors.chartLabel, fontWeight: "800" },
 
   noteBubble: {
     marginTop: 14,
     marginHorizontal: 16,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.cardBackground,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -467,19 +474,19 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
   },
-  noteText: { flex: 1, color: "#334155", fontSize: 13, fontWeight: "700", lineHeight: 18 },
+  noteText: { flex: 1, color: colors.chartValue, fontSize: 13, fontWeight: "700", lineHeight: 18 },
 
   historyCard: {
     marginTop: 12,
     marginHorizontal: 16,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.cardBorder,
   },
   historyTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  cardTitle: { fontSize: 14, fontWeight: "900", color: "#0B1220" },
+  cardTitle: { fontSize: 14, fontWeight: "900", color: colors.textPrimary },
 
   boltBadge: {
     flexDirection: "row",
@@ -496,10 +503,10 @@ const styles = StyleSheet.create({
 
   historyRowTwo: { flexDirection: "row", alignItems: "center" },
   historyCellTwo: { flex: 1, alignItems: "center" },
-  dividerV: { width: 1, height: 44, backgroundColor: "#E2E8F0", marginHorizontal: 10 },
+  dividerV: { width: 1, height: 44, backgroundColor: colors.cardBorder, marginHorizontal: 10 },
   historyLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  historyLabel: { fontSize: 12, fontWeight: "800", color: "#64748B" },
-  historyValue: { marginTop: 8, fontSize: 18, fontWeight: "900", color: "#0B1220" },
+  historyLabel: { fontSize: 12, fontWeight: "800", color: colors.chartLabel },
+  historyValue: { marginTop: 8, fontSize: 18, fontWeight: "900", color: colors.textPrimary },
 
   actionsWrap: { marginTop: 14, paddingHorizontal: 16, position: "relative" },
   actionsRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -508,35 +515,34 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     borderRadius: 16,
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.pillBackground,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
   },
-  repeatText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  repeatText: { color: colors.pillText, fontWeight: "900", fontSize: 14 },
 
   moreBtn: {
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.cardBackground,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.cardBorder,
   },
 
-  // ✅ menu under ellipsis
   menu: {
     position: "absolute",
     right: 16,
     top: 62,
     width: 180,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.cardBorder,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 10,
@@ -544,8 +550,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  menuText: { fontSize: 14, fontWeight: "800", color: "#111" },
-  menuDivider: { height: 1, backgroundColor: "#E2E8F0", marginHorizontal: 10 },
+  menuText: { fontSize: 14, fontWeight: "800", color: colors.textPrimary },
+  menuDivider: { height: 1, backgroundColor: colors.cardBorder, marginHorizontal: 10 },
 
   playerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" },
   playerBox: { width: "92%", height: "55%", borderRadius: 18, overflow: "hidden", backgroundColor: "#000" },

@@ -7,10 +7,12 @@ const config: ExpoConfig = {
   slug: "climMate",
   scheme: "climMate",
   newArchEnabled: true,
+  userInterfaceStyle: "automatic",
 
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.yh382.climmate",
+    usesAppleSignIn: true,
   infoPlist: {
     NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
 
@@ -62,6 +64,7 @@ const config: ExpoConfig = {
       icon: "./assets/images/icon.png",
       color: "#22C55E",
     }],
+    "expo-apple-authentication",
   ],
 
   updates: {

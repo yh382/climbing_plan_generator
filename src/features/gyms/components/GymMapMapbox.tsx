@@ -98,9 +98,10 @@ export function GymMapMapbox({
 
 const styles = StyleSheet.create({
   pin: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    padding: 6,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#306E6F",
     borderWidth: 2,
     borderColor: "#fff",
   },

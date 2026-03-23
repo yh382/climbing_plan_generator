@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { clamp01 } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
+import { theme } from "../../../lib/theme";
 
 type Props = TrainingPlanCardProps & {
   style?: ViewStyle;
@@ -212,12 +213,14 @@ const styles = StyleSheet.create({
   typePillText: {
     fontSize: 11,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
   title: {
     marginTop: 14,
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: theme.fonts.black,
     lineHeight: 24,
     color: "#FFFFFF",
     textShadowColor: "rgba(0,0,0,0.3)",
@@ -228,6 +231,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.80)",
   },
   progressTrack: {
@@ -254,6 +258,7 @@ const styles = StyleSheet.create({
   bottomMetaText: {
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.75)",
   },
   statusDot: {
@@ -284,6 +289,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
   menuBtn: {
@@ -321,11 +327,13 @@ const styles = StyleSheet.create({
   timerLabel: {
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: theme.fonts.medium,
     color: "rgba(255,255,255,0.7)",
   },
   timerValue: {
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: theme.fonts.monoMedium,
     color: "#FFFFFF",
     fontVariant: ["tabular-nums"] as any,
     flex: 1,
@@ -339,6 +347,7 @@ const styles = StyleSheet.create({
   resumeText: {
     fontSize: 12,
     fontWeight: "700",
+    fontFamily: theme.fonts.bold,
     color: "#FFFFFF",
   },
 });

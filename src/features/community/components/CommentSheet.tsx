@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { theme } from '../../../lib/theme';
+import { useThemeColors } from '@/lib/useThemeColors';
 import { communityApi } from '../api';
 import { useCommunityStore } from '../../../store/useCommunityStore';
 import { useUserStore } from '../../../store/useUserStore';
@@ -49,6 +51,8 @@ function mapRawComment(d: any): CommentOut {
 }
 
 export default function CommentSheet({ visible, onClose, postId, postOwnerId, commentCount }: CommentSheetProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const currentUserId = useUserStore((s) => s.user?.id);
   const updateCommentCount = useCommunityStore((s) => s.updateCommentCount);
@@ -217,9 +221,6 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Comments ({commentCount ?? comments.length})</Text>
-              <TouchableOpacity onPress={animateClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={22} color="#111" />
-              </TouchableOpacity>
             </View>
 
             {/* Comment list */}
@@ -250,47 +251,50 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
                   </View>
                 }
                 style={{ flex: 1 }}
-                contentContainerStyle={comments.length === 0 ? { flex: 1 } : undefined}
+                contentContainerStyle={comments.length === 0 ? { flex: 1, paddingBottom: 80 } : { paddingBottom: 80 }}
                 keyboardShouldPersistTaps="handled"
               />
             )}
 
-            {/* Replying indicator */}
-            {replyingTo && (
-              <View style={styles.replyBar}>
-                <Text style={styles.replyBarText} numberOfLines={1}>
-                  Replying to <Text style={styles.replyBarName}>@{replyingTo.authorName || 'User'}</Text>
-                </Text>
-                <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+            {/* Floating input area */}
+            <View style={styles.floatingInput}>
+              {/* Replying indicator */}
+              {replyingTo && (
+                <View style={styles.replyBar}>
+                  <Text style={styles.replyBarText} numberOfLines={1}>
+                    Replying to <Text style={styles.replyBarName}>@{replyingTo.authorName || 'User'}</Text>
+                  </Text>
+                  <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Input bar */}
+              <View style={styles.inputBar}>
+                <TextInput
+                  ref={inputRef}
+                  style={styles.input}
+                  placeholder={replyingTo ? `Reply to @${replyingTo.authorName || 'User'}...` : 'Add a comment...'}
+                  placeholderTextColor={colors.textTertiary}
+                  value={text}
+                  onChangeText={setText}
+                  multiline
+                  maxLength={500}
+                  returnKeyType="default"
+                />
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={!text.trim() || sending}
+                  style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={text.trim() ? '#FFF' : colors.textTertiary} />
+                  ) : (
+                    <Ionicons name="send" size={16} color={text.trim() ? '#FFF' : colors.textTertiary} />
+                  )}
                 </TouchableOpacity>
               </View>
-            )}
-
-            {/* Input bar */}
-            <View style={styles.inputBar}>
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                placeholder={replyingTo ? `Reply to @${replyingTo.authorName || 'User'}...` : 'Add a comment...'}
-                placeholderTextColor="#9CA3AF"
-                value={text}
-                onChangeText={setText}
-                multiline
-                maxLength={500}
-                returnKeyType="default"
-              />
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={!text.trim() || sending}
-                style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Ionicons name="send" size={18} color="#FFF" />
-                )}
-              </TouchableOpacity>
             </View>
           </Pressable>
         </Animated.View>
@@ -299,7 +303,7 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -312,31 +316,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: SCREEN_HEIGHT * 0.85,
+    height: SCREEN_HEIGHT * 0.6,
     overflow: 'hidden',
   },
   dragBar: {
-    width: 40,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#E5E7EB',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
     alignSelf: 'center',
     marginTop: 12,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 22,
+    paddingBottom: 10,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111',
+    fontSize: 17,
+    fontWeight: '800',
+    fontFamily: theme.fonts.black,
+    letterSpacing: -0.5,
+    color: colors.textPrimary,
   },
   loadingWrap: {
     flex: 1,
@@ -350,35 +351,42 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+  },
+  floatingInput: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   replyBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 22,
     paddingVertical: 8,
-    backgroundColor: '#F9FAFB',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    backgroundColor: colors.backgroundSecondary,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   replyBarText: {
     fontSize: 13,
-    color: '#6B7280',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
     flex: 1,
     marginRight: 8,
   },
   replyBarName: {
     fontWeight: '700',
-    color: '#111',
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
     gap: 8,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
   },
@@ -386,22 +394,23 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 36,
     maxHeight: 80,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 18,
-    paddingHorizontal: 14,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 999,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#111',
+    fontFamily: theme.fonts.regular,
+    color: colors.textPrimary,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#111',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#1C1C1E',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendBtnDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.backgroundSecondary,
   },
 });

@@ -1,6 +1,6 @@
 // app/community/notifications.tsx
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,30 +14,36 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TopBar from "../../components/TopBar";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../../src/lib/theme";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useNotifications, Notification } from "../../src/features/community/hooks";
 
-// Map notification kind → icon + colors for visual distinction
-function kindStyle(kind: string): { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string } {
+// Map notification kind → icon (uniform dark gray circle background)
+function kindStyle(
+  kind: string,
+  colors: ReturnType<typeof useThemeColors>,
+): { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string } {
+  const base = { color: "#FFF", bg: colors.cardDarkImage };
   switch (kind) {
     case "post_liked":
-      return { icon: "heart", color: "#EF4444", bg: "#FEE2E2" };
+      return { ...base, icon: "heart" };
     case "post_commented":
     case "comment_replied":
-      return { icon: "chatbubble", color: "#3B82F6", bg: "#DBEAFE" };
+      return { ...base, icon: "chatbubble" };
     case "new_follower":
-      return { icon: "person-add", color: "#8B5CF6", bg: "#EDE9FE" };
+      return { ...base, icon: "person-add" };
     case "badge_awarded":
-      return { icon: "ribbon", color: "#F59E0B", bg: "#FEF3C7" };
+      return { ...base, icon: "ribbon" };
     case "challenge_started":
     case "challenge_ended":
-      return { icon: "trophy", color: "#F97316", bg: "#FFEDD5" };
+      return { ...base, icon: "trophy" };
     case "event_reminder":
     case "event_started":
-      return { icon: "calendar", color: "#10B981", bg: "#D1FAE5" };
+      return { ...base, icon: "calendar" };
     case "mention":
-      return { icon: "at", color: "#06B6D4", bg: "#CFFAFE" };
+      return { ...base, icon: "at" };
     default:
-      return { icon: "notifications", color: "#6B7280", bg: "#F3F4F6" };
+      return { ...base, icon: "notifications" };
   }
 }
 
@@ -52,9 +58,88 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    itemContainer: {
+      flexDirection: "row",
+      padding: 16,
+      alignItems: "center",
+    },
+    unreadBg: {},
+    iconCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      marginRight: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    content: {
+      flex: 1,
+      marginRight: 12,
+      justifyContent: "center",
+    },
+    text: {
+      fontSize: 14,
+      fontFamily: theme.fonts.regular,
+      color: colors.textPrimary,
+      lineHeight: 20,
+    },
+    boldName: {
+      fontWeight: "700",
+      fontFamily: theme.fonts.bold,
+    },
+    time: {
+      fontSize: 12,
+      fontFamily: theme.fonts.regular,
+      color: colors.textTertiary,
+      marginTop: 2,
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.accent,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    emptyText: {
+      color: colors.textTertiary,
+      fontFamily: theme.fonts.regular,
+      fontSize: 15,
+    },
+    markAllRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    markAllText: {
+      fontSize: 13,
+      fontWeight: "600",
+      fontFamily: theme.fonts.medium,
+      color: colors.textPrimary,
+    },
+  });
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     notifications,
     unreadCount,
@@ -90,7 +175,7 @@ export default function NotificationsScreen() {
       >
         {/* Icon */}
         {(() => {
-          const s = kindStyle(item.kind);
+          const s = kindStyle(item.kind, colors);
           return (
             <View style={[styles.iconCircle, { backgroundColor: s.bg }]}>
               <Ionicons name={s.icon} size={18} color={s.color} />
@@ -127,7 +212,7 @@ export default function NotificationsScreen() {
       {/* Mark All Read */}
       {unreadCount > 0 && (
         <TouchableOpacity style={styles.markAllRow} onPress={markAllRead} activeOpacity={0.7}>
-          <Ionicons name="checkmark-done" size={16} color="#4F46E5" />
+          <Ionicons name="checkmark-done" size={16} color={colors.textPrimary} />
           <Text style={styles.markAllText}>Mark all as read</Text>
         </TouchableOpacity>
       )}
@@ -155,76 +240,3 @@ export default function NotificationsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  itemContainer: {
-    flexDirection: "row",
-    padding: 16,
-    alignItems: "center",
-  },
-  unreadBg: {
-    backgroundColor: "#F9FAFB",
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    flex: 1,
-    marginRight: 12,
-    justifyContent: "center",
-  },
-  text: {
-    fontSize: 14,
-    color: "#111",
-    lineHeight: 20,
-  },
-  boldName: {
-    fontWeight: "700",
-  },
-  time: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#111",
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  emptyText: {
-    color: "#9CA3AF",
-    fontSize: 15,
-  },
-  markAllRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  markAllText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#4F46E5",
-  },
-});

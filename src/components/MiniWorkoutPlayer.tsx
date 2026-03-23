@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF', borderRadius: 30, padding: 8, paddingRight: 16,
     shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: {width:0, height:4}, elevation: 10
   },
-  iconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  iconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   content: { marginRight: 10 },
   label: { fontSize: 10, color: '#6B7280', fontWeight: '700', textTransform: 'uppercase' },
   timer: { fontSize: 16, color: '#111', fontWeight: '800', fontVariant: ['tabular-nums'] },

@@ -32,11 +32,9 @@ const StyleBadge = ({ style }: { style: LocalDayLogItem["style"] }) => {
 function FeelPill({ feel }: { feel: Feel }) {
   if (feel === "solid") return null;
   const text = feel === "soft" ? "SOFT" : "HARD";
-  const bg = feel === "soft" ? "#EEF2FF" : "#FEF2F2";
-  const fg = feel === "soft" ? "#366e48ff" : "#991B1B";
   return (
-    <View style={[styles.feelPill, { backgroundColor: bg }]}>
-      <Text style={[styles.feelPillText, { color: fg }]}>{text}</Text>
+    <View style={[styles.feelPill, { backgroundColor: '#1C1C1E' }]}>
+      <Text style={[styles.feelPillText, { color: '#FFFFFF' }]}>{text}</Text>
     </View>
   );
 }
@@ -110,13 +108,13 @@ const styles = StyleSheet.create({
   },
   imageWrap: { width: 76, height: 76 },
   image: { width: "100%", height: "100%" },
-  noImage: { backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
-  noImageText: { fontSize: 14, fontWeight: "900", color: "#E5E7EB" },
+  noImage: { backgroundColor: "#272727", alignItems: "center", justifyContent: "center" },
+  noImageText: { fontSize: 14, fontFamily: "DMMono_500Medium", color: "#888888" },
   styleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
   info: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, justifyContent: "center" },
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  routeName: { flex: 1, fontSize: 15, fontWeight: "900", color: "#111", letterSpacing: -0.2 },
+  routeName: { flex: 1, fontSize: 15, fontFamily: "DMSans_900Black", color: "#000000", letterSpacing: -0.2 },
 
   metaRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   metaText: { fontSize: 12, fontWeight: "800", color: "#64748B" },
