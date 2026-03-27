@@ -37,7 +37,7 @@ export default function EventListCard({ card }: { card: EventInfoCardModel }) {
       <View style={styles.headerRow}>
         <Text style={styles.title}>{card.title}</Text>
         {card.trailingIcon ? (
-          <Ionicons name={card.trailingIcon as any} size={18} color="#9CA3AF" />
+          <Ionicons name={card.trailingIcon as any} size={18} color={colors.textTertiary} />
         ) : null}
       </View>
 
@@ -76,9 +76,9 @@ export default function EventListCard({ card }: { card: EventInfoCardModel }) {
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create<Styles>({
   wrap: {
     borderRadius: 18,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderColor: colors.cardBorder,
     padding: 14,
     marginBottom: 12,
   },

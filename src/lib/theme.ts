@@ -29,6 +29,7 @@ export const theme = {
     pillBackground: '#1C1C1E',
     pillText: '#FFFFFF',
     emptyBarColor: '#E5E7EB',
+    borderTertiary: '#E5E7EB',
   },
   typography: {
     hero: { fontSize: 33, fontWeight: '900' as const, letterSpacing: -1.5 },

@@ -1,5 +1,7 @@
 // src/features/community/challenges/ChallengeCardRow.tsx
+import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { getChallengeStatus } from "./types";
 import type { ChallengeOut } from "./types";
 
@@ -36,14 +38,14 @@ const TIER_COLORS: Record<string, string> = {
   unlocked: "#10B981",
 };
 
-function TierProgress({ tiers }: { tiers: Record<string, number> }) {
+function TierProgress({ tiers, colors }: { tiers: Record<string, number>; colors: ReturnType<typeof useThemeColors> }) {
   const sorted = Object.entries(tiers).sort((a, b) => a[1] - b[1]);
   return (
     <View style={tierStyles.row}>
       {sorted.map(([name, threshold]) => (
         <View key={name} style={tierStyles.chip}>
-          <View style={[tierStyles.dot, { backgroundColor: TIER_COLORS[name] || "#9CA3AF" }]} />
-          <Text style={tierStyles.label}>
+          <View style={[tierStyles.dot, { backgroundColor: TIER_COLORS[name] || colors.textSecondary }]} />
+          <Text style={[tierStyles.label, { color: colors.textSecondary }]}>
             {TIER_LABELS[name] || name}: {threshold}
           </Text>
         </View>
@@ -56,7 +58,7 @@ const tierStyles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
   chip: { flexDirection: "row", alignItems: "center", gap: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  label: { fontSize: 10, fontWeight: "700", color: "#6B7280" },
+  label: { fontSize: 10, fontWeight: "700" },
 });
 
 export default function ChallengeCardRow({
@@ -66,11 +68,13 @@ export default function ChallengeCardRow({
   item: ChallengeOut;
   onPress?: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const uiStatus = getChallengeStatus(item);
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
-      <View style={[styles.icon, { backgroundColor: "#111" }]} />
+      <View style={styles.icon} />
 
       <View style={{ flex: 1 }}>
         <Text style={styles.title} numberOfLines={1}>
@@ -92,7 +96,7 @@ export default function ChallengeCardRow({
 
         {/* Tier progress (for rule-engine challenges) */}
         {item.rulePayload?.tiers && (
-          <TierProgress tiers={item.rulePayload.tiers} />
+          <TierProgress tiers={item.rulePayload.tiers} colors={colors} />
         )}
 
         {/* Status + category chips */}
@@ -116,33 +120,28 @@ export default function ChallengeCardRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     flexDirection: "row",
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 1,
+    borderColor: colors.cardBorder,
     marginBottom: 12,
   },
-  icon: { width: 44, height: 44, borderRadius: 14 },
-  title: { fontSize: 15, fontWeight: "900", color: "#111" },
-  desc: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+  icon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.cardDark },
+  title: { fontSize: 15, fontWeight: "900", color: colors.textPrimary },
+  desc: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   metaRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  metaText: { fontSize: 12, color: "#9CA3AF", fontWeight: "700" },
-  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#D1D5DB", marginHorizontal: 8 },
+  metaText: { fontSize: 12, color: colors.textTertiary, fontWeight: "700" },
+  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.border, marginHorizontal: 8 },
   statusRow: { flexDirection: "row", gap: 6, marginTop: 8 },
-  statusChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: "#F3F4F6" },
+  statusChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.backgroundSecondary },
   statusActive: { backgroundColor: "#DCFCE7" },
   statusUpcoming: { backgroundColor: "#FEF3C7" },
-  statusPast: { backgroundColor: "#E5E7EB" },
-  kindChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: "#F3F4F6" },
-  statusText: { fontSize: 11, fontWeight: "700", color: "#374151" },
+  statusPast: { backgroundColor: colors.backgroundSecondary },
+  kindChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.backgroundSecondary },
+  statusText: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
 });

@@ -1,21 +1,17 @@
 // src/features/session/components/PreSessionModal.tsx
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
   ScrollView,
-  Animated,
-  Dimensions,
-  Easing,
   TextInput,
+  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { api } from "src/lib/apiClient";
 import { theme } from "src/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -36,8 +32,6 @@ type GymItem = {
   state?: string | null;
   distance_m?: number | null;
 };
-
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function formatDistance(distance_m?: number | null) {
   if (!distance_m || distance_m <= 0) return "";
@@ -71,17 +65,14 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
 
   const [selectedGym, setSelectedGym] = useState<string | null>(null);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [items, setItems] = useState<GymItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  // 动画值：0 = 关闭, 1 = 打开
-  const animValue = useRef(new Animated.Value(0)).current;
-  const [showModal, setShowModal] = useState(visible);
+  const sheetRef = useRef<TrueSheet>(null);
+  const isPresented = useRef(false);
 
   // --- Data fetching ---
 
@@ -95,10 +86,9 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
         return;
       }
       const res = await api.get<{ items: GymItem[] }>(
-        `/gyms/nearby?lat=${encodeURIComponent(c.lat)}&lng=${encodeURIComponent(c.lng)}&limit=10`
+        `/gyms/nearby?lat=${encodeURIComponent(c.lat)}&lng=${encodeURIComponent(c.lng)}&limit=3`
       );
       setItems(res.items ?? []);
-      // Auto-select first result
       if (res.items?.length) setSelectedGym(res.items[0].name);
     } catch (e: any) {
       setItems([]);
@@ -134,6 +124,22 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     }
   };
 
+  // Present/dismiss based on visible prop
+  useEffect(() => {
+    if (visible && !isPresented.current) {
+      sheetRef.current?.present();
+      isPresented.current = true;
+    } else if (!visible && isPresented.current) {
+      sheetRef.current?.dismiss();
+      isPresented.current = false;
+    }
+  }, [visible]);
+
+  const handleDismiss = useCallback(() => {
+    isPresented.current = false;
+    onClose();
+  }, [onClose]);
+
   // Auto-locate on open
   useEffect(() => {
     let mounted = true;
@@ -146,11 +152,9 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     setDiscipline(null);
 
     (async () => {
-      setIsLocating(true);
       const c = await getDeviceCoords();
       if (!mounted) return;
       setCoords(c);
-      setIsLocating(false);
       await fetchNearby(c);
     })();
 
@@ -163,7 +167,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   // Debounced search
   useEffect(() => {
     if (!visible) return;
-    if (!query.trim()) return; // empty handled by fetchNearby on clear
+    if (!query.trim()) return;
     const t = setTimeout(() => {
       fetchSearch(query, coords);
     }, 300);
@@ -171,41 +175,9 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  // When query is cleared, go back to nearby
   const handleClearSearch = () => {
     setQuery("");
     fetchNearby(coords);
-  };
-
-  // 监听 visible 变化来驱动进场/退场动画
-  useEffect(() => {
-    if (visible) {
-      setShowModal(true);
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.cubic),
-      }).start();
-    } else {
-      if (!showModal) return;
-      Animated.timing(animValue, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => setShowModal(false));
-    }
-  }, [visible]);
-
-  const handleClose = () => {
-    Animated.timing(animValue, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowModal(false);
-      onClose();
-    });
   };
 
   const handleStart = () => {
@@ -214,264 +186,173 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     }
   };
 
-  const handleLocate = async () => {
-    setIsLocating(true);
-    setQuery("");
-    const c = await getDeviceCoords();
-    setCoords(c);
-    setIsLocating(false);
-    await fetchNearby(c);
-  };
-
-  const handleOpenMap = () => {
-    // Placeholder for future map selection
-  };
-
-  // 动画插值
-  const backdropOpacity = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  const sheetTranslateY = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [SCREEN_HEIGHT, 0],
-  });
-
-  if (!showModal) return null;
 
   return (
-    <Modal
-      transparent
-      visible={showModal}
-      animationType="none"
-      onRequestClose={handleClose}
+    <TrueSheet
+      ref={sheetRef}
+      detents={[0.6]}
+      cornerRadius={24}
+      backgroundColor={colors.background}
+      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+      dimmed
+      dimmedDetentIndex={0}
+      onDidDismiss={handleDismiss}
     >
-      <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
-        <Pressable style={styles.overlayPressable} onPress={handleClose} />
-      </Animated.View>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Start Session</Text>
+          <Text style={styles.subTitle}>Where are you climbing today?</Text>
+        </View>
+        <TouchableOpacity onPress={() => sheetRef.current?.dismiss()} style={styles.closeBtn}>
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
-      <Animated.View
-        style={[
-          styles.sheetContainer,
-          { transform: [{ translateY: sheetTranslateY }] },
-        ]}
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 12 }}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
-          {/* Handle */}
-          <View style={styles.handleContainer}>
-            <View style={styles.handle} />
-          </View>
+        {/* Search */}
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={colors.textTertiary} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search gyms..."
+            placeholderTextColor={colors.textTertiary}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {!!query && (
+            <TouchableOpacity onPress={handleClearSearch} hitSlop={10}>
+              <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Start Session</Text>
-              <Text style={styles.subTitle}>Where are you climbing today?</Text>
+        {/* Gym List */}
+        <Text style={styles.sectionLabel}>
+          {query.trim() ? "SEARCH RESULTS" : "NEARBY GYMS"}
+        </Text>
+        <View style={{ gap: 6 }}>
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={styles.loadingText}>Loading...</Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.locateBtn]}
-              onPress={handleLocate}
-              disabled={isLocating}
-            >
-              {isLocating ? (
-                <ActivityIndicator size="small" color="#374151" />
-              ) : (
-                <Ionicons name="navigate" size={20} color="#374151" />
-              )}
-              <Text style={styles.locateText}>
-                {isLocating ? "Locating..." : "Current Location"}
+          ) : items.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <Ionicons name="location-outline" size={28} color={colors.cardBorder} />
+              <Text style={styles.emptyText}>
+                {errorMsg || "No gyms found"}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleOpenMap}>
-              <Ionicons name="map-outline" size={20} color="#374151" />
-              <Text style={styles.mapText}>Map</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Search */}
-          <View style={styles.searchWrap}>
-            <Ionicons name="search" size={16} color="#9CA3AF" />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search gyms..."
-              placeholderTextColor="#9CA3AF"
-              style={styles.searchInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {!!query && (
-              <TouchableOpacity onPress={handleClearSearch} hitSlop={10}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* List */}
-          <Text style={styles.sectionLabel}>
-            {query.trim() ? "SEARCH RESULTS" : "NEARBY GYMS"}
-          </Text>
-          <ScrollView
-            style={{ maxHeight: 220 }}
-            contentContainerStyle={{ gap: 8 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {loading ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator size="small" color="#306E6F" />
-                <Text style={styles.loadingText}>Loading...</Text>
-              </View>
-            ) : items.length === 0 ? (
-              <View style={styles.emptyWrap}>
-                <Ionicons name="location-outline" size={28} color="#D1D5DB" />
-                <Text style={styles.emptyText}>
-                  {errorMsg || "No gyms found"}
+              {!errorMsg && (
+                <Text style={styles.emptySubtext}>
+                  Try searching by name
                 </Text>
-                {!errorMsg && (
-                  <Text style={styles.emptySubtext}>
-                    Try searching by name
-                  </Text>
-                )}
-              </View>
-            ) : (
-              items.map((gym, idx) => {
-                const isSelected = selectedGym === gym.name;
-                const secondary = formatSecondary(gym);
-                const distance = formatDistance(gym.distance_m);
-                return (
-                  <TouchableOpacity
-                    key={gym.id ?? `gym-${idx}`}
-                    style={[styles.gymItem, isSelected && styles.gymItemActive]}
-                    onPress={() => setSelectedGym(gym.name)}
-                  >
-                    <View style={styles.gymIconWrap}>
-                      <Ionicons
-                        name="business"
-                        size={20}
-                        color={isSelected ? "#FFF" : "#9CA3AF"}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.gymName,
-                          isSelected && styles.gymNameActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {gym.name}
-                      </Text>
+              )}
+            </View>
+          ) : (
+            items.map((gym, idx) => {
+              const isSelected = selectedGym === gym.name;
+              const secondary = formatSecondary(gym);
+              const distance = formatDistance(gym.distance_m);
+              return (
+                <TouchableOpacity
+                  key={gym.id ?? `gym-${idx}`}
+                  style={[styles.gymItem, isSelected && styles.gymItemActive]}
+                  onPress={() => setSelectedGym(gym.name)}
+                >
+                  <View style={styles.gymIconWrap}>
+                    <Ionicons
+                      name="business"
+                      size={16}
+                      color={isSelected ? colors.pillText : colors.textTertiary}
+                    />
+                  </View>
+                  <View style={{ flex: 1, justifyContent: "center" }}>
+                    <Text
+                      style={[
+                        styles.gymName,
+                        isSelected && styles.gymNameActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {gym.name}
+                    </Text>
+                    {!!(secondary || distance) && (
                       <Text style={styles.gymAddr} numberOfLines={1}>
                         {[secondary, distance].filter(Boolean).join(" · ")}
                       </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={colors.accent}
-                      />
                     )}
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
+                  </View>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color={colors.accent}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
 
-          {/* Discipline */}
-          <Text style={[styles.sectionLabel, { marginTop: 16 }]}>DISCIPLINE</Text>
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <TouchableOpacity
-              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "boulder" && styles.gymItemActive]}
-              onPress={() => setDiscipline("boulder")}
-            >
-              <Text style={[styles.gymName, discipline === "boulder" && styles.gymNameActive]}>
-                Boulder
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "toprope" && styles.gymItemActive]}
-              onPress={() => setDiscipline("toprope")}
-            >
-              <Text style={[styles.gymName, discipline === "toprope" && styles.gymNameActive]}>
-                Top Rope
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.gymItem, { flex: 1, justifyContent: "center" }, discipline === "lead" && styles.gymItemActive]}
-              onPress={() => setDiscipline("lead")}
-            >
-              <Text style={[styles.gymName, discipline === "lead" && styles.gymNameActive]}>
-                Lead
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Button */}
+        {/* Discipline */}
+        <Text style={[styles.sectionLabel, { marginTop: 12 }]}>DISCIPLINE</Text>
+        <View style={{ flexDirection: "row", gap: 12 }}>
           <TouchableOpacity
-            style={[styles.startBtn, (!selectedGym || !discipline) && styles.startBtnDisabled]}
-            onPress={handleStart}
-            disabled={!selectedGym || !discipline}
+            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "boulder" && styles.gymItemActive]}
+            onPress={() => setDiscipline("boulder")}
           >
-            <Text style={styles.startBtnText}>START CLIMBING</Text>
-            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+            <Text style={[styles.gymName, discipline === "boulder" && styles.gymNameActive]}>
+              Boulder
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "toprope" && styles.gymItemActive]}
+            onPress={() => setDiscipline("toprope")}
+          >
+            <Text style={[styles.gymName, discipline === "toprope" && styles.gymNameActive]}>
+              Top Rope
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "lead" && styles.gymItemActive]}
+            onPress={() => setDiscipline("lead")}
+          >
+            <Text style={[styles.gymName, discipline === "lead" && styles.gymNameActive]}>
+              Lead
+            </Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
-    </Modal>
+
+        {/* Button */}
+        <TouchableOpacity
+          style={[styles.startBtn, (!selectedGym || !discipline) && styles.startBtnDisabled]}
+          onPress={handleStart}
+          disabled={!selectedGym || !discipline}
+        >
+          <Text style={styles.startBtnText}>START CLIMBING</Text>
+          <Ionicons name="arrow-forward" size={20} color={colors.pillText} />
+        </TouchableOpacity>
+      </ScrollView>
+    </TrueSheet>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    zIndex: 1,
-  },
-  overlayPressable: { flex: 1 },
-
-  sheetContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
-    justifyContent: "flex-end",
-  },
-
-  sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-  },
-
-  handleContainer: { alignItems: "center", marginBottom: 16 },
-  handle: {
-    width: 36,
-    height: 4,
-    backgroundColor: "#D1D5DB",
-    borderRadius: 2,
-  },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    marginBottom: 12,
   },
   title: {
     fontSize: 24,
@@ -491,38 +372,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderRadius: 20,
   },
 
-  actionRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: theme.borderRadius.pill,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    gap: 8,
-    backgroundColor: "transparent",
-  },
-  locateBtn: {},
-  locateText: {
-    fontWeight: "600",
-    fontFamily: theme.fonts.medium,
-    color: colors.textPrimary,
-    fontSize: 13,
-  },
-  mapText: {
-    fontWeight: "600",
-    fontFamily: theme.fonts.medium,
-    color: colors.textPrimary,
-    fontSize: 13,
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginBottom: 16,
-  },
 
   searchWrap: {
     height: 40,
@@ -531,7 +380,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.backgroundSecondary,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
@@ -546,7 +395,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: "700",
     fontFamily: theme.fonts.bold,
     color: colors.textTertiary,
-    marginBottom: 12,
+    marginBottom: 8,
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
@@ -584,51 +433,54 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   gymItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: theme.borderRadius.card,
     backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: "transparent",
-    gap: 12,
+    gap: 8,
   },
   gymItemActive: {
     backgroundColor: colors.cardDark,
     borderColor: colors.cardDark,
   },
   gymIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.05)",
     alignItems: "center",
     justifyContent: "center",
   },
   gymName: {
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "600",
     fontFamily: theme.fonts.medium,
     color: colors.textPrimary,
   },
-  gymNameActive: { color: "#FFF" },
+  gymNameActive: { color: colors.pillText },
   gymAddr: {
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: theme.fonts.regular,
     color: colors.textSecondary,
   },
 
   startBtn: {
-    marginTop: 24,
-    height: 56,
+    marginTop: 16,
+    height: 52,
     backgroundColor: colors.cardDark,
-    borderRadius: 28,
+    borderRadius: 26,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
-  startBtnDisabled: { backgroundColor: "#D1D5DB" },
+  startBtnDisabled: { backgroundColor: colors.cardBorder },
   startBtnText: {
-    color: "#FFF",
+    color: colors.pillText,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: theme.fonts.bold,

@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
+import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { useChatStore } from "../../../store/useChatStore";
 import { useUserStore } from "../../../store/useUserStore";
 import ChatBubble from "../components/ChatBubble";
@@ -15,6 +17,7 @@ export default function ChatScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const myUserId = useUserStore((s) => s.user?.id ?? "");
 
@@ -33,6 +36,24 @@ export default function ChatScreen() {
 
   const otherUser = conversations.find((c) => c.id === conversationId);
   const headerTitle = otherUser?.other_user_name || "Chat";
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: headerTitle,
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <Host matchContents>
+          <SUIButton
+            systemImage={"chevron.backward" as any}
+            label=""
+            onPress={() => router.back()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ),
+    });
+  }, [navigation, router, headerTitle]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -70,17 +91,7 @@ export default function ChatScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {headerTitle}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -104,18 +115,6 @@ export default function ChatScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.backgroundSecondary },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
-    borderBottomWidth: 0.8,
-    borderBottomColor: colors.border,
-  },
-  backBtn: { width: 40, alignItems: "flex-start" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: colors.textPrimary, flex: 1, textAlign: "center" },
   listContent: { paddingVertical: 8 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
   emptyText: { fontSize: 15, color: colors.textTertiary },

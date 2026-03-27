@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { setPendingImage } from "src/features/profile/imagePickerBridge";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -230,9 +231,7 @@ export default function LibraryScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.topbar}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
           <Text style={styles.title}>Library</Text>
           <View style={styles.iconBtn} />
         </View>
@@ -259,9 +258,7 @@ export default function LibraryScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.topbar}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
           <Text style={styles.title}>Library</Text>
           <View style={styles.iconBtn} />
         </View>
@@ -278,9 +275,7 @@ export default function LibraryScreen() {
     <SafeAreaView style={styles.container}>
       {/* Topbar */}
       <View style={styles.topbar}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
 
         <Text style={styles.title}>Library</Text>
 

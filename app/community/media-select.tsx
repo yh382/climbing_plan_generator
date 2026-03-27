@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { HeaderPillButton } from "../../src/components/ui/HeaderPillButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
@@ -135,21 +137,13 @@ export default function MediaSelectScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color={colors.textPrimary}
-          />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.headerTitle}>Select Media</Text>
-        <TouchableOpacity
+        <HeaderPillButton
+          title="Next"
           onPress={handleNext}
           disabled={selectedIds.size === 0}
-          style={{ opacity: selectedIds.size > 0 ? 1 : 0.4 }}
-        >
-          <Text style={styles.nextBtn}>Next</Text>
-        </TouchableOpacity>
+        />
       </View>
 
       {/* Hint */}

@@ -1,6 +1,7 @@
 // src/features/community/challenges/ChallengesTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 import ChallengeCardRow from "./ChallengeCardRow";
 import JoinedChallengeChip from "./JoinedChallengeChip";
 import { challengeApi } from "./api";
@@ -14,6 +15,8 @@ export default function ChallengesTab({
   onPressViewAllActive?: () => void;
   onPressChallenge?: (item: ChallengeOut) => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [allChallenges, setAllChallenges] = useState<ChallengeOut[]>([]);
   const [myChallenges, setMyChallenges] = useState<ChallengeOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +63,7 @@ export default function ChallengesTab({
   if (loading) {
     return (
       <View style={{ padding: 40, alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#9CA3AF" />
+        <ActivityIndicator size="large" color={colors.textTertiary} />
       </View>
     );
   }
@@ -78,7 +81,7 @@ export default function ChallengesTab({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.joinedRow}>
         {joinedActive.length === 0 ? (
           <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-            <Text style={{ color: "#9CA3AF", fontWeight: "700" }}>No joined active challenges.</Text>
+            <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>No joined active challenges.</Text>
           </View>
         ) : (
           joinedActive.map((c) => (
@@ -94,7 +97,7 @@ export default function ChallengesTab({
       {/* Monthly Challenges */}
       {monthlyChallenges.length > 0 && (
         <>
-          <SectionHeader title="Monthly Challenges" />
+          <SectionHeader title="Monthly Challenges" colors={colors} />
           <View style={styles.cardList}>
             {monthlyChallenges.map((c) => (
               <ChallengeCardRow key={c.id} item={c} onPress={() => onPressChallenge?.(c)} />
@@ -106,7 +109,7 @@ export default function ChallengesTab({
       {/* Achievements (Skill + Lifetime) */}
       {achievementChallenges.length > 0 && (
         <>
-          <SectionHeader title="Achievements" />
+          <SectionHeader title="Achievements" colors={colors} />
           <View style={styles.cardList}>
             {achievementChallenges.map((c) => (
               <ChallengeCardRow key={c.id} item={c} onPress={() => onPressChallenge?.(c)} />
@@ -118,7 +121,7 @@ export default function ChallengesTab({
       {/* Special */}
       {specialChallenges.length > 0 && (
         <>
-          <SectionHeader title="Special" />
+          <SectionHeader title="Special" colors={colors} />
           <View style={styles.cardList}>
             {specialChallenges.map((c) => (
               <ChallengeCardRow key={c.id} item={c} onPress={() => onPressChallenge?.(c)} />
@@ -130,7 +133,7 @@ export default function ChallengesTab({
       {/* Custom / Community (org-created) */}
       {customChallenges.length > 0 && (
         <>
-          <SectionHeader title="Community Challenges" />
+          <SectionHeader title="Community Challenges" colors={colors} />
           <View style={styles.cardList}>
             {customChallenges.map((c) => (
               <ChallengeCardRow key={c.id} item={c} onPress={() => onPressChallenge?.(c)} />
@@ -142,15 +145,15 @@ export default function ChallengesTab({
   );
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({ title, colors }: { title: string; colors: ReturnType<typeof useThemeColors> }) {
   return (
-    <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={{ paddingHorizontal: 16, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, marginTop: 18 }}>
+      <Text style={{ fontSize: 16, fontWeight: "900", color: colors.textPrimary }}>{title}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   sectionHeaderRow: {
     paddingHorizontal: 16,
     flexDirection: "row",
@@ -158,8 +161,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "900", color: "#111" },
-  viewAll: { fontSize: 12, fontWeight: "800", color: "#9CA3AF" },
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: colors.textPrimary },
+  viewAll: { fontSize: 12, fontWeight: "800", color: colors.textSecondary },
   joinedRow: { paddingHorizontal: 16, gap: 12, paddingBottom: 2 },
   cardList: { paddingHorizontal: 16 },
 });

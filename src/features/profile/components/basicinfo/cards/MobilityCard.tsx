@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 import EditMobilityModal from "../modals/EditMobilityModal";
 import { HeaderViewModel } from "../types";
@@ -26,6 +27,7 @@ export default function MobilityCard({
   profile: any;
   user: HeaderViewModel;
 }) {
+  const colors = useThemeColors();
   const band = (profile as any)?.anthropometrics?.mobility_band ?? null;
 
   const [open, setOpen] = useState(false);
@@ -37,12 +39,12 @@ export default function MobilityCard({
       <TouchableOpacity style={styles.statCard} activeOpacity={0.9} onPress={() => setOpen(true)}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Mobility</Text>
-          <MaterialCommunityIcons name="human-handsup" size={18} color="#666" />
+          <MaterialCommunityIcons name="human-handsup" size={18} color={colors.textSecondary} />
         </View>
 
         <View style={styles.statRow}>
           <Text style={styles.statKey}>Mobility Band</Text>
-          <Text style={[styles.statVal, { color: band == null ? "#999" : "#111" }]}>{summary}</Text>
+          <Text style={[styles.statVal, { color: band == null ? colors.textTertiary : colors.textPrimary }]}>{summary}</Text>
         </View>
 
         <View style={styles.divider} />

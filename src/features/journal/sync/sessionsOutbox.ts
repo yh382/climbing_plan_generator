@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "../../../lib/apiClient";
 
 export type SessionOutboxEventInput =
-  | { type: "create"; localKey: string; payload: { gym_name: string; location_type: string } }
+  | { type: "create"; localKey: string; payload: { gym_name: string; location_type: string; date?: string } }
   | { type: "end"; localKey: string };
 
 type SessionOutboxEvent = SessionOutboxEventInput & { id: string; createdAt: number };

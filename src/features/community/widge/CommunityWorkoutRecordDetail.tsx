@@ -1,11 +1,11 @@
 // src/features/community/widge/CommunityWorkoutRecordDetail.tsx
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { View, Text, StyleSheet, FlatList, Image } from "react-native";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 
-import CollapsibleLargeHeaderFlatList from "../../../components/CollapsibleLargeHeaderFlatList";
+import { NATIVE_HEADER_LARGE } from "../../../lib/nativeHeaderOptions";
 import DualActivityRing from "../../journal/DualActivityRing";
 import { colorForBoulder, colorForYDS } from "../../../../lib/gradeColors";
 
@@ -34,7 +34,6 @@ function toParts(items: any[], type: LogType) {
 }
 
 export default function CommunityWorkoutRecordDetail() {
-  const router = useRouter();
   const params = useLocalSearchParams<{
     // CommunityScreen 里会把 attachment 打包成 JSON 丢进来
     attachment?: string; // JSON string
@@ -181,39 +180,39 @@ export default function CommunityWorkoutRecordDetail() {
     </View>
   );
 
-  const LeftActions = (
-    <View style={styles.iconBtn}>
-      <TouchableOpacity activeOpacity={0.85} onPress={() => router.back()} style={styles.iconBtnInner}>
-        <Ionicons name="arrow-back" size={25} color="#111" />
-      </TouchableOpacity>
-    </View>
+  const subtitle = (
+    <Text style={styles.subtitleText}>{displayDate}</Text>
   );
 
   return (
-    <CollapsibleLargeHeaderFlatList
-      backgroundColor="#F9FAFB"
-      smallTitle="Daily Log"
-      largeTitle={<Text style={styles.largeTitle}>Daily Log</Text>}
-      subtitle={<Text style={styles.largeSubtitle}>{displayDate}</Text>}
-      leftActions={LeftActions}
-      rightActions={null as any} // ✅ community 只读：不显示 3dots / edit
-      data={list}
-      keyExtractor={(item: any, index: number) => item.id || String(index)}
-      renderItem={renderItem as any}
-      listHeader={header}
-      contentContainerStyle={{ paddingBottom: 8 }}
-      bottomInsetExtra={28}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <Stack.Screen
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          title: "Daily Log",
+        }}
+      />
+      <FlatList
+        data={list}
+        keyExtractor={(item: any, index: number) => item.id || String(index)}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <>
+            {subtitle}
+            {header}
+          </>
+        }
+        contentContainerStyle={{ paddingBottom: 36 }}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: "#F9FAFB" }}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  iconBtnInner: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
+  subtitleText: { fontSize: 14, color: "#6B7280", marginTop: 2, textAlign: "center" },
 
   card: {
     backgroundColor: "#FFF",

@@ -1,6 +1,6 @@
 // src/features/profile/components/EditProfileView.tsx
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef as useReactRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,15 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useFocusEffect } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
+import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { api } from "src/lib/apiClient";
 import { uploadImageToR2 } from "src/features/profile/api";
 import LocationPickerSheet from "./LocationPickerSheet";
@@ -73,9 +75,13 @@ interface InputItemProps {
 
 export default function EditProfileView() {
   const router = useRouter();
+  const navigation = useNavigation();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Use ref so headerRight always sees latest saving/form state
+  const saveRef = useReactRef<() => void>(() => {});
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
 
@@ -227,6 +233,36 @@ export default function EditProfileView() {
       setSaving(false);
     }
   };
+  // Keep ref in sync so native header button always calls latest save
+  saveRef.current = handleSaveAndBack;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <Host matchContents>
+          <SUIButton
+            label=""
+            systemImage={"chevron.backward" as any}
+            onPress={() => router.back()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ),
+      headerRight: () => (
+        <Host matchContents>
+          <SUIButton
+            label=""
+            systemImage={"checkmark" as any}
+            onPress={() => saveRef.current()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ),
+    });
+  }, [navigation, router]);
+
   const [homeGymPickerOpen, setHomeGymPickerOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false); // ✅ NEW
   // 你后面要做 bottomsheet 选择器：这里先占位
@@ -260,26 +296,19 @@ export default function EditProfileView() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+      <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
         <ActivityIndicator />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleSaveAndBack} style={styles.headerBtn} disabled={saving}>
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>{saving ? "Saving..." : "Edit Profile"}</Text>
-
-        <View style={styles.headerBtnPlaceholder} />
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         {/* 头像 */}
         <View style={styles.avatarSection}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => setAvatarPickerOpen(true)}>
@@ -394,7 +423,7 @@ export default function EditProfileView() {
             }}
             />
 
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -435,19 +464,6 @@ const InputItem = ({ label, value, onChangeText, multiline, placeholder, isLink,
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E2E8F0",
-  },
-  headerBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  headerBtnPlaceholder: { width: 44, height: 44 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-
   content: { flex: 1 },
   avatarSection: { alignItems: "center", paddingVertical: 20 },
   avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F1F5F9" },

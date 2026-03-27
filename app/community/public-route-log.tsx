@@ -1,17 +1,15 @@
 // app/community/public-route-log.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, FlatList } from "react-native";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { format, parseISO } from "date-fns";
 
+import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 import { api } from "../../src/lib/apiClient";
 import DualActivityRing from "../../src/features/journal/DualActivityRing";
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
-import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
 
 type LogItem = {
   id: string;
@@ -40,7 +38,6 @@ type PublicSessionData = {
 };
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  largeTitle: { fontSize: 32, fontFamily: theme.fonts.black, color: colors.textPrimary, lineHeight: 38 },
   largeSubtitle: { fontSize: 14, fontFamily: theme.fonts.regular, color: colors.textSecondary, marginTop: 2 },
 
   gradeRow: {
@@ -101,7 +98,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
 export default function PublicRouteLogScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
 
   const colors = useThemeColors();
@@ -270,31 +266,31 @@ export default function PublicRouteLogScreen() {
     </View>
   );
 
-  const LeftActions = (
-    <View style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
-      <TouchableOpacity activeOpacity={0.85} onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
-        <Ionicons name="arrow-back" size={25} color={colors.textPrimary} />
-      </TouchableOpacity>
-    </View>
-  );
-
   const subtitleText = session.username ? `@${session.username}` : displayDate;
 
   return (
-    <CollapsibleLargeHeaderFlatList
-      backgroundColor={colors.background}
-      smallTitle="Route Log"
-      largeTitle={<Text style={styles.largeTitle}>Route Log</Text>}
-      subtitle={<Text style={styles.largeSubtitle}>{subtitleText}</Text>}
-      leftActions={LeftActions}
-      rightActions={null as any}
-      data={session.logs}
-      keyExtractor={(item: any, index: number) => item.id || String(index)}
-      renderItem={renderItem as any}
-      listHeader={header}
-      contentContainerStyle={{ paddingBottom: 8 }}
-      bottomInsetExtra={28}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <Stack.Screen options={{
+        ...NATIVE_HEADER_LARGE,
+        title: "Route Log",
+      }} />
+      <FlatList
+        style={{ backgroundColor: colors.background }}
+        data={session.logs}
+        keyExtractor={(item: any, index: number) => item.id || String(index)}
+        renderItem={renderItem as any}
+        ListHeaderComponent={
+          <>
+            <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4 }}>
+              <Text style={styles.largeSubtitle}>{subtitleText}</Text>
+            </View>
+            {header}
+          </>
+        }
+        contentContainerStyle={{ paddingBottom: 8 }}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      />
+    </>
   );
 }

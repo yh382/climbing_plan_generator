@@ -109,9 +109,9 @@ function TodayDetailsList({
         const routeName = (item.name || "").trim() || item.grade;
         const note = (item.note || "").trim();
 
-        // Resolve session server ID for backend association
+        // Resolve session server ID — await in-flight session creation to avoid NULL
         const sessionServerId =
-          useLogsStore.getState().activeSession?.serverId ||
+          (await useLogsStore.getState().awaitSessionServerId()) ||
           (await getSessionServerId(sessionKey)) ||
           null;
 
@@ -120,6 +120,7 @@ function TodayDetailsList({
           localId: item.id,
           payload: {
             session_id: sessionServerId,
+            _sessionKey: sessionKey, // fallback key for outbox flush if still null
             date: item.date,
             log_type: item.type,
             grade_text: item.grade,

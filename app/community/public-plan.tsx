@@ -1,9 +1,11 @@
 // app/community/public-plan.tsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useLayoutEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Dimensions } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -37,6 +39,7 @@ function detectLocale(): "zh" | "en" {
 
 export default function PublicPlanScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { planId } = useLocalSearchParams<{ planId: string }>();
   const { plan, loading } = usePlanDetail(planId ?? null);
@@ -64,6 +67,15 @@ export default function PublicPlanScreen() {
       ],
     };
   });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerBlurEffect: "systemChromeMaterial",
+      title: plan?.title ?? "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+    });
+  }, [navigation, router, plan]);
 
   const { totalWeeks, sessionsPerWeek, allSessions } = useMemo(() => {
     if (!plan?.planJson) {
@@ -121,13 +133,6 @@ export default function PublicPlanScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
-
-      {/* Floating TopBar */}
-      <View style={[styles.floatingTopBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.floatingBtn}>
-          <Ionicons name="chevron-back" size={22} color="#FFF" />
-        </TouchableOpacity>
-      </View>
 
       <Animated.ScrollView onScroll={scrollHandler} scrollEventThrottle={16} stickyHeaderIndices={[2]} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero */}
@@ -251,26 +256,6 @@ export default function PublicPlanScreen() {
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  floatingTopBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
-  floatingBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   heroContainer: { width: "100%", overflow: "hidden" },
   heroGradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: "60%" },
   heroContent: {

@@ -1,10 +1,11 @@
 // src/features/analysis/TrainingVolumeChart.tsx
-import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BarChart, LineChart } from "react-native-gifted-charts";
 import { useThemeColors } from "../../lib/useThemeColors";
-import SmartBottomSheet from "../community/components/SmartBottomSheet";
+import { theme } from "../../lib/theme";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import useLogsStore from "../../store/useLogsStore";
 import { toDateString } from "../../store/usePlanStore";
 import { backfillIntensityData } from "../../services/stats/intensityCalculator";
@@ -93,7 +94,7 @@ export default function TrainingVolumeChart() {
   const [selectedTypes, setSelectedTypes] = useState<LogType[]>(["boulder"]);
   const { logs } = useLogsStore();
 
-  const [helpOpen, setHelpOpen] = useState(false);
+  const helpRef = useRef<TrueSheet>(null);
 
   const [intensityData, setIntensityData] = useState<DailyIntensityStore>({});
 
@@ -411,7 +412,7 @@ export default function TrainingVolumeChart() {
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity onPress={() => setHelpOpen(true)} style={styles.helpBtn}>
+          <TouchableOpacity onPress={() => helpRef.current?.present()} style={styles.helpBtn}>
             <Ionicons name="help-circle-outline" size={20} color={colors.chartLabel} />
           </TouchableOpacity>
         </View>
@@ -495,32 +496,45 @@ export default function TrainingVolumeChart() {
         </View>
       </View>
 
-      <SmartBottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} mode="list" title="Training Volume">
-        <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 14 }}>
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>📊 训练量柱状图</Text>
-            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
-              展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。
-            </Text>
-          </View>
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>📈 费劲程度（紫色虚线, 0-1）</Text>
-            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
-              综合反映每次训练的费劲程度，基于：{"\n"}
-              • 你对路线难度的主观感受（soft / solid / hard）{"\n"}
-              • 每条路线的尝试次数{"\n"}
-              • 完攀情况{"\n\n"}
-              数值越接近 1 代表这次训练越费劲，越接近 0 代表越轻松。
-            </Text>
-          </View>
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.chartTitle, marginBottom: 4 }}>💡 怎么看？</Text>
-            <Text style={{ fontSize: 13, color: colors.chartValue, lineHeight: 20 }}>
-              对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。
-            </Text>
-          </View>
+      <TrueSheet
+        ref={helpRef}
+        detents={[0.6, 0.9]}
+        cornerRadius={24}
+        backgroundColor={colors.background}
+        grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+        dimmed
+        dimmedDetentIndex={0}
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetHeaderTitle}>Training Volume</Text>
         </View>
-      </SmartBottomSheet>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.sheetBody}>
+            <View>
+              <Text style={styles.sheetSectionTitle}>训练量柱状图</Text>
+              <Text style={styles.sheetBodyText}>
+                展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.sheetSectionTitle}>费劲程度（紫色虚线, 0-1）</Text>
+              <Text style={styles.sheetBodyText}>
+                综合反映每次训练的费劲程度，基于：{"\n"}
+                • 你对路线难度的主观感受（soft / solid / hard）{"\n"}
+                • 每条路线的尝试次数{"\n"}
+                • 完攀情况{"\n\n"}
+                数值越接近 1 代表这次训练越费劲，越接近 0 代表越轻松。
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.sheetSectionTitle}>怎么看？</Text>
+              <Text style={styles.sheetBodyText}>
+                对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </TrueSheet>
     </View>
   );
 }
@@ -553,5 +567,39 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   typePillText: { fontSize: 11, fontFamily: "DMSans_500Medium", color: colors.toggleInactiveText },
   helpBtn: { padding: 2 },
   legendRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "center" },
-  legendTitle: { fontSize: 11, fontWeight: "700", color: colors.chartValue, marginRight: 4 },
+  legendTitle: { fontSize: 11, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.chartValue, marginRight: 4 },
+  // TrueSheet help styles
+  sheetHeader: {
+    paddingHorizontal: 22,
+    paddingTop: 26,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.cardBorder,
+  },
+  sheetHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+    textAlign: "center" as const,
+  },
+  sheetBody: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  sheetSectionTitle: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    fontFamily: theme.fonts.bold,
+    color: colors.chartTitle,
+    marginBottom: 4,
+  },
+  sheetBodyText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.chartValue,
+    lineHeight: 20,
+  },
 });

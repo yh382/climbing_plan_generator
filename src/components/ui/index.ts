@@ -1,5 +1,5 @@
 export { ImagePlaceholder } from './ImagePlaceholder'
-export { Button } from './Button'
 export { SectionHeader } from './SectionHeader'
 export { CardDark } from './CardDark'
 export { Tag } from './Tag'
+export { NativeSegmentedControl } from './NativeSegmentedControl'

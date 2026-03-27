@@ -1,9 +1,10 @@
 // src/components/plancard/variants/CompactPlanCard.tsx
 
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Host, ContextMenu, Button } from "@expo/ui/swift-ui";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { statusLabel } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
@@ -61,7 +62,26 @@ export default function CompactPlanCard(props: TrainingPlanCardProps) {
             <Text style={styles.typePillText}>{typeLabel}</Text>
           </View>
 
-          {handlers?.onOpenMenu && context === "personal" ? (
+          {Platform.OS === "ios" && handlers?.contextMenuItems?.length && context === "personal" ? (
+            <Host matchContents style={styles.menuBtn}>
+              <ContextMenu>
+                <ContextMenu.Trigger>
+                  <Button systemImage="ellipsis" label="" />
+                </ContextMenu.Trigger>
+                <ContextMenu.Items>
+                  {handlers.contextMenuItems.map((item) => (
+                    <Button
+                      key={item.label}
+                      systemImage={item.systemImage as any}
+                      role={item.role}
+                      onPress={item.onPress}
+                      label={item.label}
+                    />
+                  ))}
+                </ContextMenu.Items>
+              </ContextMenu>
+            </Host>
+          ) : handlers?.onOpenMenu && context === "personal" ? (
             <TouchableOpacity
               onPress={() => handlers.onOpenMenu?.(plan)}
               style={styles.menuBtn}

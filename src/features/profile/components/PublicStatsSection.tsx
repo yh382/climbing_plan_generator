@@ -5,11 +5,11 @@ import { format, parseISO } from "date-fns";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import DailyLogCard from "../../session/components/DailyLogCard";
-import type { PublicProfile, PublicDailySummary } from "../../community/hooks";
+import type { PublicProfile, PublicSessionSummary } from "../../community/hooks";
 
 type Props = {
   profile: PublicProfile;
-  dailySummary: PublicDailySummary[];
+  sessionSummary: PublicSessionSummary[];
 };
 
 function formatDuration(minutes: number | null): string {
@@ -20,7 +20,7 @@ function formatDuration(minutes: number | null): string {
   return `${m}m`;
 }
 
-export default function PublicStatsSection({ profile, dailySummary }: Props) {
+export default function PublicStatsSection({ profile, sessionSummary }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -43,24 +43,24 @@ export default function PublicStatsSection({ profile, dailySummary }: Props) {
             <Text style={styles.kpiLabel}>max R</Text>
           </View>
           <View style={styles.kpiItem}>
-            <Text style={styles.kpiVal}>{dailySummary.length}</Text>
-            <Text style={styles.kpiLabel}>days</Text>
+            <Text style={styles.kpiVal}>{sessionSummary.length}</Text>
+            <Text style={styles.kpiLabel}>sessions</Text>
           </View>
         </View>
       </View>
 
-      {/* Recent Climbs */}
-      <Text style={styles.recentTitle}>Recent Climbs</Text>
-      {dailySummary.length > 0 ? (
+      {/* Recent Sessions */}
+      <Text style={styles.recentTitle}>Recent Sessions</Text>
+      {sessionSummary.length > 0 ? (
         <View style={{ marginHorizontal: -16, gap: 0 }}>
-          {dailySummary.map((d) => (
+          {sessionSummary.map((s) => (
             <DailyLogCard
-              key={d.date}
-              dateLabel={format(parseISO(d.date), "EEE · M.dd")}
-              duration={formatDuration(d.durationMinutes)}
-              climbs={d.climbs}
-              sends={d.sends}
-              maxGrade={d.bestGrade || "—"}
+              key={s.id}
+              dateLabel={format(parseISO(s.date), "EEE · M.dd")}
+              duration={formatDuration(s.durationMinutes)}
+              climbs={s.climbs}
+              sends={s.sends}
+              maxGrade={s.bestGrade || "—"}
               onPress={() => {}}
             />
           ))}
@@ -68,7 +68,7 @@ export default function PublicStatsSection({ profile, dailySummary }: Props) {
       ) : (
         <View style={styles.emptyState}>
           <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>No recent climbs.</Text>
+          <Text style={styles.emptyText}>No recent sessions.</Text>
         </View>
       )}
     </View>

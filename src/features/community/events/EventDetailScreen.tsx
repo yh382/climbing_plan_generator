@@ -1,5 +1,5 @@
 // src/features/community/events/EventDetailScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,11 +21,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   interpolate,
-  Extrapolate,
 } from "react-native-reanimated";
-import { BlurView } from "expo-blur";
 
-import GlassIconButton from "./component/GlassIconButton";
+import { HeaderButton } from "@/components/ui/HeaderButton";
 import CategoryChip from "./component/CategoryChip";
 import EventDynamicCards from "./component/EventDynamicCards";
 import EventDetailsModal from "./EventDetailsModal";
@@ -118,42 +118,27 @@ export default function EventDetailScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const navigation = useNavigation();
+  const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
 
   const { event, eventRaw, onToggleJoin, joined, loading } = useEventDetailData();
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  // ===== Scroll Animation (Header Fade) — hooks must be before early return =====
+  // ===== Scroll Animation — hooks must be before early return =====
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((evt) => {
     scrollY.value = evt.contentOffset.y;
   });
 
-  const headerStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollY.value,
-      [0, COVER_H - 100],
-      [0, 1],
-      Extrapolate.CLAMP
-    );
-    return {
-      opacity,
-      shadowOpacity: interpolate(
-        scrollY.value,
-        [0, COVER_H],
-        [0, 0.05],
-        Extrapolate.CLAMP
-      ),
-    };
-  });
-
   const coverParallaxStyle = useAnimatedStyle(() => {
-    if (scrollY.value >= 0) return {};
-    const absScroll = -scrollY.value;
+    const adjustedScrollY = scrollY.value + headerHeight;
+    if (adjustedScrollY >= 0) return {};
+    const absScroll = -adjustedScrollY;
     return {
       transform: [
         { scale: 1 + absScroll / COVER_H },
-        { translateY: scrollY.value / 2 },
+        { translateY: adjustedScrollY / 2 },
       ],
     };
   });
@@ -171,6 +156,16 @@ export default function EventDetailScreen() {
     () => (event ? daysLeft(event.endDateISO ?? event.startDateISO) : null),
     [event?.endDateISO, event?.startDateISO]
   );
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      headerRight: () => <HeaderButton icon="square.and.arrow.up" onPress={() => {}} />,
+      scrollEdgeEffects: { top: 'soft' },
+    });
+  }, [navigation, router, event]);
 
   // Loading / not found states
   if (loading || !event) {
@@ -204,39 +199,16 @@ export default function EventDetailScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      {/* ===== Header (Glass Fade) ===== */}
-      <View style={[styles.headerContainer, { height: insets.top + 50 }]}>
-        <Animated.View style={[StyleSheet.absoluteFill, headerStyle]}>
-          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: "rgba(255,255,255,0.65)" },
-            ]}
-          />
-          <View style={styles.headerBottomHairline} />
-        </Animated.View>
-
-        <View style={[styles.headerButtonsRow, { marginTop: insets.top }]}>
-          <GlassIconButton icon="chevron-back" onPress={() => router.back()} />
-          <GlassIconButton
-            icon="share-outline"
-            onPress={() => {
-              /* TODO share */
-            }}
-          />
-        </View>
-      </View>
-
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
         {/* ===== Hero Area ===== */}
         <View style={styles.heroWrap}>
-          <Animated.View style={coverParallaxStyle}>
+          <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.coverWrap, { height: COVER_H }]}>
               {event.coverImage ? (
                 <Image
@@ -404,30 +376,6 @@ export default function EventDetailScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-
-  // === Header ===
-  headerContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
-  headerButtonsRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SIDE_PADDING,
-  },
-  headerBottomHairline: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: colors.border,
-  },
 
   // === Hero ===
   heroWrap: { position: "relative" },

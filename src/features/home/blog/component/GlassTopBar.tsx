@@ -3,13 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  Platform,
-  TouchableOpacity,
-  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
-import { GlassView } from "expo-glass-effect";
 import Animated, {
   Extrapolate,
   interpolate,
@@ -105,49 +101,6 @@ export function GlassTopBar({
   );
 }
 
-/**
- * GlassIconButton
- * - 默认 44x44（不改变你原来的按钮位置/点击区规范）
- * - 默认 circle（圆形）
- * - 支持传 style，方便你继续复用原来的 styles.iconBtn（如果有 margin/padding）
- */
-export function GlassIconButton({
-  onPress,
-  children,
-  size = 44,
-  shape = "circle",
-  style,
-}: {
-  onPress: () => void;
-  children: React.ReactNode;
-  size?: number;
-  shape?: "circle" | "pill";
-  style?: ViewStyle;
-}) {
-  const radius = shape === "circle" ? size / 2 : 14;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[{ width: size, height: size }, style]}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-    >
-      <View style={[btn.wrap, { borderRadius: radius }]}>
-        {Platform.OS === "ios" ? (
-          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
-        ) : (
-          <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
-        )}
-
-        <View style={[btn.tint, { borderRadius: radius }]} />
-        <View style={[btn.border, { borderRadius: radius }]} />
-        <View style={btn.content}>{children}</View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   fixedHeader: {
     position: "absolute",
@@ -181,25 +134,4 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
-});
-
-const btn = StyleSheet.create({
-  wrap: {
-    flex: 1,
-    overflow: "hidden",
-  },
-  tint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
-  border: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.12)",
-  },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

@@ -1,9 +1,8 @@
 // app/library/exercises.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import { useRouter, useNavigation } from "expo-router";
+import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import TopBar from "../../components/TopBar";
 
 const CATEGORIES = ["All", "Finger", "Core", "Upper Body", "Legs", "Mobility", "Pull"];
 
@@ -17,11 +16,7 @@ const EXERCISES = [
 ];
 
 export default function ExercisesLibraryScreen() {
-  const router = useRouter();
-  const navigation = useNavigation();
   const [filter, setFilter] = useState("All");
-
-  React.useLayoutEffect(() => { navigation.setOptions({ headerShown: false }); }, [navigation]);
 
   const filteredData = filter === "All" 
     ? EXERCISES 
@@ -42,12 +37,7 @@ export default function ExercisesLibraryScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
-      <TopBar 
-        routeName="exercises_lib" 
-        titleZH="动作库" 
-        titleEN="Exercise Library" 
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-      />
+      <Stack.Screen options={{ title: "Exercise Library" }} />
 
       {/* Category Filter */}
       <View style={{ height: 50 }}>
@@ -72,6 +62,7 @@ export default function ExercisesLibraryScreen() {
         data={filteredData}
         renderItem={renderItem}
         keyExtractor={item => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16 }}
       />
     </View>

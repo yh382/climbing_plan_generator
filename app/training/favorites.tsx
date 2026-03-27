@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useI18N } from "../../lib/i18n";
@@ -109,9 +110,7 @@ export default function ExerciseFavoritesScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.headerTitle}>{tr("收藏动作", "Favorite Exercises")}</Text>
         <View style={{ width: 40 }} />
       </View>

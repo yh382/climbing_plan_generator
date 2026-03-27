@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 import EditCapacityModal from "../modals/EditCapacityModal";
 import { HeaderViewModel } from "../types";
 
@@ -13,6 +14,7 @@ export default function CapacityCard({
   profile: any;
   user: HeaderViewModel;
 }) {
+  const colors = useThemeColors();
   const capacity = (profile as any)?.capacity ?? null;
 
   const maxPullUps = capacity?.max_pullups ?? user.strengthStats.maxPullUps ?? null;
@@ -30,7 +32,7 @@ export default function CapacityCard({
       <TouchableOpacity style={styles.statCard} activeOpacity={0.9} onPress={() => setOpen(true)}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Capacity</Text>
-          <MaterialCommunityIcons name="arm-flex" size={18} color="#666" />
+          <MaterialCommunityIcons name="arm-flex" size={18} color={colors.textSecondary} />
         </View>
 
         <View style={styles.statRow}>
@@ -49,7 +51,7 @@ export default function CapacityCard({
 
         <View style={styles.statRow}>
           <Text style={styles.statKey}> </Text>
-          <Text style={[styles.statVal, { color: "#999" }]}>{subtitle}</Text>
+          <Text style={[styles.statVal, { color: colors.textTertiary }]}>{subtitle}</Text>
         </View>
       </TouchableOpacity>
 

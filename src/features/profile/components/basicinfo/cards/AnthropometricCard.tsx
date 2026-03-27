@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useThemeColors } from "@/lib/useThemeColors";
 import EditAnthropometricModal, { EditField } from "../modals/EditAnthropometricModal";
 import { HeaderViewModel } from "../types";
 import { computeApeIndexCm } from "../utils";
@@ -13,6 +14,7 @@ export default function AnthropometricCard({
   profile: any;
   user: HeaderViewModel;
 }) {
+  const colors = useThemeColors();
   const anthropometrics = (profile as any)?.anthropometrics ?? null;
 
   const height =
@@ -53,7 +55,7 @@ export default function AnthropometricCard({
             </Text>
           </View>
 
-          <View style={local.vDivider} />
+          <View style={[local.vDivider, { backgroundColor: colors.divider }]} />
 
           <View style={local.tripleCol}>
             <Text style={styles.metricLabel}>WEIGHT</Text>
@@ -63,7 +65,7 @@ export default function AnthropometricCard({
             </Text>
           </View>
 
-          <View style={local.vDivider} />
+          <View style={[local.vDivider, { backgroundColor: colors.divider }]} />
 
           <View style={local.tripleCol}>
             <Text style={styles.metricLabel}>ARM SPAN</Text>

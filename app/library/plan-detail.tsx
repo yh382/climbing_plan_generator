@@ -1,10 +1,8 @@
 // app/library/plan-detail.tsx
 import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TopBar from "../../components/TopBar"; 
 
 // 模拟数据
 const MOCK_WEEKS = [
@@ -17,22 +15,10 @@ const MOCK_WEEKS = [
 export default function PlanDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FAFAFA" }}>
-      {/* TopBar 区域 */}
-      <View style={{ 
-          backgroundColor: '#FFF',
-          paddingTop: insets.top // 保持安全区域处理
-      }}>
-        <TopBar 
-            routeName="plan_detail" 
-            title="Training Plan"
-            useSafeArea={false}
-            leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
-      </View>
+      <Stack.Screen options={{ title: "Training Plan" }} />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         

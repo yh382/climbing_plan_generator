@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 import EditFingerStrengthModal from "../modals/EditFingerStrengthModal";
 import { HeaderViewModel, FingerStrength } from "../types";
 import { computeFSI, formatGrip } from "../utils";
@@ -16,6 +17,7 @@ export default function FingerStrengthCard({
   profile: any;
   user: HeaderViewModel;
 }) {
+  const colors = useThemeColors();
   const anthropometrics = (profile as any)?.anthropometrics ?? null;
   const bodyWeight =
     anthropometrics?.weight ?? anthropometrics?.weight_kg ?? user.bodyMetrics.weight ?? null;
@@ -41,7 +43,7 @@ export default function FingerStrengthCard({
       <TouchableOpacity style={styles.statCard} activeOpacity={0.9} onPress={() => setOpen(true)}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Finger Strength</Text>
-          <MaterialCommunityIcons name="hand-back-left-outline" size={18} color="#666" />
+          <MaterialCommunityIcons name="hand-back-left-outline" size={18} color={colors.textSecondary} />
         </View>
 
         <View style={styles.statRow}>
@@ -53,7 +55,7 @@ export default function FingerStrengthCard({
 
         <View style={styles.statRow}>
           <Text style={styles.statKey}>Reference</Text>
-          <Text style={[styles.statVal, { color: finger?.edge_mm ? "#111" : "#999" }]}>{summary}</Text>
+          <Text style={[styles.statVal, { color: finger?.edge_mm ? colors.textPrimary : colors.textTertiary }]}>{summary}</Text>
         </View>
 
         <View style={styles.divider} />

@@ -9,12 +9,11 @@ import {
   Dimensions,
   TouchableOpacity,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 
-import TopBar from "../../components/TopBar";
 import { getColorForGrade } from "../../lib/gradeColors";
 import {
   readDayList,
@@ -61,14 +60,7 @@ export default function RouteDetailScreen() {
   if (!item) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-        <View style={{ paddingTop: insets.top }}>
-          <TopBar
-            routeName="route_detail"
-            title="Route"
-            useSafeArea={false}
-            leftControls={{ mode: "back", onBack: () => router.back() }}
-          />
-        </View>
+        <Stack.Screen options={{ title: "Route Detail" }} />
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -117,16 +109,9 @@ export default function RouteDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <View style={{ paddingTop: insets.top }}>
-        <TopBar
-          routeName="route_detail"
-          title="Route"
-          useSafeArea={false}
-          leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
-      </View>
+      <Stack.Screen options={{ title: "Route Detail" }} />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Media section - always visible */}
         <View style={styles.mediaContainer}>
           {mediaUri ? (

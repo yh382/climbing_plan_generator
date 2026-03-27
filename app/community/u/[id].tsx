@@ -1,6 +1,6 @@
 // app/community/u/[id].tsx
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,11 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useI18N } from "../../../lib/i18n";
+import { HeaderButton } from "../../../src/components/ui/HeaderButton";
 
 import Animated, {
   useSharedValue,
@@ -24,7 +26,6 @@ import Animated, {
   Extrapolate,
 } from "react-native-reanimated";
 
-import ProfileTopBar from "../../../src/components/shared/ProfileTopBar";
 import ProfileHeader from "../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
 import ProfilePostGrid from "../../../src/features/profile/components/ProfilePostGrid";
@@ -76,10 +77,11 @@ const SCROLL_THRESHOLD = 44;
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { tt } = useI18N();
 
-  const { profile, posts, plans, badges, dailySummary, loading } = usePublicProfile(id ?? null);
+  const { profile, posts, plans, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
   const { width } = useWindowDimensions();
 
   const badgeCardSize = useMemo(() => (width - 24 - 12) / 3, [width]);
@@ -237,16 +239,15 @@ export default function PublicProfileScreen() {
     scrollY.value = event.contentOffset.y;
   });
 
-  const topbarBgStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [0, 1], Extrapolate.CLAMP),
-  }));
-
-  const topbarTitleStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD + 10], [0, 1], Extrapolate.CLAMP),
-    transform: [{
-      translateY: interpolate(scrollY.value, [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD + 10], [10, 0], Extrapolate.CLAMP),
-    }],
-  }));
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerBlurEffect: "systemChromeMaterial",
+      title: profile?.displayName ?? "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      headerRight: () => <HeaderButton icon="ellipsis.circle" onPress={handleMorePress} />,
+    });
+  }, [navigation, router, profile, handleMorePress]);
 
   const headerTitleAnimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0], Extrapolate.CLAMP),
@@ -281,16 +282,6 @@ export default function PublicProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      <ProfileTopBar
-        title={profile.displayName}
-        isOwnProfile={false}
-        topbarBgStyle={topbarBgStyle}
-        topbarTitleStyle={topbarTitleStyle}
-        insetTop={insets.top}
-        onBackPress={() => router.back()}
-        onMorePress={handleMorePress}
-      />
-
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -317,7 +308,6 @@ export default function PublicProfileScreen() {
           onFollowPress={handleFollow}
           onMessagePress={handleMessage}
           headerTitleAnimStyle={headerTitleAnimStyle}
-          topPadding={insets.top + 44}
           scrollY={scrollY}
         />
 
@@ -345,7 +335,7 @@ export default function PublicProfileScreen() {
                 message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
               />
             ) : profile ? (
-              <PublicStatsSection profile={profile} dailySummary={dailySummary} />
+              <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
             ) : null
           )}
 

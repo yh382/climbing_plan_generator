@@ -1,19 +1,24 @@
-import { useEffect } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
-export default function GymDetailPage() {
-  const { gymId } = useLocalSearchParams<{ gymId: string }>();
+/**
+ * Backwards-compatibility redirect: /gyms/:gymId → /gym-community
+ */
+export default function GymDetailRedirect() {
+  const { gymId, gymName } = useLocalSearchParams<{
+    gymId: string;
+    gymName?: string;
+  }>();
   const router = useRouter();
 
-  // Redirect to Community tab Gyms view
   useEffect(() => {
     if (gymId) {
       router.replace({
-        pathname: '/(tabs)/community',
-        params: { tab: 'gyms', gymId },
+        pathname: "/gym-community",
+        params: { gymId, ...(gymName ? { gymName } : {}) },
       });
     }
-  }, [gymId, router]);
+  }, [gymId, gymName, router]);
 
   return null;
 }

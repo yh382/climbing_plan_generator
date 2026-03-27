@@ -1,7 +1,8 @@
 // src/features/session/components/CalendarDayRing.tsx
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { TouchableOpacity, Text, View, StyleSheet } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const SIZE = 42;
 const THICKNESS = 3;
@@ -38,6 +39,9 @@ function CalendarDayRing({
   isCurrentMonth = true,
   onPress,
 }: CalendarDayRingProps) {
+  const colors = useThemeColors();
+  const isDark = colors.background === "#000000";
+
   const outerRatio = Math.min(durationMin / durationGoal, 1);
   const innerRatio = Math.min(sendCount / sendGoal, 1);
   const outerDash = C_OUTER * outerRatio;
@@ -45,20 +49,40 @@ function CalendarDayRing({
   const hasOuter = outerRatio > 0;
   const hasInner = innerRatio > 0;
 
-  // Center dot: none / accent (in progress) / red (complete)
+  // Center dot: none / accent (in progress) / brown (complete)
   const dotColor =
     planProgress >= 100
       ? "#A08060"
       : planProgress > 0
-        ? "#306E6F"
+        ? colors.accent
         : null;
+
+  const trackColor = isDark ? "#38383A" : "#E5E7EB";
+  const todayBg = isDark ? "#2C2C2E" : "#ECEEE8";
+  const selectedBg = isDark ? "#2C2C2E" : "#ECEEE8";
+  const textColor = isDark ? "#E5E7EB" : "#374151";
+  const textSelectedColor = isDark ? "#FFFFFF" : "#111";
+  const textInactiveColor = isDark ? "#48484A" : "#9CA3AF";
+  const textOutsideColor = isDark ? "#38383A" : "#D1D5DB";
+
+  const dynamicStyles = useMemo(
+    () => ({
+      cellSelected: { backgroundColor: selectedBg },
+      cellToday: { backgroundColor: todayBg, borderRadius: 8 },
+      dayText: { color: textColor },
+      dayTextSelected: { color: textSelectedColor },
+      dayTextInactive: { color: textInactiveColor },
+      dayTextOutside: { color: textOutsideColor },
+    }),
+    [isDark],
+  );
 
   return (
     <TouchableOpacity
       style={[
         styles.cell,
-        isSelected && styles.cellSelected,
-        isToday && !isSelected && styles.cellToday,
+        isSelected && dynamicStyles.cellSelected,
+        isToday && !isSelected && dynamicStyles.cellToday,
       ]}
       onPress={onPress}
       activeOpacity={0.7}
@@ -72,12 +96,12 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_OUTER}
-                stroke="#E5E7EB"
+                stroke={trackColor}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
             )}
-            {/* Outer ring progress (green - duration) */}
+            {/* Outer ring progress (duration) */}
             {hasOuter && (
               <Circle
                 cx={SIZE / 2}
@@ -96,18 +120,18 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke="#E5E7EB"
+                stroke={trackColor}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
             )}
-            {/* Inner ring progress (accent - sends) */}
+            {/* Inner ring progress (sends) */}
             {hasInner && (
               <Circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke={innerRatio >= 1 ? "#265858" : "#306E6F"}
+                stroke={innerRatio >= 1 ? "#265858" : colors.accent}
                 strokeWidth={THICKNESS}
                 fill="none"
                 strokeDasharray={`${innerDash} ${C_INNER - innerDash}`}
@@ -121,9 +145,11 @@ function CalendarDayRing({
         <Text
           style={[
             styles.dayText,
-            isSelected && styles.dayTextSelected,
-            !isCurrentMonth && styles.dayTextOutside,
-            !hasOuter && !hasInner && isCurrentMonth && styles.dayTextInactive,
+            dynamicStyles.dayText,
+            isSelected && dynamicStyles.dayTextSelected,
+            isSelected && styles.dayTextSelectedWeight,
+            !isCurrentMonth && dynamicStyles.dayTextOutside,
+            !hasOuter && !hasInner && isCurrentMonth && dynamicStyles.dayTextInactive,
           ]}
         >
           {dayLabel}
@@ -150,14 +176,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
   },
-  cellSelected: {
-    backgroundColor: "#F3F4F6",
-  },
-  cellToday: {
-    borderWidth: 1,
-    borderColor: "#306E6F",
-    borderRadius: 8,
-  },
   ringWrap: {
     width: SIZE,
     height: SIZE,
@@ -168,17 +186,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     fontSize: 12,
     fontWeight: "600",
-    color: "#374151",
   },
-  dayTextSelected: {
+  dayTextSelectedWeight: {
     fontWeight: "800",
-    color: "#111",
-  },
-  dayTextInactive: {
-    color: "#9CA3AF",
-  },
-  dayTextOutside: {
-    color: "#D1D5DB",
   },
   planDot: {
     width: 4,

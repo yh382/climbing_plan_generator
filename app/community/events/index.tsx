@@ -1,5 +1,5 @@
 // app/community/events/index.tsx
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-
-import CollapsibleLargeHeader from "../../../src/components/CollapsibleLargeHeader";
+import { useNavigation } from "@react-navigation/native";
+import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { HeaderButton } from "@/components/ui/HeaderButton";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { eventApi } from "@/features/community/events/api";
 import type { EventOut } from "@/features/community/events/types";
 import EventCardRow from "@/features/community/events/EventCardRow";
@@ -32,10 +33,23 @@ const FILTER_CHIPS: { key: EventFilter; label: string }[] = [
 
 export default function EventsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [events, setEvents] = useState<EventOut[]>([]);
   const [myEvents, setMyEvents] = useState<EventOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<EventFilter>("all");
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      ...NATIVE_HEADER_LARGE,
+      title: "Events",
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
 
   useEffect(() => {
     setLoading(true);
@@ -66,24 +80,11 @@ export default function EventsScreen() {
     });
   };
 
-  const LeftActions = (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
-      <Ionicons name="arrow-back" size={24} color="#111" />
-    </TouchableOpacity>
-  );
-
-  const LargeTitle = <Text style={styles.largeTitle}>Events</Text>;
-  const Subtitle = <Text style={styles.largeSubtitle}>Discover local climbing events</Text>;
-
   return (
-    <CollapsibleLargeHeader
-      backgroundColor="#FFF"
-      smallTitle="Events"
-      largeTitle={LargeTitle}
-      subtitle={Subtitle}
-      leftActions={LeftActions}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ paddingBottom: 40 }}
-      bottomInsetExtra={28}
     >
       {/* My registered events horizontal scroll */}
       {myEvents.length > 0 && (
@@ -111,6 +112,7 @@ export default function EventsScreen() {
               key={chip.key}
               style={[styles.filterChip, active && styles.filterChipActive]}
               onPress={() => setFilter(chip.key)}
+              activeOpacity={0.8}
             >
               <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
                 {chip.label}
@@ -124,11 +126,11 @@ export default function EventsScreen() {
       <View style={styles.listContainer}>
         {loading ? (
           <View style={{ padding: 40, alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#9CA3AF" />
+            <ActivityIndicator size="large" color={colors.textTertiary} />
           </View>
         ) : filtered.length === 0 ? (
           <View style={{ padding: 40, alignItems: "center" }}>
-            <Text style={{ color: "#9CA3AF" }}>No events found.</Text>
+            <Text style={{ color: colors.textSecondary }}>No events found.</Text>
           </View>
         ) : (
           filtered.map((event) => (
@@ -140,16 +142,11 @@ export default function EventsScreen() {
           ))
         )}
       </View>
-    </CollapsibleLargeHeader>
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   myEventsRow: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, gap: 10 },
 
   filterRow: {
@@ -161,12 +158,14 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    borderRadius: 999,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   },
-  filterChipActive: { backgroundColor: "#111" },
-  filterChipText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  filterChipTextActive: { color: "#FFF" },
+  filterChipActive: { backgroundColor: colors.pillBackground, borderColor: colors.pillBackground },
+  filterChipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  filterChipTextActive: { color: colors.pillText },
 
   listContainer: { paddingHorizontal: 16, paddingTop: 12 },
 });

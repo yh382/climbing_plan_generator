@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { Card } from "@components/ui/Card";
 
 export default function AboutSettings() {
@@ -10,9 +11,7 @@ export default function AboutSettings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} />
         <Text style={styles.headerTitle}>About</Text>
         <View style={styles.headerBtn} />
       </View>

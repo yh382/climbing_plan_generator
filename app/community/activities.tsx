@@ -1,10 +1,9 @@
 // app/community/activities.tsx
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { useRouter } from "expo-router";
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from "react-native";
+import { Stack, useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-
-import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
+import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 
 // --- Mock Data: 岩馆活动 ---
 const ACTIVITIES = [
@@ -104,21 +103,12 @@ export default function ActivitiesScreen() {
     </View>
   );
 
-  const LeftActions = (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
-      <Ionicons name="arrow-back" size={24} color="#111" />
-    </TouchableOpacity>
-  );
-
   const RightActions = (
     <TouchableOpacity style={styles.cityBtn} activeOpacity={0.7}>
       <Text style={styles.cityText}>Brno</Text>
       <Ionicons name="chevron-down" size={14} color="#111" />
     </TouchableOpacity>
   );
-
-  const LargeTitle = <Text style={styles.largeTitle}>Local Activities</Text>;
-  const Subtitle = <Text style={styles.largeSubtitle}>Happening around you</Text>;
 
   const ListHeader = (
     <View>
@@ -147,22 +137,23 @@ export default function ActivitiesScreen() {
   );
 
   return (
-    <CollapsibleLargeHeaderFlatList
-      backgroundColor="#FFF"
-      smallTitle="Activities"
-      largeTitle={LargeTitle}
-      subtitle={Subtitle}
-      leftActions={LeftActions}
-      rightActions={RightActions}
-      data={ACTIVITIES}
-      keyExtractor={(item) => item.id}
-      renderItem={renderActivityCard as any}
-      listHeader={ListHeader}
-      // 重要：不要再在这里加 paddingHorizontal（会让大标题也被额外缩进）
-      contentContainerStyle={{ paddingBottom: 40 }}
-      bottomInsetExtra={28}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <Stack.Screen options={{
+        ...NATIVE_HEADER_LARGE,
+        title: "Activities",
+        headerRight: () => RightActions,
+      }} />
+      <FlatList
+        style={{ backgroundColor: "#FFF" }}
+        data={ACTIVITIES}
+        keyExtractor={(item) => item.id}
+        renderItem={renderActivityCard as any}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      />
+    </>
   );
 }
 

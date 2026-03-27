@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import ExerciseTimer from "../../src/features/session/components/ExerciseTimer";
 import LogWorkoutSheet from "../../src/features/session/components/LogWorkoutSheet";
@@ -101,9 +102,7 @@ export default function ExerciseTrainingScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.headerTitle} numberOfLines={1}>{exerciseName}</Text>
         <View style={{ width: 40 }} />
       </View>

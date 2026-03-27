@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../../components/ui/HeaderButton";
 import { VideoView, useVideoPlayer } from "expo-video";
 
 import type { LocalDayLogItem, LogMedia } from "./types";
@@ -27,7 +28,6 @@ import {
 } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
 import useLogsStore from "../../../store/useLogsStore";
-import { invalidateRecentClimbsCache } from "../../profile/components/RecentClimbsList";
 
 type Params = { id?: string; date?: string; logType?: "boulder" | "toprope" | "lead"; sessionKey?: string };
 
@@ -191,7 +191,6 @@ export default function LogItemDetailScreen() {
               delta: -sends,
             });
           }
-          invalidateRecentClimbsCache();
 
           // ✅ enqueue outbox event (offline-first; backend sync later)
           await enqueueLogEvent({ type: "delete", localId: item.id });
@@ -221,9 +220,7 @@ export default function LogItemDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ padding: 16, paddingTop: 52 }}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.topbarBtn}>
-            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
           <Text style={{ marginTop: 12, color: colors.chartLabel, fontWeight: "700" }}>Log not found.</Text>
         </View>
       </View>
@@ -285,15 +282,11 @@ export default function LogItemDetailScreen() {
 
         {/* ✅ topbar：左返回 / 右分享（中间无文字） */}
         <View style={styles.topbar}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.85} style={styles.topbarBtn}>
-            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
 
           <View style={{ flex: 1 }} />
 
-          <TouchableOpacity onPress={() => {}} activeOpacity={0.85} style={styles.topbarBtn}>
-            <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="square.and.arrow.up" onPress={() => {}} />
         </View>
       </View>
 

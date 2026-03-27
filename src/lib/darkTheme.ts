@@ -33,4 +33,5 @@ export const darkColors: ThemeColors = {
   pillBackground: '#FFFFFF',
   pillText: '#1C1C1E',
   emptyBarColor: '#38383A',
+  borderTertiary: '#38383A',
 };

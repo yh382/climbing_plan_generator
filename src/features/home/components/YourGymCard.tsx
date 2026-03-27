@@ -40,7 +40,10 @@ export default function YourGymSection() {
         <TouchableOpacity
           style={styles.gymCard}
           activeOpacity={0.7}
-          onPress={() => router.push(`/gyms/${displayGym.gym_id}`)}
+          onPress={() => router.push({
+            pathname: "/gym-community",
+            params: { gymId: displayGym.gym_id, gymName: displayGym.name },
+          })}
         >
           <View style={styles.gymCardLeft}>
             <View style={styles.gymIconWrap}>

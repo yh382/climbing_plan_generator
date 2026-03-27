@@ -1,11 +1,12 @@
 // app/library/log-detail.tsx
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Share } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, FlatList } from "react-native";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { format, parseISO } from "date-fns";
 
-import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
+import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 import DualActivityRing from "../../src/features/journal/DualActivityRing";
 import ClimbItemCard from "../../src/components/shared/ClimbItemCard";
 import SmartBottomSheet from "../../src/features/community/components/SmartBottomSheet";
@@ -189,17 +190,14 @@ export default function LogDetailScreen() {
       let ld: any[] = [];
 
       if (sessionKey) {
-        // Try session-scoped lists first
+        // Session-scoped only — no day fallback (avoids merging multiple sessions)
         [b, tr, ld] = await Promise.all([
           readSessionList(sessionKey, "boulder"),
           readSessionList(sessionKey, "toprope"),
           readSessionList(sessionKey, "lead"),
         ]);
-      }
-
-      // Fallback to day lists if session lists are empty
-      const hasSessionData = (b?.length || 0) + (tr?.length || 0) + (ld?.length || 0) > 0;
-      if (!hasSessionData && date) {
+      } else if (date) {
+        // Date-only navigation (no sessionKey) — backward compat
         [b, tr, ld] = await Promise.all([
           readDayList(date, "boulder"),
           readDayList(date, "toprope"),
@@ -438,15 +436,23 @@ export default function LogDetailScreen() {
     />
   );
 
+  // Infer display mode from param or data (fixes ring TOTAL 0 when mode not passed)
+  const effectiveMode = useMemo(() => {
+    if (modeParam === "boulder") return "boulder";
+    if (modeParam === "toprope" || modeParam === "lead" || modeParam === "rope") return "route";
+    // No mode param → infer from actual data
+    if (hasBoulder && !hasRoutes) return "boulder";
+    if (hasRoutes && !hasBoulder) return "route";
+    return "boulder"; // mixed → default boulder
+  }, [modeParam, hasBoulder, hasRoutes]);
+
   const activeParts = useMemo(() => {
-    if (modeParam !== "boulder" || (hasRoutes && !hasBoulder)) return routeParts;
-    return boulderParts;
-  }, [modeParam, hasBoulder, hasRoutes, boulderParts, routeParts]);
+    return effectiveMode === "boulder" ? boulderParts : routeParts;
+  }, [effectiveMode, boulderParts, routeParts]);
 
   const activeTotal = useMemo(() => {
-    if (modeParam !== "boulder" || (hasRoutes && !hasBoulder)) return routeTotal;
-    return boulderTotal;
-  }, [modeParam, hasBoulder, hasRoutes, boulderTotal, routeTotal]);
+    return effectiveMode === "boulder" ? boulderTotal : routeTotal;
+  }, [effectiveMode, boulderTotal, routeTotal]);
 
   const ring = (
     <DualActivityRing
@@ -499,65 +505,63 @@ export default function LogDetailScreen() {
   );
 
   const LeftActions = (
-    <View style={styles.iconBtn}>
-      <TouchableOpacity activeOpacity={0.85} onPress={handleBack} style={styles.iconBtnInner}>
-        <Ionicons name="arrow-back" size={25} color={colors.textPrimary} />
-      </TouchableOpacity>
-    </View>
+    <HeaderButton icon="chevron.backward" onPress={handleBack} />
   );
 
   const RightActions = (
-    <TouchableOpacity onPress={handleMenu} style={styles.iconBtn}>
-      <Ionicons name="ellipsis-horizontal" size={22} color={colors.textPrimary} />
-    </TouchableOpacity>
+    <HeaderButton icon="ellipsis" onPress={handleMenu} />
   );
 
   return (
     <>
-      <CollapsibleLargeHeaderFlatList
-        backgroundColor={colors.backgroundSecondary}
-        smallTitle="Route Log"
-        largeTitle={<Text style={styles.largeTitle}>Route Log</Text>}
-        subtitle={
-          <View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={styles.largeSubtitle}>{displayDate}</Text>
-              {sessionServerId && (
-                <Ionicons
-                  name={isPublic ? "globe-outline" : "lock-closed-outline"}
-                  size={12}
-                  color={colors.textSecondary}
-                  style={{ marginLeft: 6 }}
-                />
-              )}
-            </View>
-            {gymName ? (
-              gymId ? (
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/(tabs)/community', params: { tab: 'gyms', gymId } })}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="location-outline" size={12} color={colors.accent} />
-                  <Text style={{ fontSize: 12, color: colors.accent }}>{gymName}</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{gymName}</Text>
-                </View>
-              )
-            ) : null}
-          </View>
-        }
-        leftActions={LeftActions}
-        rightActions={RightActions}
+      <Stack.Screen options={{
+        ...NATIVE_HEADER_LARGE,
+        title: "Route Log",
+        headerLeft: () => LeftActions,
+        headerRight: () => RightActions,
+      }} />
+      <FlatList
+        style={{ backgroundColor: colors.backgroundSecondary }}
         data={dailyLogs}
         keyExtractor={(item: any, index: number) => item.id || index.toString()}
         renderItem={renderClimbCard as any}
-        listHeader={listHeader}
+        ListHeaderComponent={
+          <>
+            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={styles.largeSubtitle}>{displayDate}</Text>
+                {sessionServerId && (
+                  <Ionicons
+                    name={isPublic ? "globe-outline" : "lock-closed-outline"}
+                    size={12}
+                    color={colors.textSecondary}
+                    style={{ marginLeft: 6 }}
+                  />
+                )}
+              </View>
+              {gymName ? (
+                gymId ? (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/(tabs)/community', params: { tab: 'gyms', gymId } })}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="location-outline" size={12} color={colors.accent} />
+                    <Text style={{ fontSize: 12, color: colors.accent }}>{gymName}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                    <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
+                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>{gymName}</Text>
+                  </View>
+                )
+              ) : null}
+            </View>
+            {listHeader}
+          </>
+        }
         contentContainerStyle={{ paddingBottom: 8 }}
-        bottomInsetExtra={28}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       />
 

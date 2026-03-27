@@ -1,5 +1,14 @@
-import React, { useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import React, { useMemo, useRef, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  useWindowDimensions,
+} from "react-native";
 import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../lib/theme";
@@ -19,8 +28,7 @@ export type HomeBlogBannerItem = {
 };
 
 const GAP = 12;
-const CARD_W = 280;
-const CARD_H = 170;
+const CARD_H = 180;
 
 export function HomeBlogBannerCarousel({
   banners,
@@ -32,21 +40,26 @@ export function HomeBlogBannerCarousel({
   onViewAll: () => void;
 }) {
   const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: screenWidth } = useWindowDimensions();
+  const CARD_W = screenWidth - theme.spacing.screenPadding * 2;
+  const snap = CARD_W + GAP;
+
+  const styles = useMemo(() => createStyles(colors, CARD_W), [colors, CARD_W]);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const [active, setActive] = useState(0);
-
-  const snap = CARD_W + GAP;
 
   const data = useMemo(() => {
     return [...banners, { id: "__view_all__", title: "View all", action: { type: "route" as const } }];
   }, [banners]);
 
-  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(x / snap);
-    setActive(idx);
-  };
+  const handleMomentumEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const idx = Math.round(x / snap);
+      setActive(idx);
+    },
+    [snap],
+  );
 
   const renderCard = (item: any) => {
     if (item.id === "__view_all__") {
@@ -77,7 +90,7 @@ export function HomeBlogBannerCarousel({
             <Image source={{ uri: item.imageUri }} style={styles.coverImg} />
           ) : (
             <View style={styles.coverPlaceholder}>
-              <Ionicons name="image-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="image-outline" size={24} color="rgba(255,255,255,0.4)" />
             </View>
           )}
 
@@ -105,7 +118,10 @@ export function HomeBlogBannerCarousel({
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: theme.spacing.screenPadding, gap: GAP }}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.screenPadding,
+          gap: GAP,
+        }}
         snapToInterval={snap}
         decelerationRate="fast"
         snapToAlignment="start"
@@ -118,7 +134,7 @@ export function HomeBlogBannerCarousel({
         ))}
       </Animated.ScrollView>
 
-      {/* Indicator: accent rectangle (active) + gray circles (inactive) */}
+      {/* Indicator dots */}
       <View style={styles.indicatorRow}>
         {data.map((_, i) => (
           <View key={i} style={[styles.dot, i === active ? styles.dotActive : styles.dotIdle]} />
@@ -128,115 +144,116 @@ export function HomeBlogBannerCarousel({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  card: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: theme.borderRadius.card,
-    overflow: "hidden",
-    backgroundColor: colors.cardDark,
-  },
+const createStyles = (colors: ReturnType<typeof useThemeColors>, cardW: number) =>
+  StyleSheet.create({
+    card: {
+      width: cardW,
+      height: CARD_H,
+      borderRadius: theme.borderRadius.card,
+      overflow: "hidden",
+      backgroundColor: colors.cardDark,
+    },
 
-  coverWrap: {
-    height: 100,
-    backgroundColor: colors.cardDarkImage,
-  },
-  coverImg: {
-    width: "100%",
-    height: "100%",
-  },
-  coverPlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    coverWrap: {
+      height: 110,
+      backgroundColor: colors.cardDarkImage,
+    },
+    coverImg: {
+      width: "100%",
+      height: "100%",
+    },
+    coverPlaceholder: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    badge: {
+      position: "absolute",
+      top: 10,
+      right: 10,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: "rgba(255,255,255,0.15)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  textArea: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-    justifyContent: "space-between",
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: "700",
-    fontFamily: theme.fonts.bold,
-    color: "#FFFFFF",
-    lineHeight: 18,
-  },
-  sub: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.35)",
-  },
+    textArea: {
+      flex: 1,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 12,
+      justifyContent: "space-between",
+    },
+    title: {
+      fontSize: 15,
+      fontWeight: "700",
+      fontFamily: theme.fonts.bold,
+      color: "#FFFFFF",
+      lineHeight: 20,
+    },
+    sub: {
+      marginTop: 4,
+      fontSize: 12,
+      fontWeight: "500",
+      color: "rgba(255,255,255,0.35)",
+    },
 
-  // View all card
-  viewAllCard: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: theme.borderRadius.card,
-    backgroundColor: colors.cardDark,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
-  viewAllInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  viewAllText: {
-    fontSize: 18,
-    fontWeight: "900",
-    fontFamily: theme.fonts.black,
-    color: "#FFF",
-  },
-  viewAllArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  viewAllSub: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.35)",
-  },
+    // View all card
+    viewAllCard: {
+      width: cardW,
+      height: CARD_H,
+      borderRadius: theme.borderRadius.card,
+      backgroundColor: colors.cardDark,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      justifyContent: "space-between",
+      overflow: "hidden",
+    },
+    viewAllInner: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    viewAllText: {
+      fontSize: 18,
+      fontWeight: "900",
+      fontFamily: theme.fonts.black,
+      color: "#FFF",
+    },
+    viewAllArrow: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: "rgba(255,255,255,0.15)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    viewAllSub: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: "rgba(255,255,255,0.35)",
+    },
 
-  // Indicator: accent rect active, gray circle inactive
-  indicatorRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  dot: {
-    height: 6,
-    borderRadius: 999,
-  },
-  dotIdle: {
-    width: 6,
-    backgroundColor: "rgba(0,0,0,0.12)",
-  },
-  dotActive: {
-    width: 18,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-});
+    // Indicator
+    indicatorRow: {
+      marginTop: 10,
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 6,
+    },
+    dot: {
+      height: 6,
+      borderRadius: 999,
+    },
+    dotIdle: {
+      width: 6,
+      backgroundColor: "rgba(0,0,0,0.12)",
+    },
+    dotActive: {
+      width: 18,
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+    },
+  });

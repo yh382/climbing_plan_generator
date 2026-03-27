@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,26 +11,25 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  interpolate,
 } from "react-native-reanimated";
 
 import SegmentedTabs from "./component/SegmentedTabs";
 import LeaderboardFilters from "./component/LeaderboardFilters";
 import RankingRowCard from "./component/RankingRowCard";
-import GlassIconButton from "./component/GlassIconButton";
+import { HeaderButton } from "@/components/ui/HeaderButton";
 
 import { useChallengeDetailData } from "./data/useChallengeDetailData";
 import { useUserStore } from "@/store/useUserStore";
 
 import ChallengeDetailsModal from "./ChallengeDetailsModal";
-import { BlurView } from "expo-blur";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 
@@ -112,33 +111,22 @@ export default function ChallengeDetailScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const headerHeight = useHeaderHeight();
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
 
-  const headerStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollY.value,
-      [0, COVER_H - 100],
-      [0, 1],
-      "clamp"
-    );
-    return {
-      opacity,
-      shadowOpacity: interpolate(scrollY.value, [0, COVER_H], [0, 0.05], "clamp"),
-    };
-  });
-
   const coverParallaxStyle = useAnimatedStyle(() => {
-    if (scrollY.value >= 0) return {};
-    const absScroll = -scrollY.value;
+    const adjustedScrollY = scrollY.value + headerHeight;
+    if (adjustedScrollY >= 0) return {};
+    const absScroll = -adjustedScrollY;
     return {
       transform: [
         { scale: 1 + absScroll / COVER_H },
-        { translateY: scrollY.value / 2 },
+        { translateY: adjustedScrollY / 2 },
       ],
     };
   });
@@ -170,6 +158,16 @@ export default function ChallengeDetailScreen() {
 
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      headerRight: () => <HeaderButton icon="square.and.arrow.up" onPress={() => {}} />,
+      scrollEdgeEffects: { top: 'soft' },
+    });
+  }, [navigation, router, challenge]);
+
   // Loading state
   if (loading || !challenge) {
     return (
@@ -192,29 +190,16 @@ export default function ChallengeDetailScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* === Animated Header Background & Buttons === */}
-      <View style={[styles.headerContainer, { height: insets.top + 50 }]}>
-        <Animated.View style={[StyleSheet.absoluteFill, headerStyle]}>
-          <BlurView intensity={80} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.65)" }]} />
-          <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(0,0,0,0.05)" }} />
-        </Animated.View>
-
-        <View style={[styles.headerButtonsRow, { marginTop: insets.top }]}>
-          <GlassIconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel="Back" />
-          <GlassIconButton icon="share-outline" onPress={() => {}} accessibilityLabel="Share" />
-        </View>
-      </View>
-
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         {/* === Hero === */}
         <View style={styles.heroWrap}>
-          <Animated.View style={coverParallaxStyle}>
+          <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: "#0F0E0C" }]}>
               {challenge.coverUrl ? <Image source={{ uri: challenge.coverUrl }} style={styles.coverImg} /> : null}
               <View style={styles.coverScrim} />
@@ -384,21 +369,6 @@ export default function ChallengeDetailScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-
-  headerContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 999,
-  },
-  headerButtonsRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SIDE_PADDING,
-  },
 
   heroWrap: { position: "relative" },
   coverWrap: { width: "100%" },

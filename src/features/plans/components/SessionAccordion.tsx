@@ -1,8 +1,9 @@
 // src/features/plans/components/SessionAccordion.tsx
 
 import { useState, useMemo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Host, ContextMenu, Button } from "@expo/ui/swift-ui";
 
 import { useThemeColors } from "../../../lib/useThemeColors";
 import { ExerciseItemCard, type ExerciseItemData, type ExerciseItemMode } from "../../../components/shared/ExerciseItemCard";
@@ -52,7 +53,6 @@ export function SessionAccordion({
   const s = useMemo(() => createStyles(colors), [colors]);
 
   const [open, setOpen] = useState(defaultOpen);
-  const [menuIndex, setMenuIndex] = useState<number | null>(null);
 
   const title = session.name || `Session ${index + 1}`;
   const sessionType = session.type === "climb" ? "Climbing" : "Training";
@@ -61,17 +61,6 @@ export function SessionAccordion({
   const completedCount = completedIds
     ? allItems.filter((it) => completedIds.has(it.action_id)).length
     : 0;
-
-  const handleMenuAction = (action: "up" | "down" | "delete") => {
-    if (menuIndex === null) return;
-    const idx = menuIndex;
-    setMenuIndex(null);
-    if (action === "delete") {
-      onExerciseRemove?.(idx);
-    } else {
-      onMoveExercise?.(idx, action);
-    }
-  };
 
   return (
     <View style={s.container}>
@@ -100,7 +89,7 @@ export function SessionAccordion({
               </View>
             )
           ) : null}
-          <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={18} color="#9CA3AF" />
+          <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={18} color={colors.textSecondary} />
         </View>
       </TouchableOpacity>
 
@@ -123,53 +112,24 @@ export function SessionAccordion({
                 locale={locale}
                 completed={completedIds?.has(item.action_id)}
                 onPress={() => onExercisePress?.(item)}
-                onLongPress={mode === "builder" ? () => setMenuIndex(i) : undefined}
               />
-
-              {/* Floating context menu */}
-              {menuIndex === i && mode === "builder" ? (
-                <>
-                  {/* Dismiss overlay */}
-                  <Pressable
-                    style={s.menuOverlay}
-                    onPress={() => setMenuIndex(null)}
-                  />
-                  <View style={s.menuContainer}>
-                    {/* Move Up */}
-                    <TouchableOpacity
-                      style={s.menuItem}
-                      disabled={i === 0}
-                      onPress={() => handleMenuAction("up")}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="arrow-up" size={16} color={i === 0 ? "#D1D5DB" : "#374151"} />
-                      <Text style={[s.menuText, i === 0 && s.menuTextDisabled]}>Move Up</Text>
-                    </TouchableOpacity>
-
-                    {/* Move Down */}
-                    <TouchableOpacity
-                      style={s.menuItem}
-                      disabled={i === exerciseCount - 1}
-                      onPress={() => handleMenuAction("down")}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="arrow-down" size={16} color={i === exerciseCount - 1 ? "#D1D5DB" : "#374151"} />
-                      <Text style={[s.menuText, i === exerciseCount - 1 && s.menuTextDisabled]}>Move Down</Text>
-                    </TouchableOpacity>
-
-                    <View style={s.menuDivider} />
-
-                    {/* Delete */}
-                    <TouchableOpacity
-                      style={s.menuItem}
-                      onPress={() => handleMenuAction("delete")}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                      <Text style={s.menuTextDelete}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
+              {Platform.OS === "ios" && mode === "builder" ? (
+                <Host matchContents style={s.exerciseMenuBtn}>
+                  <ContextMenu>
+                    <ContextMenu.Trigger>
+                      <Button systemImage="ellipsis" label="" />
+                    </ContextMenu.Trigger>
+                    <ContextMenu.Items>
+                      {i > 0 ? (
+                        <Button systemImage="arrow.up" onPress={() => onMoveExercise?.(i, "up")} label="Move Up" />
+                      ) : null}
+                      {i < exerciseCount - 1 ? (
+                        <Button systemImage="arrow.down" onPress={() => onMoveExercise?.(i, "down")} label="Move Down" />
+                      ) : null}
+                      <Button systemImage="trash" role="destructive" onPress={() => onExerciseRemove?.(i)} label="Delete" />
+                    </ContextMenu.Items>
+                  </ContextMenu>
+                </Host>
               ) : null}
             </View>
           ))}
@@ -197,7 +157,7 @@ export function SessionAccordion({
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     marginBottom: 12,
     overflow: "visible",
@@ -216,8 +176,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     minHeight: 72,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  title: { fontSize: 16, fontWeight: "700", color: "#111" },
-  sub: { fontSize: 13, color: "#6B7280", marginTop: 3 },
+  title: { fontSize: 16, fontWeight: "700", color: colors.textPrimary },
+  sub: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressPill: {
     backgroundColor: "rgba(48,110,111,0.12)",
@@ -227,14 +187,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   progressText: { fontSize: 12, fontWeight: "700", color: "#306E6F" },
   progressBarContainer: { paddingHorizontal: 16, paddingBottom: 12 },
-  progressBarTrack: { height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" },
+  progressBarTrack: { height: 4, backgroundColor: colors.progressTrack, borderRadius: 2, overflow: "hidden" },
   progressBarFill: { height: "100%", backgroundColor: "#306E6F", borderRadius: 2 },
 
   body: {
     paddingHorizontal: 16,
     paddingBottom: 14,
     borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
+    borderTopColor: colors.divider,
     paddingTop: 14,
   },
   addBtn: {
@@ -244,7 +204,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     gap: 6,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.cardBorder,
     borderRadius: 12,
     borderStyle: "dashed",
   },
@@ -261,39 +221,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   startSessionText: { fontSize: 14, fontWeight: "700", color: "#FFF" },
 
-  // Context menu
-  menuOverlay: {
+  // Exercise context menu button (builder mode)
+  exerciseMenuBtn: {
     position: "absolute",
-    top: -200,
-    left: -200,
-    right: -200,
-    bottom: -200,
-    zIndex: 10,
+    top: 8,
+    right: 8,
   },
-  menuContainer: {
-    position: "absolute",
-    right: 0,
-    top: -4,
-    width: 180,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    paddingVertical: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 20,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  menuText: { fontSize: 14, fontWeight: "600", color: "#374151" },
-  menuTextDisabled: { color: "#D1D5DB" },
-  menuTextDelete: { fontSize: 14, fontWeight: "600", color: "#EF4444" },
-  menuDivider: { height: 1, backgroundColor: "#F3F4F6", marginHorizontal: 14 },
 });

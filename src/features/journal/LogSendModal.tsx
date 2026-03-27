@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { theme } from "@/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 // 开启 LayoutAnimation (Android 需要)
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -24,18 +26,6 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
-
-// 沿用刚才美化定义的颜色
-const COLORS = {
-  primary: "#0B1220",
-  secondary: "#6B7280",
-  background: "#F3F4F6",
-  card: "#FFFFFF",
-  border: "#E5E7EB",
-  inputBg: "#F9FAFB",
-  text: "#1F2937",
-  muted: "#9CA3AF",
-};
 
 export type SendStyle = "redpoint" | "onsight" | "flash";
 export type Feel = "soft" | "solid" | "hard";
@@ -59,6 +49,8 @@ type Props = {
 
 export default function LogSendModal({ visible, title, onClose, onDone, tr }: Props) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const t = useMemo(() => tr ?? ((zh: string, en: string) => en), [tr]);
 
   const [style, setStyle] = useState<SendStyle>("redpoint");
@@ -67,7 +59,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
 
-  // 新增：用于锁定 Modal 的高度
+  // 用于锁定 Modal 的高度
   const [modalMinHeight, setModalMinHeight] = useState<number>(0);
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -105,7 +97,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     });
   };
 
-  // 关键修改 1：带动画的样式切换
+  // 带动画的样式切换
   const handleStyleChange = (newStyle: SendStyle) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setStyle(newStyle);
@@ -187,15 +179,15 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
               <View style={styles.headerRow}>
                 <Text style={styles.title}>{title}</Text>
                 <TouchableOpacity onPress={closeWithAnimation} style={styles.closeBtn} activeOpacity={0.7}>
-                  <Ionicons name="close" size={20} color={COLORS.primary} />
+                  <Ionicons name="close" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity activeOpacity={0.9} style={styles.mediaBtn} onPress={() => {}}>
                 <View style={styles.mediaTile}>
-                  <Ionicons name="camera-outline" size={26} color={COLORS.primary} />
+                  <Ionicons name="camera-outline" size={24} color={colors.textSecondary} />
                   <View style={styles.mediaPlus}>
-                    <Ionicons name="add" size={14} color={COLORS.primary} />
+                    <Ionicons name="add" size={12} color={colors.textPrimary} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -206,7 +198,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                   value={name}
                   onChangeText={setName}
                   placeholder={t("例如：蓝色大斜板", "e.g. Blue slab project")}
-                  placeholderTextColor={COLORS.muted}
+                  placeholderTextColor={colors.textTertiary}
                   style={styles.input}
                 />
               </View>
@@ -242,7 +234,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                           onPress={() => setAttempts((a) => Math.max(1, a - 1))}
                           style={styles.stepBtnCompact}
                         >
-                          <Ionicons name="remove" size={16} color={COLORS.primary} />
+                          <Ionicons name="remove" size={16} color={colors.textPrimary} />
                         </TouchableOpacity>
                         <Text style={styles.stepValueCompact}>{attempts}</Text>
                         <TouchableOpacity
@@ -250,7 +242,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                           onPress={() => setAttempts((a) => a + 1)}
                           style={styles.stepBtnCompact}
                         >
-                          <Ionicons name="add" size={16} color={COLORS.primary} />
+                          <Ionicons name="add" size={16} color={colors.textPrimary} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -262,13 +254,13 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                     <Text style={styles.cardTitle}>{t("感觉如何？", "How did it feel?")}</Text>
                     <View style={styles.feelRowCompact}>
                       <TouchableOpacity style={styles.stepBtnCompact} activeOpacity={0.7} onPress={() => feelCycle(-1)}>
-                        <Ionicons name="chevron-back" size={16} color={COLORS.primary} />
+                        <Ionicons name="chevron-back" size={16} color={colors.textPrimary} />
                       </TouchableOpacity>
                       <View style={styles.feelPillCompact}>
                         <Text style={styles.feelText}>{feel.toUpperCase()}</Text>
                       </View>
                       <TouchableOpacity style={styles.stepBtnCompact} activeOpacity={0.7} onPress={() => feelCycle(1)}>
-                        <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                        <Ionicons name="chevron-forward" size={16} color={colors.textPrimary} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -287,7 +279,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
                     value={note}
                     onChangeText={setNote}
                     placeholder={t("写点感受…", "Write something…")}
-                    placeholderTextColor={COLORS.muted}
+                    placeholderTextColor={colors.textTertiary}
                     style={[styles.input, { height: 96, textAlignVertical: "top", marginTop: 8 }]}
                     multiline
                   />
@@ -305,45 +297,192 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  dragHandleArea: { width: "100%", height: 32, alignItems: "center", justifyContent: "center" },
-  dragIndicator: { width: 48, height: 5, backgroundColor: COLORS.border, borderRadius: 3 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: "800", color: COLORS.primary },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" },
-  mediaBtn: { marginTop: 4, height: 80, alignItems: "center", justifyContent: "center" },
-  mediaTile: { width: 64, height: 64, borderRadius: 20, backgroundColor: COLORS.inputBg, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
-  mediaPlus: { position: "absolute", right: 8, bottom: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.card, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 1 },
-  section: { marginTop: 16 },
-  fieldLabel: { fontSize: 13, fontWeight: "700", color: COLORS.secondary, marginBottom: 8 },
-  input: { backgroundColor: COLORS.inputBg, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: "600", color: COLORS.text },
-  segWrap: { flexDirection: "row", backgroundColor: COLORS.inputBg, borderRadius: 18, padding: 4 },
-  segBtn: { flex: 1, height: 38, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  segBtnActive: { backgroundColor: COLORS.primary, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 3 },
-  segText: { fontSize: 13, fontWeight: "700", color: COLORS.secondary },
-  segTextActive: { color: "#fff" },
-  card: { backgroundColor: COLORS.card, borderRadius: 20, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
-  cardTitle: { fontSize: 14, fontWeight: "800", color: COLORS.primary },
-  cardHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  stepperRowCompact: { flexDirection: "row", alignItems: "center", gap: 12 },
-  stepBtnCompact: { width: 32, height: 32, borderRadius: 16, borderWidth: 0.5, borderColor: '#E2E8F0', backgroundColor: 'transparent', alignItems: "center", justifyContent: "center" },
-  stepValueCompact: { fontSize: 17, fontWeight: "800", color: COLORS.primary, minWidth: 24, textAlign: "center" },
-  feelRowCompact: { flexDirection: "row", alignItems: "center", gap: 12 },
-  feelPillCompact: { width: 100, height: 36, borderRadius: 18, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 3 },
-  feelText: { color: "#fff", fontWeight: "800", fontSize: 13, letterSpacing: 1 },
-  hintText: { fontSize: 11, color: COLORS.muted, textAlign: "center", marginBottom: 12 },
-  doneBtn: { marginTop: 12, height: 58, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  doneText: { color: "#fff", fontSize: 17, fontWeight: "800" },
-});
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingHorizontal: theme.spacing.screenPadding,
+    },
+    dragHandleArea: {
+      width: "100%",
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dragIndicator: {
+      width: 36,
+      height: 4,
+      backgroundColor: colors.textTertiary,
+      borderRadius: 2,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    title: {
+      ...theme.typography.sectionTitle,
+      fontFamily: theme.fonts.black,
+      color: colors.textPrimary,
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    mediaBtn: {
+      marginTop: 4,
+      height: 80,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    mediaTile: {
+      width: 60,
+      height: 60,
+      borderRadius: theme.borderRadius.card,
+      backgroundColor: colors.inputBackground,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    mediaPlus: {
+      position: "absolute",
+      right: 6,
+      bottom: 6,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    section: {
+      marginTop: 16,
+    },
+    fieldLabel: {
+      ...theme.typography.cardTitle,
+      fontFamily: theme.fonts.bold,
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    input: {
+      backgroundColor: colors.inputBackground,
+      borderRadius: theme.borderRadius.card,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 15,
+      fontFamily: theme.fonts.medium,
+      color: colors.textPrimary,
+    },
+    segWrap: {
+      flexDirection: "row",
+      backgroundColor: colors.inputBackground,
+      borderRadius: theme.borderRadius.card,
+      padding: 4,
+    },
+    segBtn: {
+      flex: 1,
+      height: 38,
+      borderRadius: theme.borderRadius.cardSmall,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    segBtnActive: {
+      backgroundColor: colors.pillBackground,
+    },
+    segText: {
+      ...theme.typography.cardTitle,
+      fontFamily: theme.fonts.bold,
+      color: colors.textSecondary,
+    },
+    segTextActive: {
+      color: colors.pillText,
+    },
+    card: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: theme.borderRadius.card,
+      padding: 16,
+      marginBottom: 12,
+    },
+    cardTitle: {
+      ...theme.typography.body,
+      fontFamily: theme.fonts.black,
+      color: colors.textPrimary,
+    },
+    cardHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    stepperRowCompact: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    stepBtnCompact: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: "transparent",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    stepValueCompact: {
+      fontSize: 17,
+      fontFamily: theme.fonts.black,
+      color: colors.textPrimary,
+      minWidth: 24,
+      textAlign: "center",
+    },
+    feelRowCompact: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    feelPillCompact: {
+      width: 100,
+      height: 36,
+      borderRadius: theme.borderRadius.pill,
+      backgroundColor: colors.pillBackground,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    feelText: {
+      color: colors.pillText,
+      fontFamily: theme.fonts.black,
+      fontSize: 13,
+      letterSpacing: 1,
+    },
+    hintText: {
+      ...theme.typography.caption,
+      fontFamily: theme.fonts.regular,
+      color: colors.textTertiary,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    doneBtn: {
+      marginTop: 12,
+      height: 54,
+      borderRadius: theme.borderRadius.card,
+      backgroundColor: colors.pillBackground,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    doneText: {
+      color: colors.pillText,
+      fontSize: 17,
+      fontFamily: theme.fonts.black,
+    },
+  });

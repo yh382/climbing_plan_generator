@@ -1,15 +1,15 @@
 // app/community/post/[postId].tsx
 // Single post view — navigated from notification tap
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   View,
   StyleSheet,
   ActivityIndicator,
   Text,
-  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import TopBar from "../../../components/TopBar";
+import { useNavigation } from "@react-navigation/native";
+import { HeaderButton } from "../../../src/components/ui/HeaderButton";
 import FeedPost from "../../../src/features/community/components/FeedPost";
 import CommentSheet from "../../../src/features/community/components/CommentSheet";
 import { communityApi } from "../../../src/features/community/api";
@@ -22,7 +22,15 @@ import { FeedPost as FeedPostType } from "../../../src/types/community";
 export default function SinglePostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const { toggleLike, toggleSave, updateCommentCount } = useCommunityStore();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "Post",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+    });
+  }, [navigation, router]);
   const currentUserId = useUserStore((s) => s.user?.id);
 
   const [post, setPost] = useState<FeedPostType | null>(null);
@@ -47,13 +55,7 @@ export default function SinglePostScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <TopBar
-        routeName="post"
-        title="Post"
-        useSafeArea={false}
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-      />
+    <View style={styles.container}>
 
       {loading ? (
         <View style={styles.center}>
@@ -124,7 +126,7 @@ export default function SinglePostScreen() {
           commentCount={post.comments}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

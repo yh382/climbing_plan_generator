@@ -1,6 +1,7 @@
 // src/components/shared/ExerciseItemCard.tsx
 // ~80px compact card for exercises in Builder + Execution modes
 
+import { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../lib/theme";
@@ -35,6 +36,7 @@ function getImgUrl(media: ExerciseItemData["media"]): string | null {
 
 export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLongPress }: Props) {
   const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
 
   const rawTitle = item.name_override?.[locale] || item.name_override?.en || item.action_id;
   const title = rawTitle;
@@ -78,7 +80,7 @@ export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLon
           <Image source={{ uri: imgUrl }} style={s.img} />
         ) : (
           <View style={s.imgPlaceholder}>
-            <Ionicons name="barbell-outline" size={22} color="#9CA3AF" />
+            <Ionicons name="barbell-outline" size={22} color={colors.textSecondary} />
           </View>
         )}
       </View>
@@ -96,16 +98,16 @@ export function ExerciseItemCard({ item, mode, locale, completed, onPress, onLon
       </View>
 
       {/* Right chevron */}
-      <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </TouchableOpacity>
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FAFAFA",
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -119,14 +121,14 @@ const s = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 12,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.cardDark,
     overflow: "hidden",
   },
   img: { width: "100%", height: "100%" },
   imgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   textWrap: { flex: 1 },
-  title: { fontSize: 15, fontWeight: "700", color: "#111" },
-  titleDone: { color: "#9CA3AF", textDecorationLine: "line-through" },
-  protocol: { fontSize: 13, color: "#6B7280", marginTop: 3 },
+  title: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+  titleDone: { color: colors.textSecondary, textDecorationLine: "line-through" },
+  protocol: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
 });

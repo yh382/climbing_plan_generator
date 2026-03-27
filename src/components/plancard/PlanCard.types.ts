@@ -210,6 +210,17 @@ export type TrainingPlanCardHandlers = {
    */
   onOpenMenu?: (plan: TrainingPlan) => void;
 
+  /**
+   * Native iOS ContextMenu items.
+   * When provided on iOS, renders a native ContextMenu instead of calling onOpenMenu.
+   */
+  contextMenuItems?: Array<{
+    label: string;
+    systemImage: string;
+    role?: "destructive";
+    onPress: () => void;
+  }>;
+
   /** Resume minimized workout */
   onResumeWorkout?: () => void;
 };

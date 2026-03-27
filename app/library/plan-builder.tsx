@@ -11,14 +11,14 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderPillButton } from "../../src/components/ui/HeaderPillButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
-import TopBar from "../../components/TopBar";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { WeekSelector } from "../../src/features/plans/components/WeekSelector";
@@ -357,29 +357,20 @@ export default function PlanBuilderScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <TopBar
-        routeName="plan_builder"
-        title={locale === "zh" ? "自定义计划" : "Custom Plan"}
-        useSafeArea={false}
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-        rightAccessory={
-          <TouchableOpacity
+    <View style={styles.container}>
+      <Stack.Screen options={{
+        title: locale === "zh" ? "自定义计划" : "Custom Plan",
+        headerRight: () => (
+          <HeaderPillButton
+            title={locale === "zh" ? "保存" : "Save"}
             onPress={handleSave}
             disabled={saving}
-            style={styles.saveBtnWrap}
-            activeOpacity={0.7}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.saveBtn}>{locale === "zh" ? "保存" : "Save"}</Text>
-            )}
-          </TouchableOpacity>
-        }
-      />
+            loading={saving}
+          />
+        ),
+      }} />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Plan Meta — collapsible */}
         <View style={styles.metaSection}>
           <TextInput

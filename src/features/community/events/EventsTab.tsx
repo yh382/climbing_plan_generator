@@ -70,7 +70,7 @@ export default function EventsTab({
   if (loading) {
     return (
       <View style={{ paddingVertical: 40, alignItems: "center" }}>
-        <ActivityIndicator size="small" color="#9CA3AF" />
+        <ActivityIndicator size="small" color={colors.textTertiary} />
       </View>
     );
   }

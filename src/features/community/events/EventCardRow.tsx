@@ -39,12 +39,12 @@ export default function EventCardRow({
         </Text>
 
         <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+          <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
           <Text style={styles.metaText}>{formatDateShort(item.start_at)}</Text>
         </View>
 
         <View style={styles.metaRow}>
-          <Ionicons name="business-outline" size={14} color="#9CA3AF" />
+          <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
           <Text style={styles.metaText} numberOfLines={1}>
             {publisherLine}
           </Text>
@@ -71,9 +71,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderColor: colors.cardBorder,
     marginBottom: 12,
   },
 

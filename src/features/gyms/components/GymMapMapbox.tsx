@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, useColorScheme } from "react-native";
 import MapboxGL from "@rnmapbox/maps";
 import type { MapState } from "@rnmapbox/maps";
@@ -29,6 +29,32 @@ export function GymMapMapbox({
 }: GymMapMapboxProps) {
   const scheme = useColorScheme();
 
+  const gymsGeoJSON = useMemo(
+    () => ({
+      type: "FeatureCollection" as const,
+      features: gyms.map((g) => ({
+        type: "Feature" as const,
+        id: g.place_id,
+        properties: { name: g.name, place_id: g.place_id },
+        geometry: {
+          type: "Point" as const,
+          coordinates: [g.location.lng, g.location.lat],
+        },
+      })),
+    }),
+    [gyms],
+  );
+
+  const handlePress = useCallback(
+    (e: { features: GeoJSON.Feature[] }) => {
+      const placeId = e.features?.[0]?.properties?.place_id;
+      if (!placeId) return;
+      const gym = gyms.find((g) => g.place_id === placeId);
+      if (gym) onSelectGym(gym);
+    },
+    [gyms, onSelectGym],
+  );
+
   if (!MAPBOX_TOKEN) {
     return (
       <View style={styles.missingToken}>
@@ -51,31 +77,22 @@ export function GymMapMapbox({
         onMapIdle={onMapIdle}
       >
         <MapboxGL.Camera ref={camRef} pitch={pitch} heading={0} />
-        <MapboxGL.UserLocation visible showsUserHeadingIndicator />
-
-        {gyms.map((g) => (
-          <MapboxGL.PointAnnotation
-            key={g.place_id}
-            id={g.place_id}
-            coordinate={[g.location.lng, g.location.lat]}
-            onSelected={() => onSelectGym(g)}
-          >
-            <View style={styles.pin} />
-          </MapboxGL.PointAnnotation>
-        ))}
+        <MapboxGL.UserLocation animated={false} visible showsUserHeadingIndicator />
 
         <MapboxGL.ShapeSource
-          id="gyms-labels-src"
-          shape={{
-            type: "FeatureCollection",
-            features: gyms.map((g) => ({
-              type: "Feature" as const,
-              id: g.place_id,
-              properties: { name: g.name },
-              geometry: { type: "Point" as const, coordinates: [g.location.lng, g.location.lat] },
-            })),
-          }}
+          id="gyms-src"
+          shape={gymsGeoJSON}
+          onPress={handlePress}
         >
+          <MapboxGL.CircleLayer
+            id="gyms-pins"
+            style={{
+              circleRadius: 7,
+              circleColor: "#306E6F",
+              circleStrokeWidth: 2.5,
+              circleStrokeColor: "#fff",
+            }}
+          />
           <MapboxGL.SymbolLayer
             id="gyms-labels"
             style={{
@@ -97,14 +114,6 @@ export function GymMapMapbox({
 }
 
 const styles = StyleSheet.create({
-  pin: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#306E6F",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
   missingToken: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   missingTokenText: { color: "#ef4444", fontSize: 16, textAlign: "center" },
 });

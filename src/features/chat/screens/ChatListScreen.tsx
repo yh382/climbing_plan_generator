@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,9 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
+import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useChatStore } from "../../../store/useChatStore";
@@ -34,10 +36,28 @@ function relativeTime(iso?: string): string {
 export default function ChatListScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { tr } = useSettings();
   const { conversations, loading, fetchConversations } = useChatStore();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: tr("消息", "Messages"),
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <Host matchContents>
+          <SUIButton
+            systemImage={"chevron.backward" as any}
+            label=""
+            onPress={() => router.back()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ),
+    });
+  }, [navigation, tr, router]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useFocusEffect(
@@ -97,15 +117,7 @@ export default function ChatListScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{tr("消息", "Messages")}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <View style={styles.container}>
       {loading && conversations.length === 0 ? (
         <ActivityIndicator style={{ marginTop: 40 }} />
       ) : (
@@ -113,6 +125,7 @@ export default function ChatListScreen() {
           data={conversations}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -129,22 +142,6 @@ export default function ChatListScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  backBtn: { width: 40, alignItems: "flex-start" },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    fontFamily: theme.fonts.bold,
-    color: colors.textPrimary,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",

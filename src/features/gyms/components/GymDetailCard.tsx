@@ -31,33 +31,16 @@ export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymD
     setNavigating(true);
     try {
       const result = await gymCommunityApi.ensureGym(gym.place_id);
-      Alert.alert(
-        tr('加入岩馆社区', 'Join Gym Community'),
-        tr(`确定加入 ${gym.name} 的社区吗？`, `Join ${gym.name}'s community?`),
-        [
-          { text: tr('取消', 'Cancel'), style: 'cancel' },
-          {
-            text: tr('加入', 'Join'),
-            onPress: async () => {
-              try {
-                await gymCommunityApi.favoriteGym(result.gym_id);
-              } catch {
-                // Already favorited — ignore
-              }
-              router.push({
-                pathname: '/(tabs)/community',
-                params: { tab: 'gyms', gymId: result.gym_id },
-              });
-            },
-          },
-        ]
-      );
+      router.push({
+        pathname: "/gym-community",
+        params: { gymId: result.gym_id, gymName: gym.name },
+      });
     } catch {
       Alert.alert("Error", "Could not load gym page");
     } finally {
       setNavigating(false);
     }
-  }, [gym.place_id, gym.name, tr]);
+  }, [gym.place_id, gym.name]);
 
   const handleNavigate = useCallback(async () => {
     const { lat, lng } = gym.location;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, FlatList, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import FeedPost from "../../src/features/community/components/FeedPost";
 import CommentSheet from "../../src/features/community/components/CommentSheet";
 import { communityApi } from "../../src/features/community/api";
@@ -36,9 +36,7 @@ export default function SavedPosts() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.headerTitle}>Saved</Text>
         <View style={styles.headerBtn} />
       </View>

@@ -1,16 +1,17 @@
 import React from "react";
-import { View, TouchableOpacity, Platform, StyleSheet } from "react-native";
-import Animated, { useAnimatedStyle, interpolate, Extrapolate } from "react-native-reanimated";
-import type { SharedValue } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
-import type { EdgeInsets } from "react-native-safe-area-context";
-import { IconButton } from "./IconButton";
+import { View, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Host, Button, VStack } from "@expo/ui/swift-ui";
+import {
+  buttonStyle,
+  labelStyle,
+  frame,
+  font,
+  glassEffect,
+  clipShape,
+} from "@expo/ui/swift-ui/modifiers";
 
-interface MapHeaderControlsProps {
-  animatedIndex: SharedValue<number>;
-  sheetIndex: number;
-  insets: EdgeInsets;
-  scheme: "light" | "dark" | null | undefined;
+interface MapControlsProps {
   isAtUser: boolean;
   styleId: "outdoors" | "satellite";
   is3D: boolean;
@@ -20,11 +21,35 @@ interface MapHeaderControlsProps {
   onLocate: () => void;
 }
 
-export function MapHeaderControls({
-  animatedIndex,
-  sheetIndex,
-  insets,
-  scheme,
+// Right-side button modifiers
+const BTN = [
+  buttonStyle("plain"),
+  labelStyle("iconOnly"),
+  font({ size: 22, weight: "light" }),
+  frame({ width: 55, height: 55, alignment: "center" }),
+] as const;
+
+// Back button modifiers — single glass circle
+const BACK_BTN = [
+  buttonStyle("plain"),
+  labelStyle("iconOnly"),
+  font({ size: 22, weight: "light" }),
+  frame({ width: 50, height: 50, alignment: "center" }),
+  glassEffect({ glass: { variant: "regular" }, shape: "circle" }),
+  clipShape("circle"),
+] as const;
+
+// VStack modifiers — single glass container wrapping right-side buttons
+const GLASS_GROUP = [
+  glassEffect({
+    glass: { variant: "regular" },
+    shape: "capsule",
+  }),
+  clipShape("capsule"),
+] as const;
+
+/** Floating map controls: back button (left) + vertical controls (right). */
+export function MapControls({
   isAtUser,
   styleId,
   is3D,
@@ -32,83 +57,64 @@ export function MapHeaderControls({
   onToggleStyle,
   onToggle3D,
   onLocate,
-}: MapHeaderControlsProps) {
-  const isDark = scheme === "dark";
-
-  const headerAnimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(animatedIndex.value, [1, 1.7, 2], [1, 1, 0], Extrapolate.CLAMP),
-    transform: [
-      {
-        translateY: interpolate(animatedIndex.value, [1, 2], [0, -40], Extrapolate.CLAMP),
-      },
-    ],
-  }));
+}: MapControlsProps) {
+  const insets = useSafeAreaInsets();
 
   return (
-    <Animated.View
-      style={[styles.headerButtonsWrap, { top: insets.top + 8 }, headerAnimStyle]}
-      pointerEvents={sheetIndex === 2 ? "none" : "auto"}
-    >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={onBack}
-        style={[styles.backButton, isDark && styles.backButtonDark]}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="chevron-back" size={22} color={isDark ? "#E2E8F0" : "#1F2937"} />
-      </TouchableOpacity>
-
-      <View style={{ flex: 1 }} />
-
-      <View style={[styles.controlCard, isDark && styles.controlCardDark]}>
-        <IconButton
-          icon={styleId === "outdoors" ? "layers-outline" : "image-outline"}
-          onPress={onToggleStyle}
-          dark={isDark}
-        />
-        <IconButton icon={is3D ? "cube" : "cube-outline"} active={is3D} onPress={onToggle3D} dark={isDark} />
-        {!isAtUser && <IconButton icon="locate" dark={isDark} onPress={onLocate} />}
+    <View style={[styles.overlay, { top: insets.top + 8 }]} pointerEvents="box-none">
+      {/* Back button — left */}
+      <View style={styles.backWrap}>
+        <Host matchContents>
+          <Button
+            systemImage={"chevron.left" as any}
+            label=""
+            onPress={onBack}
+            modifiers={BACK_BTN as any}
+          />
+        </Host>
       </View>
-    </Animated.View>
+
+      {/* Right-side controls */}
+      <View style={styles.rightWrap}>
+        <Host matchContents>
+          <VStack spacing={0} modifiers={GLASS_GROUP as any}>
+            <Button
+              systemImage={(styleId === "outdoors" ? "square.3.layers.3d.down.left" : "photo") as any}
+              label=""
+              onPress={onToggleStyle}
+              modifiers={BTN as any}
+            />
+            <Button
+              systemImage={(is3D ? "cube.fill" : "cube") as any}
+              label=""
+              onPress={onToggle3D}
+              modifiers={BTN as any}
+            />
+            {!isAtUser && (
+              <Button
+                systemImage={"location" as any}
+                label=""
+                onPress={onLocate}
+                modifiers={BTN as any}
+              />
+            )}
+          </VStack>
+        </Host>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerButtonsWrap: {
+  overlay: {
     position: "absolute",
     left: 12,
     right: 12,
     zIndex: 50,
-    elevation: 50,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.96)",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: Platform.OS === "android" ? 8 : 0,
-  },
-  backButtonDark: { backgroundColor: "rgba(15,23,42,0.92)" },
-  controlCard: {
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: Platform.OS === "android" ? 8 : 0,
-  },
-  controlCardDark: { backgroundColor: "rgba(15,23,42,0.92)" },
+  backWrap: {},
+  rightWrap: {},
 });

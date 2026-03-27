@@ -8,11 +8,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Platform,
   NativeSyntheticEvent,
   TextLayoutEventData,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Host, ContextMenu, Button } from "@expo/ui/swift-ui";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { FeedPost as FeedPostType, PostAttachment } from "../../../types/community";
@@ -54,7 +56,13 @@ interface Props {
   onPress: (userId: string) => void;
   onPressComment: (id: string) => void;
   onSave: (id: string) => void;
+  /** @deprecated Use isOwn + action callbacks instead */
   onThreeDot?: () => void;
+  isOwn?: boolean;
+  onShare?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onReport?: () => void;
 
   // [新增] 简易模式开关：用于在个人主页隐藏头像用户名
   simpleMode?: boolean;
@@ -115,6 +123,11 @@ export default function FeedPost({
   onPressComment,
   onSave,
   onThreeDot,
+  isOwn,
+  onShare,
+  onEdit,
+  onDelete,
+  onReport,
   simpleMode = false, // 默认为 false
 }: Props) {
   const colors = useThemeColors();
@@ -167,9 +180,25 @@ export default function FeedPost({
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={{ padding: 4 }} onPress={onThreeDot}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+          {Platform.OS === "ios" && (onShare || onEdit || onDelete || onReport) ? (
+            <Host matchContents style={{ padding: 4 }}>
+              <ContextMenu>
+                <ContextMenu.Trigger>
+                  <Button systemImage="ellipsis" label="" />
+                </ContextMenu.Trigger>
+                <ContextMenu.Items>
+                  {onShare && <Button systemImage="square.and.arrow.up" onPress={onShare} label="Share" />}
+                  {isOwn && onEdit && <Button systemImage="pencil" onPress={onEdit} label="Edit" />}
+                  {isOwn && onDelete && <Button systemImage="trash" role="destructive" onPress={onDelete} label="Delete" />}
+                  {!isOwn && onReport && <Button systemImage="flag" role="destructive" onPress={onReport} label="Report" />}
+                </ContextMenu.Items>
+              </ContextMenu>
+            </Host>
+          ) : onThreeDot ? (
+            <TouchableOpacity style={{ padding: 4 }} onPress={onThreeDot}>
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
         </TouchableOpacity>
       )}
 

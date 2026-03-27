@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { EventInfoCardModel, EventListItem } from "./data/types";
-import GlassIconButton from "./component/GlassIconButton";
+import { HeaderButton } from "@/components/ui/HeaderButton";
 import EventInfoCardEditor from "./component/EventInfoCardEditor";
 
 function uid(prefix: string) {
@@ -87,7 +87,7 @@ export default function EventEditorScreen() {
     <View style={styles.container}>
       {/* topbar */}
       <View style={[styles.topbar, { paddingTop: insets.top }]}>
-        <GlassIconButton icon="chevron-back" onPress={() => router.back()} />
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.topbarTitle}>Create Event</Text>
         <TouchableOpacity
           activeOpacity={0.85}

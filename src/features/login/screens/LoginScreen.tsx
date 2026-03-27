@@ -13,6 +13,7 @@ import {
   StatusBar,
   ScrollView,
   KeyboardAvoidingView,
+  useColorScheme,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,6 +40,7 @@ const t = (en: string) => en;
 
 export default function LoginScreen() {
   const colors = useThemeColors();
+  const isDark = useColorScheme() === 'dark';
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
@@ -121,7 +123,9 @@ export default function LoginScreen() {
       <ImageBackground source={loginBg} style={{ height: 320, width: '100%' }} resizeMode="cover">
         <StatusBar barStyle="light-content" />
         <LinearGradient
-          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.65)', '#ffffff']}
+          colors={isDark
+            ? ['rgba(0,0,0,0)', 'rgba(0,0,0,0.65)', '#000000']
+            : ['rgba(255,255,255,0)', 'rgba(255,255,255,0.65)', '#ffffff']}
           locations={[0, 0.55, 1]}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 180 }}
         />
@@ -135,7 +139,7 @@ export default function LoginScreen() {
           alignItems: 'center', justifyContent: 'center',
           overflow: 'hidden',
         }}>
-          <Image source={mascotImg} style={{ width: 74, height: 74 }} resizeMode="cover" />
+          <Image source={mascotImg} style={{ width: 80, height: 80 }} resizeMode="cover" />
         </View>
       </View>
 

@@ -77,7 +77,13 @@ export async function apiRepeatLog(token: string, serverId: string) {
 }
 
 export async function apiDeleteLog(token: string, serverId: string) {
-  return authedFetch(`/climb-logs/${serverId}`, token, { method: "DELETE" });
+  try {
+    return await authedFetch(`/climb-logs/${serverId}`, token, { method: "DELETE" });
+  } catch (e: any) {
+    // 404 = already deleted or never existed → goal achieved
+    if (e?.message?.includes("404")) return { ok: true };
+    throw e;
+  }
 }
 
 export async function apiUpdateLog(token: string, serverId: string, patch: any) {

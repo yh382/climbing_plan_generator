@@ -1,11 +1,12 @@
 // src/features/analysis/GradePyramid.tsx
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useMemo, useState, useRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import useLogsStore from "../../store/useLogsStore";
-import SmartBottomSheet from "../community/components/SmartBottomSheet";
 import { buildFixedGradePyramid } from "../../services/stats";
 import { useThemeColors } from "../../lib/useThemeColors";
+import { theme } from "../../lib/theme";
 
 type TabType = "boulder" | "rope";
 
@@ -25,7 +26,7 @@ export default function GradePyramid() {
     return Math.max(...pyramidData.map((d) => d.count));
   }, [pyramidData]);
 
-  const [helpOpen, setHelpOpen] = useState(false);
+  const helpRef = useRef<TrueSheet>(null);
 
   return (
     <View style={styles.chartCard}>
@@ -48,7 +49,7 @@ export default function GradePyramid() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => setHelpOpen(true)} style={styles.helpBtn}>
+          <TouchableOpacity onPress={() => helpRef.current?.present()} style={styles.helpBtn}>
             <Ionicons name="help-circle-outline" size={20} color={colors.chartLabel} />
           </TouchableOpacity>
         </View>
@@ -85,47 +86,52 @@ export default function GradePyramid() {
         </View>
       </View>
 
-      <SmartBottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} mode="list" title="Grade Pyramid">
-        <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 14 }}>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
-            能力金字塔反映了你的攀爬基础结构。
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{
-              width: 20, height: 20, borderRadius: 4,
-              backgroundColor: 'rgba(48,110,111,0.15)',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Ionicons name="checkmark" size={12} color="#306E6F" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>
-                健康结构：正三角形
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
-                底宽顶尖，说明有扎实的中低难度积累来支撑高难度突破。
-              </Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{
-              width: 20, height: 20, borderRadius: 4,
-              backgroundColor: 'rgba(139,111,92,0.15)',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Ionicons name="warning-outline" size={12} color="#8B6F5C" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>
-                不健康结构：倒 T 型或柱状
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
-                基础不稳，强行碰红线更容易导致受伤。建议多积累金字塔中下层路线。
-              </Text>
-            </View>
-          </View>
+      <TrueSheet
+        ref={helpRef}
+        detents={[0.6, 0.9]}
+        cornerRadius={24}
+        backgroundColor={colors.background}
+        grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+        dimmed
+        dimmedDetentIndex={0}
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetHeaderTitle}>Grade Pyramid</Text>
         </View>
-      </SmartBottomSheet>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.sheetBody}>
+            <Text style={styles.sheetBodyText}>
+              能力金字塔反映了你的攀爬基础结构。
+            </Text>
+            <View style={styles.sheetTipRow}>
+              <View style={[styles.sheetTipIcon, { backgroundColor: 'rgba(48,110,111,0.15)' }]}>
+                <Ionicons name="checkmark" size={12} color="#306E6F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTipTitle}>
+                  健康结构：正三角形
+                </Text>
+                <Text style={[styles.sheetBodyText, { marginTop: 4 }]}>
+                  底宽顶尖，说明有扎实的中低难度积累来支撑高难度突破。
+                </Text>
+              </View>
+            </View>
+            <View style={styles.sheetTipRow}>
+              <View style={[styles.sheetTipIcon, { backgroundColor: 'rgba(139,111,92,0.15)' }]}>
+                <Ionicons name="warning-outline" size={12} color="#8B6F5C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTipTitle}>
+                  不健康结构：倒 T 型或柱状
+                </Text>
+                <Text style={[styles.sheetBodyText, { marginTop: 4 }]}>
+                  基础不稳，强行碰红线更容易导致受伤。建议多积累金字塔中下层路线。
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </TrueSheet>
     </View>
   );
 }
@@ -232,5 +238,49 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     width: 4,
     borderRadius: 2,
     backgroundColor: colors.emptyBarColor,
+  },
+  // TrueSheet help styles
+  sheetHeader: {
+    paddingHorizontal: 22,
+    paddingTop: 26,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.cardBorder,
+  },
+  sheetHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+    textAlign: "center" as const,
+  },
+  sheetBody: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  sheetBodyText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  sheetTipRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+  },
+  sheetTipIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  sheetTipTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
 });

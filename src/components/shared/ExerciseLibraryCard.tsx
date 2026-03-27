@@ -113,7 +113,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     width: 88,
     borderRadius: 10,
     overflow: "hidden",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
   },
   cardImg: { width: "100%", height: "100%", resizeMode: "cover" as const },
   cardImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -123,7 +123,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
   cardTitle: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary, flexShrink: 1 },
   cardSubtitle: { marginTop: 3, fontSize: 13, color: colors.textSecondary, fontFamily: theme.fonts.regular, lineHeight: 18 },
-  cardMeta: { marginTop: 3, fontSize: 11.5, color: "#6B7280" },
+  cardMeta: { marginTop: 3, fontSize: 11.5, color: colors.textSecondary },
 
   cardBottomRow: {
     marginTop: "auto",

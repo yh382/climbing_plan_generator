@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { useThemeColors } from "@/lib/useThemeColors";
 import Animated, {
   useAnimatedStyle,
@@ -7,7 +7,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "../../../contexts/SettingsContext";
 import type { CoachMode } from "../types";
 
@@ -34,24 +33,27 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { tr } = useSettings();
-  const insets = useSafeAreaInsets();
 
   const opacity = useSharedValue(visible ? 1 : 0);
   const translateY = useSharedValue(visible ? 0 : 20);
+  const height = useSharedValue(visible ? 44 : 0);
 
   useEffect(() => {
     opacity.value = withTiming(visible ? 1 : 0, { duration: 300 });
     translateY.value = withTiming(visible ? 0 : 20, { duration: 300 });
+    height.value = withTiming(visible ? 44 : 0, { duration: 300 });
   }, [visible]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
+    height: height.value,
+    overflow: "hidden" as const,
   }));
 
   return (
     <Animated.View
-      style={[styles.container, { bottom: insets.bottom + 113 }, animStyle]}
+      style={[styles.container, animStyle]}
       pointerEvents={visible ? "auto" : "none"}
     >
       {TASKS.map((t) => {
@@ -84,13 +86,9 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
-    position: "absolute",
-    left: 0,
-    right: 0,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    height: 44,
     gap: 12,
     paddingHorizontal: 16,
   },

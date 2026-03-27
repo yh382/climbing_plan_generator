@@ -1,17 +1,17 @@
 // src/features/session/components/LogWorkoutSheet.tsx
 
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../../../lib/theme";
+import { useThemeColors } from "../../../lib/useThemeColors";
 
 interface LogWorkoutData {
   completion: number;       // 0.25 | 0.5 | 0.75 | 1
@@ -41,12 +41,21 @@ const INTENSITY_OPTIONS: { value: LogWorkoutData["intensity"]; zhLabel: string; 
 ];
 
 export default function LogWorkoutSheet({ visible, exerciseName, onSave, onClose, isZH }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [completion, setCompletion] = useState(1);
   const [intensity, setIntensity] = useState<LogWorkoutData["intensity"]>("moderate");
   const [notes, setNotes] = useState("");
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<TrueSheet>(null);
 
-  const snapPoints = useMemo(() => ["55%"], []);
+  useEffect(() => {
+    if (visible) {
+      bottomSheetRef.current?.present();
+    } else {
+      bottomSheetRef.current?.dismiss();
+    }
+  }, [visible]);
 
   const handleSave = useCallback(() => {
     onSave({ completion, intensity, notes: notes.trim() });
@@ -56,103 +65,113 @@ export default function LogWorkoutSheet({ visible, exerciseName, onSave, onClose
     setNotes("");
   }, [completion, intensity, notes, onSave]);
 
-  if (!visible) return null;
-
   return (
-    <BottomSheet
+    <TrueSheet
       ref={bottomSheetRef}
-      index={0}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      onClose={onClose}
-      backgroundStyle={styles.sheetBg}
-      handleIndicatorStyle={styles.handle}
+      detents={[0.55]}
+      cornerRadius={24}
+      backgroundColor={colors.background}
+      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+      onDidDismiss={onClose}
     >
-      <BottomSheetView style={styles.content}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{isZH ? "记录训练" : "Log Workout"}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.exerciseName} numberOfLines={1}>{exerciseName}</Text>
-
-          {/* Completion */}
-          <Text style={styles.label}>{isZH ? "完成度" : "Completion"}</Text>
-          <View style={styles.optionRow}>
-            {COMPLETION_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.chip, completion === opt.value && styles.chipActive]}
-                onPress={() => setCompletion(opt.value)}
-              >
-                <Text style={[styles.chipText, completion === opt.value && styles.chipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Intensity */}
-          <Text style={styles.label}>{isZH ? "强度" : "Intensity"}</Text>
-          <View style={styles.optionRow}>
-            {INTENSITY_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.chip, intensity === opt.value && styles.chipActive]}
-                onPress={() => setIntensity(opt.value)}
-              >
-                <Ionicons
-                  name={opt.icon as any}
-                  size={16}
-                  color={intensity === opt.value ? "#FFF" : "#6B7280"}
-                />
-                <Text style={[styles.chipText, intensity === opt.value && styles.chipTextActive]}>
-                  {isZH ? opt.zhLabel : opt.enLabel}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Notes */}
-          <Text style={styles.label}>{isZH ? "备注" : "Notes"}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={isZH ? "补充说明 (可选)" : "Optional notes..."}
-            placeholderTextColor="#9CA3AF"
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            maxLength={200}
-          />
-
-          {/* Save button */}
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-            <Text style={styles.saveBtnText}>{isZH ? "保存" : "Save"}</Text>
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{isZH ? "记录训练" : "Log Workout"}</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </BottomSheetView>
-    </BottomSheet>
+        </View>
+
+        <Text style={styles.exerciseName} numberOfLines={1}>{exerciseName}</Text>
+
+        {/* Completion */}
+        <Text style={styles.label}>{isZH ? "完成度" : "Completion"}</Text>
+        <View style={styles.optionRow}>
+          {COMPLETION_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.chip, completion === opt.value && styles.chipActive]}
+              onPress={() => setCompletion(opt.value)}
+            >
+              <Text style={[styles.chipText, completion === opt.value && styles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Intensity */}
+        <Text style={styles.label}>{isZH ? "强度" : "Intensity"}</Text>
+        <View style={styles.optionRow}>
+          {INTENSITY_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.chip, intensity === opt.value && styles.chipActive]}
+              onPress={() => setIntensity(opt.value)}
+            >
+              <Ionicons
+                name={opt.icon as any}
+                size={16}
+                color={intensity === opt.value ? colors.pillText : colors.textSecondary}
+              />
+              <Text style={[styles.chipText, intensity === opt.value && styles.chipTextActive]}>
+                {isZH ? opt.zhLabel : opt.enLabel}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Notes */}
+        <Text style={styles.label}>{isZH ? "备注" : "Notes"}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={isZH ? "补充说明 (可选)" : "Optional notes..."}
+          placeholderTextColor={colors.textTertiary}
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          maxLength={200}
+        />
+
+        {/* Save button */}
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+          <Ionicons name="checkmark-circle" size={20} color={colors.pillText} />
+          <Text style={styles.saveBtnText}>{isZH ? "保存" : "Save"}</Text>
+        </TouchableOpacity>
+      </View>
+    </TrueSheet>
   );
 }
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#FFF", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  handle: { backgroundColor: "#D1D5DB", width: 36 },
-  content: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
   },
-  title: { fontSize: 18, fontWeight: "700", color: "#111" },
-  exerciseName: { fontSize: 14, color: "#6B7280", marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 8, marginTop: 12 },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+  },
+  exerciseName: {
+    fontSize: 14,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+    marginBottom: 8,
+    marginTop: 12,
+  },
   optionRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   chip: {
     flexDirection: "row",
@@ -161,21 +180,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.cardBorder,
   },
-  chipActive: { backgroundColor: "#111827", borderColor: "#111827" },
-  chipText: { fontSize: 14, fontWeight: "600", color: "#374151" },
-  chipTextActive: { color: "#FFF" },
+  chipActive: {
+    backgroundColor: colors.cardDark,
+    borderColor: colors.cardDark,
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+  },
+  chipTextActive: { color: colors.pillText },
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.inputBackground,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.cardBorder,
     padding: 12,
     fontSize: 14,
-    color: "#111",
+    fontFamily: theme.fonts.regular,
+    color: colors.textPrimary,
     minHeight: 60,
     textAlignVertical: "top",
   },
@@ -184,10 +212,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#111827",
+    backgroundColor: colors.cardDark,
     borderRadius: 28,
     paddingVertical: 16,
     marginTop: 20,
   },
-  saveBtnText: { fontSize: 16, fontWeight: "700", color: "#FFF" },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.pillText,
+  },
 });

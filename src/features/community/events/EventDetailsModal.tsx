@@ -1,7 +1,8 @@
 // src/features/community/events/EventDetailsModal.tsx
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { Modal, View, Text, StyleSheet, Pressable, ScrollView, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 const DURATION = 280;
 
@@ -16,6 +17,8 @@ export default function EventDetailsModal({
   title: string;
   text: string;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [modalVisible, setModalVisible] = useState(false);
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim = useRef(new Animated.Value(500)).current;
@@ -46,7 +49,7 @@ export default function EventDetailsModal({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{title}</Text>
             <Pressable onPress={onClose} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-              <Ionicons name="close" size={20} color="#111" />
+              <Ionicons name="close" size={20} color={colors.textPrimary} />
             </Pressable>
           </View>
 
@@ -59,10 +62,10 @@ export default function EventDetailsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.background,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     overflow: "hidden",
@@ -72,11 +75,11 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.cardBorder,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sheetTitle: { fontSize: 16, fontWeight: "900", color: "#111" },
-  body: { color: "#111827", fontSize: 14, fontWeight: "700", lineHeight: 20 },
+  sheetTitle: { fontSize: 16, fontWeight: "900", color: colors.textPrimary },
+  body: { color: colors.textPrimary, fontSize: 14, fontWeight: "700", lineHeight: 20 },
 });

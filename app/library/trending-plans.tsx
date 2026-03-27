@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { TRAINING_INTENTS, TrainingIntent } from "../../src/components/plancard";
 
 import { TrainingPlanCard } from "../../src/components/plancard";
@@ -25,9 +26,7 @@ export default function TrendingPlansScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Top bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
 
         <Text style={styles.topTitle}>Trending Plans</Text>
 

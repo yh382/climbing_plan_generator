@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { HeaderButton } from '@/components/ui/HeaderButton';
 
 import CollapsibleLargeHeaderFlatList from '../../components/CollapsibleLargeHeaderFlatList';
 import { useGymsStore } from '../../store/useGymsStore';
@@ -97,9 +98,7 @@ export default function GymDetailScreen({ gymId }: Props) {
         }
         smallTitle={gymName}
         leftActions={
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={25} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         }
         rightActions={
           <TouchableOpacity

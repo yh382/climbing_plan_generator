@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { Icon, Label, VectorIcon } from "expo-router/unstable-native-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useUserStore } from "../../src/store/useUserStore";
@@ -39,59 +38,59 @@ export default function TabsLayout() {
       {/* 1. Home */}
       <NativeTabs.Trigger name="index">
         {isIOS ? (
-          <Icon sf={{ default: "house", selected: "house.fill" } as any} />
+          <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
         ) : (
-          <Icon src={{
-            default: <VectorIcon family={Ionicons} name="home-outline" />,
-            selected: <VectorIcon family={Ionicons} name="home" />,
+          <NativeTabs.Trigger.Icon src={{
+            default: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="home-outline" />,
+            selected: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="home" />,
           }} />
         )}
-        <Label>Home</Label>
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       {/* 2. Calendar */}
       <NativeTabs.Trigger name="calendar">
         {isIOS ? (
-          <Icon sf={"calendar" as any} />
+          <NativeTabs.Trigger.Icon sf="calendar" />
         ) : (
-          <Icon src={{
-            default: <VectorIcon family={MaterialCommunityIcons} name="calendar-outline" />,
-            selected: <VectorIcon family={MaterialCommunityIcons} name="calendar" />,
+          <NativeTabs.Trigger.Icon src={{
+            default: <NativeTabs.Trigger.VectorIcon family={MaterialCommunityIcons} name="calendar-outline" />,
+            selected: <NativeTabs.Trigger.VectorIcon family={MaterialCommunityIcons} name="calendar" />,
           }} />
         )}
-        <Label>Calendar</Label>
+        <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       {/* 3. Community */}
       <NativeTabs.Trigger name="community">
         {isIOS ? (
-          <Icon sf={{ default: "person.2", selected: "person.2.fill" } as any} />
+          <NativeTabs.Trigger.Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
         ) : (
-          <Icon src={{
-            default: <VectorIcon family={Ionicons} name="people-outline" />,
-            selected: <VectorIcon family={Ionicons} name="people" />,
+          <NativeTabs.Trigger.Icon src={{
+            default: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="people-outline" />,
+            selected: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="people" />,
           }} />
         )}
-        <Label>Community</Label>
+        <NativeTabs.Trigger.Label>Community</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       {/* 4. Profile */}
       <NativeTabs.Trigger name="profile">
         {isIOS ? (
-          <Icon sf={{ default: "person", selected: "person.fill" } as any} />
+          <NativeTabs.Trigger.Icon sf={{ default: "person", selected: "person.fill" }} />
         ) : (
-          <Icon src={{
-            default: <VectorIcon family={Ionicons} name="person-outline" />,
-            selected: <VectorIcon family={Ionicons} name="person" />,
+          <NativeTabs.Trigger.Icon src={{
+            default: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="person-outline" />,
+            selected: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="person" />,
           }} />
         )}
-        <Label>Profile</Label>
+        <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       {/* 5. Climmate — separated (role="search" triggers iOS 26 floating pill) */}
       <NativeTabs.Trigger name="climmate" role="search">
-        <Icon src={require("../../assets/images/tab_climmate.png")} />
-        <Label>Climmate</Label>
+        <NativeTabs.Trigger.Icon src={require("../../assets/images/tab_climmate.png")} renderingMode="template" />
+        <NativeTabs.Trigger.Label>Climmate</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

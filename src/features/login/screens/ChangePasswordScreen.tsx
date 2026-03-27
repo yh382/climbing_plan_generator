@@ -9,8 +9,8 @@ import {
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HeaderButton } from "../../../components/ui/HeaderButton";
 import { authApi } from "../api";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -75,9 +75,7 @@ export default function ChangePasswordScreen() {
     <View style={styles.page}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Pressable style={styles.headerBack} onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </Pressable>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <Text style={styles.headerTitle}>{tr("修改密码", "Change Password")}</Text>
         <View style={{ width: 40 }} />
       </View>

@@ -8,8 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
-import { useRecentGym, useFavoriteGyms } from '../../gyms/hooks';
-import { GymSummary } from '../../gyms/api';
+import { useFavoriteGyms } from '../../gyms/hooks';
 import GymCommunityTabs from './GymCommunityTabs';
 
 interface Props {
@@ -20,39 +19,16 @@ export default function GymsTab({ initialGymId }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const { recentGym, loading: recentLoading, refresh: refreshRecent } = useRecentGym();
   const { favorites, loading: favLoading, refresh: refreshFav } = useFavoriteGyms();
 
   useFocusEffect(
     useCallback(() => {
-      refreshRecent();
       refreshFav();
-    }, [refreshRecent, refreshFav]),
+    }, [refreshFav]),
   );
 
-  // Merge recent gym + favorites, de-dup
-  const myGyms = useMemo(() => {
-    const result: GymSummary[] = [];
-    const seen = new Set<string>();
-    if (recentGym) {
-      result.push({
-        gym_id: recentGym.gym_id,
-        name: recentGym.name,
-        place_id: recentGym.place_id,
-        is_favorited: recentGym.is_favorited,
-        weekly_active: 0,
-        total_sends: 0,
-      });
-      seen.add(recentGym.gym_id);
-    }
-    for (const fav of favorites) {
-      if (!seen.has(fav.gym_id)) {
-        result.push(fav);
-        seen.add(fav.gym_id);
-      }
-    }
-    return result;
-  }, [recentGym, favorites]);
+  // Only show favorited gyms in community tab
+  const myGyms = useMemo(() => favorites, [favorites]);
 
   const [selectedGymId, setSelectedGymId] = useState<string | null>(null);
 
@@ -75,7 +51,7 @@ export default function GymsTab({ initialGymId }: Props) {
     [myGyms, selectedGymId],
   );
 
-  const loading = recentLoading || favLoading;
+  const loading = favLoading;
 
   if (loading) {
     return (
@@ -92,7 +68,7 @@ export default function GymsTab({ initialGymId }: Props) {
         <Ionicons name="business-outline" size={48} color="#D1D5DB" />
         <Text style={styles.emptyTitle}>No gyms yet</Text>
         <Text style={styles.emptySub}>
-          Log a session at a gym or explore the map to find gyms nearby.
+          Favorite a gym from the map to see its community here.
         </Text>
         <TouchableOpacity
           style={styles.findBtn}

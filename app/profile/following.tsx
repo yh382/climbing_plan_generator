@@ -10,11 +10,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import TopBar from "../../components/TopBar";
 import { communityApi } from "../../src/features/community/api";
 import { api } from "../../src/lib/apiClient";
 
@@ -28,7 +26,6 @@ interface FollowUser {
 
 export default function FollowingScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const [users, setUsers] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,13 +97,8 @@ export default function FollowingScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top }}>
-      <TopBar
-        routeName="following"
-        title="Following"
-        useSafeArea={false}
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-      />
+    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
+      <Stack.Screen options={{ title: "Following" }} />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#111" />
@@ -122,6 +114,7 @@ export default function FollowingScreen() {
           keyExtractor={(item) => item.user_id}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 40 }}
+          contentInsetAdjustmentBehavior="automatic"
         />
       )}
     </View>

@@ -72,6 +72,8 @@ type LogsState = {
   deleteSession: (sessionKey: string) => Promise<string[]>;
   toggleSessionPublic: (sessionKey: string) => Promise<void>;
 
+  awaitSessionServerId: () => Promise<string | null>;
+
   syncFromBackend: () => Promise<void>;
   isSyncing: boolean;
   hasSyncedOnce: boolean;
@@ -199,14 +201,34 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       isSyncing: false,
       hasSyncedOnce: false,
 
+      awaitSessionServerId: async () => {
+        const current = get().activeSession?.serverId;
+        if (current) return current;
+        if (_sessionCreatePromise) {
+          return await _sessionCreatePromise;
+        }
+        return null;
+      },
+
       syncFromBackend: async () => {
         if (get().isSyncing) return;
         set({ isSyncing: true });
         try {
+          // Fix orphan logs on first sync (associates NULL session_id logs with sessions)
+          if (!get().hasSyncedOnce) {
+            await api.post("/climb-logs/fix-orphans", {}).catch(() => {});
+          }
+
           const [sessionsData, logsData] = await Promise.all([
             api.get<any[]>("/sessions/me"),
             api.get<any[]>("/climb-logs/me"),
           ]);
+
+          if (__DEV__) {
+            console.log("[syncFromBackend] sessions:", sessionsData?.length ?? 0,
+              "| completed:", sessionsData?.filter((s: any) => s.status === "completed").length ?? 0,
+              "| logs:", logsData?.length ?? 0);
+          }
 
           // Group logs by session_id
           const logsBySession = new Map<string, any[]>();
@@ -249,6 +271,17 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             const discipline = (Object.entries(typeCounts)
               .sort((a, b) => b[1] - a[1])[0]?.[0] || "boulder") as LogType;
 
+            // Compute metrics from logs when available, fallback to summary
+            const sends = sessionLogs.length > 0
+              ? sessionLogs.filter((l: any) => ["send", "flash", "onsight"].includes(l.result)).length
+              : (s.summary?.total_sends || 0);
+            const bestLog = sessionLogs.reduce(
+              (best: any, l: any) => (l.grade_score > (best?.grade_score || 0) ? l : best),
+              null as any,
+            );
+            const best = bestLog?.grade_text || (s.summary?.best_grade || "—");
+            const climbs = sessionLogs.length || (s.summary?.log_count || 0);
+
             newSessions.push({
               id: String(s.id),
               date: s.date,
@@ -258,9 +291,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               gymName: s.gym_name || "",
               discipline,
               sessionKey,
-              sends: s.summary?.total_sends || 0,
-              best: s.summary?.best_grade || "V?",
-              climbs: s.summary?.log_count || sessionLogs.length,
+              sends,
+              best,
+              climbs,
               serverId: String(s.id),
               isPublic: false,
               synced: true,
@@ -301,7 +334,8 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             hasSyncedOnce: true,
           });
         } catch (e) {
-          console.warn("[syncFromBackend]", e);
+          console.error("[syncFromBackend] FAILED:", e instanceof Error ? e.message : e,
+            (e as any)?.response?.status ? `| status: ${(e as any).response.status}` : "");
           set({ isSyncing: false });
         }
       },
@@ -309,6 +343,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       startSession: (gymName, discipline) => {
         const startTime = Date.now();
         const sessionKey = String(startTime);
+        const localDate = keyOf(new Date(startTime)); // YYYY-MM-DD in user's local timezone
         set({
           activeSession: { startTime, gymName, discipline, serverId: null },
         });
@@ -319,6 +354,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             const res = await api.post<{ id: string }>("/sessions", {
               gym_name: gymName,
               location_type: "gym",
+              date: localDate,
             });
             if (res?.id) {
               const sid = String(res.id);
@@ -335,7 +371,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             await enqueueSessionEvent({
               type: "create",
               localKey: sessionKey,
-              payload: { gym_name: gymName, location_type: "gym" },
+              payload: { gym_name: gymName, location_type: "gym", date: localDate },
             });
             return null;
           }

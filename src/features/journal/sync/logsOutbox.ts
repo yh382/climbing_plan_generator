@@ -1,6 +1,7 @@
 // src/features/journal/sync/logsOutbox.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiCreateLog, apiRepeatLog, apiDeleteLog } from "../../../../src/lib/logsApi";
+import { getSessionServerId } from "./sessionServerIdMap";
 
 export type LocalLogId = string;
 
@@ -60,6 +61,13 @@ export async function flushLogsOutbox(opts: {
       if (ev.type === "create") {
         const existing = resolveServerId(ev.localId);
         if (existing) continue;
+
+        // Resolve session_id from _sessionKey if still null (offline fallback)
+        if (!ev.payload.session_id && ev.payload._sessionKey) {
+          const sid = await getSessionServerId(ev.payload._sessionKey);
+          if (sid) ev.payload.session_id = sid;
+        }
+        delete ev.payload._sessionKey; // strip before sending
 
         const created = await apiCreateLog(token, ev.payload);
         if (created?.id) {

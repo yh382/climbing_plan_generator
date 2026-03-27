@@ -54,19 +54,13 @@ function PulsingDot({ delay }: { delay: number }) {
 }
 
 export default function ThinkingBubble() {
-  const colors = useThemeColors();
   return (
-    <View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: "flex-start" }}>
+    <View style={{ width: "100%", paddingHorizontal: 16, paddingVertical: 8, alignItems: "flex-start" }}>
       <View
         style={{
-          borderRadius: 18,
-          paddingHorizontal: 18,
-          paddingVertical: 14,
-          backgroundColor: colors.bubbleAI,
-          borderWidth: 0.8,
-          borderColor: colors.bubbleAIBorder,
           flexDirection: "row",
           gap: 6,
+          paddingVertical: 4,
         }}
       >
         <PulsingDot delay={0} />

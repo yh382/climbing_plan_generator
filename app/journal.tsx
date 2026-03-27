@@ -25,7 +25,6 @@ import CollapsibleLargeHeader from "../src/components/CollapsibleLargeHeader";
 import LogSendModal, { LogSendDraft } from "../src/features/journal/LogSendModal";
 import QuickLogCard from "../src/features/journal/QuickLogCard";
 import { TodayDetailsList } from "../src/features/journal/loglist";
-import { invalidateRecentClimbsCache } from "../src/features/profile/components/RecentClimbsList";
 import type { LocalDayLogItem } from "../src/features/journal/loglist/types";
 import { enqueueLogEvent } from "../src/features/journal/sync/logsOutbox";
 import FirstLogTooltip from "../src/features/home/components/FirstLogTooltip";
@@ -159,29 +158,22 @@ export default function Journal() {
       // 每次回到 Journal（从 detail back）都触发一次
       setRefreshNonce((n) => n + 1);
 
-      // Retry any pending outbox events on focus
+      // Retry any pending outbox events on focus: sessions FIRST, then logs
       const token = useAuthStore.getState().accessToken;
       if (token) {
-        readAllServerIds().then((idMap) => {
-          flushLogsOutbox({
-            token,
-            resolveServerId: (localId) => idMap[localId] ?? null,
-            saveServerId: async (localId, serverId) => {
-              await setServerId(localId, serverId);
-            },
-          }).catch(() => {});
-        });
+        (async () => {
+          try {
+            // 1. Flush sessions first (so logs can resolve session_id)
+            const sMap = await readAllSessionServerIds();
+            await flushSessionsOutbox({
+              resolveServerId: (k) => sMap[k] ?? null,
+              saveServerId: async (k, id) => {
+                await setSessionSId(k, id);
+                sMap[k] = id;
+              },
+            });
 
-        // Flush sessions outbox on focus too
-        readAllSessionServerIds().then((sMap) => {
-          flushSessionsOutbox({
-            resolveServerId: (k) => sMap[k] ?? null,
-            saveServerId: async (k, id) => {
-              await setSessionSId(k, id);
-              sMap[k] = id;
-            },
-          }).then(() => {
-            // After outbox flush, sync any remaining unsynced local sessions
+            // 2. Sync any remaining unsynced local sessions
             syncAllLocalSessions({
               getSessions: () => useLogsStore.getState().sessions,
               updateSession: (sessionKey, patch) => {
@@ -193,8 +185,20 @@ export default function Journal() {
                 });
               },
             });
-          }).catch(() => {});
-        });
+          } catch {}
+
+          try {
+            // 3. Flush logs after sessions are resolved
+            const idMap = await readAllServerIds();
+            await flushLogsOutbox({
+              token,
+              resolveServerId: (localId) => idMap[localId] ?? null,
+              saveServerId: async (localId, serverId) => {
+                await setServerId(localId, serverId);
+              },
+            });
+          } catch {}
+        })();
       }
     }, [])
   );
@@ -329,7 +333,7 @@ export default function Journal() {
 
             // 3) 再真正结束 session（写入 storage / 后端）
             const newSession = await endSession();
-            invalidateRecentClimbsCache();
+
 
             // 4) Compute & save intensity for today (fire-and-forget)
             const intensityDate = todayKey;
@@ -341,29 +345,32 @@ export default function Journal() {
               })
             ).catch(() => {});
 
-            // 5) Flush outbox → backend (fire-and-forget, errors silently retry next time)
+            // 5) Flush outbox → backend: sessions FIRST (so logs can resolve session_id)
             const token = useAuthStore.getState().accessToken;
             if (token) {
-              const idMap = await readAllServerIds();
-              flushLogsOutbox({
-                token,
-                resolveServerId: (localId) => idMap[localId] ?? null,
-                saveServerId: async (localId, serverId) => {
-                  await setServerId(localId, serverId);
-                  idMap[localId] = serverId; // keep in-memory map current
-                },
-              }).catch(() => {}); // best-effort; retries on next flush
-            }
+              try {
+                const sMap = await readAllSessionServerIds();
+                await flushSessionsOutbox({
+                  resolveServerId: (k) => sMap[k] ?? null,
+                  saveServerId: async (k, id) => {
+                    await setSessionSId(k, id);
+                    sMap[k] = id;
+                  },
+                });
+              } catch {}
 
-            // Flush sessions outbox (fire-and-forget)
-            const sMap = await readAllSessionServerIds();
-            flushSessionsOutbox({
-              resolveServerId: (k) => sMap[k] ?? null,
-              saveServerId: async (k, id) => {
-                await setSessionSId(k, id);
-                sMap[k] = id;
-              },
-            }).catch(() => {});
+              try {
+                const idMap = await readAllServerIds();
+                await flushLogsOutbox({
+                  token,
+                  resolveServerId: (localId) => idMap[localId] ?? null,
+                  saveServerId: async (localId, serverId) => {
+                    await setServerId(localId, serverId);
+                    idMap[localId] = serverId;
+                  },
+                });
+              } catch {}
+            }
 
             if (newSession) {
               router.replace({

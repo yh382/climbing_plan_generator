@@ -149,5 +149,5 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   handleBarContainer: { alignItems: 'center', paddingTop: 12, paddingBottom: 8, width: '100%', backgroundColor: colors.background },
   handleBar: { width: 40, height: 5, backgroundColor: colors.cardBorder, borderRadius: 2.5 },
   modalHeader: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.cardBorder, backgroundColor: colors.background },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  modalTitle: { fontSize: 17, fontWeight: '800', fontFamily: 'DMSans_900Black', letterSpacing: -0.5, color: colors.textPrimary, textAlign: 'center' },
 });

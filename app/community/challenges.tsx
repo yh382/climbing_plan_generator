@@ -1,18 +1,19 @@
 // app/community/challenges.tsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NATIVE_HEADER_LARGE } from "../../src/lib/nativeHeaderOptions";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 
-import CollapsibleLargeHeader from "../../src/components/CollapsibleLargeHeader";
 import { challengeApi } from "../../src/features/community/challenges/api";
 import { getChallengeStatus } from "../../src/features/community/challenges/types";
 import type { ChallengeOut } from "../../src/features/community/challenges/types";
@@ -31,12 +32,23 @@ type FilterIndex = 0 | 1 | 2 | 3 | 4;
 
 export default function ChallengesScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [allChallenges, setAllChallenges] = useState<ChallengeOut[]>([]);
   const [myChallenges, setMyChallenges] = useState<ChallengeOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterIndex>(0);
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      ...NATIVE_HEADER_LARGE,
+      title: "Challenges",
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
 
   const fetchChallenges = useCallback(() => {
     setLoading(true);
@@ -82,24 +94,10 @@ export default function ChallengesScreen() {
     });
   };
 
-  const LeftActions = (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
-      <Ionicons name="arrow-back" size={24} color="#111" />
-    </TouchableOpacity>
-  );
-
-  const LargeTitle = <Text style={styles.largeTitle}>Challenges</Text>;
-  const Subtitle = <Text style={styles.largeSubtitle}>Discover & Join</Text>;
-
   return (
-    <CollapsibleLargeHeader
-      backgroundColor="#FFF"
-      smallTitle="Challenges"
-      largeTitle={LargeTitle}
-      subtitle={Subtitle}
-      leftActions={LeftActions}
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ paddingBottom: 40 }}
-      bottomInsetExtra={28}
     >
       {/* Joined challenges horizontal scroll (N3d: only active, non-lifetime/skill) */}
       {activeJoinedChallenges.length > 0 && (
@@ -118,7 +116,7 @@ export default function ChallengesScreen() {
         </ScrollView>
       )}
 
-      {/* Filter chips: single row (All / Boulder / Rope / Lead / Milestone) */}
+      {/* Filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -131,6 +129,7 @@ export default function ChallengesScreen() {
               key={f.label}
               style={[styles.filterChip, active && styles.filterChipActive]}
               onPress={() => setActiveFilter(idx as FilterIndex)}
+              activeOpacity={0.8}
             >
               <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
                 {f.label}
@@ -144,11 +143,11 @@ export default function ChallengesScreen() {
       <View style={styles.gridContainer}>
         {loading ? (
           <View style={{ padding: 40, alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#9CA3AF" />
+            <ActivityIndicator size="large" color={colors.textTertiary} />
           </View>
         ) : filtered.length === 0 ? (
           <View style={{ padding: 40, alignItems: "center" }}>
-            <Text style={{ color: "#9CA3AF" }}>No challenges found.</Text>
+            <Text style={{ color: colors.textSecondary }}>No challenges found.</Text>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -162,16 +161,11 @@ export default function ChallengesScreen() {
           </View>
         )}
       </View>
-    </CollapsibleLargeHeader>
+    </ScrollView>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-
   joinedRow: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, gap: 10 },
 
   filterRow: {
@@ -188,9 +182,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderWidth: 0.5,
     borderColor: colors.border,
   },
-  filterChipActive: { backgroundColor: "#1C1C1E", borderColor: "#1C1C1E" },
+  filterChipActive: { backgroundColor: colors.pillBackground, borderColor: colors.pillBackground },
   filterChipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
-  filterChipTextActive: { color: "#FFF" },
+  filterChipTextActive: { color: colors.pillText },
 
   gridContainer: { paddingHorizontal: 22, paddingTop: 12 },
   grid: {

@@ -1,7 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
-import { BottomSheetFlatList } from "@gorhom/bottom-sheet";
-import type { BottomSheetFlatListMethods } from "@gorhom/bottom-sheet";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { View, Text, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import type { EdgeInsets } from "react-native-safe-area-context";
 import type { GymPlace } from "../../../../lib/poi/types";
 import { PAGE_SIZE } from "../constants";
@@ -42,7 +40,7 @@ export function GymList({
   emptyText,
 }: GymListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const listRef = useRef<BottomSheetFlatListMethods>(null);
+  const listRef = useRef<FlatList<GymPlace>>(null);
 
   // Reset pagination when gyms change (new search/fetch)
   useEffect(() => {
@@ -67,15 +65,14 @@ export function GymList({
     [displayedGyms],
   );
 
-  return (
-    <View style={styles.listContainer}>
+  const listHeader = useMemo(() => (
+    <>
       {loading && (
         <View style={styles.loadingRow}>
           <ActivityIndicator />
         </View>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}
-
       {selectedGym && (
         <GymDetailCard
           gym={selectedGym}
@@ -85,50 +82,51 @@ export function GymList({
           primaryBg={primaryBg}
         />
       )}
+    </>
+  ), [loading, error, selectedGym, onCloseDetail, colors, primary, primaryBg]);
 
-      <View style={styles.listCard}>
-        <BottomSheetFlatList<GymPlace>
-          ref={listRef}
-          data={displayedGyms}
-          keyExtractor={(it: GymPlace) => it.place_id}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }: { item: GymPlace }) => (
-            <GymListItem
-              gym={item}
-              onPress={() => onSelectGym(item)}
-              colors={colors}
-            />
-          )}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.rowDivider, { backgroundColor: colors.shellBorder }]} />
-          )}
-          ListEmptyComponent={
-            !loading && !error ? (
-              <Text style={[styles.emptyLabel, { color: colors.iconInactive }]}>
-                {emptyText}
-              </Text>
-            ) : null
-          }
-          onEndReached={onEndReached}
-          onEndReachedThreshold={0.5}
-          bounces={false}
-          overScrollMode="never"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.listCardContent, { paddingBottom: insets.bottom + 12 }]}
-        />
-      </View>
+  return (
+    <View style={styles.listContainer}>
+      <FlatList<GymPlace>
+        ref={listRef}
+        data={displayedGyms}
+        keyExtractor={(it: GymPlace) => it.place_id}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }: { item: GymPlace }) => (
+          <GymListItem
+            gym={item}
+            onPress={() => onSelectGym(item)}
+            colors={colors}
+          />
+        )}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.rowDivider, { backgroundColor: colors.shellBorder }]} />
+        )}
+        ListEmptyComponent={
+          !loading && !error ? (
+            <Text style={[styles.emptyLabel, { color: colors.iconInactive }]}>
+              {emptyText}
+            </Text>
+          ) : null
+        }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.5}
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.listCardContent, { paddingBottom: insets.bottom + 12 }]}
+      />
     </View>
   );
 }
 
-export type { BottomSheetFlatListMethods as GymListRef };
 
 const styles = StyleSheet.create({
   listContainer: { flex: 1, paddingTop: 8 },
   loadingRow: { paddingVertical: 6 },
   errorText: { color: "#ef4444", marginBottom: 6, textAlign: "center" },
   emptyLabel: { paddingVertical: 12, textAlign: "center", fontSize: 13, color: "#64748b" },
-  listCard: { flex: 1, marginTop: 12 },
   listCardContent: { paddingHorizontal: 16, paddingVertical: 4 },
   rowDivider: { height: 1, width: "100%", alignSelf: "center", opacity: 1 },
 });

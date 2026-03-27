@@ -1,6 +1,9 @@
 // src/components/shared/ClimbItemCard.tsx
+import { useMemo } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { theme } from "@/lib/theme";
 import { getColorForGrade } from "../../../lib/gradeColors";
 import type { LocalDayLogItem } from "../../features/journal/loglist/types";
 
@@ -23,6 +26,9 @@ function styleLabel(style?: string): string {
 }
 
 export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const routeName = (item.name || "").trim();
   const gc = getColorForGrade(item.grade);
   const style = styleLabel(item.style);
@@ -49,7 +55,7 @@ export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
           />
         ) : (
           <View style={styles.thumbPlaceholder}>
-            <Ionicons name="camera-outline" size={20} color="#D1D5DB" />
+            <Ionicons name="camera-outline" size={20} color={colors.textTertiary} />
           </View>
         )}
       </View>
@@ -84,15 +90,15 @@ export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
 
       {/* Chevron */}
       <View style={styles.chevron}>
-        <Text style={{ color: "#D1D5DB", fontSize: 14 }}>›</Text>
+        <Text style={{ color: colors.textTertiary, fontSize: 14 }}>›</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBackground,
     marginHorizontal: 16,
     marginBottom: 8,
     borderRadius: 12,
@@ -100,7 +106,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
     borderWidth: 0.6,
-    borderColor: "#E5E7EB",
+    borderColor: colors.cardBorder,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -117,7 +123,7 @@ const styles = StyleSheet.create({
   thumbPlaceholder: {
     width: 64,
     height: 64,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -130,7 +136,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111",
+    color: colors.textPrimary,
   },
   subtitleRow: {
     flexDirection: "row",
@@ -145,21 +151,21 @@ const styles = StyleSheet.create({
   gradeText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#374151",
+    color: colors.textPrimary,
   },
   separator: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: colors.textTertiary,
     marginHorizontal: 4,
   },
   metaText: {
     fontSize: 12,
-    color: "#6B7280",
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   noteText: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: colors.textTertiary,
     fontWeight: "500",
   },
   chevron: {

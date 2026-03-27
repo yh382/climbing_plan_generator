@@ -65,21 +65,33 @@ export default function MessageBubble({ msg }: { msg: ChatMessage }) {
   const displayText = isStreaming ? msg.text.slice(0, displayLen) : msg.text;
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: isUser ? "flex-end" : "flex-start" }}>
+    <View style={{
+      width: "100%",
+      paddingHorizontal: 16,
+      paddingVertical: isUser ? 6 : 8,
+      alignItems: isUser ? "flex-end" : "flex-start",
+    }}>
       <Pressable
         onPress={handleTap}
         disabled={!isStreaming}
-        style={{
+        style={isUser ? {
           maxWidth: "86%",
           borderRadius: 18,
           paddingHorizontal: 14,
           paddingVertical: 12,
-          backgroundColor: isUser ? colors.accent : colors.bubbleAI,
-          borderWidth: isUser ? 0 : 0.8,
-          borderColor: isUser ? "transparent" : colors.bubbleAIBorder,
+          backgroundColor: colors.accent,
+        } : {
+          maxWidth: "92%",
+          paddingHorizontal: 0,
+          paddingVertical: 0,
         }}
       >
-        <Text style={{ color: isUser ? "#FFF" : colors.bubbleAIText, lineHeight: 18, fontFamily: theme.fonts.regular }}>
+        <Text style={{
+          color: isUser ? "#FFF" : colors.textPrimary,
+          lineHeight: isUser ? 18 : 22,
+          fontSize: 15,
+          fontFamily: theme.fonts.regular,
+        }}>
           {displayText}
           {isStreaming && displayLen < msg.text.length ? "\u258C" : ""}
         </Text>

@@ -14,6 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { useSearchUsers, PublicProfile } from "../../src/features/community/hooks";
 
 export default function SearchScreen() {
@@ -72,9 +73,7 @@ export default function SearchScreen() {
     <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top }}>
       {/* Search Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={26} color="#111" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput

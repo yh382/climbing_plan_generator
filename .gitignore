@@ -39,6 +39,6 @@ yarn-error.*
 
 app-example
 
-# Ignore native build directories
-ios/
-android/
+# Ignore native build directories (root only, not modules/)
+/ios/
+/android/

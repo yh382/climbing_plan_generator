@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../../components/ui/HeaderButton";
 import { authApi } from "../api";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -74,12 +75,9 @@ export default function ForgotPasswordScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* 返回按钮 */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ position: 'absolute', top: 60, left: 22, zIndex: 10 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ position: 'absolute', top: 52, left: 12, zIndex: 10 }}>
+          <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+        </View>
 
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingBottom: 80 }}>
           <View style={styles.checkCircle}>
@@ -124,12 +122,9 @@ export default function ForgotPasswordScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* 返回按钮 (绝对定位) */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{ position: 'absolute', top: 60, left: 22, zIndex: 10 }}
-      >
-        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <View style={{ position: 'absolute', top: 52, left: 12, zIndex: 10 }}>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      </View>
 
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
         {/* 锁图标圆圈 */}

@@ -11,12 +11,11 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import TopBar from "../../components/TopBar";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { exercisesApi } from "../../src/features/exercises/api";
@@ -248,13 +247,8 @@ export default function ExerciseDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[s.container, { paddingTop: insets.top }]}>
-        <TopBar
-          routeName="exercise_detail"
-          title=""
-          useSafeArea={false}
-          leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
+      <View style={s.container}>
+        <Stack.Screen options={{ title: "" }} />
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.cardDark} />
         </View>
@@ -264,13 +258,8 @@ export default function ExerciseDetailScreen() {
 
   if (error || !exercise) {
     return (
-      <View style={[s.container, { paddingTop: insets.top }]}>
-        <TopBar
-          routeName="exercise_detail"
-          title=""
-          useSafeArea={false}
-          leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
+      <View style={s.container}>
+        <Stack.Screen options={{ title: "" }} />
         <View style={s.center}>
           <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{error || "Exercise not found"}</Text>
           <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
@@ -299,22 +288,21 @@ export default function ExerciseDetailScreen() {
   const isCompound = subExercises && subExercises.length > 0;
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      <TopBar
-        routeName="exercise_detail"
-        title={title}
-        useSafeArea={false}
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-        rightAccessory={
-          context === "custom" ? (
-            <TouchableOpacity onPress={handleAddToPlan} hitSlop={10}>
-              <Ionicons name="add-circle-outline" size={26} color="#111" />
-            </TouchableOpacity>
-          ) : null
-        }
-      />
+    <View style={s.container}>
+      <Stack.Screen options={{ title }} />
+      {context === "custom" && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="plus.circle"
+            onPress={handleAddToPlan}
+          />
+        </Stack.Toolbar>
+      )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         {/* Media */}
         <View style={s.mediaWrap}>
           {imgUrl ? (

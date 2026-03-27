@@ -1,9 +1,10 @@
 // src/components/plancard/variants/ActivePlanCard.tsx
 
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Platform } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Host, ContextMenu, Button } from "@expo/ui/swift-ui";
 import type { TrainingPlanCardProps } from "../PlanCard.types";
 import { clamp01 } from "../PlanCard.styles";
 import { TRAINING_TYPE_GRADIENTS } from "../PlanCard.gradients";
@@ -168,7 +169,26 @@ export default function ActivePlanCard(props: Props) {
                 <Text style={styles.ctaText}>{primaryLabel}</Text>
               </TouchableOpacity>
 
-              {handlers?.onOpenMenu ? (
+              {Platform.OS === "ios" && handlers?.contextMenuItems?.length ? (
+                <Host matchContents style={styles.menuBtn}>
+                  <ContextMenu>
+                    <ContextMenu.Trigger>
+                      <Button systemImage="ellipsis" label="" />
+                    </ContextMenu.Trigger>
+                    <ContextMenu.Items>
+                      {handlers.contextMenuItems.map((item) => (
+                        <Button
+                          key={item.label}
+                          systemImage={item.systemImage as any}
+                          role={item.role}
+                          onPress={item.onPress}
+                          label={item.label}
+                        />
+                      ))}
+                    </ContextMenu.Items>
+                  </ContextMenu>
+                </Host>
+              ) : handlers?.onOpenMenu ? (
                 <TouchableOpacity
                   activeOpacity={0.9}
                   onPress={() => handlers.onOpenMenu?.(plan)}

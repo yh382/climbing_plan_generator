@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Image, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { Segmented } from "@components/ui/Segmented"; // 复用你的 Segmented
 
 export default function HelpCenter() {
@@ -61,9 +62,7 @@ export default function HelpCenter() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} />
         
         {/* 顶部 Segmented 切换 */}
         <View style={{ width: 160 }}>

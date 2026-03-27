@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HeaderButton } from "../../components/ui/HeaderButton";
 
 // Store
 import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
@@ -39,9 +40,7 @@ const PlanHeader = React.memo(({
     <View style={{ backgroundColor: '#FFF', paddingBottom: 16, paddingTop }}>
       {/* TopBar: minimize + title + timer */}
       <View style={styles.topBarContainer}>
-         <TouchableOpacity onPress={onMinimize} style={styles.backBtn}>
-            <Ionicons name="chevron-down" size={28} color="#111" />
-         </TouchableOpacity>
+         <HeaderButton icon="chevron.down" onPress={onMinimize} />
 
          <Text style={styles.headerTitle}>{isZH ? "训练中" : "Active Workout"}</Text>
 

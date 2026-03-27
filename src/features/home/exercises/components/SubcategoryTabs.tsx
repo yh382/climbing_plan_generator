@@ -56,8 +56,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     justifyContent: "center",
   },
   tabActive: {
-    backgroundColor: "#1C1C1E",
+    backgroundColor: colors.pillBackground,
   },
   tabText: { fontSize: 13, color: colors.textSecondary, fontWeight: "700" },
-  tabTextActive: { color: "#FFF" },
+  tabTextActive: { color: colors.pillText },
 });

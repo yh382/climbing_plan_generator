@@ -231,6 +231,7 @@ export interface PublicBadge {
   sourceId?: string | null;
 }
 
+/** @deprecated Replaced by PublicSessionSummary */
 export interface PublicDailySummary {
   date: string;
   climbs: number;
@@ -239,12 +240,23 @@ export interface PublicDailySummary {
   durationMinutes: number | null;
 }
 
+export interface PublicSessionSummary {
+  id: string;
+  date: string;
+  gymName: string | null;
+  durationMinutes: number | null;
+  climbs: number;
+  sends: number;
+  bestGrade: string | null;
+}
+
 export function usePublicProfile(userId: string | null) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<FeedPostType[]>([]);
   const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [badges, setBadges] = useState<PublicBadge[]>([]);
   const [dailySummary, setDailySummary] = useState<PublicDailySummary[]>([]);
+  const [sessionSummary, setSessionSummary] = useState<PublicSessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
@@ -256,7 +268,7 @@ export function usePublicProfile(userId: string | null) {
         api.get<any[]>(`/posts/user/${userId}?limit=20`),
         api.get<any[]>(`/plans/user/${userId}`).catch(() => []),
         api.get<any[]>(`/badges/user/${userId}`).catch(() => []),
-        api.get<any[]>(`/climb-logs/daily-summary/user/${userId}?limit=20`).catch(() => []),
+        api.get<any[]>(`/sessions/user/${userId}?limit=20`).catch(() => []),
       ]);
       const mapped: PublicProfile = {
         id: raw.user_id ?? raw.id,
@@ -281,13 +293,25 @@ export function usePublicProfile(userId: string | null) {
       setPosts(feedPosts);
       setPlans(plansData || []);
       setBadges(badgesData || []);
+      // Map sessions → per-session summary (replaces daily-summary)
+      const mappedSessions = (summaryData || []).map((s: any) => ({
+        id: String(s.id),
+        date: s.date,
+        gymName: s.gym_name ?? null,
+        durationMinutes: s.duration_minutes ?? null,
+        climbs: s.summary?.log_count ?? 0,
+        sends: s.summary?.total_sends ?? 0,
+        bestGrade: s.summary?.best_grade ?? null,
+      }));
+      setSessionSummary(mappedSessions);
+      // Keep dailySummary for backward compat (deprecated)
       setDailySummary(
-        (summaryData || []).map((d: any) => ({
-          date: d.date,
-          climbs: d.climbs ?? 0,
-          sends: d.sends ?? 0,
-          bestGrade: d.best_grade ?? null,
-          durationMinutes: d.duration_minutes ?? null,
+        mappedSessions.map((s: PublicSessionSummary) => ({
+          date: s.date,
+          climbs: s.climbs,
+          sends: s.sends,
+          bestGrade: s.bestGrade,
+          durationMinutes: s.durationMinutes,
         })),
       );
     } catch (_e) { /* swallow */ }
@@ -295,7 +319,7 @@ export function usePublicProfile(userId: string | null) {
   }, [userId]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
-  return { profile, posts, plans, badges, dailySummary, loading, refresh: fetchProfile };
+  return { profile, posts, plans, badges, dailySummary, sessionSummary, loading, refresh: fetchProfile };
 }
 
 // ---- Search Users ----

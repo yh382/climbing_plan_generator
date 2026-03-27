@@ -3,42 +3,30 @@ import { View, StyleSheet } from "react-native";
 import MapboxGL from "@rnmapbox/maps";
 import type { MapState } from "@rnmapbox/maps";
 import * as Location from "expo-location";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSharedValue } from "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import type BottomSheet from "@gorhom/bottom-sheet";
-
 
 import { searchGymsNearby } from "../../../lib/poi";
 import type { GymPlace, LatLng } from "../../../lib/poi/types";
-import { useSettings } from "../../contexts/SettingsContext";
 import { useGymsStore } from "../../store/useGymsStore";
 import { useGymsColors } from "./useGymsColors";
 import { sortAndFilterGyms } from "./utils/sortAndFilter";
-import { isGlobal } from "../../lib/region";
 
 import { GymMap } from "./components/GymMap";
-import { MapHeaderControls } from "./components/MapHeaderControls";
-import { TopGradientOverlay } from "./components/TopGradientOverlay";
-import { GymBottomSheet } from "./components/GymBottomSheet";
+import { MapControls } from "./components/MapHeaderControls";
 
 export default function GymsScreen() {
   const mapRef = useRef<MapboxGL.MapView>(null);
   const camRef = useRef<MapboxGL.Camera>(null);
-  const bsRef = useRef<BottomSheet>(null);
   const insets = useSafeAreaInsets();
-  const { tr } = useSettings();
-  const { colors, overlayTint, primary, primaryBg, scheme } = useGymsColors();
-  const animatedIndex = useSharedValue(1);
+  const { scheme } = useGymsColors();
 
   // Store
   const gyms = useGymsStore((s) => s.gyms);
-  const loading = useGymsStore((s) => s.loading);
-  const error = useGymsStore((s) => s.error);
   const selectedGym = useGymsStore((s) => s.selectedGym);
-  const sheetIndex = useGymsStore((s) => s.sheetIndex);
   const query = useGymsStore((s) => s.query);
   const userLoc = useGymsStore((s) => s.userLoc);
   const center = useGymsStore((s) => s.center);
@@ -48,14 +36,54 @@ export default function GymsScreen() {
   const [is3D, setIs3D] = useState(false);
   const [styleId, setStyleId] = useState<"outdoors" | "satellite">("outdoors");
 
-  // Reset sheet to default position on focus
+  // Track whether the sheet has been pushed
+  const sheetPushed = useRef(false);
+
+  // Fetch nearby gyms
+  const fetchNearby = useCallback(
+    async (c: LatLng, q: string) => {
+      const s = useGymsStore.getState();
+      s.setLoading(true);
+      s.setError(null);
+      try {
+        const raw = await searchGymsNearby(c, 30, q);
+        const filtered = sortAndFilterGyms(raw, c);
+        s.setGyms(filtered);
+      } catch (e: any) {
+        s.setError(e?.message ?? "获取附近岩馆失败");
+      } finally {
+        s.setLoading(false);
+      }
+    },
+    [],
+  );
+
+  // Push the native formSheet on focus
   useFocusEffect(
     useCallback(() => {
-      useGymsStore.getState().setSheetIndex(1);
-      const t = setTimeout(() => bsRef.current?.snapToIndex(1), 150);
-      return () => clearTimeout(t);
-    }, []),
+      if (!sheetPushed.current) {
+        sheetPushed.current = true;
+        // Small delay to let the map screen render first
+        const t = setTimeout(() => router.push("/gyms-sheet"), 100);
+        return () => clearTimeout(t);
+      }
+
+      // Re-fetch gyms on subsequent focus events
+      const { center: c, query: q } = useGymsStore.getState();
+      if (c) fetchNearby(c, q);
+    }, [fetchNearby]),
   );
+
+  // Fly to selected gym when it changes (triggered from the sheet)
+  useEffect(() => {
+    if (selectedGym) {
+      camRef.current?.setCamera({
+        centerCoordinate: [selectedGym.location.lng, selectedGym.location.lat],
+        zoomLevel: 14,
+        animationDuration: 600,
+      });
+    }
+  }, [selectedGym]);
 
   // Is map centered on user (≈120m threshold)
   const isAtUser = useMemo(() => {
@@ -66,24 +94,6 @@ export default function GymsScreen() {
     const distM = Math.sqrt(x * x + y * y) * 111320;
     return distM < 120;
   }, [userLoc, center]);
-
-  // Fetch nearby gyms
-  const fetchNearby = useCallback(
-    async (c: LatLng, q: string) => {
-      store.setLoading(true);
-      store.setError(null);
-      try {
-        const raw = await searchGymsNearby(c, 30, q);
-        const filtered = sortAndFilterGyms(raw, c);
-        store.setGyms(filtered);
-      } catch (e: any) {
-        store.setError(e?.message ?? "获取附近岩馆失败");
-      } finally {
-        store.setLoading(false);
-      }
-    },
-    [store],
-  );
 
   // Initial location
   useEffect(() => {
@@ -122,35 +132,17 @@ export default function GymsScreen() {
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        if (sheetIndex <= 1) fetchNearby(c, query);
+        fetchNearby(c, useGymsStore.getState().query);
       }, 800);
     },
-    [fetchNearby, query, sheetIndex, store],
-  );
-
-  const onSubmitSearch = useCallback(() => {
-    if (!center) return;
-    fetchNearby(center, query.trim());
-  }, [center, query, fetchNearby]);
-
-  const flyTo = useCallback(
-    (p: GymPlace) => {
-      camRef.current?.setCamera({
-        centerCoordinate: [p.location.lng, p.location.lat],
-        zoomLevel: 14,
-        animationDuration: 600,
-      });
-      bsRef.current?.snapToIndex(1);
-    },
-    [],
+    [fetchNearby, store],
   );
 
   const openGymDetails = useCallback(
     (g: GymPlace) => {
       store.setSelectedGym(g);
-      flyTo(g);
     },
-    [store, flyTo],
+    [store],
   );
 
   const mapStyleURL = useMemo(() => {
@@ -160,14 +152,32 @@ export default function GymsScreen() {
       : "mapbox://styles/mapbox/outdoors-v12";
   }, [styleId, scheme]);
 
-  const searchPlaceholder = tr("搜索附近的岩馆…", "Search nearby climbing gyms…");
-  const emptyText = center
-    ? tr("附近没有匹配结果", "No gyms found nearby.")
-    : tr("等待定位或输入搜索关键字。", "Waiting for your location or a keyword…");
-
   return (
     <View style={[styles.root, { backgroundColor: scheme === "dark" ? "#0B1220" : "#E2E8F0" }]}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} translucent />
+
+      <MapControls
+        isAtUser={isAtUser}
+        styleId={styleId}
+        is3D={is3D}
+        onBack={() => {
+          // Dismiss both gyms-sheet and gyms screen (2 levels) back to home with animation
+          router.dismiss(2);
+        }}
+        onToggleStyle={() => setStyleId((s) => (s === "outdoors" ? "satellite" : "outdoors"))}
+        onToggle3D={() => setIs3D((v) => !v)}
+        onLocate={() => {
+          if (!userLoc) {
+            store.setError("定位未获取，请检查定位权限。");
+            return;
+          }
+          camRef.current?.setCamera({
+            centerCoordinate: [userLoc.lng, userLoc.lat],
+            zoomLevel: 12.5,
+            animationDuration: 600,
+          });
+        }}
+      />
 
       <View style={styles.mapWrapper}>
         <GymMap
@@ -181,55 +191,15 @@ export default function GymsScreen() {
         />
       </View>
 
-      <TopGradientOverlay insets={insets} tintColor={overlayTint} />
-
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
-        <GymBottomSheet
-          bsRef={bsRef}
-          animatedIndex={animatedIndex}
-          sheetIndex={sheetIndex}
-          onSheetChange={store.setSheetIndex}
-          query={query}
-          onChangeQuery={store.setQuery}
-          onSubmitSearch={onSubmitSearch}
-          searchPlaceholder={searchPlaceholder}
-          gyms={gyms}
-          selectedGym={selectedGym}
-          onSelectGym={openGymDetails}
-          onCloseDetail={() => store.setSelectedGym(null)}
-          loading={loading}
-          error={error}
-          insets={insets}
-          colors={colors}
-          primary={primary}
-          primaryBg={primaryBg}
-          emptyText={emptyText}
-        />
-      </View>
-
-      {/* Header rendered AFTER BottomSheet to ensure it's on top */}
-      {isGlobal && (
-        <MapHeaderControls
-          animatedIndex={animatedIndex}
-          sheetIndex={sheetIndex}
-          insets={insets}
-          scheme={scheme}
-          isAtUser={isAtUser}
-          styleId={styleId}
-          is3D={is3D}
-          onBack={() => router.back()}
-          onToggleStyle={() => setStyleId((s) => (s === "outdoors" ? "satellite" : "outdoors"))}
-          onToggle3D={() => setIs3D((v) => !v)}
-          onLocate={() => {
-            if (!userLoc) return;
-            camRef.current?.setCamera({
-              centerCoordinate: [userLoc.lng, userLoc.lat],
-              zoomLevel: 12.5,
-              animationDuration: 600,
-            });
-          }}
-        />
-      )}
+      <LinearGradient
+        pointerEvents="none"
+        colors={
+          scheme === "dark"
+            ? ["rgba(11,18,32,0.85)", "rgba(11,18,32,0)"]
+            : ["rgba(248,250,252,0.85)", "rgba(248,250,252,0)"]
+        }
+        style={[styles.statusBarOverlay, { height: insets.top + 16 }]}
+      />
     </View>
   );
 }
@@ -237,4 +207,11 @@ export default function GymsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   mapWrapper: { flex: 1 },
+  statusBarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 40,
+  },
 });

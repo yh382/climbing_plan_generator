@@ -61,23 +61,18 @@ export default function ExpandableCalendar({
 
   const { monthMap, buildMonthMap } = usePlanStore();
   const sessions = useLogsStore((s) => s.sessions);
-  const logs = useLogsStore((s) => s.logs);
 
-  // Build dayStats: duration from sessions, sends from logs (stays in sync with actual items)
+  // Build dayStats: both duration and sends from sessions (same date, no timezone split)
   const dayStats = useMemo(() => {
     const map: Record<string, { durationMin: number; sends: number }> = {};
     for (const s of sessions) {
       const prev = map[s.date] || { durationMin: 0, sends: 0 };
       prev.durationMin += parseDurationToMin(s.duration);
+      prev.sends += s.sends || 0;
       map[s.date] = prev;
     }
-    for (const l of logs) {
-      const prev = map[l.date] || { durationMin: 0, sends: 0 };
-      prev.sends += l.count;
-      map[l.date] = prev;
-    }
     return map;
-  }, [sessions, logs]);
+  }, [sessions]);
 
   useEffect(() => {
     if (expanded) {

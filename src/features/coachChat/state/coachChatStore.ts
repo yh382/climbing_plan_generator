@@ -6,13 +6,6 @@ function uid(prefix: string) {
   return `${Date.now()}-${prefix}-${Math.random().toString(16).slice(2)}`;
 }
 
-const SEED_MESSAGE: ChatMessage = {
-  id: "seed-1",
-  role: "assistant",
-  text: "Hi, I'm Paddi 🦍 What would you like to do: plan / actions / training summary — or just chat about anything climbing-related?",
-  ts: Date.now(),
-};
-
 function createLocalConversation(): CoachConversation {
   const now = new Date().toISOString();
   return {
@@ -22,7 +15,7 @@ function createLocalConversation(): CoachConversation {
     updatedAt: now,
     phase: "collect",
     mode: "none",
-    messages: [{ ...SEED_MESSAGE, id: uid("seed"), ts: Date.now() }],
+    messages: [],
     draftPlan: null,
   };
 }
@@ -103,7 +96,7 @@ export const useCoachChatStore = create<CoachChatStore>((set, get) => ({
     const convId = prev.currentConversationId;
     if (!convId) return;
 
-    const freshMessages: ChatMessage[] = [{ ...SEED_MESSAGE, id: uid("seed"), ts: Date.now() }];
+    const freshMessages: ChatMessage[] = [];
     const now = new Date().toISOString();
 
     const conversations = updateConversationInList(prev.conversations, convId, {

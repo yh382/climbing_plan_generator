@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getChallengeStatus } from "./types";
+import { useThemeColors } from "@/lib/useThemeColors";
 import type { ChallengeOut } from "./types";
 
 const SCREEN_W = Dimensions.get("window").width;
@@ -21,7 +22,8 @@ export default function ChallengeCardGrid({
   item: ChallengeOut;
   onPress?: () => void;
 }) {
-  const uiStatus = getChallengeStatus(item);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <TouchableOpacity
@@ -49,16 +51,7 @@ export default function ChallengeCardGrid({
           )}
         </ImageBackground>
       ) : (
-        <View
-          style={[
-            styles.cover,
-            {
-              backgroundColor: "#272727",
-              borderTopLeftRadius: 14,
-              borderTopRightRadius: 14,
-            },
-          ]}
-        >
+        <View style={styles.coverPlaceholder}>
           <Ionicons name="trophy" size={28} color="rgba(255,255,255,0.4)" />
           {item.discipline && (
             <View style={styles.disciplineChip}>
@@ -79,25 +72,31 @@ export default function ChallengeCardGrid({
           {item.title}
         </Text>
 
-        <View style={styles.bottom}>
-          <Text style={styles.joined}>{item.participantCount} joined</Text>
-        </View>
+        <Text style={styles.joined}>{item.participantCount} joined</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     width: CARD_W,
     borderRadius: 14,
-    backgroundColor: "#1C1C1E",
+    backgroundColor: colors.cardDark,
     overflow: "hidden",
   },
   cover: {
     height: 110,
     alignItems: "center",
     justifyContent: "center",
+  },
+  coverPlaceholder: {
+    height: 110,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.cardDarkImage,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
   coverOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -129,6 +128,5 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   title: { fontSize: 13, fontWeight: "800", color: "#FFF", letterSpacing: -0.3, lineHeight: 18 },
-  bottom: {},
   joined: { fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 },
 });

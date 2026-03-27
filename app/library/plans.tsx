@@ -1,23 +1,42 @@
 // app/library/plans.tsx
-import { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
-import { useRouter } from "expo-router";
+import { useMemo, useState, useLayoutEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, FlatList } from "react-native";
+import { NativeSegmentedControl } from "../../src/components/ui";
+import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import { TrainingPlanCard, TrainingIntent, TRAINING_INTENTS } from "../../src/components/plancard";
 import TrendingPlansEntryCard from "./TrendingPlansEntryCard";
-import CollapsibleLargeHeaderFlatList from "../../src/components/CollapsibleLargeHeaderFlatList";
 import { usePublicPlans, useMyPlans } from "../../src/features/plans/hooks";
 import { planSummaryToTrainingPlan } from "../../src/features/plans/adapters";
+
+import { useThemeColors } from "../../src/lib/useThemeColors";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
 
 const SIDE_PAD = 16;
 
 type TabKey = "MyPlans" | "Official" | "Plaza";
+const TAB_KEYS: TabKey[] = ["MyPlans", "Official", "Plaza"];
+const TAB_LABELS = ["My Plans", "Official", "Plaza"];
 
 export default function PlansHubScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // --- Native large title header with back button ---
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      ...NATIVE_HEADER_LARGE,
+      ...withHeaderTheme(colors),
+      headerShown: true,
+      title: "Plans",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+    });
+  }, [navigation, colors, router]);
 
   const [activeTab, setActiveTab] = useState<TabKey>("MyPlans");
 
@@ -29,8 +48,6 @@ export default function PlansHubScreen() {
   const [sortType, setSortType] = useState<"Newest" | "Highest">("Newest");
   const [selectedIntents, setSelectedIntents] = useState<TrainingIntent[]>([]);
 
-  // FAB (My Plans tab)
-  const [fabOpen, setFabOpen] = useState(false);
 
   // API data
   const { plans: publicPlans, loading: publicLoading } = usePublicPlans();
@@ -45,15 +62,12 @@ export default function PlansHubScreen() {
     });
   };
 
-  const handleFabAction = (action: "AI" | "Custom") => {
-    setFabOpen(false);
-    if (action === "AI") {
-      Alert.alert("Coming Soon", "AI plan generation will be available with Coach AI");
-      return;
-    }
-    if (action === "Custom") {
-      router.push("/library/plan-builder" as any);
-    }
+  const handleCreateCustom = () => {
+    router.push("/library/plan-builder" as any);
+  };
+
+  const handleCreateAI = () => {
+    Alert.alert("Coming Soon", "AI plan generation will be available with Coach AI");
   };
 
   // My Plans data
@@ -107,52 +121,29 @@ export default function PlansHubScreen() {
   const activeData = isMyPlansTab ? myPlansData : displayedData;
   const activeLoading = isMyPlansTab ? myLoading : publicLoading;
 
-  const LargeTitle = <Text style={styles.largeTitle}>Plans</Text>;
-  const Subtitle = (
-    <Text style={styles.largeSubtitle}>
-      {activeTab === "MyPlans" ? "My Plans" : activeTab === "Official" ? "Official" : "Plaza"}
-    </Text>
-  );
-
-  const LeftActions = (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
-      <Ionicons name="arrow-back" size={25} color="#111" />
-    </TouchableOpacity>
-  );
-
   const ListHeader = (
     <View>
       {/* Search */}
       <View style={{ paddingHorizontal: SIDE_PAD }}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search plans..."
-            placeholderTextColor="#9CA3AF"
-            style={{ flex: 1, marginLeft: 8, fontSize: 15, color: "#111" }}
+            placeholderTextColor={colors.textSecondary}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
           />
         </View>
       </View>
 
-      {/* 3 Tabs */}
-      <View style={styles.tabContainer}>
-        {([
-          { key: "MyPlans" as const, label: "My Plans" },
-          { key: "Official" as const, label: "Official" },
-          { key: "Plaza" as const, label: "Plaza" },
-        ]).map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* 3 Tabs — native segmented control */}
+      <View style={{ paddingHorizontal: SIDE_PAD, paddingVertical: 10 }}>
+        <NativeSegmentedControl
+          options={TAB_LABELS}
+          selectedIndex={TAB_KEYS.indexOf(activeTab)}
+          onSelect={(i) => setActiveTab(TAB_KEYS[i])}
+        />
       </View>
 
       {/* Filter — only for Plaza/Official */}
@@ -168,7 +159,7 @@ export default function PlansHubScreen() {
                   : ""}
               </Text>
             </Text>
-            <Ionicons name={filterOpen ? "chevron-up" : "chevron-down"} size={16} color="#6B7280" />
+            <Ionicons name={filterOpen ? "chevron-up" : "chevron-down"} size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           {filterOpen ? (
@@ -224,13 +215,8 @@ export default function PlansHubScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <CollapsibleLargeHeaderFlatList
-        backgroundColor="#FFF"
-        smallTitle="Plans"
-        largeTitle={LargeTitle}
-        subtitle={Subtitle}
-        leftActions={LeftActions}
+    <View style={styles.container}>
+      <FlatList
         data={activeData}
         keyExtractor={(item: any) => item.id}
         renderItem={({ item }: any) => (
@@ -256,17 +242,17 @@ export default function PlansHubScreen() {
             />
           </View>
         )}
-        listHeader={
+        ListHeaderComponent={
           <View>
             {ListHeader}
             {activeLoading && activeData.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <ActivityIndicator size="large" color="#111" />
+                <ActivityIndicator size="large" color={colors.textPrimary} />
               </View>
             ) : null}
             {!activeLoading && activeData.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name={isMyPlansTab ? "albums-outline" : "search-outline"} size={44} color="#E5E7EB" />
+                <Ionicons name={isMyPlansTab ? "albums-outline" : "search-outline"} size={44} color={colors.textTertiary} />
                 <Text style={styles.emptyTitle}>
                   {isMyPlansTab ? "No plans yet" : "No plans found"}
                 </Text>
@@ -280,133 +266,94 @@ export default function PlansHubScreen() {
           </View>
         }
         contentContainerStyle={{ paddingBottom: 8 }}
-        bottomInsetExtra={28}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       />
 
-      {/* FAB — only on My Plans tab */}
+      {/* Native toolbar menu — create plan actions */}
       {isMyPlansTab ? (
-        <>
-          {fabOpen ? (
-            <TouchableOpacity
-              style={styles.fabOverlay}
-              activeOpacity={1}
-              onPress={() => setFabOpen(false)}
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu icon="plus">
+            <Stack.Toolbar.MenuAction
+              icon="hammer"
+              onPress={handleCreateCustom}
             >
-              <View style={[styles.fabActions, { bottom: insets.bottom + 80 }]}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleFabAction("Custom")}>
-                  <Text style={styles.actionText}>Customize</Text>
-                  <View style={[styles.miniFab, { backgroundColor: "#4F46E5" }]}>
-                    <Ionicons name="construct" size={20} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleFabAction("AI")}>
-                  <Text style={styles.actionText}>AI Pick</Text>
-                  <View style={[styles.miniFab, { backgroundColor: "#10B981" }]}>
-                    <Ionicons name="sparkles" size={20} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ) : null}
-
-          <TouchableOpacity
-            style={[styles.fab, { bottom: insets.bottom + 20 }]}
-            activeOpacity={0.8}
-            onPress={() => setFabOpen((v) => !v)}
-          >
-            <Ionicons name={fabOpen ? "close" : "add"} size={32} color="#FFF" />
-          </TouchableOpacity>
-        </>
+              Customize
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="sparkles"
+              onPress={handleCreateAI}
+            >
+              AI Pick
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+type Colors = ReturnType<typeof useThemeColors>;
 
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
 
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    borderRadius: 12,
-  },
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.inputBackground,
+      marginBottom: 12,
+      paddingHorizontal: 12,
+      height: 44,
+      borderRadius: 12,
+    },
+    searchInput: { flex: 1, marginLeft: 8, fontSize: 15 },
 
-  tabContainer: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
-  tabItem: { flex: 1, paddingVertical: 14, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabItemActive: { borderBottomColor: "#111" },
-  tabText: { fontSize: 15, fontWeight: "600", color: "#9CA3AF" },
-  tabTextActive: { color: "#111", fontWeight: "800" },
+    filterHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingHorizontal: SIDE_PAD,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    },
+    filterTitle: { fontSize: 13, fontWeight: "700", color: colors.textPrimary },
+    filterBody: {
+      padding: SIDE_PAD,
+      backgroundColor: colors.backgroundSecondary,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    },
+    filterRow: { flexDirection: "row", alignItems: "center" },
+    filterLabel: { width: 60, fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: "600" },
 
-  filterHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: SIDE_PAD,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F9FAFB",
-  },
-  filterTitle: { fontSize: 13, fontWeight: "700", color: "#374151" },
-  filterBody: {
-    padding: SIDE_PAD,
-    backgroundColor: "#FAFAFA",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  filterRow: { flexDirection: "row", alignItems: "center" },
-  filterLabel: { width: 60, fontSize: 13, color: "#9CA3AF", marginTop: 2, fontWeight: "600" },
+    radioBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    radioBtnActive: { backgroundColor: colors.pillBackground, borderColor: colors.pillBackground },
+    radioText: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
+    radioTextActive: { color: colors.pillText, fontWeight: "800" },
 
-  radioBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  radioBtnActive: { backgroundColor: "#111", borderColor: "#111" },
-  radioText: { fontSize: 12, color: "#4B5563", fontWeight: "600" },
-  radioTextActive: { color: "#FFF", fontWeight: "800" },
+    tagBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    tagBtnActive: { backgroundColor: colors.accent + '1A', borderColor: colors.accent },
+    tagText: { fontSize: 12, color: colors.textSecondary, fontWeight: "700" },
+    tagTextActive: { color: colors.accent, fontWeight: "800" },
 
-  tagBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  tagBtnActive: { backgroundColor: "#EEF2FF", borderColor: "#4F46E5" },
-  tagText: { fontSize: 12, color: "#4B5563", fontWeight: "700" },
-  tagTextActive: { color: "#4F46E5", fontWeight: "800" },
+    emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 90, paddingHorizontal: 24 },
+    emptyTitle: { marginTop: 10, fontSize: 15, fontWeight: "900", color: colors.textPrimary },
+    emptySub: { marginTop: 6, fontSize: 13, fontWeight: "600", color: colors.textSecondary, textAlign: "center" },
 
-  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 90, paddingHorizontal: 24 },
-  emptyTitle: { marginTop: 10, fontSize: 15, fontWeight: "900", color: "#111" },
-  emptySub: { marginTop: 6, fontSize: 13, fontWeight: "600", color: "#9CA3AF", textAlign: "center" },
-
-  // FAB
-  fab: {
-    position: "absolute",
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#111",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-    zIndex: 100,
-  },
-  fabOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.8)", zIndex: 90 },
-  fabActions: { position: "absolute", right: 24, alignItems: "flex-end", gap: 16 },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 12 },
-  actionText: { fontSize: 14, fontWeight: "700", color: "#111" },
-  miniFab: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-});
+  });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { Card } from "@components/ui/Card";
 import { Segmented } from "@components/ui/Segmented";
 import { profileApi } from "../../src/features/profile/api";
@@ -58,9 +58,7 @@ export default function PrivacySettings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} />
         <Text style={styles.headerTitle}>Privacy</Text>
         <View style={styles.headerBtn} />
       </View>

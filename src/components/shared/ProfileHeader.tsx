@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  useColorScheme,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,9 +16,11 @@ import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 
-// Eased light-grey fade — subtle darkening to enhance white text readability
-const FADE_COLORS = [
+// Eased fade — light grey for light mode, black for dark mode
+const FADE_LIGHT = [
   "rgba(200,200,200,0)",
   "rgba(200,200,200,0.02)",
   "rgba(200,200,200,0.06)",
@@ -31,8 +34,23 @@ const FADE_COLORS = [
   "rgba(200,200,200,0.97)",
   "rgba(200,200,200,1)",
 ] as readonly string[];
+const FADE_DARK = [
+  "rgba(0,0,0,0)",
+  "rgba(0,0,0,0.02)",
+  "rgba(0,0,0,0.06)",
+  "rgba(0,0,0,0.12)",
+  "rgba(0,0,0,0.20)",
+  "rgba(0,0,0,0.32)",
+  "rgba(0,0,0,0.46)",
+  "rgba(0,0,0,0.62)",
+  "rgba(0,0,0,0.78)",
+  "rgba(0,0,0,0.90)",
+  "rgba(0,0,0,0.97)",
+  "rgba(0,0,0,1)",
+] as readonly string[];
 const FADE_ZONE_HEIGHT = 100;
-const DEFAULT_GRADIENT: [string, string, string] = ["#7A9E8E", "#A8C0B4", "#C8D4C8"];
+const DEFAULT_GRADIENT_LIGHT: [string, string, string] = ["#7A9E8E", "#A8C0B4", "#C8D4C8"];
+const DEFAULT_GRADIENT_DARK: [string, string, string] = ["#2C2C2E", "#1C1C1E", "#000000"];
 
 export interface ProfileHeaderProps {
   name: string;
@@ -57,7 +75,7 @@ export interface ProfileHeaderProps {
   onFollowingPress?: () => void;
   onYearInReviewPress?: () => void;
   headerTitleAnimStyle: any;
-  topPadding: number;
+  topPadding?: number;
   scrollY?: SharedValue<number>;
 }
 
@@ -84,20 +102,27 @@ export default function ProfileHeader({
   onFollowingPress,
   onYearInReviewPress,
   headerTitleAnimStyle,
-  topPadding,
   scrollY,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
+  const isDark = useColorScheme() === "dark";
+  const fadeColors = isDark ? FADE_DARK : FADE_LIGHT;
+  const defaultGradient = isDark ? DEFAULT_GRADIENT_DARK : DEFAULT_GRADIENT_LIGHT;
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight() || (insets.top + 44);
 
   const PROFILE_COVER_H = 300;
   const bgParallaxStyle = useAnimatedStyle(() => {
-    if (!scrollY || scrollY.value >= 0) return {};
-    const absScroll = -scrollY.value;
+    if (!scrollY) return {};
+    const adjustedScrollY = scrollY.value + headerHeight;
+    if (adjustedScrollY >= 0) return {};
+    const absScroll = -adjustedScrollY;
     return {
       transform: [
         { scale: 1 + absScroll / PROFILE_COVER_H },
-        { translateY: scrollY.value / 2 },
+        { translateY: adjustedScrollY / 2 },
       ],
     };
   });
@@ -122,19 +147,19 @@ export default function ProfileHeader({
           <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
           {/* Dark overlay for text readability */}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.35)" }]} />
-          <LinearGradient colors={FADE_COLORS as any} style={styles.blurZone} />
+          <LinearGradient colors={fadeColors as any} style={styles.blurZone} />
         </View>
       );
     }
     return (
       <>
         <LinearGradient
-          colors={DEFAULT_GRADIENT}
+          colors={defaultGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        <LinearGradient colors={FADE_COLORS as any} style={styles.blurZone} />
+        <LinearGradient colors={fadeColors as any} style={styles.blurZone} />
       </>
     );
   };
@@ -143,12 +168,12 @@ export default function ProfileHeader({
   const FollowingWrapper = isOwnProfile && onFollowingPress ? TouchableOpacity : View;
 
   return (
-    <View>
-      <Animated.View style={[StyleSheet.absoluteFill, bgParallaxStyle]}>
+    <View style={{ marginTop: -headerHeight }}>
+      <Animated.View style={[StyleSheet.absoluteFill, bgParallaxStyle, { overflow: "hidden" }]}>
         {renderBackground()}
       </Animated.View>
 
-      <View style={{ paddingTop: topPadding }}>
+      <View style={{ paddingTop: headerHeight }}>
         <View style={styles.headerBlock}>
           {/* Avatar row */}
           <Animated.View style={[styles.avatarRow, headerTitleAnimStyle]}>

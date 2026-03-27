@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { useRouter } from "expo-router";
 
 type YearStats = {
@@ -68,9 +69,7 @@ export default function ProfileStatsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Topbar */}
       <View style={styles.topbar}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()} activeOpacity={0.75}>
-          <Ionicons name="chevron-back" size={24} color="#111" />
-        </TouchableOpacity>
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
 
         <Text style={styles.topbarTitle}>Stats</Text>
 

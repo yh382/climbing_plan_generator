@@ -1,11 +1,10 @@
 // src/features/home/exercises/ExercisesLibraryScreen.tsx
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-
-import CollapsibleLargeHeaderFlatList from "../../../components/CollapsibleLargeHeaderFlatList";
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 import type { ActionSummary, BlockInventorySummary, LocaleKey } from "./model/types";
 import { GOAL_LABEL, LEVEL_LABEL } from "./model/labels";
 import { getBlockListing, getLibrarySummary } from "./api/libraryApi";
@@ -79,6 +78,8 @@ function mapActionToCardProps(action: ActionSummary, locale: LocaleKey) {
 export default function ExercisesLibraryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ big?: string }>();
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const { isFavorite, toggle: toggleFavorite } = useFavoriteIds();
 
   const locale = useMemo(() => detectLocale(), []);
@@ -199,21 +200,16 @@ export default function ExercisesLibraryScreen() {
     setActionsBySub(map);
   }
 
-  const LeftActions = (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
-      <Ionicons name="arrow-back" size={25} color="#111" />
-    </TouchableOpacity>
-  );
-
   const largeTitleText = locale === "zh" ? "动作库" : "Exercise Library";
   const bigTitle = cfg.title[locale];
 
-  const LargeTitle = <Text style={styles.largeTitle}>{largeTitleText}</Text>;
-  const Subtitle = (
-    <Text style={styles.largeSubtitle}>
-      {locale === "zh" ? "分类 · " : "Category · "}
-      {bigTitle}
-    </Text>
+  const ListHeader = (
+    <View>
+      <Text style={s.subtitleText}>
+        {locale === "zh" ? "分类 · " : "Category · "}
+        {bigTitle}
+      </Text>
+    </View>
   );
 
   const TabsHeader = (
@@ -243,9 +239,9 @@ export default function ExercisesLibraryScreen() {
 
   if (loadingSummary) {
     return (
-      <View style={[styles.loadingWrap, { backgroundColor: "#F9FAFB" }]}>
+      <View style={[s.loadingWrap, { backgroundColor: colors.background }]}>
         <ActivityIndicator />
-        <Text style={{ marginTop: 10, color: "#6B7280", fontSize: 12 }}>
+        <Text style={{ marginTop: 10, color: colors.textSecondary, fontSize: 12 }}>
           {locale === "zh" ? "加载动作库中…" : "Loading library…"}
         </Text>
       </View>
@@ -253,44 +249,39 @@ export default function ExercisesLibraryScreen() {
   }
 
   return (
-    <CollapsibleLargeHeaderFlatList
-      backgroundColor="#F9FAFB"
-      smallTitle={largeTitleText}
-      largeTitle={LargeTitle}
-      subtitle={Subtitle}
-      leftActions={LeftActions}
-      data={list}
-      keyExtractor={(it: ActionSummary) => it.id}
-      renderItem={({ item }: any) => {
-        const cardProps = mapActionToCardProps(item, locale);
-        return (
-          <ExerciseLibraryCard
-            {...cardProps}
-            locale={locale}
-            isFavorite={isFavorite(item.id)}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-            onPress={() =>
-              router.push({
-                pathname: "/library/exercise-detail",
-                params: { exerciseId: item.id, context: "library" },
-              })
-            }
-          />
-        );
-      }}
-      listHeader={TabsHeader}
-      contentContainerStyle={{ paddingHorizontal: 0 }}
-      bottomInsetExtra={28}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <Stack.Screen options={{ ...NATIVE_HEADER_LARGE, title: largeTitleText }} />
+      <FlatList
+        data={list}
+        keyExtractor={(it: ActionSummary) => it.id}
+        renderItem={({ item }: any) => {
+          const cardProps = mapActionToCardProps(item, locale);
+          return (
+            <ExerciseLibraryCard
+              {...cardProps}
+              locale={locale}
+              isFavorite={isFavorite(item.id)}
+              onToggleFavorite={() => toggleFavorite(item.id)}
+              onPress={() =>
+                router.push({
+                  pathname: "/library/exercise-detail",
+                  params: { exerciseId: item.id, context: "library" },
+                })
+              }
+            />
+          );
+        }}
+        ListHeaderComponent={<>{ListHeader}{TabsHeader}</>}
+        contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 28 }}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: colors.background }}
+      />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  largeTitle: { fontSize: 32, fontWeight: "800", color: "#111", lineHeight: 38 },
-  largeSubtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
+  subtitleText: { fontSize: 14, color: colors.textSecondary, paddingHorizontal: 16, marginTop: 4 },
 });

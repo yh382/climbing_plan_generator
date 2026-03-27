@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, useWindowDimensions, Pressable } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useBadgesProgress } from "@/features/community/hooks";
 import BadgeCard from "@/features/profile/components/badgessection/BadgeCard";
-import TopBar from "../../components/TopBar";
+
 import type { Badge, BadgeSectionKey, BadgeTier } from "@/features/profile/components/badgessection/types";
 
 const COLUMNS = 3;
@@ -39,7 +39,6 @@ const DISPLAY_GROUPS = [
 export default function AllBadgesPage() {
   const { badges: rawBadges, loading } = useBadgesProgress();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -67,15 +66,10 @@ export default function AllBadgesPage() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#fff", paddingTop: insets.top }}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <TopBar
-        routeName="badges"
-        title="All Badges"
-        useSafeArea={false}
-        leftControls={{ mode: "back", onBack: () => router.back() }}
-      />
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <Stack.Screen options={{ title: "Badges" }} />
       <FlatList
+        contentInsetAdjustmentBehavior="automatic"
         data={grouped}
         keyExtractor={item => item.key}
         contentContainerStyle={styles.container}

@@ -1,10 +1,10 @@
 // app/library/plan-overview.tsx
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useLayoutEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Dimensions, Share } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,7 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { usePlanDetail } from "../../src/features/plans/hooks";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
-import SmartBottomSheet from "../../src/features/community/components/SmartBottomSheet";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { TRAINING_TYPE_GRADIENTS } from "../../src/components/plancard/PlanCard.gradients";
 import type { TrainingType } from "../../src/components/plancard/PlanCard.types";
 import type { PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
@@ -40,7 +40,9 @@ function detectLocale(): "zh" | "en" {
 
 export default function PlanOverviewScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -49,7 +51,6 @@ export default function PlanOverviewScreen() {
 
   const locale = useMemo(() => detectLocale(), []);
   const [selectedWeek, setSelectedWeek] = useState(1);
-  const [planMenuVisible, setPlanMenuVisible] = useState(false);
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
@@ -57,15 +58,26 @@ export default function PlanOverviewScreen() {
   });
 
   const heroParallaxStyle = useAnimatedStyle(() => {
-    if (scrollY.value >= 0) return {};
-    const absScroll = -scrollY.value;
+    const adjustedScrollY = scrollY.value + headerHeight;
+    if (adjustedScrollY >= 0) return {};
+    const absScroll = -adjustedScrollY;
     return {
       transform: [
         { scale: 1 + absScroll / HERO_HEIGHT },
-        { translateY: scrollY.value / 2 },
+        { translateY: adjustedScrollY / 2 },
       ],
     };
   });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      scrollEdgeEffects: { top: 'soft' },
+    });
+  }, [navigation, router, plan]);
+
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   // Derive weeks and sessions from planJson
@@ -184,20 +196,9 @@ export default function PlanOverviewScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
-      {/* Floating TopBar (overlays hero) */}
-      <View style={[styles.floatingTopBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.floatingBtn}>
-          <Ionicons name="chevron-back" size={22} color="#FFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setPlanMenuVisible(true)} style={styles.floatingBtn}>
-          <Ionicons name="ellipsis-horizontal" size={22} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-
-      <Animated.ScrollView onScroll={scrollHandler} scrollEventThrottle={16} stickyHeaderIndices={[2]} contentContainerStyle={{ paddingBottom: 120 }}>
+      <Animated.ScrollView onScroll={scrollHandler} scrollEventThrottle={16} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero Image */}
-        <Animated.View style={heroParallaxStyle}>
+        <Animated.View style={[heroParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
         <View style={[styles.heroContainer, { height: HERO_HEIGHT }]}>
           {coverUrl ? (
             <Image
@@ -268,7 +269,7 @@ export default function PlanOverviewScreen() {
           ) : null}
         </View>
 
-        {/* Week Navigator */}
+        {/* Week Navigator — paddingTop offsets sticky position below floating TopBar */}
         <View style={styles.navWrapper}>
           <ScrollView
             horizontal
@@ -350,137 +351,107 @@ export default function PlanOverviewScreen() {
         </View>
       )}
 
-      {/* Plan menu bottom sheet */}
-      <SmartBottomSheet visible={planMenuVisible} onClose={() => setPlanMenuVisible(false)} mode="menu">
-        {/* Share to Post */}
-        <TouchableOpacity style={styles.menuRow} onPress={() => {
-          setPlanMenuVisible(false);
-          router.push({
-            pathname: '/community/create',
-            params: {
-              prefillAttachType: 'plan',
-              prefillAttachId: planId,
-              prefillAttachTitle: plan?.title || '',
-              prefillAttachSubtitle: `${totalWeeks} weeks · ${sessionsPerWeek || '—'} sessions/wk · ${plan?.trainingType || ''}`,
-            },
-          });
-        }}>
-          <Ionicons name="create-outline" size={20} color={colors.textPrimary} />
-          <Text style={styles.menuRowText}>Share to Post</Text>
-        </TouchableOpacity>
-
-        {/* Share via... */}
-        <TouchableOpacity style={styles.menuRow} onPress={async () => {
-          setPlanMenuVisible(false);
-          await Share.share({ message: `Check out "${plan?.title}" training plan on ClimMate!` });
-        }}>
-          <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
-          <Text style={styles.menuRowText}>Share via...</Text>
-        </TouchableOpacity>
-
-        {/* Pause/Activate (only for user's own plan) */}
-        {source === "user" && plan && plan.status !== "completed" && (
-          <TouchableOpacity style={styles.menuRow} onPress={() => {
-            setPlanMenuVisible(false);
-            handleStatusToggle();
-          }}>
-            <Ionicons name={plan.status === "active" ? "pause-outline" : "play-outline"} size={20} color={colors.textPrimary} />
-            <Text style={styles.menuRowText}>
+      {/* Native toolbar menu */}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="ellipsis.circle">
+          <Stack.Toolbar.MenuAction
+            icon="square.and.pencil"
+            onPress={() => {
+              router.push({
+                pathname: '/community/create',
+                params: {
+                  prefillAttachType: 'plan',
+                  prefillAttachId: planId,
+                  prefillAttachTitle: plan?.title || '',
+                  prefillAttachSubtitle: `${totalWeeks} weeks · ${sessionsPerWeek || '—'} sessions/wk · ${plan?.trainingType || ''}`,
+                },
+              });
+            }}
+          >
+            Share to Post
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="square.and.arrow.up"
+            onPress={async () => {
+              await Share.share({ message: `Check out "${plan?.title}" training plan on ClimMate!` });
+            }}
+          >
+            Share via...
+          </Stack.Toolbar.MenuAction>
+          {source === "user" && plan.status !== "completed" ? (
+            <Stack.Toolbar.MenuAction
+              icon={plan.status === "active" ? "pause.circle" : "play.circle"}
+              onPress={handleStatusToggle}
+            >
               {plan.status === "active"
                 ? (locale === "zh" ? "暂停计划" : "Pause Plan")
                 : (locale === "zh" ? "激活计划" : "Activate Plan")}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Complete Plan */}
-        {source === "user" && plan && plan.status !== "completed" && (
-          <TouchableOpacity style={styles.menuRow} onPress={() => {
-            setPlanMenuVisible(false);
-            Alert.alert(
-              locale === "zh" ? "完成计划" : "Complete Plan",
-              locale === "zh" ? "标记为已完成？" : "Mark this plan as completed?",
-              [
-                { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
-                {
-                  text: locale === "zh" ? "确认" : "Confirm",
-                  onPress: async () => {
-                    try {
-                      await plansApi.updatePlanStatus(plan.id, "completed");
-                      router.back();
-                    } catch {
-                      Alert.alert("Error", "Failed to complete plan.");
-                    }
-                  },
-                },
-              ]
-            );
-          }}>
-            <Ionicons name="checkmark-done-outline" size={20} color={colors.textPrimary} />
-            <Text style={styles.menuRowText}>
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {source === "user" && plan.status !== "completed" ? (
+            <Stack.Toolbar.MenuAction
+              icon="checkmark.circle"
+              onPress={() => {
+                Alert.alert(
+                  locale === "zh" ? "完成计划" : "Complete Plan",
+                  locale === "zh" ? "标记为已完成？" : "Mark this plan as completed?",
+                  [
+                    { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
+                    {
+                      text: locale === "zh" ? "确认" : "Confirm",
+                      onPress: async () => {
+                        try {
+                          await plansApi.updatePlanStatus(plan.id, "completed");
+                          router.back();
+                        } catch {
+                          Alert.alert("Error", "Failed to complete plan.");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
               {locale === "zh" ? "完成计划" : "Complete Plan"}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Delete Plan */}
-        {source === "user" && plan && (
-          <TouchableOpacity style={styles.menuRow} onPress={() => {
-            setPlanMenuVisible(false);
-            Alert.alert(
-              locale === "zh" ? "删除计划" : "Delete Plan",
-              locale === "zh" ? "删除后无法恢复" : "This cannot be undone.",
-              [
-                { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
-                {
-                  text: locale === "zh" ? "删除" : "Delete",
-                  style: "destructive" as const,
-                  onPress: async () => {
-                    try {
-                      await plansApi.deletePlan(plan.id);
-                      router.back();
-                    } catch {
-                      Alert.alert("Error", "Failed to delete plan.");
-                    }
-                  },
-                },
-              ]
-            );
-          }}>
-            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            <Text style={[styles.menuRowText, { color: "#EF4444" }]}>
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {source === "user" ? (
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={() => {
+                Alert.alert(
+                  locale === "zh" ? "删除计划" : "Delete Plan",
+                  locale === "zh" ? "删除后无法恢复" : "This cannot be undone.",
+                  [
+                    { text: locale === "zh" ? "取消" : "Cancel", style: "cancel" as const },
+                    {
+                      text: locale === "zh" ? "删除" : "Delete",
+                      style: "destructive" as const,
+                      onPress: async () => {
+                        try {
+                          await plansApi.deletePlan(plan.id);
+                          router.back();
+                        } catch {
+                          Alert.alert("Error", "Failed to delete plan.");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
               {locale === "zh" ? "删除计划" : "Delete Plan"}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </SmartBottomSheet>
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
 
     </View>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  // Floating top bar
-  floatingTopBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
-  floatingBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   // Hero
   heroContainer: {
     width: "100%",
@@ -549,7 +520,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   progressTrack: { height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4 },
   progressFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 2 },
 
-  navWrapper: { backgroundColor: colors.background, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  navWrapper: { backgroundColor: colors.background, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   navContent: { paddingHorizontal: 16, gap: 10 },
   weekCard: {
     width: 80, height: 60,
@@ -587,16 +558,4 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   mainBtnText: { color: "#FFF", fontFamily: theme.fonts.bold, fontSize: 16 },
 
-  menuRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  menuRowText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: colors.textPrimary,
-  },
 });

@@ -6,7 +6,6 @@ const config: ExpoConfig = {
   name: "climMate",
   slug: "climMate",
   scheme: "climMate",
-  newArchEnabled: true,
   userInterfaceStyle: "automatic",
 
   ios: {
@@ -37,7 +36,6 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff",
     },
-    edgeToEdgeEnabled: true,
   },
 
   icon: "./assets/images/icon.png",
@@ -65,6 +63,10 @@ const config: ExpoConfig = {
       color: "#22C55E",
     }],
     "expo-apple-authentication",
+    "@react-native-community/datetimepicker",
+    "expo-image",
+    "expo-sharing",
+    "expo-web-browser",
   ],
 
   updates: {
@@ -73,7 +75,7 @@ const config: ExpoConfig = {
   },
 
   assetBundlePatterns: ["**/*"],
-  experiments: { typedRoutes: true },
+  experiments: { typedRoutes: true, reactCompiler: true },
   owner: "1185679154",
 };
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 import EditCoreEnduranceModal from "../modals/EditCoreEnduranceModal";
 import { HeaderViewModel } from "../types";
@@ -19,6 +20,7 @@ export default function CoreEnduranceCard({
   profile: any;
   user: HeaderViewModel;
 }) {
+  const colors = useThemeColors();
   const sec = (profile as any)?.performance?.hollow_hold_sec?.value ?? null;
 
   const [open, setOpen] = useState(false);
@@ -32,12 +34,12 @@ export default function CoreEnduranceCard({
       <TouchableOpacity style={styles.statCard} activeOpacity={0.9} onPress={() => setOpen(true)}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Core Endurance</Text>
-          <MaterialCommunityIcons name="ab-testing" size={18} color="#666" />
+          <MaterialCommunityIcons name="ab-testing" size={18} color={colors.textSecondary} />
         </View>
 
         <View style={styles.statRow}>
           <Text style={styles.statKey}>Hollow Hold</Text>
-          <Text style={[styles.statVal, { color: sec == null ? "#999" : "#111" }]}>
+          <Text style={[styles.statVal, { color: sec == null ? colors.textTertiary : colors.textPrimary }]}>
             {sec == null ? subtitle : fmtSec(sec)}
           </Text>
         </View>

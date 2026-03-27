@@ -2,21 +2,17 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import {
   View,
   Text,
-  Modal,
+  TouchableOpacity,
   FlatList,
   TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   StyleSheet,
-  Animated,
-  Dimensions,
-  Pressable,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { theme } from '../../../lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
 import { communityApi } from '../api';
@@ -24,8 +20,6 @@ import { useCommunityStore } from '../../../store/useCommunityStore';
 import { useUserStore } from '../../../store/useUserStore';
 import type { CommentOut } from '../types';
 import CommentItem from './CommentItem';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface CommentSheetProps {
   visible: boolean;
@@ -61,56 +55,39 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [replyingTo, setReplyingTo] = useState<CommentOut | null>(null);
-  const inputRef = useRef<TextInput>(null);
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const inputRef = useRef<any>(null);
+  const sheetRef = useRef<TrueSheet>(null);
+  const isPresented = useRef(false);
 
   const isPostOwner = !!currentUserId && !!postOwnerId &&
     currentUserId.toLowerCase().trim() === postOwnerId.toLowerCase().trim();
 
-  // Animation: match SmartBottomSheet pattern
+  // Present/dismiss based on visible prop
   useEffect(() => {
-    if (visible) {
-      setShowModal(true);
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        bounciness: 0,
-      }).start();
-    } else if (showModal) {
-      Animated.timing(translateY, {
-        toValue: SCREEN_HEIGHT,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowModal(false);
-      });
+    if (visible && !isPresented.current) {
+      sheetRef.current?.present();
+      isPresented.current = true;
+    } else if (!visible && isPresented.current) {
+      sheetRef.current?.dismiss();
+      isPresented.current = false;
     }
   }, [visible]);
+
+  const handleDismiss = useCallback(() => {
+    isPresented.current = false;
+    setComments([]);
+    setText('');
+    setReplyingTo(null);
+    onClose();
+  }, [onClose]);
 
   // Load comments when sheet opens
   useEffect(() => {
     if (visible && postId) {
       loadComments();
     }
-    if (!visible) {
-      setComments([]);
-      setText('');
-      setReplyingTo(null);
-    }
   }, [visible, postId]);
-
-  const animateClose = () => {
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowModal(false);
-      onClose();
-    });
-  };
 
   const loadComments = async () => {
     setLoading(true);
@@ -135,14 +112,12 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
       const newComment = mapRawComment(raw);
 
       if (parentId) {
-        // Reply: increment parent's replyCount in local state
         setComments((prev) =>
           prev.map((c) =>
             c.id === parentId ? { ...c, replyCount: c.replyCount + 1 } : c
           )
         );
       } else {
-        // Top-level comment: add to list
         setComments((prev) => [...prev, newComment]);
       }
       updateCommentCount(postId, 1);
@@ -156,15 +131,12 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   };
 
   const handleDelete = async (commentId: string) => {
-    // Find the comment to determine if it's top-level or a reply
     const comment = comments.find((c) => c.id === commentId);
     if (comment) {
-      // Top-level comment: remove from list and adjust count (1 + its replies)
       const adjustment = -(1 + comment.replyCount);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
       updateCommentCount(postId, adjustment);
     } else {
-      // It's a reply deleted from within CommentItem — just adjust by -1
       updateCommentCount(postId, -1);
     }
     try {
@@ -176,7 +148,6 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   };
 
   const handleReport = useCallback((commentId: string) => {
-    // Placeholder: report comment
     if (__DEV__) console.log('Report comment:', commentId);
     Alert.alert('Reported', 'This comment has been reported.');
   }, []);
@@ -187,7 +158,7 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   }, []);
 
   const handlePressUser = (userId: string) => {
-    animateClose();
+    sheetRef.current?.dismiss();
     setTimeout(() => router.push(`/community/u/${userId}`), 300);
   };
 
@@ -195,149 +166,109 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
     setReplyingTo(null);
   };
 
-  if (!showModal) return null;
+  const footerElement = (
+    <View style={styles.inputArea}>
+      {replyingTo && (
+        <View style={styles.replyBar}>
+          <Text style={styles.replyBarText} numberOfLines={1}>
+            Replying to <Text style={styles.replyBarName}>@{replyingTo.authorName || 'User'}</Text>
+          </Text>
+          <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.inputBar}>
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          placeholder={replyingTo ? `Reply to @${replyingTo.authorName || 'User'}...` : 'Add a comment...'}
+          placeholderTextColor={colors.textTertiary}
+          value={text}
+          onChangeText={setText}
+          multiline
+          maxLength={500}
+          returnKeyType="default"
+        />
+        {text.trim().length > 0 && (
+          <TouchableOpacity onPress={handleSubmit} disabled={sending} style={styles.postBtn}>
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Text style={styles.postBtnText}>Post</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 
   return (
-    <Modal transparent visible={showModal} onRequestClose={animateClose}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Backdrop — appears immediately */}
-        <Pressable style={styles.backdrop} onPress={animateClose} />
+    <TrueSheet
+      ref={sheetRef}
+      detents={[0.6, 0.9]}
+      cornerRadius={24}
+      backgroundColor={colors.background}
+      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+      dimmed
+      dimmedDetentIndex={0}
+      onDidDismiss={handleDismiss}
+      footer={footerElement}
+    >
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Comments</Text>
+      </View>
 
-        {/* Sheet — slides up with spring animation */}
-        <Animated.View
-          style={[
-            styles.sheet,
-            { transform: [{ translateY }] },
-          ]}
-        >
-          {/* Stop backdrop press from propagating */}
-          <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
-            {/* Drag bar */}
-            <View style={styles.dragBar} />
-
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>Comments ({commentCount ?? comments.length})</Text>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.textSecondary} />
+        </View>
+      ) : (
+        <FlatList
+          data={comments}
+          keyExtractor={(item: CommentOut) => item.id}
+          renderItem={({ item }: { item: CommentOut }) => (
+            <CommentItem
+              comment={item}
+              isOwnComment={item.userId === currentUserId}
+              isPostOwner={isPostOwner}
+              postId={postId}
+              currentUserId={currentUserId}
+              onDelete={handleDelete}
+              onReport={handleReport}
+              onReply={handleReply}
+              onPressUser={handlePressUser}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>No comments yet. Be the first!</Text>
             </View>
-
-            {/* Comment list */}
-            {loading ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator size="small" color="#111" />
-              </View>
-            ) : (
-              <FlatList
-                data={comments}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <CommentItem
-                    comment={item}
-                    isOwnComment={item.userId === currentUserId}
-                    isPostOwner={isPostOwner}
-                    postId={postId}
-                    currentUserId={currentUserId}
-                    onDelete={handleDelete}
-                    onReport={handleReport}
-                    onReply={handleReply}
-                    onPressUser={handlePressUser}
-                  />
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyWrap}>
-                    <Text style={styles.emptyText}>No comments yet. Be the first!</Text>
-                  </View>
-                }
-                style={{ flex: 1 }}
-                contentContainerStyle={comments.length === 0 ? { flex: 1, paddingBottom: 80 } : { paddingBottom: 80 }}
-                keyboardShouldPersistTaps="handled"
-              />
-            )}
-
-            {/* Floating input area */}
-            <View style={styles.floatingInput}>
-              {/* Replying indicator */}
-              {replyingTo && (
-                <View style={styles.replyBar}>
-                  <Text style={styles.replyBarText} numberOfLines={1}>
-                    Replying to <Text style={styles.replyBarName}>@{replyingTo.authorName || 'User'}</Text>
-                  </Text>
-                  <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Input bar */}
-              <View style={styles.inputBar}>
-                <TextInput
-                  ref={inputRef}
-                  style={styles.input}
-                  placeholder={replyingTo ? `Reply to @${replyingTo.authorName || 'User'}...` : 'Add a comment...'}
-                  placeholderTextColor={colors.textTertiary}
-                  value={text}
-                  onChangeText={setText}
-                  multiline
-                  maxLength={500}
-                  returnKeyType="default"
-                />
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={!text.trim() || sending}
-                  style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-                >
-                  {sending ? (
-                    <ActivityIndicator size="small" color={text.trim() ? '#FFF' : colors.textTertiary} />
-                  ) : (
-                    <Ionicons name="send" size={16} color={text.trim() ? '#FFF' : colors.textTertiary} />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Pressable>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Modal>
+          }
+          style={styles.commentList}
+          contentContainerStyle={comments.length === 0 ? { flexGrow: 1, paddingBottom: 80 } : { paddingBottom: 80 }}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
+    </TrueSheet>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sheet: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: SCREEN_HEIGHT * 0.6,
-    overflow: 'hidden',
-  },
-  dragBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
   header: {
     paddingHorizontal: 22,
-    paddingBottom: 10,
+    paddingTop: 26,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.cardBorder,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    fontFamily: theme.fonts.black,
-    letterSpacing: -0.5,
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: theme.fonts.bold,
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   loadingWrap: {
     flex: 1,
@@ -354,11 +285,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.regular,
     color: colors.textTertiary,
   },
-  floatingInput: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  commentList: {
+    flex: 1,
+  },
+  inputArea: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.cardBorder,
+    backgroundColor: colors.background,
   },
   replyBar: {
     flexDirection: 'row',
@@ -367,8 +300,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 22,
     paddingVertical: 8,
     backgroundColor: colors.backgroundSecondary,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
   },
   replyBarText: {
     fontSize: 13,
@@ -384,11 +315,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    paddingVertical: 10,
+    gap: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
   },
   input: {
     flex: 1,
@@ -402,15 +333,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.regular,
     color: colors.textPrimary,
   },
-  sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
+  postBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  sendBtnDisabled: {
-    backgroundColor: colors.backgroundSecondary,
+  postBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: theme.fonts.bold,
+    color: colors.accent,
   },
 });

@@ -1,8 +1,10 @@
 // app/_layout.tsx
 import "react-native-gesture-handler";
 import React, { useEffect, useState, useCallback } from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, useColorScheme } from "react-native";
 import { Stack, SplashScreen, useRouter, useSegments } from "expo-router";
+import { ThemeProvider, DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "../src/lib/nativeHeaderOptions";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -26,6 +28,8 @@ import FloatingActiveSessionTimer from "../src/features/journal/FloatingActiveSe
 import { useAuthStore } from "../src/store/useAuthStore";
 import { runMigrationsIfNeeded } from "../src/features/journal/loglist/storage";
 import { registerForPushNotifications } from "../src/lib/pushNotifications";
+import { SidebarProvider } from "../src/contexts/SidebarContext";
+import { SidebarLayout, useGestureLock } from "@/components/sidebar/Sidebar";
 
 // Set up notification handler (must be outside component)
 Notifications.setNotificationHandler({
@@ -56,8 +60,42 @@ function FloatingTimerOverlay() {
   );
 }
 
+function RootStack() {
+  const gestureEnabled = useGestureLock();
+
+  return (
+    <Stack screenOptions={{ headerShown: false, gestureEnabled }}>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="library" options={{ headerShown: false }} />
+      <Stack.Screen name="training" options={{ headerShown: false }} />
+      <Stack.Screen name="journal" options={{ headerShown: false }} />
+      <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
+      <Stack.Screen name="gyms" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="gyms-sheet"
+        options={{
+          headerShown: false,
+          presentation: "formSheet",
+          gestureEnabled: false,
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: "transparent" },
+          sheetAllowedDetents: [0.125, 0.45, 0.8],
+          sheetInitialDetentIndex: 1,
+          sheetLargestUndimmedDetentIndex: 2,
+        }}
+      />
+      <Stack.Screen name="analysis" options={{ ...NATIVE_HEADER_LARGE, headerShown: true }} />
+      <Stack.Screen name="action" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
+      <Stack.Screen name="gym-community" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
 
   const [appIsReady, setAppIsReady] = useState(false);
   const [splashAnimationFinished, setSplashAnimationFinished] = useState(false);
@@ -113,7 +151,7 @@ export default function RootLayout() {
     }
   }, [appIsReady]);
 
-  if (!appIsReady) {
+  if (!appIsReady || !fontsLoaded) {
     return null;
   }
 
@@ -121,38 +159,28 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <SettingsProvider>
-          {/* 状态栏透明沉浸式，style auto 跟随系统深色模式 */}
-          <StatusBar style="auto" translucent backgroundColor="transparent" />
-
-          <View style={{ flex: 1 }}>
-            {/* 主应用导航 */}
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="library" options={{ headerShown: false }} />
-              <Stack.Screen name="training" options={{ headerShown: false }} />
-              <Stack.Screen name="journal" options={{ headerShown: false }} />
-              <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
-              <Stack.Screen name="gyms" options={{ headerShown: false }} />
-              <Stack.Screen name="analysis" options={{ headerShown: false }} />
-              <Stack.Screen name="coach" options={{ headerShown: false }} />
-              <Stack.Screen name="action" options={{ headerShown: false }} />
-              <Stack.Screen name="settings" options={{ headerShown: false }} />
-            </Stack>
-
-            <FloatingTimerOverlay />
-
-            {/* 猩猩遮罩层：动画没播完前覆盖在最上层 */}
-            {!splashAnimationFinished && (
-              <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
-                <GorillaSplash
-                  onAnimationFinish={() => {
-                    setSplashAnimationFinished(true);
-                  }}
-                />
-              </View>
-            )}
-          </View>
+          <SidebarProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              {/* 状态栏透明沉浸式，style auto 跟随系统深色模式 */}
+              <StatusBar style="auto" translucent backgroundColor="transparent" />
+              <SidebarLayout>
+                <View style={{ flex: 1 }}>
+                  <RootStack />
+                  <FloatingTimerOverlay />
+                </View>
+              </SidebarLayout>
+            </ThemeProvider>
+              {/* 猩猩遮罩层：动画没播完前覆盖在最上层 */}
+              {!splashAnimationFinished && (
+                <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
+                  <GorillaSplash
+                    onAnimationFinish={() => {
+                      setSplashAnimationFinished(true);
+                    }}
+                  />
+                </View>
+              )}
+          </SidebarProvider>
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

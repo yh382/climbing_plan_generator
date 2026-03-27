@@ -1,6 +1,6 @@
 // app/community/notifications.tsx
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   RefreshControl,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TopBar from "../../components/TopBar";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
+import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useNotifications, Notification } from "../../src/features/community/hooks";
@@ -117,29 +118,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.regular,
       fontSize: 15,
     },
-    markAllRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    markAllText: {
-      fontSize: 13,
-      fontWeight: "600",
-      fontFamily: theme.fonts.medium,
-      color: colors.textPrimary,
-    },
   });
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
   const {
     notifications,
     unreadCount,
@@ -148,6 +134,36 @@ export default function NotificationsScreen() {
     markRead,
     markAllRead,
   } = useNotifications();
+
+  const markAllReadRef = useRef<() => void>(() => {});
+  markAllReadRef.current = markAllRead;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <Host matchContents>
+          <SUIButton
+            systemImage={"chevron.backward" as any}
+            label=""
+            onPress={() => router.back()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ),
+      headerRight: unreadCount > 0 ? () => (
+        <Host matchContents>
+          <SUIButton
+            systemImage={"checkmark.circle" as any}
+            label=""
+            onPress={() => markAllReadRef.current()}
+            modifiers={[buttonStyle("plain"), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
+          />
+        </Host>
+      ) : undefined,
+    });
+  }, [navigation, router, unreadCount]);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -199,24 +215,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <View style={{ paddingTop: insets.top }}>
-        <TopBar
-          routeName="notifications"
-          title="Notifications"
-          useSafeArea={false}
-          leftControls={{ mode: "back", onBack: () => router.back() }}
-        />
-      </View>
-
-      {/* Mark All Read */}
-      {unreadCount > 0 && (
-        <TouchableOpacity style={styles.markAllRow} onPress={markAllRead} activeOpacity={0.7}>
-          <Ionicons name="checkmark-done" size={16} color={colors.textPrimary} />
-          <Text style={styles.markAllText}>Mark all as read</Text>
-        </TouchableOpacity>
-      )}
-
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {loading && notifications.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#111" />
@@ -232,6 +231,7 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ paddingVertical: 8 }}
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#111" />
           }

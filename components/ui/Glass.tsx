@@ -1,6 +1,8 @@
 import React from "react";
-import { Platform, StyleProp, View, ViewStyle } from "react-native";
+import { Platform, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { GlassView } from "expo-glass-effect";
+import { SymbolView } from "expo-symbols";
+import type { SFSymbol } from "sf-symbols-typescript";
 
 // 你可以把这两个当成“设计系统”级别的基础组件
 type BaseProps = {
@@ -66,4 +68,43 @@ export function GlassCard({ style, children }: BaseProps) {
   }
 
   return <View style={[base, fallback, style]}>{children}</View>;
+}
+
+// 玻璃胶囊图标组：多个 SF Symbol 合并为一个 UIVisualEffectView 胶囊
+interface GlassIconCapsuleProps {
+  buttons: { name: SFSymbol; onPress: () => void }[];
+  size?: number;
+  iconSize?: number;
+}
+
+export function GlassIconCapsule({ buttons, size = 44, iconSize = 20 }: GlassIconCapsuleProps) {
+  return (
+    <GlassPill style={{ flexDirection: "row", height: size }}>
+      {buttons.map((btn, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && (
+            <View
+              style={{
+                width: StyleSheet.hairlineWidth,
+                height: "50%",
+                backgroundColor: "rgba(255,255,255,0.25)",
+                alignSelf: "center",
+              }}
+            />
+          )}
+          <Pressable
+            onPress={btn.onPress}
+            style={{
+              width: size,
+              height: size,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <SymbolView name={btn.name} size={iconSize} tintColor="white" />
+          </Pressable>
+        </React.Fragment>
+      ))}
+    </GlassPill>
+  );
 }
