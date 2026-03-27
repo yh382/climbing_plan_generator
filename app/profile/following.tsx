@@ -1,6 +1,6 @@
 // app/profile/following.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import { communityApi } from "../../src/features/community/api";
 import { api } from "../../src/lib/apiClient";
@@ -26,23 +28,36 @@ interface FollowUser {
 
 export default function FollowingScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { userId } = useLocalSearchParams<{ userId?: string }>();
 
   const [users, setUsers] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "Following",
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const me = await api.get<{ id: string }>("/users/me");
-      const data = await communityApi.getFollowing(me.id);
+      const targetId = userId ?? (await api.get<{ id: string }>("/users/me")).id;
+      const data = await communityApi.getFollowing(targetId);
       setUsers(Array.isArray(data) ? data : []);
     } catch (_e) {
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadData();
@@ -61,6 +76,59 @@ export default function FollowingScreen() {
         return next;
       });
     }
+  };
+
+  const isOtherUser = Boolean(userId);
+
+  const handleFollow = async (uid: string) => {
+    setToggling((s) => new Set(s).add(uid));
+    try {
+      await communityApi.followUser(uid);
+      setUsers((prev) =>
+        prev.map((u) => (u.user_id === uid ? { ...u, is_following: true } : u))
+      );
+    } catch (_e) { /* swallow */ }
+    finally {
+      setToggling((s) => {
+        const next = new Set(s);
+        next.delete(uid);
+        return next;
+      });
+    }
+  };
+
+  const renderButton = (item: FollowUser) => {
+    if (isOtherUser) {
+      // Viewing another user's following: hide button for self & already-followed
+      if (item.is_following == null || item.is_following === true) return null;
+      return (
+        <TouchableOpacity
+          style={styles.followBtn}
+          onPress={() => handleFollow(item.user_id)}
+          disabled={toggling.has(item.user_id)}
+        >
+          {toggling.has(item.user_id) ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text style={styles.followBtnText}>Follow</Text>
+          )}
+        </TouchableOpacity>
+      );
+    }
+    // Own following: show Following with unfollow action
+    return (
+      <TouchableOpacity
+        style={styles.unfollowBtn}
+        onPress={() => handleUnfollow(item.user_id)}
+        disabled={toggling.has(item.user_id)}
+      >
+        {toggling.has(item.user_id) ? (
+          <ActivityIndicator size="small" color="#111" />
+        ) : (
+          <Text style={styles.unfollowText}>Following</Text>
+        )}
+      </TouchableOpacity>
+    );
   };
 
   const renderItem = ({ item }: { item: FollowUser }) => (
@@ -82,23 +150,12 @@ export default function FollowingScreen() {
         </Text>
         <Text style={styles.handle} numberOfLines={1}>@{item.username}</Text>
       </View>
-      <TouchableOpacity
-        style={styles.unfollowBtn}
-        onPress={() => handleUnfollow(item.user_id)}
-        disabled={toggling.has(item.user_id)}
-      >
-        {toggling.has(item.user_id) ? (
-          <ActivityIndicator size="small" color="#111" />
-        ) : (
-          <Text style={styles.unfollowText}>Following</Text>
-        )}
-      </TouchableOpacity>
+      {renderButton(item)}
     </TouchableOpacity>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <Stack.Screen options={{ title: "Following" }} />
+    <View style={{ flex: 1 }}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#111" />
@@ -137,6 +194,15 @@ const styles = StyleSheet.create({
   info: { flex: 1, marginLeft: 12 },
   username: { fontSize: 15, fontWeight: "700", color: "#111" },
   handle: { fontSize: 13, color: "#9CA3AF", marginTop: 1 },
+  followBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
+    backgroundColor: "#111",
+  },
+  followBtnText: { fontSize: 13, fontWeight: "600", color: "#FFF" },
   unfollowBtn: {
     paddingHorizontal: 14,
     paddingVertical: 7,

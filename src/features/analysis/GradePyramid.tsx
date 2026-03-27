@@ -7,11 +7,13 @@ import useLogsStore from "../../store/useLogsStore";
 import { buildFixedGradePyramid } from "../../services/stats";
 import { useThemeColors } from "../../lib/useThemeColors";
 import { theme } from "../../lib/theme";
+import { useSettings } from "../../contexts/SettingsContext";
 
 type TabType = "boulder" | "rope";
 
 export default function GradePyramid() {
   const colors = useThemeColors();
+  const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { logs } = useLogsStore();
   const [activeTab, setActiveTab] = useState<TabType>("boulder");
@@ -31,7 +33,7 @@ export default function GradePyramid() {
   return (
     <View style={styles.chartCard}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>Grade Pyramid</Text>
+        <Text style={styles.cardTitle}>{tr("能力金字塔", "Grade Pyramid")}</Text>
 
         <View style={styles.headerControls}>
           <View style={styles.toggleContainer}>
@@ -39,13 +41,13 @@ export default function GradePyramid() {
               style={[styles.toggleBtn, activeTab === "boulder" && styles.toggleBtnActive]}
               onPress={() => setActiveTab("boulder")}
             >
-              <Text style={[styles.toggleText, activeTab === "boulder" && styles.toggleTextActive]}>Boulder</Text>
+              <Text style={[styles.toggleText, activeTab === "boulder" && styles.toggleTextActive]}>{tr("抱石", "Boulder")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, activeTab === "rope" && styles.toggleBtnActive]}
               onPress={() => setActiveTab("rope")}
             >
-              <Text style={[styles.toggleText, activeTab === "rope" && styles.toggleTextActive]}>Rope</Text>
+              <Text style={[styles.toggleText, activeTab === "rope" && styles.toggleTextActive]}>{tr("绳攀", "Rope")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -55,7 +57,11 @@ export default function GradePyramid() {
         </View>
       </View>
 
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.pyramidScroll}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.chartBody}>
           {pyramidData.map((item) => {
             const widthPct = maxCount > 0 ? Math.max(12, (item.count / maxCount) * 100) : 0;
@@ -84,24 +90,26 @@ export default function GradePyramid() {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       <TrueSheet
         ref={helpRef}
-        detents={[0.6, 0.9]}
-        cornerRadius={24}
+        detents={[0.4, 0.9]}
         backgroundColor={colors.background}
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         dimmed
         dimmedDetentIndex={0}
       >
         <View style={styles.sheetHeader}>
-          <Text style={styles.sheetHeaderTitle}>Grade Pyramid</Text>
+          <Text style={styles.sheetHeaderTitle}>{tr("能力金字塔", "Grade Pyramid")}</Text>
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           <View style={styles.sheetBody}>
             <Text style={styles.sheetBodyText}>
-              能力金字塔反映了你的攀爬基础结构。
+              {tr(
+                "能力金字塔反映了你的攀爬基础结构。",
+                "The grade pyramid reflects the structure of your climbing foundation."
+              )}
             </Text>
             <View style={styles.sheetTipRow}>
               <View style={[styles.sheetTipIcon, { backgroundColor: 'rgba(48,110,111,0.15)' }]}>
@@ -109,10 +117,13 @@ export default function GradePyramid() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetTipTitle}>
-                  健康结构：正三角形
+                  {tr("健康结构：正三角形", "Healthy: Triangle Shape")}
                 </Text>
                 <Text style={[styles.sheetBodyText, { marginTop: 4 }]}>
-                  底宽顶尖，说明有扎实的中低难度积累来支撑高难度突破。
+                  {tr(
+                    "底宽顶尖，说明有扎实的中低难度积累来支撑高难度突破。",
+                    "Wide base, narrow top — solid volume at lower grades supports harder breakthroughs."
+                  )}
                 </Text>
               </View>
             </View>
@@ -122,10 +133,13 @@ export default function GradePyramid() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetTipTitle}>
-                  不健康结构：倒 T 型或柱状
+                  {tr("不健康结构：倒 T 型或柱状", "Unhealthy: Inverted-T or Column")}
                 </Text>
                 <Text style={[styles.sheetBodyText, { marginTop: 4 }]}>
-                  基础不稳，强行碰红线更容易导致受伤。建议多积累金字塔中下层路线。
+                  {tr(
+                    "基础不稳，强行碰红线更容易导致受伤。建议多积累金字塔中下层路线。",
+                    "Weak base increases injury risk. Build more volume at mid-to-low grades."
+                  )}
                 </Text>
               </View>
             </View>
@@ -138,6 +152,7 @@ export default function GradePyramid() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   chartCard: {
+    flex: 1,
     backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: 16,
@@ -185,8 +200,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   toggleTextActive: {
     color: colors.toggleActiveText,
   },
-  container: {
-    width: "100%",
+  pyramidScroll: {
+    flex: 1,
     paddingTop: 8,
   },
   chartBody: {

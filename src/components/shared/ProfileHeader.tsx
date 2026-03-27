@@ -164,8 +164,8 @@ export default function ProfileHeader({
     );
   };
 
-  const FollowersWrapper = isOwnProfile && onFollowersPress ? TouchableOpacity : View;
-  const FollowingWrapper = isOwnProfile && onFollowingPress ? TouchableOpacity : View;
+  const FollowersWrapper = onFollowersPress ? TouchableOpacity : View;
+  const FollowingWrapper = onFollowingPress ? TouchableOpacity : View;
 
   return (
     <View style={{ marginTop: -headerHeight }}>
@@ -211,7 +211,7 @@ export default function ProfileHeader({
           {/* Row 1: Followers | Following */}
           <View style={styles.statsRow}>
             <FollowersWrapper
-              {...(isOwnProfile && onFollowersPress ? { onPress: onFollowersPress, activeOpacity: 0.7 } : {})}
+              {...(onFollowersPress ? { onPress: onFollowersPress, activeOpacity: 0.7 } : {})}
               style={styles.statFieldItem}
             >
               <Text style={styles.statFieldNum}>{followersCount}</Text>
@@ -219,7 +219,7 @@ export default function ProfileHeader({
             </FollowersWrapper>
             <View style={styles.statFieldDivider} />
             <FollowingWrapper
-              {...(isOwnProfile && onFollowingPress ? { onPress: onFollowingPress, activeOpacity: 0.7 } : {})}
+              {...(onFollowingPress ? { onPress: onFollowingPress, activeOpacity: 0.7 } : {})}
               style={styles.statFieldItem}
             >
               <Text style={styles.statFieldNum}>{followingCount}</Text>

@@ -9,26 +9,21 @@ export type { PoiProvider } from "./types";
 
 /** Backend gym item shape (matches _gym_item_from_place output) */
 interface BackendGymItem {
-  place_id: string;
+  id: string;
   name: string;
-  vicinity?: string;
-  formatted_address?: string;
-  location: { lat: number; lng: number };
-  distanceMiles?: number | null;
-  rating?: number;
-  user_ratings_total?: number;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+  distance_m?: number | null;
 }
 
 function toGymPlace(item: BackendGymItem): GymPlace {
   return {
-    place_id: item.place_id,
+    place_id: item.id,
     name: item.name,
-    vicinity: item.vicinity,
-    formatted_address: item.formatted_address,
-    location: item.location,
-    distanceMiles: item.distanceMiles ?? 0,
-    rating: item.rating,
-    user_ratings_total: item.user_ratings_total,
+    address: item.address,
+    location: { lat: item.lat ?? 0, lng: item.lng ?? 0 },
+    distance_m: item.distance_m,
   };
 }
 

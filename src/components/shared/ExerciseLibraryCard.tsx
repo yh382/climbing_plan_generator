@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { getClimbingTypeIcons, CLIMBING_TYPE_ICON } from "../ui/icons/equipmentIcons";
 
 type LocaleKey = "zh" | "en";
 
@@ -15,6 +16,7 @@ interface Props {
   level?: string;
   minutes?: number | null;
   imageUrl?: string | null;
+  equipment?: string[];
   onPress?: () => void;
   locale: LocaleKey;
   isFavorite?: boolean;
@@ -28,13 +30,14 @@ export default function ExerciseLibraryCard({
   level,
   minutes,
   imageUrl,
+  equipment,
   onPress,
   locale,
   isFavorite,
-  onToggleFavorite,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const climbingTypes = useMemo(() => getClimbingTypeIcons(equipment), [equipment]);
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
@@ -47,20 +50,9 @@ export default function ExerciseLibraryCard({
       </View>
 
       <View style={styles.cardRight}>
-        <View style={styles.cardTitleRow}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {title}
-          </Text>
-          {onToggleFavorite && (
-            <TouchableOpacity onPress={onToggleFavorite} hitSlop={8}>
-              <Ionicons
-                name={isFavorite ? "heart" : "heart-outline"}
-                size={18}
-                color={isFavorite ? colors.accent : colors.textTertiary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {title}
+        </Text>
 
         {description ? (
           <Text style={styles.cardSubtitle} numberOfLines={2}>
@@ -73,17 +65,18 @@ export default function ExerciseLibraryCard({
         </Text>
 
         <View style={styles.cardBottomRow}>
-          <View style={styles.iconRow}>
-            <View style={styles.miniIconPill}>
-              <Ionicons name="pricetag-outline" size={14} color={colors.textTertiary} />
+          {climbingTypes.length > 0 && (
+            <View style={styles.iconRow}>
+              {climbingTypes.map((key) => {
+                const Icon = CLIMBING_TYPE_ICON[key];
+                return (
+                  <View key={key} style={styles.miniIconPill}>
+                    <Icon size={28} color="#3C3C3C" />
+                  </View>
+                );
+              })}
             </View>
-            <View style={styles.miniIconPill}>
-              <Ionicons name="construct-outline" size={14} color={colors.textTertiary} />
-            </View>
-            <View style={styles.miniIconPill}>
-              <Ionicons name="fitness-outline" size={14} color={colors.textTertiary} />
-            </View>
-          </View>
+          )}
 
           <View style={styles.timePill}>
             <Ionicons name="time-outline" size={14} color={colors.textTertiary} />
@@ -91,6 +84,13 @@ export default function ExerciseLibraryCard({
           </View>
         </View>
       </View>
+
+      {/* Favorite indicator — non-interactive */}
+      {isFavorite && (
+        <View style={styles.favIndicator}>
+          <Ionicons name="heart" size={16} color={colors.accent} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -119,14 +119,19 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   cardImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   cardRight: { flex: 1, paddingRight: 2 },
-  cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  cardTitle: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary, flexShrink: 1 },
+  cardTitle: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+
+  favIndicator: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+  },
   cardSubtitle: { marginTop: 3, fontSize: 13, color: colors.textSecondary, fontFamily: theme.fonts.regular, lineHeight: 18 },
   cardMeta: { marginTop: 3, fontSize: 11.5, color: colors.textSecondary },
 
   cardBottomRow: {
-    marginTop: "auto",
+    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -134,9 +139,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
   iconRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   miniIconPill: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.backgroundSecondary,
     alignItems: "center",
     justifyContent: "center",

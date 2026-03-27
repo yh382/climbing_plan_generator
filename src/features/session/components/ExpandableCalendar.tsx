@@ -37,6 +37,8 @@ if (
 
 interface ExpandableCalendarProps {
   onDateSelect?: (date: Date) => void;
+  /** The date string (yyyy-MM-dd) actively selected by the parent, or null for month view */
+  activeDate?: string | null;
 }
 
 /** Parse duration string like "2h 30m" or "45m" to minutes */
@@ -51,6 +53,7 @@ function parseDurationToMin(dur: string): number {
 
 export default function ExpandableCalendar({
   onDateSelect,
+  activeDate,
 }: ExpandableCalendarProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -93,13 +96,15 @@ export default function ExpandableCalendar({
 
   const handleDateSelect = useCallback(
     (date: Date) => {
-      if (isSameDay(date, selectedDate)) {
-        // Same date tapped again — reset calendar to today
+      if (isTodayFn(date)) {
+        // Tapping today — reset week view to today
+        setSelectedDate(new Date());
+      } else if (isSameDay(date, selectedDate)) {
+        // Same non-today date tapped again — reset to today
         setSelectedDate(new Date());
       } else {
         setSelectedDate(date);
       }
-      // Always pass tapped date to parent for its toggle logic
       onDateSelect?.(date);
     },
     [onDateSelect, selectedDate]
@@ -176,7 +181,7 @@ export default function ExpandableCalendar({
                 durationMin={stats?.durationMin ?? 0}
                 sendCount={stats?.sends ?? 0}
                 planProgress={planProgress}
-                isSelected={isSameDay(date, selectedDate)}
+                isSelected={activeDate != null && activeDate === dateStr}
                 isToday={isTodayFn(date)}
                 isCurrentMonth={isCurrentMonth}
                 onPress={() => handleDateSelect(date)}

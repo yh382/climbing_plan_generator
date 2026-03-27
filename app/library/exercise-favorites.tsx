@@ -8,21 +8,14 @@ import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 
 import ExerciseLibraryCard from "@/components/shared/ExerciseLibraryCard";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "../../src/contexts/SettingsContext";
+import { GOAL_LABEL, LEVEL_LABEL } from "../../src/features/home/exercises/model/labels";
 import {
   getFavoriteExercises,
   removeFavorite,
 } from "@/features/home/exercises/favoritesApi";
 
 type LocaleKey = "zh" | "en";
-
-function detectLocale(): LocaleKey {
-  try {
-    const loc = Intl.DateTimeFormat().resolvedOptions().locale || "en";
-    return loc.toLowerCase().startsWith("zh") ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
 
 type FavExercise = {
   id: string;
@@ -39,8 +32,8 @@ type FavExercise = {
 const ALL_KEY = "__all__";
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F9FAFB" },
-  loadingText: { marginTop: 10, color: "#6B7280", fontSize: 12 },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  loadingText: { marginTop: 10, color: colors.textSecondary, fontSize: 12 },
 
   tabsWrap: { marginTop: 8, marginBottom: 12 },
   tabsRow: {
@@ -75,7 +68,7 @@ export default function ExerciseFavoritesScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const locale = useMemo(() => detectLocale(), []);
+  const { lang: locale, tr } = useSettings();
 
   const [exercises, setExercises] = useState<FavExercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,8 +104,11 @@ export default function ExerciseFavoritesScreen() {
     }
     const sorted = Array.from(goals).sort();
     return [
-      { key: ALL_KEY, label: locale === "zh" ? "全部" : "All" },
-      ...sorted.map((g) => ({ key: g, label: g.charAt(0).toUpperCase() + g.slice(1) })),
+      { key: ALL_KEY, label: tr("全部", "All") },
+      ...sorted.map((g) => ({
+        key: g,
+        label: (GOAL_LABEL as any)?.[locale]?.[g] ?? (g.charAt(0).toUpperCase() + g.slice(1)),
+      })),
     ];
   }, [exercises, locale]);
 
@@ -135,7 +131,7 @@ export default function ExerciseFavoritesScreen() {
     [load]
   );
 
-  const titleText = locale === "zh" ? "我的收藏" : "My Favorites";
+  const titleText = tr("我的收藏", "My Favorites");
 
   const TabsHeader = goalTabs.length > 1 ? (
     <View style={styles.tabsWrap}>
@@ -162,7 +158,7 @@ export default function ExerciseFavoritesScreen() {
       <View style={styles.loadingWrap}>
         <ActivityIndicator />
         <Text style={styles.loadingText}>
-          {locale === "zh" ? "加载中…" : "Loading…"}
+          {tr("加载中…", "Loading…")}
         </Text>
       </View>
     );
@@ -172,12 +168,13 @@ export default function ExerciseFavoritesScreen() {
     <View style={styles.emptyWrap}>
       <Ionicons name="heart-outline" size={48} color={colors.textTertiary} />
       <Text style={styles.emptyTitle}>
-        {locale === "zh" ? "还没有收藏" : "No favorites yet"}
+        {tr("还没有收藏", "No favorites yet")}
       </Text>
       <Text style={styles.emptyHint}>
-        {locale === "zh"
-          ? "在动作库中点击 ♡ 收藏你喜欢的训练动作"
-          : "Tap ♡ on exercises in the library to save them here"}
+        {tr(
+          "在动作库中点击 ♡ 收藏你喜欢的训练动作",
+          "Tap ♡ on exercises in the library to save them here",
+        )}
       </Text>
     </View>
   ) : null;
@@ -189,16 +186,17 @@ export default function ExerciseFavoritesScreen() {
         title: titleText,
       }} />
       <FlatList
-        style={{ backgroundColor: "#F9FAFB" }}
+        style={{ backgroundColor: colors.background }}
         data={filtered}
         keyExtractor={(item: FavExercise) => String(item.id)}
         renderItem={({ item }: { item: FavExercise }) => (
           <ExerciseLibraryCard
             title={locale === "zh" ? item.name_zh : item.name_en}
-            goal={item.goal}
-            level={item.level}
+            goal={item.goal ? ((GOAL_LABEL as any)?.[locale]?.[item.goal] ?? item.goal) : undefined}
+            level={item.level ? ((LEVEL_LABEL as any)?.[locale]?.[item.level] ?? item.level) : undefined}
             minutes={item.duration_min ?? null}
             imageUrl={item.media?.thumbnail_url || item.media?.image_url || null}
+            equipment={item.equipment ?? []}
             locale={locale}
             isFavorite
             onToggleFavorite={() => handleUnfavorite(item.id)}

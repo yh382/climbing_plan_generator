@@ -273,6 +273,7 @@ export default function PublicRouteLogScreen() {
       <Stack.Screen options={{
         ...NATIVE_HEADER_LARGE,
         title: "Route Log",
+        headerShadowVisible: false,
       }} />
       <FlatList
         style={{ backgroundColor: colors.background }}

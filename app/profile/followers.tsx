@@ -1,6 +1,6 @@
 // app/profile/followers.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import { communityApi } from "../../src/features/community/api";
 import { api } from "../../src/lib/apiClient";
@@ -26,23 +28,36 @@ interface FollowerUser {
 
 export default function FollowersScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { userId } = useLocalSearchParams<{ userId?: string }>();
 
   const [users, setUsers] = useState<FollowerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "Followers",
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const me = await api.get<{ id: string }>("/users/me");
-      const data = await communityApi.getFollowers(me.id);
+      const targetId = userId ?? (await api.get<{ id: string }>("/users/me")).id;
+      const data = await communityApi.getFollowers(targetId);
       setUsers(Array.isArray(data) ? data : []);
     } catch (_e) {
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadData();
@@ -77,55 +92,78 @@ export default function FollowersScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: FollowerUser }) => {
-    const isFollowingBack = item.is_following;
-    return (
-      <TouchableOpacity
-        style={styles.row}
-        onPress={() => router.push(`/community/u/${item.user_id}` as any)}
-        activeOpacity={0.7}
-      >
-        {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={20} color="#9CA3AF" />
-          </View>
-        )}
-        <View style={styles.info}>
-          <Text style={styles.username} numberOfLines={1}>
-            {item.display_name || item.username}
-          </Text>
-          <Text style={styles.handle} numberOfLines={1}>@{item.username}</Text>
-        </View>
+  const isOtherUser = Boolean(userId);
+
+  const renderButton = (item: FollowerUser) => {
+    if (isOtherUser) {
+      // Viewing another user's followers: hide button for self & already-followed
+      if (item.is_following == null || item.is_following === true) return null;
+      return (
         <TouchableOpacity
-          style={[
-            styles.followBtn,
-            isFollowingBack ? styles.followBtnOutline : styles.followBtnFilled,
-          ]}
+          style={[styles.followBtn, styles.followBtnFilled]}
           onPress={() => handleToggleFollow(item)}
           disabled={toggling.has(item.user_id)}
         >
           {toggling.has(item.user_id) ? (
-            <ActivityIndicator size="small" color={isFollowingBack ? "#111" : "#FFF"} />
+            <ActivityIndicator size="small" color="#FFF" />
           ) : (
-            <Text
-              style={[
-                styles.followBtnText,
-                isFollowingBack ? styles.followBtnTextOutline : styles.followBtnTextFilled,
-              ]}
-            >
-              {isFollowingBack ? "Following" : "Follow Back"}
-            </Text>
+            <Text style={[styles.followBtnText, styles.followBtnTextFilled]}>Follow</Text>
           )}
         </TouchableOpacity>
+      );
+    }
+    // Own followers: show Follow Back / Following toggle
+    const isFollowingBack = item.is_following;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.followBtn,
+          isFollowingBack ? styles.followBtnOutline : styles.followBtnFilled,
+        ]}
+        onPress={() => handleToggleFollow(item)}
+        disabled={toggling.has(item.user_id)}
+      >
+        {toggling.has(item.user_id) ? (
+          <ActivityIndicator size="small" color={isFollowingBack ? "#111" : "#FFF"} />
+        ) : (
+          <Text
+            style={[
+              styles.followBtnText,
+              isFollowingBack ? styles.followBtnTextOutline : styles.followBtnTextFilled,
+            ]}
+          >
+            {isFollowingBack ? "Following" : "Follow Back"}
+          </Text>
+        )}
       </TouchableOpacity>
     );
   };
 
+  const renderItem = ({ item }: { item: FollowerUser }) => (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => router.push(`/community/u/${item.user_id}` as any)}
+      activeOpacity={0.7}
+    >
+      {item.avatar_url ? (
+        <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+          <Ionicons name="person" size={20} color="#9CA3AF" />
+        </View>
+      )}
+      <View style={styles.info}>
+        <Text style={styles.username} numberOfLines={1}>
+          {item.display_name || item.username}
+        </Text>
+        <Text style={styles.handle} numberOfLines={1}>@{item.username}</Text>
+      </View>
+      {renderButton(item)}
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-      <Stack.Screen options={{ title: "Followers" }} />
+    <View style={{ flex: 1 }}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#111" />

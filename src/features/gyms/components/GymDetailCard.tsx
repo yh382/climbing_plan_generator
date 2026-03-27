@@ -91,13 +91,14 @@ export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymD
       <Text style={[styles.detailTitle, { color: colors.iconLabel }]} numberOfLines={2}>
         {gym.name}
       </Text>
-      <Text style={[styles.detailMeta, { color: colors.iconInactive }]}>
-        {gym.distanceMiles.toFixed(1)} mi
-        {gym.rating ? ` · ${gym.rating} (${gym.user_ratings_total ?? 0})` : ""}
-      </Text>
-      {(gym.vicinity || gym.formatted_address) && (
+      {gym.distance_m != null && (
+        <Text style={[styles.detailMeta, { color: colors.iconInactive }]}>
+          {gym.distance_m < 1000 ? `${Math.round(gym.distance_m)} m` : `${(gym.distance_m / 1000).toFixed(1)} km`}
+        </Text>
+      )}
+      {!!gym.address && (
         <Text style={[styles.detailAddr, { color: colors.iconInactive }]} numberOfLines={2}>
-          {gym.vicinity || gym.formatted_address}
+          {gym.address}
         </Text>
       )}
 

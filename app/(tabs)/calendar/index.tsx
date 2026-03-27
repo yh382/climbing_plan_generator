@@ -63,8 +63,14 @@ export default function CalendarScreen() {
 
   const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    setSelectedDate((prev) => (prev === dateStr ? null : dateStr));
-  }, []);
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    // Tap today or tap same date again → back to month view
+    if (dateStr === todayStr || dateStr === selectedDate) {
+      setSelectedDate(null);
+    } else {
+      setSelectedDate(dateStr);
+    }
+  }, [selectedDate]);
 
   // Load climb items when date is selected or screen regains focus (e.g. after delete)
   useFocusEffect(
@@ -201,7 +207,7 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <StatusBar style="auto" />
-        <ExpandableCalendar onDateSelect={handleDateSelect} />
+        <ExpandableCalendar onDateSelect={handleDateSelect} activeDate={selectedDate} />
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{isZH ? "当前训练" : "Current Training"}</Text>

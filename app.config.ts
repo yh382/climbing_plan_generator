@@ -41,10 +41,11 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   
   extra: {
+    API_BASE: process.env.EXPO_PUBLIC_API_BASE ?? "",
     MAPBOX_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "",
     REGION: process.env.EXPO_PUBLIC_REGION ?? "global",
     AMAP_KEY: process.env.EXPO_PUBLIC_AMAP_KEY ?? "",
-    eas: { projectId: "d4b98925-c856-48a8-9c93-e2bfa0cc4e24" },
+    eas: { projectId: "03d16d73-266d-4044-94d5-2568911c31f4" },
     router: {},
   },
 
@@ -70,7 +71,7 @@ const config: ExpoConfig = {
   ],
 
   updates: {
-    url: "https://u.expo.dev/d4b98925-c856-48a8-9c93-e2bfa0cc4e24",
+    url: "https://u.expo.dev/03d16d73-266d-4044-94d5-2568911c31f4",
     checkAutomatically: "ON_LOAD",
   },
 

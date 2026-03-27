@@ -6,6 +6,7 @@ import { BarChart, LineChart } from "react-native-gifted-charts";
 import { useThemeColors } from "../../lib/useThemeColors";
 import { theme } from "../../lib/theme";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { useSettings } from "../../contexts/SettingsContext";
 import useLogsStore from "../../store/useLogsStore";
 import { toDateString } from "../../store/usePlanStore";
 import { backfillIntensityData } from "../../services/stats/intensityCalculator";
@@ -89,6 +90,7 @@ const LegendDot = ({ color, label }: { color: string; label: string }) => {
 
 export default function TrainingVolumeChart() {
   const colors = useThemeColors();
+  const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [timeRange, setTimeRange] = useState<TimeRange>("W");
   const [selectedTypes, setSelectedTypes] = useState<LogType[]>(["boulder"]);
@@ -384,19 +386,19 @@ export default function TrainingVolumeChart() {
     <View style={styles.chartCard}>
       <View style={styles.cardHeader}>
         <View>
-          <Text style={styles.cardTitle}>Training Volume</Text>
+          <Text style={styles.cardTitle}>{tr("训练量", "Training Volume")}</Text>
           <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
             <TouchableOpacity
               onPress={() => toggleType("boulder")}
               style={[styles.typePill, selectedTypes.includes("boulder") ? styles.typePillActive : styles.typePillInactive]}
             >
-              <Text style={[styles.typePillText, selectedTypes.includes("boulder") && { color: colors.toggleActiveText }]}>Boulder</Text>
+              <Text style={[styles.typePillText, selectedTypes.includes("boulder") && { color: colors.toggleActiveText }]}>{tr("抱石", "Boulder")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => toggleType("rope")}
               style={[styles.typePill, selectedTypes.includes("rope") ? styles.typePillActive : styles.typePillInactive]}
             >
-              <Text style={[styles.typePillText, selectedTypes.includes("rope") && { color: colors.toggleActiveText }]}>Rope</Text>
+              <Text style={[styles.typePillText, selectedTypes.includes("rope") && { color: colors.toggleActiveText }]}>{tr("绳攀", "Rope")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -473,7 +475,7 @@ export default function TrainingVolumeChart() {
       <View style={{ marginTop: 16, gap: 8 }}>
         {selectedTypes.includes("boulder") && (
           <View style={styles.legendRow}>
-            <Text style={styles.legendTitle}>Boulder:</Text>
+            <Text style={styles.legendTitle}>{tr("抱石:", "Boulder:")}</Text>
             <LegendDot color={BOULDER_COLORS.easy} label="V0-V2" />
             <LegendDot color={BOULDER_COLORS.mid} label="V3-V5" />
             <LegendDot color={BOULDER_COLORS.hard} label="V6-V8" />
@@ -482,8 +484,8 @@ export default function TrainingVolumeChart() {
         )}
         {selectedTypes.includes("rope") && (
           <View style={styles.legendRow}>
-            <Text style={styles.legendTitle}>Rope:</Text>
-            <LegendDot color={ROPE_COLORS.beginner} label="Beginner" />
+            <Text style={styles.legendTitle}>{tr("绳攀:", "Rope:")}</Text>
+            <LegendDot color={ROPE_COLORS.beginner} label={tr("入门", "Beginner")} />
             <LegendDot color={ROPE_COLORS.intermediate} label="5.10" />
             <LegendDot color={ROPE_COLORS.advanced} label="5.11" />
             <LegendDot color={ROPE_COLORS.expert} label="5.12" />
@@ -491,45 +493,49 @@ export default function TrainingVolumeChart() {
           </View>
         )}
         <View style={styles.legendRow}>
-          <Text style={styles.legendTitle}>Intensity:</Text>
+          <Text style={styles.legendTitle}>{tr("费劲程度:", "Intensity:")}</Text>
           <LegendDot color={INTENSITY_COLOR} label="0-1" />
         </View>
       </View>
 
       <TrueSheet
         ref={helpRef}
-        detents={[0.6, 0.9]}
-        cornerRadius={24}
+        detents={[0.4, 0.9]}
         backgroundColor={colors.background}
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         dimmed
         dimmedDetentIndex={0}
       >
         <View style={styles.sheetHeader}>
-          <Text style={styles.sheetHeaderTitle}>Training Volume</Text>
+          <Text style={styles.sheetHeaderTitle}>{tr("训练量", "Training Volume")}</Text>
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           <View style={styles.sheetBody}>
             <View>
-              <Text style={styles.sheetSectionTitle}>训练量柱状图</Text>
+              <Text style={styles.sheetSectionTitle}>{tr("训练量柱状图", "Volume Bar Chart")}</Text>
               <Text style={styles.sheetBodyText}>
-                展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。
+                {tr(
+                  "展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。",
+                  "Shows your daily/weekly/monthly climb count, color-stacked by grade category."
+                )}
               </Text>
             </View>
             <View>
-              <Text style={styles.sheetSectionTitle}>费劲程度（紫色虚线, 0-1）</Text>
+              <Text style={styles.sheetSectionTitle}>{tr("费劲程度（紫色虚线, 0-1）", "Intensity (dashed line, 0-1)")}</Text>
               <Text style={styles.sheetBodyText}>
-                综合反映每次训练的费劲程度，基于：{"\n"}
-                • 你对路线难度的主观感受（soft / solid / hard）{"\n"}
-                • 每条路线的尝试次数{"\n"}
-                • 完攀情况{"\n\n"}
-                数值越接近 1 代表这次训练越费劲，越接近 0 代表越轻松。
+                {tr(
+                  `综合反映每次训练的费劲程度，基于：\n• 你对路线难度的主观感受（soft / solid / hard）\n• 每条路线的尝试次数\n• 完攀情况\n\n数值越接近 1 代表这次训练越费劲，越接近 0 代表越轻松。`,
+                  `Reflects how hard each session felt, based on:\n• Subjective feel per route (soft / solid / hard)\n• Number of attempts\n• Send success\n\nCloser to 1 = harder session, closer to 0 = easier.`
+                )}
               </Text>
             </View>
             <View>
-              <Text style={styles.sheetSectionTitle}>怎么看？</Text>
+              <Text style={styles.sheetSectionTitle}>{tr("怎么看？", "How to Read")}</Text>
               <Text style={styles.sheetBodyText}>
-                对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。
+                {tr(
+                  "对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。",
+                  "Compare volume and intensity trends to gauge your training rhythm. High volume + low intensity = solid base building. Low volume + high intensity = pushing limits."
+                )}
               </Text>
             </View>
           </View>

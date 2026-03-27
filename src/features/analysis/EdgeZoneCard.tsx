@@ -42,7 +42,7 @@ export default function EdgeZoneCard({ edgeZone, discipline, pi }: Props) {
 
   const lowerText = gradeText(edgeZone.lower, discipline);
   const upperText = gradeText(pi, discipline);
-  const maxLogCount = Math.max(...edgeZone.grades.map((g) => g.logCount), 1);
+  const maxTotalTries = Math.max(...edgeZone.grades.map((g) => g.totalTries), 1);
 
   return (
     <View style={styles.card}>
@@ -54,8 +54,8 @@ export default function EdgeZoneCard({ edgeZone, discipline, pi }: Props) {
       {/* Grade bars */}
       <View style={styles.gradeList}>
         {edgeZone.grades.map((g) => {
-          const pct = Math.max(8, (g.logCount / maxLogCount) * 100);
-          const sendPct = g.logCount > 0 ? (g.sends / g.logCount) * 100 : 0;
+          const pct = Math.max(8, (g.totalTries / maxTotalTries) * 100);
+          const sendPct = g.totalTries > 0 ? (g.sends / g.totalTries) * 100 : 0;
           return (
             <View key={g.gradeScore} style={styles.gradeRow}>
               <Text style={styles.gradeLabel}>{g.gradeText}</Text>
@@ -65,7 +65,7 @@ export default function EdgeZoneCard({ edgeZone, discipline, pi }: Props) {
                 </View>
               </View>
               <Text style={styles.statText}>
-                {g.sends}/{g.logCount}
+                {g.sends}/{g.totalTries}
               </Text>
               <Text style={styles.pctText}>
                 {g.avgTries > 0 ? `~${g.avgTries}t` : "—"}

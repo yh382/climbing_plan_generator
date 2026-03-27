@@ -299,7 +299,7 @@ export function usePublicProfile(userId: string | null) {
         date: s.date,
         gymName: s.gym_name ?? null,
         durationMinutes: s.duration_minutes ?? null,
-        climbs: s.summary?.log_count ?? 0,
+        climbs: s.summary?.total_attempts ?? s.summary?.log_count ?? 0,
         sends: s.summary?.total_sends ?? 0,
         bestGrade: s.summary?.best_grade ?? null,
       }));

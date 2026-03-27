@@ -280,7 +280,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               null as any,
             );
             const best = bestLog?.grade_text || (s.summary?.best_grade || "—");
-            const climbs = sessionLogs.length || (s.summary?.log_count || 0);
+            const climbs = sessionLogs.length > 0
+              ? sessionLogs.reduce((sum: number, l: any) => sum + (l.attempts || 1), 0)
+              : (s.summary?.total_attempts || s.summary?.log_count || 0);
 
             newSessions.push({
               id: String(s.id),

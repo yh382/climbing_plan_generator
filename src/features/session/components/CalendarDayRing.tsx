@@ -57,18 +57,31 @@ function CalendarDayRing({
         ? colors.accent
         : null;
 
-  const trackColor = isDark ? "#38383A" : "#E5E7EB";
-  const todayBg = isDark ? "#2C2C2E" : "#ECEEE8";
-  const selectedBg = isDark ? "#2C2C2E" : "#ECEEE8";
+  // Ring colors adapt to selected state (accent bg)
+  const ringTrackColor = isSelected
+    ? "rgba(255,255,255,0.25)"
+    : isDark
+      ? "#38383A"
+      : "#E5E7EB";
+  const innerRingColor = isSelected
+    ? "#FFFFFF"
+    : colors.accent;
+  const innerRingFullColor = isSelected
+    ? "rgba(255,255,255,0.8)"
+    : "#265858";
+
+  const selectedBg = colors.accent;
   const textColor = isDark ? "#E5E7EB" : "#374151";
-  const textSelectedColor = isDark ? "#FFFFFF" : "#111";
+  const textSelectedColor = "#FFFFFF";
   const textInactiveColor = isDark ? "#48484A" : "#9CA3AF";
   const textOutsideColor = isDark ? "#38383A" : "#D1D5DB";
+
+  // Today dot color: white on accent bg, accent on normal bg
+  const todayDotColor = isSelected ? "#FFFFFF" : colors.accent;
 
   const dynamicStyles = useMemo(
     () => ({
       cellSelected: { backgroundColor: selectedBg },
-      cellToday: { backgroundColor: todayBg, borderRadius: 8 },
       dayText: { color: textColor },
       dayTextSelected: { color: textSelectedColor },
       dayTextInactive: { color: textInactiveColor },
@@ -82,7 +95,6 @@ function CalendarDayRing({
       style={[
         styles.cell,
         isSelected && dynamicStyles.cellSelected,
-        isToday && !isSelected && dynamicStyles.cellToday,
       ]}
       onPress={onPress}
       activeOpacity={0.7}
@@ -96,7 +108,7 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_OUTER}
-                stroke={trackColor}
+                stroke={ringTrackColor}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
@@ -120,7 +132,7 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke={trackColor}
+                stroke={ringTrackColor}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
@@ -131,7 +143,7 @@ function CalendarDayRing({
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke={innerRatio >= 1 ? "#265858" : colors.accent}
+                stroke={innerRatio >= 1 ? innerRingFullColor : innerRingColor}
                 strokeWidth={THICKNESS}
                 fill="none"
                 strokeDasharray={`${innerDash} ${C_INNER - innerDash}`}
@@ -149,15 +161,17 @@ function CalendarDayRing({
             isSelected && dynamicStyles.dayTextSelected,
             isSelected && styles.dayTextSelectedWeight,
             !isCurrentMonth && dynamicStyles.dayTextOutside,
-            !hasOuter && !hasInner && isCurrentMonth && dynamicStyles.dayTextInactive,
+            !hasOuter && !hasInner && isCurrentMonth && !isSelected && dynamicStyles.dayTextInactive,
           ]}
         >
           {dayLabel}
         </Text>
       </View>
 
-      {/* Center dot indicator for plan progress */}
-      {dotColor ? (
+      {/* Bottom indicator: today dot takes priority, then plan dot */}
+      {isToday ? (
+        <View style={[styles.todayDot, { backgroundColor: todayDotColor }]} />
+      ) : dotColor ? (
         <View style={[styles.planDot, { backgroundColor: dotColor }]} />
       ) : (
         <View style={styles.dotSpacer} />
@@ -189,6 +203,12 @@ const styles = StyleSheet.create({
   },
   dayTextSelectedWeight: {
     fontWeight: "800",
+  },
+  todayDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 2,
   },
   planDot: {
     width: 4,

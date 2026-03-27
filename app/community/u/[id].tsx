@@ -11,7 +11,7 @@ import {
   FlatList,
   useWindowDimensions,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -167,67 +167,45 @@ export default function PublicProfileScreen() {
     }
   }, [tt]);
 
-  // ── Three-dot menu ──
-  const handleMorePress = useCallback(() => {
+  // ── Menu action handlers ──
+  const handleBlock = useCallback(() => {
     if (!id) return;
     Alert.alert(
-      profile?.displayName ?? "",
-      undefined,
+      tt({ zh: "确认屏蔽", en: "Confirm Block" }),
+      tt({ zh: "屏蔽后将无法看到对方的内容", en: "You won't see their content after blocking" }),
       [
+        { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
         {
           text: tt({ zh: "屏蔽", en: "Block" }),
           style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              tt({ zh: "确认屏蔽", en: "Confirm Block" }),
-              tt({
-                zh: `屏蔽后将无法看到对方的内容`,
-                en: `You won't see their content after blocking`,
-              }),
-              [
-                { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
-                {
-                  text: tt({ zh: "屏蔽", en: "Block" }),
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      await communityApi.blockUser(id);
-                      router.back();
-                    } catch (_e) { /* swallow */ }
-                  },
-                },
-              ],
-            );
+          onPress: async () => {
+            try { await communityApi.blockUser(id); router.back(); } catch (_e) { /* swallow */ }
           },
         },
-        {
-          text: tt({ zh: "举报", en: "Report" }),
-          onPress: () => {
-            Alert.alert(
-              tt({ zh: "选择举报原因", en: "Select Report Reason" }),
-              undefined,
-              [
-                { text: tt({ zh: "垃圾内容", en: "Spam" }), onPress: () => submitReport("user", id!, "spam") },
-                { text: tt({ zh: "骚扰", en: "Harassment" }), onPress: () => submitReport("user", id!, "harassment") },
-                { text: tt({ zh: "不当内容", en: "Inappropriate" }), onPress: () => submitReport("user", id!, "inappropriate") },
-                { text: tt({ zh: "其他", en: "Other" }), onPress: () => submitReport("user", id!, "other") },
-                { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
-              ],
-            );
-          },
-        },
-        {
-          text: tt({ zh: "分享主页", en: "Share Profile" }),
-          onPress: () => {
-            Share.share({
-              message: `Check out ${profile?.displayName ?? profile?.username}'s climbing profile!`,
-            }).catch(() => {});
-          },
-        },
+      ],
+    );
+  }, [id, tt, router]);
+
+  const handleReport = useCallback(() => {
+    if (!id) return;
+    Alert.alert(
+      tt({ zh: "选择举报原因", en: "Select Report Reason" }),
+      undefined,
+      [
+        { text: tt({ zh: "垃圾内容", en: "Spam" }), onPress: () => submitReport("user", id!, "spam") },
+        { text: tt({ zh: "骚扰", en: "Harassment" }), onPress: () => submitReport("user", id!, "harassment") },
+        { text: tt({ zh: "不当内容", en: "Inappropriate" }), onPress: () => submitReport("user", id!, "inappropriate") },
+        { text: tt({ zh: "其他", en: "Other" }), onPress: () => submitReport("user", id!, "other") },
         { text: tt({ zh: "取消", en: "Cancel" }), style: "cancel" },
       ],
     );
-  }, [id, profile, tt, router]);
+  }, [id, tt, submitReport]);
+
+  const handleShare = useCallback(() => {
+    Share.share({
+      message: `Check out ${profile?.displayName ?? profile?.username}'s climbing profile!`,
+    }).catch(() => {});
+  }, [profile]);
 
   // Tabs
   const [activeTab, setActiveTab] = useState("posts");
@@ -242,12 +220,10 @@ export default function PublicProfileScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTransparent: true,
-      headerBlurEffect: "systemChromeMaterial",
-      title: profile?.displayName ?? "",
+      title: "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
-      headerRight: () => <HeaderButton icon="ellipsis.circle" onPress={handleMorePress} />,
     });
-  }, [navigation, router, profile, handleMorePress]);
+  }, [navigation, router]);
 
   const headerTitleAnimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0], Extrapolate.CLAMP),
@@ -286,6 +262,7 @@ export default function PublicProfileScreen() {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
         stickyHeaderIndices={[1]}
       >
         {/* [0] Cover/gradient + header */}
@@ -307,6 +284,8 @@ export default function PublicProfileScreen() {
           msgLoading={msgLoading}
           onFollowPress={handleFollow}
           onMessagePress={handleMessage}
+          onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
+          onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
           headerTitleAnimStyle={headerTitleAnimStyle}
           scrollY={scrollY}
         />
@@ -324,7 +303,7 @@ export default function PublicProfileScreen() {
             ) : (
               <ProfilePostGrid
                 posts={posts as any}
-                onPressPost={() => {}}
+                onPressPost={(post) => router.push(`/community/post/${post.id}` as any)}
               />
             )
           )}
@@ -421,6 +400,30 @@ export default function PublicProfileScreen() {
           )}
         </View>
       </Animated.ScrollView>
+
+      {/* Native toolbar menu (context menu from button position) */}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="ellipsis">
+          <Stack.Toolbar.MenuAction
+            icon="square.and.arrow.up"
+            onPress={handleShare}
+          >
+            {tt({ zh: "分享主页", en: "Share Profile" })}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="exclamationmark.bubble"
+            onPress={handleReport}
+          >
+            {tt({ zh: "举报", en: "Report" })}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="hand.raised.slash"
+            onPress={handleBlock}
+          >
+            {tt({ zh: "屏蔽", en: "Block" })}
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
     </View>
   );
 }

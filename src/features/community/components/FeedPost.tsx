@@ -9,12 +9,13 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  ActionSheetIOS,
+  Alert,
   NativeSyntheticEvent,
   TextLayoutEventData,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Host, ContextMenu, Button } from "@expo/ui/swift-ui";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { FeedPost as FeedPostType, PostAttachment } from "../../../types/community";
@@ -153,53 +154,77 @@ export default function FeedPost({
         </View>
       ) : (
         // 原版 Header：显示头像用户名
-        <TouchableOpacity style={styles.header} onPress={() => onPress(post.user.id)} activeOpacity={0.7}>
-          {post.user.avatar ? (
-            <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-              <Ionicons name="person" size={18} color={colors.textTertiary} />
-            </View>
-          )}
-          <View style={styles.headerText}>
-            <Text style={styles.username}>{post.user.username}</Text>
-            <Text style={styles.time}>
-              {new Date(post.timestamp).toLocaleDateString()} · {post.user?.homeGym || "Climber"}
-            </Text>
-            {post.gymName && (
-              <TouchableOpacity
-                onPress={() => router.push({
-                  pathname: '/(tabs)/community',
-                  params: { tab: 'gyms', gymId: post.gymId },
-                })}
-                style={styles.gymTag}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="location" size={11} color={colors.textTertiary} />
-                <Text style={styles.gymTagText}>{post.gymName}</Text>
-              </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerLeft} onPress={() => onPress(post.user.id)} activeOpacity={0.7}>
+            {post.user.avatar ? (
+              <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+                <Ionicons name="person" size={18} color={colors.textTertiary} />
+              </View>
             )}
-          </View>
-          {Platform.OS === "ios" && (onShare || onEdit || onDelete || onReport) ? (
-            <Host matchContents style={{ padding: 4 }}>
-              <ContextMenu>
-                <ContextMenu.Trigger>
-                  <Button systemImage="ellipsis" label="" />
-                </ContextMenu.Trigger>
-                <ContextMenu.Items>
-                  {onShare && <Button systemImage="square.and.arrow.up" onPress={onShare} label="Share" />}
-                  {isOwn && onEdit && <Button systemImage="pencil" onPress={onEdit} label="Edit" />}
-                  {isOwn && onDelete && <Button systemImage="trash" role="destructive" onPress={onDelete} label="Delete" />}
-                  {!isOwn && onReport && <Button systemImage="flag" role="destructive" onPress={onReport} label="Report" />}
-                </ContextMenu.Items>
-              </ContextMenu>
-            </Host>
-          ) : onThreeDot ? (
-            <TouchableOpacity style={{ padding: 4 }} onPress={onThreeDot}>
+            <View style={styles.headerText}>
+              <Text style={styles.username}>{post.user.username}</Text>
+              <Text style={styles.time}>
+                {new Date(post.timestamp).toLocaleDateString()} · {post.user?.homeGym || "Climber"}
+              </Text>
+              {post.gymName && (
+                <TouchableOpacity
+                  onPress={() => router.push({
+                    pathname: '/(tabs)/community',
+                    params: { tab: 'gyms', gymId: post.gymId },
+                  })}
+                  style={styles.gymTag}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="location" size={11} color={colors.textTertiary} />
+                  <Text style={styles.gymTagText}>{post.gymName}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+          {(onShare || onEdit || onDelete || onReport) ? (
+            <TouchableOpacity
+              style={{ padding: 4 }}
+              onPress={() => {
+                const options: string[] = [];
+                const actions: (() => void)[] = [];
+                if (onShare) { options.push("Share"); actions.push(onShare); }
+                if (isOwn && onEdit) { options.push("Edit"); actions.push(onEdit); }
+                if (isOwn && onDelete) { options.push("Delete"); actions.push(onDelete); }
+                if (!isOwn && onReport) { options.push("Report"); actions.push(onReport); }
+                options.push("Cancel");
+
+                if (Platform.OS === "ios") {
+                  ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      options,
+                      cancelButtonIndex: options.length - 1,
+                      destructiveButtonIndex: options.indexOf("Delete") !== -1
+                        ? options.indexOf("Delete")
+                        : options.indexOf("Report") !== -1
+                        ? options.indexOf("Report")
+                        : undefined,
+                    },
+                    (idx) => { if (idx < actions.length) actions[idx](); }
+                  );
+                } else {
+                  const buttons: { text: string; onPress?: () => void; style?: "destructive" | "cancel" | "default" }[] =
+                    actions.map((fn, i) => ({
+                      text: options[i],
+                      onPress: fn,
+                      style: (options[i] === "Delete" || options[i] === "Report") ? "destructive" as const : "default" as const,
+                    }));
+                  buttons.push({ text: "Cancel", style: "cancel" });
+                  Alert.alert("Options", undefined, buttons);
+                }
+              }}
+              activeOpacity={0.7}
+            >
               <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* 2. Images / Video — carousel with full-screen viewer */}
@@ -283,6 +308,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
 
   header: { flexDirection: "row", alignItems: "center", padding: 16 },
+  headerLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   simpleHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundSecondary },

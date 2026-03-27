@@ -21,13 +21,14 @@ export function GymListItem({ gym, onPress, colors }: GymListItemProps) {
       <Text style={[styles.rowTitle, { color: colors.iconLabel }]} numberOfLines={1}>
         {gym.name}
       </Text>
-      <Text style={[styles.rowMeta, { color: colors.iconInactive }]} numberOfLines={1}>
-        {gym.distanceMiles.toFixed(1)} mi
-        {gym.rating ? ` · ${gym.rating} (${gym.user_ratings_total ?? 0})` : ""}
-      </Text>
-      {(gym.vicinity || gym.formatted_address) && (
+      {gym.distance_m != null && (
+        <Text style={[styles.rowMeta, { color: colors.iconInactive }]} numberOfLines={1}>
+          {gym.distance_m < 1000 ? `${Math.round(gym.distance_m)} m` : `${(gym.distance_m / 1000).toFixed(1)} km`}
+        </Text>
+      )}
+      {!!gym.address && (
         <Text style={[styles.rowAddr, { color: colors.iconInactive }]} numberOfLines={1}>
-          {gym.vicinity || gym.formatted_address}
+          {gym.address}
         </Text>
       )}
     </Pressable>

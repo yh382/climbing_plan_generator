@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
+import { useRouter } from "expo-router";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import DailyLogCard from "../../session/components/DailyLogCard";
@@ -22,6 +23,7 @@ function formatDuration(minutes: number | null): string {
 
 export default function PublicStatsSection({ profile, sessionSummary }: Props) {
   const colors = useThemeColors();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
@@ -61,7 +63,7 @@ export default function PublicStatsSection({ profile, sessionSummary }: Props) {
               climbs={s.climbs}
               sends={s.sends}
               maxGrade={s.bestGrade || "—"}
-              onPress={() => {}}
+              onPress={() => router.push({ pathname: "/community/public-route-log", params: { sessionId: s.id } })}
             />
           ))}
         </View>

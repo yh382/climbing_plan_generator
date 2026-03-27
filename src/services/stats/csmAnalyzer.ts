@@ -186,7 +186,7 @@ function computeCE(
       sends: data.sends,
       totalTries: data.totalTries,
       avgTries: Math.round(avg * 10) / 10,
-      sendRate: data.logCount > 0 ? data.sends / data.logCount : 0,
+      sendRate: data.totalTries > 0 ? data.sends / data.totalTries : 0,
     });
   }
   grades.sort((a, b) => b.gradeScore - a.gradeScore);

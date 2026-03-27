@@ -186,7 +186,7 @@ export default function ClimmateScreen() {
     <View style={{ flex: 1, backgroundColor: colors.backgroundSecondary }}>
       {/* Native toolbar menu */}
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Menu icon="ellipsis.circle">
+        <Stack.Toolbar.Menu icon="ellipsis">
           <Stack.Toolbar.MenuAction
             icon="plus.bubble"
             onPress={handleNewConversation}

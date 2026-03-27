@@ -5,6 +5,7 @@ import { View, Text, StyleSheet, ActivityIndicator, FlatList } from "react-nativ
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { useSettings } from "../../../contexts/SettingsContext";
 import type { ActionSummary, BlockInventorySummary, LocaleKey } from "./model/types";
 import { GOAL_LABEL, LEVEL_LABEL } from "./model/labels";
 import { getBlockListing, getLibrarySummary } from "./api/libraryApi";
@@ -21,16 +22,6 @@ import {
 } from "./model/userTaxonomy";
 import { SubcategoryTabs } from "./components/SubcategoryTabs";
 import ExerciseLibraryCard from "../../../components/shared/ExerciseLibraryCard";
-
-// ---------- helpers ----------
-function detectLocale(): LocaleKey {
-  try {
-    const loc = Intl.DateTimeFormat().resolvedOptions().locale || "en";
-    return loc.toLowerCase().startsWith("zh") ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
 
 function uniqueById(list: ActionSummary[]) {
   const map = new Map<string, ActionSummary>();
@@ -72,7 +63,8 @@ function mapActionToCardProps(action: ActionSummary, locale: LocaleKey) {
   const minutes = getDurationMinutes(action);
   const media = (action as any)?.media;
   const imageUrl = media?.thumbnail_url || media?.image_url || media?.thumb || media?.image || null;
-  return { title, description, goal, level, minutes, imageUrl };
+  const equipment = action.equipment ?? [];
+  return { title, description, goal, level, minutes, imageUrl, equipment };
 }
 
 export default function ExercisesLibraryScreen() {
@@ -81,8 +73,8 @@ export default function ExercisesLibraryScreen() {
   const colors = useThemeColors();
   const s = useMemo(() => createStyles(colors), [colors]);
   const { isFavorite, toggle: toggleFavorite } = useFavoriteIds();
+  const { lang: locale, tr } = useSettings();
 
-  const locale = useMemo(() => detectLocale(), []);
   const [blocks, setBlocks] = useState<BlockInventorySummary[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -200,13 +192,12 @@ export default function ExercisesLibraryScreen() {
     setActionsBySub(map);
   }
 
-  const largeTitleText = locale === "zh" ? "动作库" : "Exercise Library";
   const bigTitle = cfg.title[locale];
 
   const ListHeader = (
     <View>
       <Text style={s.subtitleText}>
-        {locale === "zh" ? "分类 · " : "Category · "}
+        {tr("分类 · ", "Category · ")}
         {bigTitle}
       </Text>
     </View>
@@ -242,7 +233,7 @@ export default function ExercisesLibraryScreen() {
       <View style={[s.loadingWrap, { backgroundColor: colors.background }]}>
         <ActivityIndicator />
         <Text style={{ marginTop: 10, color: colors.textSecondary, fontSize: 12 }}>
-          {locale === "zh" ? "加载动作库中…" : "Loading library…"}
+          {tr("加载动作库中…", "Loading library…")}
         </Text>
       </View>
     );
@@ -250,7 +241,7 @@ export default function ExercisesLibraryScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ ...NATIVE_HEADER_LARGE, title: largeTitleText }} />
+      <Stack.Screen options={{ ...NATIVE_HEADER_LARGE, title: bigTitle }} />
       <FlatList
         data={list}
         keyExtractor={(it: ActionSummary) => it.id}

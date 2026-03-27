@@ -1,212 +1,143 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
-  Animated,
-  PanResponder,
-  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { theme } from "src/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   onChooseFromLibrary: () => void;
   onTakePhoto: () => void;
+  title?: string;
 };
-
-const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 export default function AvatarPickerSheet({
   visible,
   onClose,
   onChooseFromLibrary,
   onTakePhoto,
+  title = "Change Profile Photo",
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const [showModal, setShowModal] = useState(visible);
+  const sheetRef = useRef<TrueSheet>(null);
+  const isPresented = useRef(false);
+  const pendingAction = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (visible) {
-      setShowModal(true);
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 90,
-      }).start();
-    } else {
-      closeWithAnimation();
+    if (visible && !isPresented.current) {
+      sheetRef.current?.present();
+      isPresented.current = true;
+    } else if (!visible && isPresented.current) {
+      sheetRef.current?.dismiss();
+      isPresented.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const closeWithAnimation = (afterClose?: () => void) => {
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowModal(false);
-      onClose();
-      if (afterClose) setTimeout(afterClose, 50);
-    });
-  };
+  const handleDismiss = useCallback(() => {
+    isPresented.current = false;
+    onClose();
+    if (pendingAction.current) {
+      const action = pendingAction.current;
+      pendingAction.current = null;
+      setTimeout(action, 50);
+    }
+  }, [onClose]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 5,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.vy > 0.5 || g.dy > 100) {
-          closeWithAnimation();
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            damping: 20,
-            stiffness: 200,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  const handleChooseLibrary = useCallback(() => {
+    pendingAction.current = onChooseFromLibrary;
+    sheetRef.current?.dismiss();
+  }, [onChooseFromLibrary]);
 
-  if (!showModal) return null;
+  const handleTakePhoto = useCallback(() => {
+    pendingAction.current = onTakePhoto;
+    sheetRef.current?.dismiss();
+  }, [onTakePhoto]);
 
   return (
-    <Modal
-      animationType="fade"
-      transparent
-      visible={showModal}
-      onRequestClose={() => closeWithAnimation()}
+    <TrueSheet
+      ref={sheetRef}
+      detents={['auto']}
+      backgroundColor={colors.background}
+      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+      dimmed
+      dimmedDetentIndex={0}
+      onDidDismiss={handleDismiss}
     >
-      {/* 点击背景关闭 */}
-      <Pressable style={styles.overlay} onPress={() => closeWithAnimation()}>
-        <Animated.View
-          style={[
-            styles.modalContent,
-            {
-              paddingBottom: insets.bottom + 20,
-              transform: [{ translateY }],
-            },
-          ]}
-          {...panResponder.panHandlers}
-        >
-          {/* 阻止点击内容区穿透到背景 */}
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            {/* 顶部拖拽指示条 */}
-            <View style={styles.dragHandleArea}>
-              <View style={styles.dragIndicator} />
-            </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{title}</Text>
+      </View>
 
-            <Text style={styles.title}>Change Profile Photo</Text>
+      <TouchableOpacity
+        style={styles.row}
+        activeOpacity={0.75}
+        onPress={handleChooseLibrary}
+      >
+        <View style={styles.iconWrap}>
+          <Ionicons name="images-outline" size={20} color={colors.textPrimary} />
+        </View>
+        <Text style={styles.rowText}>Choose from library</Text>
+      </TouchableOpacity>
 
-            <View style={styles.list}>
-              <TouchableOpacity
-                style={styles.row}
-                activeOpacity={0.75}
-                onPress={() => closeWithAnimation(onChooseFromLibrary)}
-              >
-                <View style={styles.iconCircle}>
-                  <Ionicons name="images-outline" size={22} color="#0F172A" />
-                </View>
-                <Text style={styles.rowText}>Choose from library</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.row}
-                activeOpacity={0.75}
-                onPress={() => closeWithAnimation(onTakePhoto)}
-              >
-                <View style={styles.iconCircle}>
-                  <Ionicons name="camera-outline" size={22} color="#0F172A" />
-                </View>
-                <Text style={styles.rowText}>Take photo</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+      <TouchableOpacity
+        style={styles.row}
+        activeOpacity={0.75}
+        onPress={handleTakePhoto}
+      >
+        <View style={styles.iconWrap}>
+          <Ionicons name="camera-outline" size={20} color={colors.textPrimary} />
+        </View>
+        <Text style={styles.rowText}>Take photo</Text>
+      </TouchableOpacity>
+    </TrueSheet>
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  dragHandleArea: {
-    width: "100%",
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dragIndicator: {
-    width: 40,
-    height: 5,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 3,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0F172A",
-    textAlign: "center",
-    marginBottom: 18,
-    marginTop: 4,
-  },
-  list: {
-    gap: 12,
-    paddingBottom: 6,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    height: 52,
-    borderRadius: 14,
-  },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#0F172A",
-  },
-});
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    header: {
+      paddingHorizontal: 22,
+      paddingTop: 20,
+      paddingBottom: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.cardBorder,
+    },
+    headerTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      fontFamily: theme.fonts.bold,
+      color: colors.textPrimary,
+      textAlign: "center",
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingHorizontal: 22,
+      height: 54,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.cardBorder,
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowText: {
+      fontSize: 15,
+      fontWeight: "500",
+      fontFamily: theme.fonts.medium,
+      color: colors.textPrimary,
+    },
+  });

@@ -19,6 +19,8 @@ import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
 import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { api } from "src/lib/apiClient";
 import { uploadImageToR2 } from "src/features/profile/api";
+import { theme } from "src/lib/theme";
+import { useThemeColors } from "@/lib/useThemeColors";
 import LocationPickerSheet from "./LocationPickerSheet";
 import HomeGymPickerSheet from "./HomeGymPickerSheet";
 import AvatarPickerSheet from "./AvatarPickerSheet";
@@ -71,11 +73,15 @@ interface InputItemProps {
   placeholder?: string;
   isLink?: boolean;
   onPress?: () => void;
+  colors: ReturnType<typeof useThemeColors>;
+  styles: ReturnType<typeof createStyles>;
 }
 
 export default function EditProfileView() {
   const router = useRouter();
   const navigation = useNavigation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -124,12 +130,12 @@ export default function EditProfileView() {
           cover_url: (u.cover_url ?? "").toString(),
 
           location_place_id: u.location_place_id ?? null,
-            location_lat: u.location_lat ?? null,
-            location_lng: u.location_lng ?? null,
+          location_lat: u.location_lat ?? null,
+          location_lng: u.location_lng ?? null,
 
-            home_gym_place_id: u.home_gym_place_id ?? null,
-            home_gym_lat: u.home_gym_lat ?? null,
-            home_gym_lng: u.home_gym_lng ?? null,
+          home_gym_place_id: u.home_gym_place_id ?? null,
+          home_gym_lat: u.home_gym_lat ?? null,
+          home_gym_lng: u.home_gym_lng ?? null,
         });
       } catch (e: any) {
         console.error("LOAD USER ME ERROR =>", e);
@@ -190,18 +196,17 @@ export default function EditProfileView() {
         home_gym_lng: form.home_gym_lng ?? null,
       };
 
-    if (!payload.location) {
-    payload.location_place_id = null;
-    payload.location_lat = null;
-    payload.location_lng = null;
-    }
+      if (!payload.location) {
+        payload.location_place_id = null;
+        payload.location_lat = null;
+        payload.location_lng = null;
+      }
 
-    if (!payload.home_gym) {
-    payload.home_gym_place_id = null;
-    payload.home_gym_lat = null;
-    payload.home_gym_lng = null;
-    }
-
+      if (!payload.home_gym) {
+        payload.home_gym_place_id = null;
+        payload.home_gym_lat = null;
+        payload.home_gym_lng = null;
+      }
 
       const updated = await api.put<UserMe>("/users/me", payload);
 
@@ -223,7 +228,6 @@ export default function EditProfileView() {
         home_gym_lat: (updated as any).home_gym_lat ?? null,
         home_gym_lng: (updated as any).home_gym_lng ?? null,
       });
-      
 
       router.back();
     } catch (e: any) {
@@ -264,15 +268,12 @@ export default function EditProfileView() {
   }, [navigation, router]);
 
   const [homeGymPickerOpen, setHomeGymPickerOpen] = useState(false);
-  const [locationPickerOpen, setLocationPickerOpen] = useState(false); // ✅ NEW
-  // 你后面要做 bottomsheet 选择器：这里先占位
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const handlePickLocation = () => {
-        setLocationPickerOpen(true);
-    // TODO: BottomSheet
+    setLocationPickerOpen(true);
   };
   const handlePickHomeGym = () => {
     setHomeGymPickerOpen(true);
-    // TODO: BottomSheet
   };
 
   // Pick up image selected from library screen
@@ -311,13 +312,13 @@ export default function EditProfileView() {
       >
         {/* 头像 */}
         <View style={styles.avatarSection}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setAvatarPickerOpen(true)}>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setAvatarPickerOpen(true)}>
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.changePhotoBtn} onPress={() => setAvatarPickerOpen(true)}>
+          <TouchableOpacity style={styles.changePhotoBtn} onPress={() => setAvatarPickerOpen(true)}>
             <Text style={styles.changePhotoText}>Change Profile Photo</Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
         </View>
 
         {/* Cover Image */}
@@ -333,7 +334,7 @@ export default function EditProfileView() {
               </View>
             ) : (
               <View style={[styles.coverPreview, styles.coverPlaceholder]}>
-                <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                <Ionicons name="image-outline" size={28} color={colors.textTertiary} />
                 <Text style={styles.coverPlaceholderText}>Add Cover Photo</Text>
               </View>
             )}
@@ -347,6 +348,8 @@ export default function EditProfileView() {
             value={form.username}
             placeholder="Add username"
             onChangeText={(t) => setForm((s) => ({ ...s, username: t }))}
+            colors={colors}
+            styles={styles}
           />
 
           <InputItem
@@ -355,6 +358,8 @@ export default function EditProfileView() {
             placeholder="Bio"
             onChangeText={(t) => setForm((s) => ({ ...s, bio: t }))}
             multiline
+            colors={colors}
+            styles={styles}
           />
 
           <InputItem
@@ -363,6 +368,8 @@ export default function EditProfileView() {
             placeholder="Add location"
             isLink
             onPress={handlePickLocation}
+            colors={colors}
+            styles={styles}
           />
 
           <InputItem
@@ -371,64 +378,64 @@ export default function EditProfileView() {
             placeholder="Add home gym"
             isLink
             onPress={handlePickHomeGym}
+            colors={colors}
+            styles={styles}
           />
         </View>
-        </ScrollView>
-                {/* ✅ NEW: Location Picker Sheet */}
-        <LocationPickerSheet
-            visible={locationPickerOpen}
-            onClose={() => setLocationPickerOpen(false)}
-            onSelect={(item) => {
-            const text = item.secondary ? `${item.primary}, ${item.secondary}` : item.primary;
-            setForm((s) => ({
-                ...s,
-                location: text,
-                location_place_id: item.id ?? null,
-                location_lat: item.lat ?? null,
-                location_lng: item.lng ?? null,
-            }));
-            }}
+      </ScrollView>
 
-            title="Location"
-        />
-        <HomeGymPickerSheet
-            visible={homeGymPickerOpen}
-            onClose={() => setHomeGymPickerOpen(false)}
-            onSelect={(gym) => {
-            setForm((s) => ({
-                ...s,
-                home_gym: gym.name,
-                home_gym_place_id: gym.id ?? null,
-                home_gym_lat: gym.lat ?? null,
-                home_gym_lng: gym.lng ?? null,
-            }));
-            }}
-
-            title="Home gym"
-        />
-        <AvatarPickerSheet
-            visible={avatarPickerOpen}
-            onClose={() => setAvatarPickerOpen(false)}
-            onChooseFromLibrary={() => router.push("/profile/library")}
-            onTakePhoto={() => {
-                Alert.alert("Not supported", "Camera is not available in simulator yet.");
-            }}
-            />
-        <AvatarPickerSheet
-            visible={coverPickerOpen}
-            onClose={() => setCoverPickerOpen(false)}
-            onChooseFromLibrary={() => router.push({ pathname: "/profile/library", params: { target: "cover" } })}
-            onTakePhoto={() => {
-                Alert.alert("Not supported", "Camera is not available in simulator yet.");
-            }}
-            />
-
+      <LocationPickerSheet
+        visible={locationPickerOpen}
+        onClose={() => setLocationPickerOpen(false)}
+        onSelect={(item) => {
+          const text = item.secondary ? `${item.primary}, ${item.secondary}` : item.primary;
+          setForm((s) => ({
+            ...s,
+            location: text,
+            location_place_id: item.id ?? null,
+            location_lat: item.lat ?? null,
+            location_lng: item.lng ?? null,
+          }));
+        }}
+        title="Location"
+      />
+      <HomeGymPickerSheet
+        visible={homeGymPickerOpen}
+        onClose={() => setHomeGymPickerOpen(false)}
+        onSelect={(gym) => {
+          setForm((s) => ({
+            ...s,
+            home_gym: gym.name,
+            home_gym_place_id: gym.id ?? null,
+            home_gym_lat: gym.lat ?? null,
+            home_gym_lng: gym.lng ?? null,
+          }));
+        }}
+        title="Home gym"
+      />
+      <AvatarPickerSheet
+        visible={avatarPickerOpen}
+        onClose={() => setAvatarPickerOpen(false)}
+        onChooseFromLibrary={() => router.push("/profile/library")}
+        onTakePhoto={() => {
+          Alert.alert("Not supported", "Camera is not available in simulator yet.");
+        }}
+      />
+      <AvatarPickerSheet
+        visible={coverPickerOpen}
+        onClose={() => setCoverPickerOpen(false)}
+        onChooseFromLibrary={() => router.push({ pathname: "/profile/library", params: { target: "cover" } })}
+        onTakePhoto={() => {
+          Alert.alert("Not supported", "Camera is not available in simulator yet.");
+        }}
+        title="Change Cover Photo"
+      />
     </View>
   );
 }
 
 // 通用输入组件
-const InputItem = ({ label, value, onChangeText, multiline, placeholder, isLink, onPress }: InputItemProps) => {
+const InputItem = ({ label, value, onChangeText, multiline, placeholder, isLink, onPress, colors, styles }: InputItemProps) => {
   const Container: any = isLink ? TouchableOpacity : View;
 
   return (
@@ -445,14 +452,14 @@ const InputItem = ({ label, value, onChangeText, multiline, placeholder, isLink,
             <Text style={[styles.linkText, !value ? styles.placeholderText : null]}>
               {value || placeholder || ""}
             </Text>
-            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </>
         ) : (
           <TextInput
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.textTertiary}
             multiline={multiline}
             style={[styles.textInput, multiline ? styles.textInputMultiline : null]}
           />
@@ -462,54 +469,55 @@ const InputItem = ({ label, value, onChangeText, multiline, placeholder, isLink,
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  content: { flex: 1 },
-  avatarSection: { alignItems: "center", paddingVertical: 20 },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F1F5F9" },
-  changePhotoBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 12 },
-  changePhotoText: { color: "#0F172A", fontWeight: "600" },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { flex: 1 },
+    avatarSection: { alignItems: "center", paddingVertical: 20 },
+    avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.backgroundSecondary },
+    changePhotoBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 12 },
+    changePhotoText: { color: colors.textPrimary, fontWeight: "600", fontFamily: theme.fonts.medium },
 
-  formGroup: { paddingHorizontal: 16, paddingBottom: 24 },
+    formGroup: { paddingHorizontal: 16, paddingBottom: 24 },
 
-  inputItem: { marginBottom: 14 },
-  inputLabel: { fontSize: 13, fontWeight: "600", color: "#888888", marginBottom: 8 },
+    inputItem: { marginBottom: 14 },
+    inputLabel: { fontSize: 13, fontWeight: "600", fontFamily: theme.fonts.medium, color: colors.textSecondary, marginBottom: 8 },
 
-  inputBox: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  inputBoxMultiline: { minHeight: 90, alignItems: "stretch", paddingVertical: 10 },
-  textInput: { width: "100%", color: "#0F172A" },
-  textInputMultiline: { height: 70, textAlignVertical: "top" },
+    inputBox: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.background,
+    },
+    inputBoxMultiline: { minHeight: 90, alignItems: "stretch", paddingVertical: 10 },
+    textInput: { width: "100%", color: colors.textPrimary, fontFamily: theme.fonts.regular },
+    textInputMultiline: { height: 70, textAlignVertical: "top" },
 
-  inputBoxLink: { flexDirection: "row", justifyContent: "space-between" },
-  linkText: { flex: 1, color: "#0F172A" },
-  placeholderText: { color: "#94A3B8" },
+    inputBoxLink: { flexDirection: "row", justifyContent: "space-between" },
+    linkText: { flex: 1, color: colors.textPrimary, fontFamily: theme.fonts.regular },
+    placeholderText: { color: colors.textTertiary },
 
-  coverSection: { paddingHorizontal: 16, marginBottom: 8 },
-  coverLabel: { fontSize: 13, fontWeight: "600", color: "#888888", marginBottom: 8 },
-  coverPreview: { width: "100%", height: 120, borderRadius: 12, overflow: "hidden" },
-  coverImage: { borderRadius: 12 },
-  coverOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  coverPlaceholder: {
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderStyle: "dashed",
-  },
-  coverPlaceholderText: { color: "#94A3B8", fontSize: 13, marginTop: 4 },
-});
+    coverSection: { paddingHorizontal: 16, marginBottom: 8 },
+    coverLabel: { fontSize: 13, fontWeight: "600", fontFamily: theme.fonts.medium, color: colors.textSecondary, marginBottom: 8 },
+    coverPreview: { width: "100%", height: 120, borderRadius: 12, overflow: "hidden" },
+    coverImage: { borderRadius: 12 },
+    coverOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    coverPlaceholder: {
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderStyle: "dashed",
+    },
+    coverPlaceholderText: { color: colors.textTertiary, fontSize: 13, fontFamily: theme.fonts.regular, marginTop: 4 },
+  });

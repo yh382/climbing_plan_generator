@@ -1,38 +1,41 @@
 // app/library/exercise-detail.tsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Image,
   ActivityIndicator,
-  Alert,
+  Dimensions,
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
+import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
+import { useSettings } from "../../src/contexts/SettingsContext";
 import { exercisesApi } from "../../src/features/exercises/api";
 import type { ExerciseDetail } from "../../src/features/exercises/types";
 import { parseExerciseName } from "../../src/lib/exerciseUtils";
 import { useFavoriteIds } from "../../src/features/home/exercises/favoritesApi";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { GOAL_LABEL, LEVEL_LABEL } from "../../src/features/home/exercises/model/labels";
 
 type ExerciseContext = "custom" | "library" | "execution";
 
-function detectLocale(): "zh" | "en" {
-  try {
-    const loc = Intl.DateTimeFormat().resolvedOptions().locale || "en";
-    return loc.toLowerCase().startsWith("zh") ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const HERO_HEIGHT = SCREEN_WIDTH * 0.55;
 
 function getMediaUrl(media: ExerciseDetail["media"]): string | null {
   if (!media) return null;
@@ -44,16 +47,6 @@ function getMediaUrl(media: ExerciseDetail["media"]): string | null {
     media?.video ||
     null
   );
-}
-
-function formatGoal(goal: string): string {
-  const map: Record<string, string> = {
-    strength_power: "Strength & Power",
-    power_endurance: "Power Endurance",
-    endurance: "Endurance",
-    conditioning: "Conditioning",
-  };
-  return map[goal] || goal;
 }
 
 function formatDuration(sec: number): string {
@@ -88,29 +81,31 @@ function buildProtocolFields(p: {
   resistance?: string;
   target?: string;
   format?: string;
-}): { protocol: FieldPill[]; rest: FieldPill[]; extras: FieldPill[] } {
+}, tr: (zh: string, en: string) => string): { protocol: FieldPill[]; rest: FieldPill[]; extras: FieldPill[] } {
   const protocol: FieldPill[] = [];
-  if (p.sets && p.sets > 0) protocol.push({ label: "Sets", value: `${p.sets}`, mono: true });
-  if (p.reps && p.reps > 0) protocol.push({ label: "Reps", value: `${p.reps}`, mono: true });
-  if (p.duration && p.duration > 0) protocol.push({ label: "Duration", value: formatDuration(p.duration), mono: true });
+  if (p.sets && p.sets > 0) protocol.push({ label: tr("组数", "SETS"), value: `${p.sets}`, mono: true });
+  if (p.reps && p.reps > 0) protocol.push({ label: tr("次数", "REPS"), value: `${p.reps}`, mono: true });
+  if (p.duration && p.duration > 0) protocol.push({ label: tr("时长", "DURATION"), value: formatDuration(p.duration), mono: true });
 
   const rest: FieldPill[] = [];
-  if (p.restPerRep) rest.push({ label: "Rest/rep", value: formatDuration(p.restPerRep), mono: true });
-  if (p.restPerSet) rest.push({ label: "Rest/set", value: formatDuration(p.restPerSet), mono: true });
+  if (p.restPerRep) rest.push({ label: tr("次间休息", "REST/REP"), value: formatDuration(p.restPerRep), mono: true });
+  if (p.restPerSet) rest.push({ label: tr("组间休息", "REST/SET"), value: formatDuration(p.restPerSet), mono: true });
 
   const extras: FieldPill[] = [];
-  if (p.target) extras.push({ label: "Target", value: p.target });
-  if (p.resistance) extras.push({ label: "Resistance", value: p.resistance });
-  if (p.format === "benchmark") extras.push({ label: "Format", value: "benchmark" });
+  if (p.target) extras.push({ label: tr("目标", "TARGET"), value: p.target });
+  if (p.resistance) extras.push({ label: tr("阻力", "RESISTANCE"), value: p.resistance });
+  if (p.format === "benchmark") extras.push({ label: tr("格式", "FORMAT"), value: "benchmark" });
 
   return { protocol, rest, extras };
 }
 
 export default function ExerciseDetailScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const locale = useMemo(() => detectLocale(), []);
+  const headerHeight = useHeaderHeight();
   const colors = useThemeColors();
+  const { lang: locale, tr } = useSettings();
   const s = useMemo(() => createStyles(colors), [colors]);
 
   const params = useLocalSearchParams<{
@@ -136,6 +131,33 @@ export default function ExerciseDetailScreen() {
   const [sets, setSets] = useState(0);
   const [reps, setReps] = useState(0);
   const [restSec, setRestSec] = useState(0);
+
+  // Scroll + parallax
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+  const heroParallaxStyle = useAnimatedStyle(() => {
+    const adjustedScrollY = scrollY.value + headerHeight;
+    if (adjustedScrollY >= 0) return {};
+    const absScroll = -adjustedScrollY;
+    return {
+      transform: [
+        { scale: 1 + absScroll / HERO_HEIGHT },
+        { translateY: adjustedScrollY / 2 },
+      ],
+    };
+  });
+
+  // Native transparent header with scroll edge effect
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: "",
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      scrollEdgeEffects: { top: "soft" },
+    });
+  }, [navigation, router]);
 
   useEffect(() => {
     if (!exerciseId) return;
@@ -179,10 +201,7 @@ export default function ExerciseDetailScreen() {
   };
 
   const handleAddToPlan = () => {
-    // Return exercise data to the builder via router params
     router.back();
-    // The builder will read the selected exercise from a temp store or params
-    // For now, we set a global flag via AsyncStorage
     const payload = JSON.stringify({
       action_id: exerciseId,
       sets: sets || undefined,
@@ -199,7 +218,7 @@ export default function ExerciseDetailScreen() {
     AsyncStorage.setItem("__pending_exercise__", payload);
   };
 
-  // Helper components moved inside for closure access to `s` and `colors`
+  // Helper components
   function FieldPillItem({ field }: { field: FieldPill }) {
     return (
       <View style={s.fieldItem}>
@@ -214,7 +233,6 @@ export default function ExerciseDetailScreen() {
   function ProtocolCard({ fields }: { fields: ReturnType<typeof buildProtocolFields> }) {
     return (
       <View style={s.protocolDetails}>
-        {/* Row 1: protocol pills connected with x */}
         {fields.protocol.length > 0 ? (
           <View style={s.fieldRow}>
             {fields.protocol.map((f, i) => (
@@ -225,7 +243,6 @@ export default function ExerciseDetailScreen() {
             ))}
           </View>
         ) : null}
-        {/* Row 2: rest pills */}
         {fields.rest.length > 0 ? (
           <View style={s.fieldRow}>
             {fields.rest.map((f, i) => (
@@ -233,7 +250,6 @@ export default function ExerciseDetailScreen() {
             ))}
           </View>
         ) : null}
-        {/* Row 3: extras */}
         {fields.extras.length > 0 ? (
           <View style={s.fieldRow}>
             {fields.extras.map((f, i) => (
@@ -248,7 +264,6 @@ export default function ExerciseDetailScreen() {
   if (loading) {
     return (
       <View style={s.container}>
-        <Stack.Screen options={{ title: "" }} />
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.cardDark} />
         </View>
@@ -259,11 +274,14 @@ export default function ExerciseDetailScreen() {
   if (error || !exercise) {
     return (
       <View style={s.container}>
-        <Stack.Screen options={{ title: "" }} />
         <View style={s.center}>
-          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{error || "Exercise not found"}</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>
+            {error || tr("动作未找到", "Exercise not found")}
+          </Text>
           <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-            <Text style={{ color: colors.cardDark, fontWeight: "700" }}>Go Back</Text>
+            <Text style={{ color: colors.cardDark, fontWeight: "700" }}>
+              {tr("返回", "Go Back")}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -287,9 +305,11 @@ export default function ExerciseDetailScreen() {
   const subExercises = protocol?.sub_exercises as SubExercise[] | undefined;
   const isCompound = subExercises && subExercises.length > 0;
 
+  const goalLabel = (GOAL_LABEL as any)?.[locale]?.[exercise.goal] ?? exercise.goal;
+  const levelLabel = (LEVEL_LABEL as any)?.[locale]?.[exercise.level] ?? exercise.level;
+
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title }} />
       {context === "custom" && (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
@@ -299,37 +319,46 @@ export default function ExerciseDetailScreen() {
         </Stack.Toolbar>
       )}
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
       >
-        {/* Media */}
-        <View style={s.mediaWrap}>
-          {imgUrl ? (
-            <Image source={{ uri: imgUrl }} style={s.mediaImg} resizeMode="cover" />
-          ) : (
-            <View style={s.mediaPlaceholder}>
-              <Ionicons name="barbell-outline" size={48} color={colors.textTertiary} />
-            </View>
-          )}
-        </View>
+        {/* Hero Media — extends behind transparent nav bar */}
+        <Animated.View style={[heroParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
+          <View style={[s.heroContainer, { height: HERO_HEIGHT }]}>
+            {imgUrl ? (
+              <Image
+                source={{ uri: imgUrl }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={s.mediaPlaceholder}>
+                <Ionicons name="barbell-outline" size={56} color={colors.textTertiary} />
+              </View>
+            )}
+          </View>
+        </Animated.View>
 
         {/* Title & Meta */}
         <View style={s.section}>
           <Text style={s.title}>{title}</Text>
 
           {subtitle ? (
-            <Text style={s.cues} numberOfLines={2}>{subtitle}</Text>
+            <Text style={s.cuesText} numberOfLines={2}>{subtitle}</Text>
           ) : null}
 
           <View style={s.metaRow}>
             <View style={s.metaPill}>
               <Ionicons name="fitness-outline" size={14} color={colors.textSecondary} />
-              <Text style={s.metaText}>{formatGoal(exercise.goal)}</Text>
+              <Text style={s.metaText}>{goalLabel}</Text>
             </View>
             <View style={s.metaPill}>
               <Ionicons name="speedometer-outline" size={14} color={colors.textSecondary} />
-              <Text style={s.metaText}>{exercise.level}</Text>
+              <Text style={s.metaText}>{levelLabel}</Text>
             </View>
             {estDuration ? (
               <View style={s.metaPill}>
@@ -340,11 +369,11 @@ export default function ExerciseDetailScreen() {
           </View>
         </View>
 
-        {/* Exercises Section -- compound or standard protocol card */}
+        {/* Exercises Section */}
         {isCompound ? (
           <View style={s.section}>
             <Text style={s.sectionTitle}>
-              {locale === "zh" ? "训练内容" : "Exercises"}
+              {tr("训练内容", "Exercises")}
             </Text>
             {subExercises.map((sub, idx) => (
               <View key={idx} style={[s.exerciseCard, { marginBottom: 10 }]}>
@@ -360,12 +389,11 @@ export default function ExerciseDetailScreen() {
                   restPerSet: sub.rest_between_sets_sec,
                   resistance: sub.resistance,
                   target: sub.target,
-                })} />
+                }, tr)} />
               </View>
             ))}
           </View>
         ) : (() => {
-          // Standard single-card protocol display
           let eSets = sets;
           let eReps = reps;
           let eRest = restSec;
@@ -379,12 +407,12 @@ export default function ExerciseDetailScreen() {
           const hasProtocol = eSets > 0 || eReps > 0 || eRest > 0 || repDuration > 0 || restPerRep > 0 || protocol?.target || protocol?.resistance || protocol?.format;
           if (!hasProtocol) return null;
 
-          const cardTitle = detailName || formatGoal(exercise.goal);
+          const cardTitle = detailName || goalLabel;
 
           return (
             <View style={s.section}>
               <Text style={s.sectionTitle}>
-                {locale === "zh" ? "训练内容" : "Exercises"}
+                {tr("训练内容", "Exercises")}
               </Text>
               <View style={s.exerciseCard}>
                 <View style={s.exerciseCardHeader}>
@@ -400,7 +428,7 @@ export default function ExerciseDetailScreen() {
                   resistance: protocol?.resistance,
                   target: protocol?.target,
                   format: protocol?.format,
-                })} />
+                }, tr)} />
               </View>
             </View>
           );
@@ -420,7 +448,7 @@ export default function ExerciseDetailScreen() {
         {cues ? (
           <View style={s.section}>
             <Text style={s.sectionTitle}>
-              {locale === "zh" ? "详细描述" : "Description"}
+              {tr("详细描述", "Description")}
             </Text>
             <Text style={s.descText}>{cues}</Text>
           </View>
@@ -431,7 +459,7 @@ export default function ExerciseDetailScreen() {
           <View style={s.section}>
             {exercise.equipment.length > 0 ? (
               <View style={{ marginBottom: 12 }}>
-                <Text style={s.tagLabel}>{locale === "zh" ? "器械" : "Equipment"}</Text>
+                <Text style={s.tagLabel}>{tr("器械", "Equipment")}</Text>
                 <View style={s.tagRow}>
                   {exercise.equipment.map((eq) => (
                     <View key={eq} style={s.tag}>
@@ -443,7 +471,7 @@ export default function ExerciseDetailScreen() {
             ) : null}
             {exercise.muscles.length > 0 ? (
               <View>
-                <Text style={s.tagLabel}>{locale === "zh" ? "目标肌群" : "Muscles"}</Text>
+                <Text style={s.tagLabel}>{tr("目标肌群", "Muscles")}</Text>
                 <View style={s.tagRow}>
                   {exercise.muscles.map((m) => (
                     <View key={m} style={s.tag}>
@@ -455,7 +483,7 @@ export default function ExerciseDetailScreen() {
             ) : null}
           </View>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Bottom CTA */}
       <View style={[s.bottomFloat, { paddingBottom: insets.bottom + 12 }]}>
@@ -463,7 +491,7 @@ export default function ExerciseDetailScreen() {
           <TouchableOpacity style={s.mainBtn} onPress={handleAddToPlan} activeOpacity={0.8}>
             <Ionicons name="add-circle-outline" size={20} color="#FFF" />
             <Text style={s.mainBtnText}>
-              {locale === "zh" ? "添加到计划" : "Add to Plan"}
+              {tr("添加到计划", "Add to Plan")}
             </Text>
           </TouchableOpacity>
         ) : context === "execution" ? (
@@ -474,7 +502,7 @@ export default function ExerciseDetailScreen() {
             <TouchableOpacity style={s.startBtn} onPress={handleStartExercise} activeOpacity={0.8}>
               <Ionicons name="play-circle" size={20} color="#FFF" />
               <Text style={s.startBtnText}>
-                {locale === "zh" ? "开始训练" : "Start"}
+                {tr("开始训练", "Start")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -483,8 +511,8 @@ export default function ExerciseDetailScreen() {
             <Ionicons name={isFav ? "heart" : "heart-outline"} size={20} color="#FFF" />
             <Text style={s.favoriteBtnText}>
               {isFav
-                ? (locale === "zh" ? "已收藏" : "Favorited")
-                : (locale === "zh" ? "收藏" : "Add to Favorites")}
+                ? tr("已收藏", "Favorited")
+                : tr("收藏", "Add to Favorites")}
             </Text>
           </TouchableOpacity>
         )}
@@ -497,13 +525,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  // Media
-  mediaWrap: {
+  // Hero media
+  heroContainer: {
     width: "100%",
-    height: 220,
     backgroundColor: colors.backgroundSecondary,
+    overflow: "hidden",
   },
-  mediaImg: { width: "100%", height: "100%" },
   mediaPlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -514,7 +541,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   // Title section
   section: { paddingHorizontal: 20, paddingTop: 16 },
   title: { fontSize: 22, fontFamily: theme.fonts.black, color: colors.textPrimary, marginBottom: 4 },
-  cues: { fontSize: 14, fontFamily: theme.fonts.regular, color: colors.textSecondary, lineHeight: 20, marginBottom: 8 },
+  cuesText: { fontSize: 14, fontFamily: theme.fonts.regular, color: colors.textSecondary, lineHeight: 20, marginBottom: 8 },
 
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   metaPill: {
@@ -656,5 +683,4 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderRadius: theme.borderRadius.pill,
   },
   startBtnText: { color: "#FFF", fontFamily: theme.fonts.bold, fontSize: 16 },
-
 });

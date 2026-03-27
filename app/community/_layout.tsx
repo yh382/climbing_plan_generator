@@ -5,7 +5,7 @@ export default function CommunityLayout() {
   return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-      <Stack.Screen name="post/[postId]" />
+      <Stack.Screen name="post/[postId]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="challenges" />
       <Stack.Screen name="challenges/[challengeId]" />
       <Stack.Screen name="activities" />
@@ -18,7 +18,7 @@ export default function CommunityLayout() {
       <Stack.Screen name="events/index" />
       <Stack.Screen name="media-select" options={{ headerShown: false }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
-      <Stack.Screen name="u/[id]" />
+      <Stack.Screen name="u/[id]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="public-plan" />
       <Stack.Screen name="public-route-log" />
       <Stack.Screen name="workout-record" />

@@ -207,8 +207,7 @@ export default function CommentSheet({ visible, onClose, postId, postOwnerId, co
   return (
     <TrueSheet
       ref={sheetRef}
-      detents={[0.6, 0.9]}
-      cornerRadius={24}
+      detents={[0.4, 0.9]}
       backgroundColor={colors.background}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed

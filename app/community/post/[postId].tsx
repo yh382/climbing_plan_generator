@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   View,
+  ScrollView,
   StyleSheet,
   ActivityIndicator,
   Text,
@@ -28,6 +29,8 @@ export default function SinglePostScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: "Post",
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
     });
   }, [navigation, router]);
@@ -55,8 +58,10 @@ export default function SinglePostScreen() {
   };
 
   return (
-    <View style={styles.container}>
-
+    <ScrollView
+      style={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="small" color="#111" />
@@ -126,7 +131,7 @@ export default function SinglePostScreen() {
           commentCount={post.comments}
         />
       )}
-    </View>
+    </ScrollView>
   );
 }
 

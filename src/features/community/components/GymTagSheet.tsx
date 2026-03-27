@@ -96,8 +96,7 @@ export default function GymTagSheet({ visible, onClose, selectedGymId, onSelect 
   return (
     <TrueSheet
       ref={sheetRef}
-      detents={[0.5]}
-      cornerRadius={24}
+      detents={[0.4, 0.9]}
       backgroundColor={colors.background}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed
