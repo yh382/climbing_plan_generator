@@ -78,7 +78,7 @@ export default function SignupScreen() {
       if (!res?.access_token) throw new Error("Missing access_token");
 
       await setToken(res.access_token, res.refresh_token ?? null);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     } catch (e: any) {
       if (e?.code === "ERR_REQUEST_CANCELED") return;
       Alert.alert(t("Apple Sign In failed"), e?.message ?? t("Unknown error"));
@@ -96,7 +96,7 @@ export default function SignupScreen() {
       });
       if (!res?.access_token) throw new Error('Missing access_token');
       await setToken(res.access_token, res.refresh_token ?? null);
-      router.replace('/(tabs)');
+      router.replace('/(tabs)' as any);
     } catch (e: any) {
       const msg = e?.message ?? 'Unknown error';
       if (msg.includes('409') || msg.includes('already')) {

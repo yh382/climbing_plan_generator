@@ -34,7 +34,7 @@ export default function TabsLayout() {
   }, [logout, router]);
 
   return (
-    <NativeTabs tintColor="#306E6F" minimizeBehavior="automatic">
+    <NativeTabs tintColor="#306E6F" minimizeBehavior="never">
       {/* 1. Home */}
       <NativeTabs.Trigger name="index">
         {isIOS ? (

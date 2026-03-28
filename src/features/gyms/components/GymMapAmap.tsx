@@ -8,7 +8,8 @@ interface GymMapAmapProps {
 }
 
 /**
- * Amap (高德地图) stub — to be implemented with react-native-amap3d.
+ * [DEFERRED] Amap (高德地图) stub — to be implemented with react-native-amap3d.
+ * Priority: Low — 仅国内用户需要，当前版本使用 Google Maps。
  *
  * When implementing:
  * - Install react-native-amap3d

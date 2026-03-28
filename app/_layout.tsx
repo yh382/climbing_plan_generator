@@ -136,7 +136,7 @@ export default function RootLayout() {
     if (!appIsReady || isHydrating) return;
 
     if (accessToken) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
       // Register for push notifications after login (skip on simulator)
       registerForPushNotifications().catch(() => {});
     } else {

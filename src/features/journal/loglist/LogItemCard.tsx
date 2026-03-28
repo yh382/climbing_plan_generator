@@ -1,5 +1,6 @@
 import React, { memo } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Feel, LocalDayLogItem } from "./types";
 import { Feather } from "@expo/vector-icons";
@@ -49,14 +50,14 @@ export default memo(function LogItemCard({ item, labelOf, note, onPress, tr }: P
     const subtitleAttempts = `${attemptsShown} ${tr("次", "attempts")}`;
 
 
-  const cover = item.coverUri || item.imageUri;
+  const cover = item.media?.[0]?.uri || item.coverUri || item.imageUri;
 
   return (
     <View style={{ paddingHorizontal: 3 }}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.card}>
         <View style={styles.imageWrap}>
           {cover ? (
-            <Image source={{ uri: cover }} style={styles.image} resizeMode="cover" />
+            <Image source={{ uri: cover }} style={styles.image} contentFit="cover" />
           ) : (
             <View style={[styles.image, styles.noImage]}>
               <Text style={styles.noImageText}>{labelOf(item.grade)}</Text>

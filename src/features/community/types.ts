@@ -1,6 +1,15 @@
 // src/features/community/types.ts
 // Backend-aligned types for community feature
 
+export interface PickedMediaItem {
+  id: string;
+  uri: string;
+  mediaType: 'image' | 'video';
+  width: number;
+  height: number;
+  duration?: number;
+}
+
 // --- Request types (snake_case, matching backend Pydantic models) ---
 
 export interface UserPostCreateIn {

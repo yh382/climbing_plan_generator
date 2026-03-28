@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, type StyleProp, type ViewStyle } from "react-native";
+import { type StyleProp, type ViewStyle } from "react-native";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 
 interface NativeSegmentedControlProps {
@@ -10,9 +10,8 @@ interface NativeSegmentedControlProps {
 }
 
 /**
- * Native iOS UISegmentedControl via @react-native-segmented-control/segmented-control.
- * Uses UIKit directly (no SwiftUI Host bridge), avoiding rendering conflicts with TrueSheet.
- * Renders nothing on Android (TODO: fallback).
+ * Cross-platform segmented control via @react-native-segmented-control/segmented-control.
+ * iOS: native UISegmentedControl. Android: package-provided styled fallback.
  */
 export function NativeSegmentedControl({
   options,
@@ -20,8 +19,6 @@ export function NativeSegmentedControl({
   onSelect,
   style,
 }: NativeSegmentedControlProps) {
-  if (Platform.OS !== "ios") return null;
-
   return (
     <SegmentedControl
       values={options}

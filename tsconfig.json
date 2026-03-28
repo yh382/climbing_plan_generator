@@ -29,6 +29,8 @@
       "@/components/*": ["src/components/*"],
       "@/store/*": ["src/store/*"],
       "@/lib/*": ["src/lib/*"],
+      "@/contexts/*": ["src/contexts/*"],
+      "@/services/*": ["src/services/*"],
       "@/assets/*": ["app/assets/*"]
     },
     "types": [

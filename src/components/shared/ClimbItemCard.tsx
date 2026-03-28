@@ -1,6 +1,7 @@
 // src/components/shared/ClimbItemCard.tsx
 import { useMemo } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
@@ -51,7 +52,7 @@ export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
           <Image
             source={{ uri: thumbUri }}
             style={styles.thumb}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : (
           <View style={styles.thumbPlaceholder}>

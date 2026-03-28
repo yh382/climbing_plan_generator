@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { View, Text, StyleSheet, ViewStyle } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 import Animated, { useSharedValue, withTiming, useAnimatedProps } from "react-native-reanimated";
+import { useThemeColors } from "../../lib/useThemeColors";
 
 // 动画化的 SVG Circle
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -35,9 +36,11 @@ export default function DualActivityRing({
   parts = [],
   outerColor = "#A08060",
   innerColor = "#306E6F",
-  bgColor = "#F3F4F6",
+  bgColor,
   style,
 }: Props) {
+  const colors = useThemeColors();
+  const resolvedBgColor = bgColor ?? colors.backgroundSecondary;
   const center = size / 2;
   const gap = 4; 
 
@@ -55,7 +58,7 @@ export default function DualActivityRing({
   const remainder = climbCount % climbGoal;
   
   // 颜色逻辑：覆盖效果
-  let innerTrackColor = bgColor;
+  let innerTrackColor = resolvedBgColor;
   let innerTrackOpacity = 1;
   let currentProgress = remainder / climbGoal;
 
@@ -98,7 +101,7 @@ export default function DualActivityRing({
         <Svg width={size} height={size}>
           <G rotation="-90" origin={`${center}, ${center}`}>
             {/* 外环 */}
-            <Circle cx={center} cy={center} r={rOuter} stroke={bgColor} strokeWidth={thickness} fill="none" />
+            <Circle cx={center} cy={center} r={rOuter} stroke={resolvedBgColor} strokeWidth={thickness} fill="none" />
             <AnimatedCircle
               cx={center} cy={center} r={rOuter}
               stroke={outerColor} strokeWidth={thickness} fill="none"
@@ -124,8 +127,8 @@ export default function DualActivityRing({
 
         {/* 中心文字 */}
         <View style={styles.centerText}>
-          <Text style={styles.totalLabel}>TOTAL</Text>
-          <Text style={styles.totalCount}>{climbCount}</Text>
+          <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>TOTAL</Text>
+          <Text style={[styles.totalCount, { color: colors.textPrimary }]}>{climbCount}</Text>
           {trainingPct > 0 && (
             <Text style={[styles.planLabel, { color: outerColor }]}>
               Plan {Math.round(trainingPct)}%
@@ -158,24 +161,24 @@ export default function DualActivityRing({
               </View>
             </View>
           ) : (
-            // [修改] 状态 B: 无数据 -> 白色长条 (带极细边框，否则看不见)
-            <View 
+            // [修改] 状态 B: 无数据 -> 长条适配主题
+            <View
               style={[
-                styles.barContainer, 
-                { 
-                  width: '100%', 
-                  backgroundColor: '#FFFFFF', // 改为白色
-                  borderWidth: 1,             // 加边框描边
-                  borderColor: '#F3F4F6',     // 极浅的灰色边框
-                  borderRadius: 4 
+                styles.barContainer,
+                {
+                  width: '100%',
+                  backgroundColor: resolvedBgColor,
+                  borderWidth: 1,
+                  borderColor: resolvedBgColor,
+                  borderRadius: 4
                 }
-              ]} 
+              ]}
             />
           )}
 
           <View style={styles.barLabels}>
-               <Text style={styles.barLabelText}>Distribution</Text>
-               <Text style={styles.barLabelText}>{climbCount} sends</Text>
+               <Text style={[styles.barLabelText, { color: colors.textSecondary }]}>Distribution</Text>
+               <Text style={[styles.barLabelText, { color: colors.textSecondary }]}>{climbCount} sends</Text>
           </View>
       </View>
     </View>

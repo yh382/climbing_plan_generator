@@ -1,13 +1,15 @@
 // app/community/create.tsx
 
-import React, { useState, useEffect, useMemo, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useLayoutEffect, useRef, useCallback } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Modal,
   Pressable, Dimensions,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
 import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
@@ -16,11 +18,13 @@ import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useCommunityStore } from "../../src/store/useCommunityStore";
 import { api } from "../../src/lib/apiClient";
-import type { UserPostCreateIn } from "../../src/features/community/types";
+import type { UserPostCreateIn, PickedMediaItem } from "../../src/features/community/types";
 import { PostAttachmentCard } from "../../src/components/shared/PostAttachmentCard";
 import LocationSheet from "../../src/features/community/components/LocationSheet";
 import GymTagSheet from "../../src/features/community/components/GymTagSheet";
 import { setAttachmentCallback } from "../../src/features/community/pendingAttachment";
+import { consumePendingMedia } from "../../src/features/community/pendingMedia";
+import { uploadPostMedia } from "../../src/features/community/api";
 
 const AUDIENCE_OPTIONS = [
   { value: 'public' as const, label: 'Public', icon: 'globe-outline' as const },
@@ -29,11 +33,6 @@ const AUDIENCE_OPTIONS = [
 ];
 
 const MAX_MEDIA = 10;
-const MOCK_URLS = [
-  "https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=400&q=80",
-  "https://images.unsplash.com/photo-1564769662533-4f00a87b4056?auto=format&fit=crop&w=400&q=80",
-  "https://images.unsplash.com/photo-1601224822079-5f8e28e14fd6?auto=format&fit=crop&w=400&q=80",
-];
 
 const VISIBILITY_TO_AUDIENCE: Record<string, 'public' | 'followers' | 'private'> = {
   'public': 'public',
@@ -94,12 +93,18 @@ export default function CreatePostScreen() {
   const { createPost, updatePost } = useCommunityStore();
 
   const [content, setContent] = useState(params.editContent || "");
-  const [mediaList, setMediaList] = useState<string[]>(() => {
+  const [mediaList, setMediaList] = useState<PickedMediaItem[]>(() => {
     if (params.prefillMedia) {
-      try { return JSON.parse(params.prefillMedia); } catch { return []; }
+      try {
+        const urls = JSON.parse(params.prefillMedia) as string[];
+        return urls.map((url, i) => ({ id: `prefill-${i}`, uri: url, mediaType: 'image' as const, width: 0, height: 0 }));
+      } catch { return []; }
     }
     if (params.editMedia) {
-      try { return JSON.parse(params.editMedia); } catch { return []; }
+      try {
+        const urls = JSON.parse(params.editMedia) as string[];
+        return urls.map((url, i) => ({ id: `edit-${i}`, uri: url, mediaType: 'image' as const, width: 0, height: 0 }));
+      } catch { return []; }
     }
     return [];
   });
@@ -155,10 +160,23 @@ export default function CreatePostScreen() {
     return () => setAttachmentCallback(null);
   }, []);
 
+  // Consume media from device picker when returning
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingMedia();
+      if (pending && pending.length > 0) {
+        setMediaList(prev => {
+          const remaining = MAX_MEDIA - prev.length;
+          const toAdd = pending.slice(0, remaining);
+          return [...prev, ...toAdd];
+        });
+      }
+    }, [])
+  );
+
   const handleAddMedia = () => {
     if (mediaList.length >= MAX_MEDIA) return;
-    const mockUrl = MOCK_URLS[mediaList.length % MOCK_URLS.length];
-    setMediaList(prev => [...prev, mockUrl]);
+    router.push('/community/device-media-picker');
   };
 
   const handleRemoveMedia = (index: number) => {
@@ -186,21 +204,37 @@ export default function CreatePostScreen() {
 
     setPosting(true);
     try {
+      // Upload local media to R2 if needed (preserve order)
+      let uploadedMedia: Array<{ type: 'image' | 'video'; url: string }> | undefined;
+      if (mediaList.length > 0) {
+        const localItems = mediaList.filter(m => !m.uri.startsWith('http'));
+        if (localItems.length > 0) {
+          // Upload all local items, then map back in original order
+          const uploadResults = await uploadPostMedia(localItems);
+          const uploadMap = new Map<string, { type: 'image' | 'video'; url: string }>();
+          localItems.forEach((item, i) => uploadMap.set(item.id, uploadResults[i]));
+
+          uploadedMedia = mediaList.map(m =>
+            m.uri.startsWith('http')
+              ? { type: m.mediaType, url: m.uri }
+              : uploadMap.get(m.id)!
+          );
+        } else {
+          uploadedMedia = mediaList.map(m => ({ type: m.mediaType, url: m.uri }));
+        }
+      }
+
       if (isEditMode) {
         await updatePost(params.postId!, {
           content_text: content || undefined,
-          media: mediaList.length > 0
-            ? mediaList.map(url => ({ type: 'image' as const, url }))
-            : undefined,
+          media: uploadedMedia,
           visibility,
         });
       } else {
         const hasValidAttachment = attachedWidget && attachedWidget.id;
         const postData: UserPostCreateIn = {
           content_text: content || undefined,
-          media: mediaList.length > 0
-            ? mediaList.map(url => ({ type: 'image' as const, url }))
-            : undefined,
+          media: uploadedMedia,
           attachment_type: hasValidAttachment ? attachedWidget.type : undefined,
           attachment_id: hasValidAttachment ? attachedWidget.id : undefined,
           attachment_meta: hasValidAttachment ? {
@@ -286,9 +320,14 @@ export default function CreatePostScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.mediaRow}
           >
-            {mediaList.map((url, idx) => (
-              <View key={`${idx}-${url}`} style={styles.mediaThumbnail}>
-                <Image source={{ uri: url }} style={styles.mediaThumbnailImage} resizeMode="cover" />
+            {mediaList.map((item, idx) => (
+              <View key={item.id} style={styles.mediaThumbnail}>
+                <Image source={{ uri: item.uri }} style={styles.mediaThumbnailImage} contentFit="cover" />
+                {item.mediaType === 'video' && (
+                  <View style={styles.mediaVideoIcon}>
+                    <Ionicons name="play-circle" size={18} color="#FFF" />
+                  </View>
+                )}
                 <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => handleRemoveMedia(idx)}>
                   <Ionicons name="close" size={12} color="#FFF" />
                 </TouchableOpacity>
@@ -629,6 +668,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
     justifyContent: 'center',
   },
+  mediaVideoIcon: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+  },
   addMediaBtn: {
     width: 80,
     height: 80,
@@ -669,7 +713,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   // Popover
   popover: {
     position: 'absolute',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.border,

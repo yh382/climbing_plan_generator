@@ -1,7 +1,32 @@
 import { api } from '../../../lib/apiClient';
 import type { EventOut } from './types';
 
+export type EventCreatePayload = {
+  publisher_org_id: string;
+  title: string;
+  category: string;
+  start_at: string; // ISO datetime
+  end_at?: string;
+  location_text?: string;
+  description?: string;
+  highlights?: string[];
+};
+
+export type MyOrgItem = {
+  org_id: string;
+  org_name: string;
+  role: string;
+};
+
 export const eventApi = {
+  /** Get user's orgs (for publisher_org_id) */
+  getMyOrgs: () =>
+    api.get<MyOrgItem[]>('/orgs/me'),
+
+  /** Create a new event (draft) */
+  createEvent: (payload: EventCreatePayload) =>
+    api.post<EventOut>('/events', payload),
+
   /** Get published events list */
   getEvents: (limit = 50) =>
     api.get<EventOut[]>(`/events?limit=${limit}`),

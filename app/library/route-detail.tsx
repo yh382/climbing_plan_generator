@@ -1,31 +1,50 @@
 // app/library/route-detail.tsx
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
-  Image,
   ScrollView,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
+  Alert,
 } from "react-native";
+import { Image } from "expo-image";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 
+import { useThemeColors } from "../../src/lib/useThemeColors";
 import { getColorForGrade } from "../../lib/gradeColors";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { consumePendingMedia } from "../../src/features/community/pendingMedia";
 import {
   readDayList,
   readSessionList,
+  updateDayItem,
+  updateSessionItem,
 } from "../../src/features/journal/loglist/storage";
-import type { LocalDayLogItem } from "../../src/features/journal/loglist/types";
+import type { LocalDayLogItem, LogMedia } from "../../src/features/journal/loglist/types";
 
 const SCREEN_W = Dimensions.get("window").width;
+const LOG_MAX_MEDIA = 2;
+
+function ensureMedia(item: LocalDayLogItem): LogMedia[] {
+  const arr: LogMedia[] = Array.isArray(item.media) ? item.media : [];
+  if (item.imageUri && !arr.some((m) => m.uri === item.imageUri)) {
+    arr.push({ id: `img_${item.createdAt}`, type: "image", uri: item.imageUri });
+  }
+  if (item.videoUri && !arr.some((m) => m.uri === item.videoUri)) {
+    arr.push({ id: `vid_${item.createdAt}`, type: "video", uri: item.videoUri, coverUri: item.coverUri });
+  }
+  return arr;
+}
 
 export default function RouteDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const { date, itemId, type, sessionKey } = useLocalSearchParams<{
     date: string;
@@ -36,12 +55,13 @@ export default function RouteDetailScreen() {
 
   const [item, setItem] = useState<LocalDayLogItem | null>(null);
 
+  const climbType = (type === "toprope" || type === "lead") ? type : "boulder";
+
   useEffect(() => {
     if (!date || !itemId) return;
     let cancelled = false;
 
     const load = async () => {
-      const climbType = (type === "toprope" || type === "lead") ? type : "boulder";
       const items = sessionKey
         ? await readSessionList(sessionKey, climbType)
         : await readDayList(date, climbType);
@@ -55,17 +75,68 @@ export default function RouteDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [date, itemId, type, sessionKey]);
+  }, [date, itemId, climbType, sessionKey]);
+
+  const media = useMemo(() => (item ? ensureMedia(item) : []), [item]);
+
+  const handleAddMedia = useCallback(() => {
+    if (media.length >= LOG_MAX_MEDIA) {
+      Alert.alert("Limit Reached", `Each log can have up to ${LOG_MAX_MEDIA} media items.`);
+      return;
+    }
+    router.push("/community/device-media-picker");
+  }, [media.length, router]);
+
+  // Consume media from device-media-picker when returning
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingMedia();
+      if (!pending || pending.length === 0 || !item) return;
+
+      const existing = ensureMedia(item);
+      const remaining = LOG_MAX_MEDIA - existing.length;
+      if (remaining <= 0) return;
+
+      const toAdd: LogMedia[] = pending.slice(0, remaining).map((p) => ({
+        id: p.id,
+        type: p.mediaType === "video" ? "video" : "image",
+        uri: p.uri,
+      }));
+
+      const updater = (old: LocalDayLogItem) => ({
+        ...old,
+        media: [...ensureMedia(old), ...toAdd],
+      });
+
+      let cancelled = false;
+      (async () => {
+        try {
+          const nextList = sessionKey
+            ? await updateSessionItem(sessionKey, climbType, item.id, updater)
+            : await updateDayItem(date, climbType, item.id, updater);
+          if (!cancelled && nextList) {
+            const updated = nextList.find((it) => it.id === itemId) ?? null;
+            setItem(updated);
+          }
+        } catch (e) {
+          if (__DEV__) console.warn("Failed to save media to log:", e);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [item, sessionKey, climbType, date, itemId])
+  );
+
+  const s = useMemo(() => createStyles(colors), [colors]);
 
   if (!item) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FFF" }}>
-        <Stack.Screen options={{ title: "Route Detail" }} />
+      <View style={s.container}>
+        <Stack.Screen options={{ title: "Route Detail", headerRight: () => <HeaderButton icon="plus.circle" onPress={handleAddMedia} /> }} />
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <Ionicons name="alert-circle-outline" size={44} color="#E5E7EB" />
-          <Text style={{ color: "#9CA3AF", marginTop: 8 }}>
+          <Ionicons name="alert-circle-outline" size={44} color={colors.textTertiary} />
+          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
             Route not found
           </Text>
         </View>
@@ -79,10 +150,9 @@ export default function RouteDetailScreen() {
     ? format(parseISO(date), "EEEE, MMM dd")
     : "";
 
-  // Get media
-  const mediaUri =
-    item.media?.[0]?.uri || item.imageUri || item.videoUri || "";
-  const isVideo = item.media?.[0]?.type === "video" || !!item.videoUri;
+  // Get media for display
+  const mediaUri = media[0]?.uri || "";
+  const isVideo = media[0]?.type === "video";
 
   // Style label
   const styleLabel =
@@ -108,68 +178,68 @@ export default function RouteDetailScreen() {
   const note = (item.note || "").trim();
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFF" }}>
+    <View style={s.container}>
       <Stack.Screen options={{ title: "Route Detail" }} />
 
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Media section - always visible */}
-        <View style={styles.mediaContainer}>
+        <View style={s.mediaContainer}>
           {mediaUri ? (
             <>
               <Image
                 source={{ uri: mediaUri }}
-                style={styles.mediaImage}
+                style={s.mediaImage}
                 resizeMode="cover"
               />
               {isVideo && (
-                <View style={styles.playOverlay}>
+                <View style={s.playOverlay}>
                   <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
                 </View>
               )}
             </>
           ) : (
-            <View style={styles.mediaPlaceholder}>
-              <Ionicons name="camera-outline" size={44} color="#D1D5DB" />
+            <View style={s.mediaPlaceholder}>
+              <Ionicons name="camera-outline" size={44} color={colors.textTertiary} />
             </View>
           )}
         </View>
 
         {/* Route info */}
-        <View style={styles.infoSection}>
-          <Text style={styles.routeName}>{routeName}</Text>
+        <View style={s.infoSection}>
+          <Text style={s.routeName}>{routeName}</Text>
 
-          <View style={styles.gradeRow}>
-            <View style={[styles.gradeDot, { backgroundColor: gc }]} />
-            <Text style={styles.gradeText}>{item.grade}</Text>
+          <View style={s.gradeRow}>
+            <View style={[s.gradeDot, { backgroundColor: gc }]} />
+            <Text style={s.gradeText}>{item.grade}</Text>
           </View>
 
           {displayDate ? (
-            <Text style={styles.dateText}>{displayDate}</Text>
+            <Text style={s.dateText}>{displayDate}</Text>
           ) : null}
         </View>
 
         {/* Tags row */}
-        <View style={styles.tagsRow}>
+        <View style={s.tagsRow}>
           {styleLabel ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{styleLabel}</Text>
+            <View style={s.tag}>
+              <Text style={s.tagText}>{styleLabel}</Text>
             </View>
           ) : null}
           {feelLabel ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{feelLabel}</Text>
+            <View style={s.tag}>
+              <Text style={s.tagText}>{feelLabel}</Text>
             </View>
           ) : null}
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{attempts}x</Text>
+          <View style={s.tag}>
+            <Text style={s.tagText}>{attempts}x</Text>
           </View>
         </View>
 
         {/* Notes */}
         {note ? (
-          <View style={styles.noteSection}>
-            <Text style={styles.noteLabel}>Notes</Text>
-            <Text style={styles.noteContent}>{note}</Text>
+          <View style={s.noteSection}>
+            <Text style={s.noteLabel}>Notes</Text>
+            <Text style={s.noteContent}>{note}</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -177,95 +247,100 @@ export default function RouteDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  mediaContainer: {
-    width: SCREEN_W,
-    height: SCREEN_W * 0.65,
-    backgroundColor: "#F3F4F6",
-  },
-  mediaImage: {
-    width: "100%",
-    height: "100%",
-  },
-  playOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.15)",
-  },
-  mediaPlaceholder: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    mediaContainer: {
+      width: SCREEN_W,
+      height: SCREEN_W * 0.65,
+      backgroundColor: colors.backgroundSecondary,
+    },
+    mediaImage: {
+      width: "100%",
+      height: "100%",
+    },
+    playOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgba(0,0,0,0.15)",
+    },
+    mediaPlaceholder: {
+      width: "100%",
+      height: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  infoSection: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  routeName: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111",
-    marginBottom: 8,
-  },
-  gradeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  gradeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  gradeText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#374151",
-  },
-  dateText: {
-    fontSize: 13,
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
+    infoSection: {
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    },
+    routeName: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    gradeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    gradeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 6,
+    },
+    gradeText: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    dateText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
 
-  tagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  tag: {
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 13,
-    color: "#4B5563",
-    fontWeight: "600",
-  },
+    tagsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    },
+    tag: {
+      backgroundColor: colors.backgroundSecondary,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    tagText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
 
-  noteSection: {
-    padding: 20,
-  },
-  noteLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#6B7280",
-    marginBottom: 8,
-  },
-  noteContent: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
-  },
-});
+    noteSection: {
+      padding: 20,
+    },
+    noteLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    noteContent: {
+      fontSize: 15,
+      color: colors.textPrimary,
+      lineHeight: 22,
+    },
+  });

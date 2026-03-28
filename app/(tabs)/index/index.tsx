@@ -14,31 +14,21 @@ import { useNavigation } from "@react-navigation/native";
 import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { useAuthStore } from "@/store/useAuthStore";
 import { HomeBlogBannerCarousel, type HomeBlogBannerItem } from "@/features/home/components/HomeBlogBannerCarousel";
+import { MOCK_BLOGS } from "@/features/home/blog/component/mockBlogs";
 import useLogsStore from "@/store/useLogsStore";
 import { getMaxGrade } from "../../../src/services/stats/gradeAnalyzer";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
 
-// ===== Banner data (mock — can be replaced by backend later) =====
-const BLOG_BANNERS: HomeBlogBannerItem[] = [
-  {
-    id: "finger-care",
-    title: "手指养护指南",
-    subtitle: "Read now →",
-    imageUri: null,
-    color: "#EFF6FF",
-    action: { type: "blog", blogId: "finger-care-001" },
-  },
-  {
-    id: "warmup",
-    title: "10 分钟热身模板",
-    subtitle: "Read now →",
-    imageUri: null,
-    color: "#FFFBEB",
-    action: { type: "blog", blogId: "warmup-002" },
-  },
-];
+// Derive banner data from blog source (auto-updates when blogs change)
+const BLOG_BANNERS: HomeBlogBannerItem[] = MOCK_BLOGS.slice(0, 3).map((blog) => ({
+  id: blog.id,
+  title: blog.title,
+  subtitle: "Read now →",
+  imageUri: blog.coverImageUri ?? null,
+  action: { type: "blog" as const, blogId: blog.id },
+}));
 
 // --- Helper: get Monday of current week as YYYY-MM-DD ---
 function getWeekStart(): string {

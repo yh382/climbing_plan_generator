@@ -16,7 +16,7 @@ export default function LibraryLayout() {
       <Stack.Screen name="plan-overview" />
       <Stack.Screen name="plan-view" />
       <Stack.Screen name="plans" />
-      <Stack.Screen name="route-detail" />
+      <Stack.Screen name="route-detail" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="trending-plans" />
       <Stack.Screen name="log-detail" />
     </Stack>

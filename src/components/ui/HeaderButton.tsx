@@ -39,7 +39,7 @@ export function HeaderButton({
       <Button
         systemImage={icon as any}
         label=""
-        disabled={disabled}
+        {...({ disabled } as Record<string, unknown>)}
         onPress={onPress}
         modifiers={[buttonStyle(variant), labelStyle("iconOnly"), frame({ width: 34, height: 34, alignment: "center" })]}
       />

@@ -1,4 +1,5 @@
 // src/features/community/api.ts
+import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../../lib/apiClient';
 import type {
   UserPostCreateIn,
@@ -9,7 +10,48 @@ import type {
   FeedItem,
   BlockedUserOut,
   MentionOut,
+  PickedMediaItem,
 } from './types';
+
+// --- Media upload helpers ---
+
+async function toFileUri(uri: string): Promise<string> {
+  if (!uri.startsWith('ph://')) return uri;
+  const ext = 'jpg'; // iOS Photos Library assets
+  const dest = `${FileSystem.cacheDirectory}upload_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  return dest;
+}
+
+type PresignResponse = { upload_url: string; public_url: string; key: string };
+
+export async function uploadPostMedia(
+  items: PickedMediaItem[]
+): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
+  return Promise.all(
+    items.map(async (item) => {
+      const fileUri = await toFileUri(item.uri);
+      const contentType = item.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+
+      const { upload_url, public_url } = await api.post<PresignResponse>(
+        '/upload/presign',
+        { category: 'posts', content_type: contentType }
+      );
+
+      const result = await FileSystem.uploadAsync(upload_url, fileUri, {
+        httpMethod: 'PUT',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { 'Content-Type': contentType },
+      });
+
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`Upload failed: ${result.status}`);
+      }
+
+      return { type: item.mediaType, url: public_url };
+    })
+  );
+}
 
 export const communityApi = {
   // === Posts ===

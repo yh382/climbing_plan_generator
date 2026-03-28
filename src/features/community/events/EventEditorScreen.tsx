@@ -1,5 +1,5 @@
 // src/features/community/events/EventEditorScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
-  Platform,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,18 +18,44 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { EventInfoCardModel, EventListItem } from "./data/types";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import EventInfoCardEditor from "./component/EventInfoCardEditor";
+import { eventApi, type MyOrgItem } from "./api";
+
+const CATEGORIES = [
+  { value: "competition", label: "Competition" },
+  { value: "meetup", label: "Meetup" },
+  { value: "training", label: "Training" },
+  { value: "route_setting", label: "Route Setting" },
+  { value: "community", label: "Community" },
+] as const;
 
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
+
+function parseDateToISO(dateStr: string, timeStr?: string): string {
+  const normalized = dateStr.replace(/\//g, "-");
+  if (timeStr) return `${normalized}T${timeStr}:00`;
+  return `${normalized}T00:00:00`;
 }
 
 export default function EventEditorScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  // ===== org =====
+  const [myOrgs, setMyOrgs] = useState<MyOrgItem[]>([]);
+  const [orgLoading, setOrgLoading] = useState(true);
+
+  useEffect(() => {
+    eventApi.getMyOrgs()
+      .then(setMyOrgs)
+      .catch(() => {})
+      .finally(() => setOrgLoading(false));
+  }, []);
+
   // ===== basic fields =====
   const [title, setTitle] = useState("New Event");
-  const [organizerName, setOrganizerName] = useState("ClimMate Community");
+  const [category, setCategory] = useState("meetup");
 
   const [locationName, setLocationName] = useState("");
   const [locationDetail, setLocationDetail] = useState("");
@@ -45,6 +72,8 @@ export default function EventEditorScreen() {
   const [showLocation, setShowLocation] = useState(true);
   const [showDate, setShowDate] = useState(true);
 
+  const [publishing, setPublishing] = useState(false);
+
   // ===== dynamic cards =====
   const [cards, setCards] = useState<EventInfoCardModel[]>([
     {
@@ -59,8 +88,9 @@ export default function EventEditorScreen() {
     if (!title.trim()) return false;
     if (showLocation && !locationName.trim()) return false;
     if (showRewards && !rewardsLine.trim()) return false;
+    if (publishing) return false;
     return true;
-  }, [title, showLocation, locationName, showRewards, rewardsLine]);
+  }, [title, showLocation, locationName, showRewards, rewardsLine, publishing]);
 
   function addCard() {
     setCards((prev) => [
@@ -77,10 +107,40 @@ export default function EventEditorScreen() {
     setCards((prev) => prev.filter((c) => c.id !== id));
   }
 
-  function onPublish() {
+  async function onPublish() {
     if (!canPublish) return;
-    // TODO: 替换为后端 upsert
-    router.back();
+
+    if (myOrgs.length === 0) {
+      Alert.alert("No Organization", "You need to belong to an organization to create events.");
+      return;
+    }
+
+    const org = myOrgs[0];
+    setPublishing(true);
+
+    try {
+      const startISO = parseDateToISO(startDate, showTime ? startTime : undefined);
+      const endISO = endDate ? parseDateToISO(endDate, showTime ? endTime : undefined) : undefined;
+      const highlights = showRewards && rewardsLine.trim()
+        ? rewardsLine.split("·").map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
+      await eventApi.createEvent({
+        publisher_org_id: org.org_id,
+        title: title.trim(),
+        category,
+        start_at: startISO,
+        end_at: endISO,
+        location_text: showLocation ? [locationName, locationDetail].filter(Boolean).join(", ") : undefined,
+        highlights,
+      });
+
+      router.back();
+    } catch (err: any) {
+      Alert.alert("Failed", err?.message || "Could not create event. Please try again.");
+    } finally {
+      setPublishing(false);
+    }
   }
 
   return (
@@ -95,7 +155,11 @@ export default function EventEditorScreen() {
           disabled={!canPublish}
           style={[styles.publishBtn, !canPublish && { opacity: 0.4 }]}
         >
-          <Text style={styles.publishText}>Publish</Text>
+          {publishing ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text style={styles.publishText}>Publish</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -103,6 +167,14 @@ export default function EventEditorScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 + insets.bottom }}
       >
+        {/* org hint */}
+        {!orgLoading && myOrgs.length === 0 && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="warning-outline" size={16} color="#92400E" />
+            <Text style={styles.warningText}>You are not a member of any organization. Join one to create events.</Text>
+          </View>
+        )}
+
         {/* basic block */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basics</Text>
@@ -113,8 +185,21 @@ export default function EventEditorScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Organizer</Text>
-            <TextInput value={organizerName} onChangeText={setOrganizerName} style={styles.input} placeholder="Organizer name" />
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.chipRow}>
+              {CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat.value}
+                  onPress={() => setCategory(cat.value)}
+                  style={[styles.chip, category === cat.value && styles.chipActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.chipText, category === cat.value && styles.chipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -257,6 +342,21 @@ const styles = StyleSheet.create({
   },
   publishText: { color: "#FFF", fontWeight: "900", fontSize: 12 },
 
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  warningText: { flex: 1, fontSize: 12, fontWeight: "700", color: "#92400E" },
+
   section: { paddingHorizontal: 16, paddingTop: 18 },
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 16, fontWeight: "900", color: "#111827" },
@@ -272,6 +372,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#111",
   },
+
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chipActive: { backgroundColor: "#111827" },
+  chipText: { fontSize: 12, fontWeight: "800", color: "#6B7280" },
+  chipTextActive: { color: "#FFF" },
 
   row2: { flexDirection: "row", gap: 12, marginTop: 12 },
 

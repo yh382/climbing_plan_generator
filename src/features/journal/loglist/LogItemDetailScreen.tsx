@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useThemeColors } from "@/lib/useThemeColors";
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../../components/ui/HeaderButton";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -28,6 +29,7 @@ import {
 } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
 import useLogsStore from "../../../store/useLogsStore";
+import { consumePendingMedia } from "../../community/pendingMedia";
 
 type Params = { id?: string; date?: string; logType?: "boulder" | "toprope" | "lead"; sessionKey?: string };
 
@@ -201,19 +203,53 @@ export default function LogItemDetailScreen() {
     ]);
   };
 
-  const pickMedia = async (_kind: "image" | "video") => {
-    setMenuOpen(false);
+  const LOG_MAX_MEDIA = 2;
 
-    // TODO: 接入真实 media picker（image / video）
-    Alert.alert("Add media", "Media upload is not enabled yet.\nThis will be available in a later version.");
-  };
+  // Consume media from device-media-picker when returning
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingMedia();
+      if (!pending || pending.length === 0 || !item) return;
+
+      // Use ensureMedia to account for legacy imageUri/videoUri fields
+      const existing = ensureMedia(item);
+      const remaining = LOG_MAX_MEDIA - existing.length;
+      if (remaining <= 0) return;
+
+      const toAdd: LogMedia[] = pending.slice(0, remaining).map((p) => ({
+        id: p.id,
+        type: p.mediaType === "video" ? "video" : "image",
+        uri: p.uri,
+      }));
+
+      const updater = (old: LocalDayLogItem) => ({
+        ...old,
+        media: [...ensureMedia(old), ...toAdd],
+      });
+
+      let cancelled = false;
+      (async () => {
+        try {
+          const nextList = sessionKey
+            ? await updateSessionItem(sessionKey, logType, item.id, updater)
+            : await updateDayItem(date, logType, item.id, updater);
+          if (!cancelled && nextList) setItems(nextList);
+        } catch (e) {
+          if (__DEV__) console.warn("Failed to save media to log:", e);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [item, sessionKey, logType, date])
+  );
 
   const handleAddMedia = () => {
-    Alert.alert("Add media", "Choose media type", [
-      { text: "Photo", onPress: () => pickMedia("image") },
-      { text: "Video", onPress: () => pickMedia("video") },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    setMenuOpen(false);
+    // Use media (derived from ensureMedia) to account for legacy fields
+    if (media.length >= LOG_MAX_MEDIA) {
+      Alert.alert("Limit Reached", `Each log can have up to ${LOG_MAX_MEDIA} media items.`);
+      return;
+    }
+    router.push("/community/device-media-picker");
   };
 
   if (!item) {

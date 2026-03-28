@@ -1,9 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, useWindowDimensions, Pressable } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import { useBadgesProgress } from "@/features/community/hooks";
 import BadgeCard from "@/features/profile/components/badgessection/BadgeCard";
+import { useThemeColors } from "@/lib/useThemeColors";
+import type { ThemeColors } from "@/lib/theme";
 
 import type { Badge, BadgeSectionKey, BadgeTier } from "@/features/profile/components/badgessection/types";
 
@@ -39,8 +43,20 @@ const DISPLAY_GROUPS = [
 export default function AllBadgesPage() {
   const { badges: rawBadges, loading } = useBadgesProgress();
   const router = useRouter();
+  const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const colors = useThemeColors();
+  const dynamicStyles = useMemo(() => createStyles(colors), [colors]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "Badges",
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
 
   const cardSize = useMemo(() => {
     return (width - PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS;
@@ -66,15 +82,14 @@ export default function AllBadgesPage() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      <Stack.Screen options={{ title: "Badges" }} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         contentInsetAdjustmentBehavior="automatic"
         data={grouped}
         keyExtractor={item => item.key}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={dynamicStyles.container}
         ListHeaderComponent={
-          <Text style={styles.headerSub}>{awardedCount} / {allBadges.length} earned</Text>
+          <Text style={dynamicStyles.headerSub}>{awardedCount} / {allBadges.length} earned</Text>
         }
         renderItem={({ item: group }) => {
           const isExpanded = expanded[group.key] ?? false;
@@ -82,17 +97,17 @@ export default function AllBadgesPage() {
           const visible = isExpanded ? group.badges : group.badges.slice(0, COLLAPSED_COUNT);
 
           return (
-            <View style={styles.section}>
+            <View style={dynamicStyles.section}>
               <Pressable
-                style={styles.sectionHeader}
+                style={dynamicStyles.sectionHeader}
                 onPress={hasMore ? () => toggleSection(group.key) : undefined}
               >
-                <Text style={styles.sectionTitle}>{group.title}</Text>
+                <Text style={dynamicStyles.sectionTitle}>{group.title}</Text>
                 {hasMore && (
-                  <Text style={styles.chevron}>{isExpanded ? "▲" : "▼"}</Text>
+                  <Text style={dynamicStyles.chevron}>{isExpanded ? "▲" : "▼"}</Text>
                 )}
               </Pressable>
-              <View style={styles.grid}>
+              <View style={dynamicStyles.grid}>
                 {visible.map(badge => (
                   <BadgeCard
                     key={badge.id}
@@ -113,17 +128,19 @@ export default function AllBadgesPage() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: PADDING, paddingBottom: 40 },
-  headerSub: { fontSize: 14, color: "#666", marginBottom: 16 },
-  section: { marginBottom: 24 },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#333" },
-  chevron: { fontSize: 12, color: "#999" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { padding: PADDING, paddingBottom: 40 },
+    headerSub: { fontSize: 14, color: colors.textSecondary, marginBottom: 16 },
+    section: { marginBottom: 24 },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    sectionTitle: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+    chevron: { fontSize: 12, color: colors.textSecondary },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
+  });
+}

@@ -70,7 +70,7 @@ export default function LoginScreen() {
       // ✅ 你现有 store 可能只存 access；如果你已升级支持 refresh，也不会报错（多余参数忽略）
       await (setToken as any)(res.access_token, res.refresh_token ?? null, remember);
 
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     } catch (e: any) {
       Alert.alert(t("Login failed"), e?.message ?? t("Unknown error"));
     } finally {
@@ -99,7 +99,7 @@ export default function LoginScreen() {
       if (!res?.access_token) throw new Error("Missing access_token");
 
       await (setToken as any)(res.access_token, res.refresh_token ?? null, true);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     } catch (e: any) {
       if (e?.code === "ERR_REQUEST_CANCELED") return;
       Alert.alert(t("Apple Sign In failed"), e?.message ?? t("Unknown error"));

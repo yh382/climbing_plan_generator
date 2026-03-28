@@ -15,17 +15,20 @@ interface HeaderPillButtonProps {
  * Auto-follows system dark/light mode.
  */
 export function HeaderPillButton({ title, onPress, disabled, loading, style }: HeaderPillButtonProps) {
+  const extraProps = {
+    variant: "borderedProminent",
+    controlSize: "small",
+    color: "#1C1C1E",
+    disabled: disabled || loading,
+  } as Record<string, unknown>;
+
   return (
     <Host matchContents style={style}>
       <Button
-        variant="borderedProminent"
-        controlSize="small"
-        color="#1C1C1E"
-        disabled={disabled || loading}
+        {...extraProps}
         onPress={onPress}
-      >
-        {loading ? "..." : title}
-      </Button>
+        label={loading ? "..." : title}
+      />
     </Host>
   );
 }

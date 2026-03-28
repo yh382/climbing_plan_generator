@@ -128,8 +128,9 @@ export const SidebarLayout: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 // ── SidebarContent ────────────────────────────────────────────────────────────
+type SidebarTheme = typeof tokens.light | typeof tokens.dark;
 const SidebarContent: React.FC<{
-  theme: typeof tokens.light;
+  theme: SidebarTheme;
   progress: Animated.Value;
 }> = ({ theme: t, progress }) => {
   const router = useRouter();                                      // [ADAPTED] 原版用 useNavigation
@@ -206,7 +207,7 @@ const SidebarContent: React.FC<{
 // ── NavRow ─────────────────────────────────────────────────────────────────────
 const NavRow: React.FC<{
   item: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
-  theme: typeof tokens.light;
+  theme: SidebarTheme;
   onPress: () => void;
 }> = ({ item, theme: t, onPress }) => {
   const scale = useRef(new Animated.Value(1)).current;

@@ -199,6 +199,7 @@ export default function Settings() {
             <NavRow label={tr("通知", "Notifications")} route="/settings/notifications" />
             <NavRow label={tr("隐私", "Privacy")} route="/settings/privacy" />
             <NavRow label={tr("修改密码", "Change Password")} route="/change-password" />
+            {/* [DEFERRED] 等后端计费系统完成后接入 */}
             <NavRow label={tr("订阅计划", "Subscription Plan")} last />
           </Card>
 

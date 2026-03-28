@@ -1,7 +1,8 @@
 // app/library/log-detail.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, FlatList } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { format, parseISO } from "date-fns";
@@ -179,47 +180,47 @@ export default function LogDetailScreen() {
       });
   }, [date, sessionKey, sessionEntry]);
 
-  useEffect(() => {
-    let cancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-    const load = async () => {
-      if (!date && !sessionKey) return;
+      const load = async () => {
+        if (!date && !sessionKey) return;
 
-      let b: any[] = [];
-      let tr: any[] = [];
-      let ld: any[] = [];
+        let b: any[] = [];
+        let tr: any[] = [];
+        let ld: any[] = [];
 
-      if (sessionKey) {
-        // Session-scoped only — no day fallback (avoids merging multiple sessions)
-        [b, tr, ld] = await Promise.all([
-          readSessionList(sessionKey, "boulder"),
-          readSessionList(sessionKey, "toprope"),
-          readSessionList(sessionKey, "lead"),
-        ]);
-      } else if (date) {
-        // Date-only navigation (no sessionKey) — backward compat
-        [b, tr, ld] = await Promise.all([
-          readDayList(date, "boulder"),
-          readDayList(date, "toprope"),
-          readDayList(date, "lead"),
-        ]);
-      }
+        if (sessionKey) {
+          [b, tr, ld] = await Promise.all([
+            readSessionList(sessionKey, "boulder"),
+            readSessionList(sessionKey, "toprope"),
+            readSessionList(sessionKey, "lead"),
+          ]);
+        } else if (date) {
+          [b, tr, ld] = await Promise.all([
+            readDayList(date, "boulder"),
+            readDayList(date, "toprope"),
+            readDayList(date, "lead"),
+          ]);
+        }
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      const bb = Array.isArray(b) ? b : [];
-      const rr = [
-        ...(Array.isArray(tr) ? tr : []),
-        ...(Array.isArray(ld) ? ld : []),
-      ];
+        const bb = Array.isArray(b) ? b : [];
+        const rr = [
+          ...(Array.isArray(tr) ? tr : []),
+          ...(Array.isArray(ld) ? ld : []),
+        ];
 
-      setItemsB(bb);
-      setItemsR(rr);
-    };
+        setItemsB(bb);
+        setItemsR(rr);
+      };
 
-    load();
-    return () => { cancelled = true; };
-  }, [date, sessionKey]);
+      load();
+      return () => { cancelled = true; };
+    }, [date, sessionKey])
+  );
 
   // Sort by grade descending
   const dailyLogs = useMemo(
