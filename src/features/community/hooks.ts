@@ -334,10 +334,26 @@ export function useSearchUsers() {
     }
     setLoading(true);
     try {
-      const data = await api.get<PublicProfile[]>(
+      const raw = await api.get<any[]>(
         `/profiles/search?q=${encodeURIComponent(query)}&limit=20`
       );
-      setResults(data);
+      setResults(raw.map((r: any) => ({
+        id: r.user_id ?? r.id,
+        username: r.username,
+        displayName: r.display_name || r.username,
+        avatarUrl: r.avatar_url ?? null,
+        coverUrl: null,
+        bio: r.bio ?? null,
+        location: null,
+        homeGym: null,
+        boulderMax: null,
+        routeMax: null,
+        totalSends: 0,
+        followersCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+        privacy: null,
+      })));
     } catch (_e) { /* swallow */ }
     finally { setLoading(false); }
   }, []);

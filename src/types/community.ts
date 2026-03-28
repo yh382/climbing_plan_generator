@@ -6,7 +6,8 @@ import { PlanV3Session } from "./plan";
 export interface UserProfile {
   id: string;
   username: string;
-  avatar: string; 
+  displayName?: string;
+  avatar: string;
   level?: string; // e.g., "V5", "5.11c"
   homeGym?: string;
 }

@@ -189,6 +189,7 @@ export default function ProfileHeader({
               <Text style={styles.bigTitle} numberOfLines={1}>
                 {name}
               </Text>
+              <Text style={styles.usernameHandle}>@{username}</Text>
 
               {showAddress ? (
                 <View style={styles.addressLine}>
@@ -342,6 +343,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     textShadowColor: "rgba(0,0,0,0.5)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  usernameHandle: {
+    fontSize: 14,
+    fontFamily: theme.fonts.regular,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 2,
   },
   addressLine: {
     marginTop: 4,

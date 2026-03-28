@@ -6,10 +6,11 @@ import { sanitizeImageUrl } from "@/lib/imageUtils";
 export type UserLite = {
   id: string;
   username: string;
+  display_name?: string | null;
   email?: string;
   email_verified: boolean;
   avatar_url?: string | null;
-  bio?: string | null;   
+  bio?: string | null;
   units?: "metric" | "imperial";
   locale?: string;
 };
@@ -27,6 +28,7 @@ function normalizeUser(raw: any): UserLite {
   return {
     id: u.id ?? u.user_id ?? u.uid ?? "",
     username: u.username ?? u.name ?? u.handle ?? "User",
+    display_name: u.display_name ?? null,
     email: u.email ?? undefined,
     email_verified: u.email_verified ?? u.is_email_verified ?? false,
     avatar_url: sanitizeImageUrl(u.avatar_url ?? u.avatar),

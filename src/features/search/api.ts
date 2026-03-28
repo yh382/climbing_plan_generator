@@ -15,6 +15,7 @@ export interface SearchUserResult {
 export interface RecommendedUser {
   user_id: string;
   username: string | null;
+  display_name: string | null;
   avatar_url: string | null;
   boulder_max: string | null;
   total_sends: number;
@@ -23,9 +24,16 @@ export interface RecommendedUser {
 
 export const searchApi = {
   searchUsers: async (q: string, limit = 5): Promise<SearchUserResult[]> => {
-    return api.get<SearchUserResult[]>(
+    const raw = await api.get<any[]>(
       `/profiles/search?q=${encodeURIComponent(q)}&limit=${limit}`
     );
+    return raw.map((r) => ({
+      id: r.user_id ?? r.id,
+      displayName: r.display_name || r.username,
+      username: r.username,
+      avatarUrl: r.avatar_url,
+      bio: r.bio,
+    }));
   },
 
   searchChallenges: async (q: string): Promise<ChallengeOut[]> => {

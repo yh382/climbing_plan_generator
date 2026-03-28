@@ -52,8 +52,8 @@ export default function UserRecommendCard({ user, onPress }: Props) {
       )}
 
       <View style={{ flex: 1 }}>
-        <Text style={styles.username} numberOfLines={1}>@{user.username}</Text>
-        <Text style={styles.stats} numberOfLines={1}>{statsText}</Text>
+        <Text style={styles.username} numberOfLines={1}>{user.display_name || user.username}</Text>
+        <Text style={styles.stats} numberOfLines={1}>@{user.username} · {statsText}</Text>
       </View>
 
       <TouchableOpacity

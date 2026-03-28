@@ -30,6 +30,7 @@ type UserMe = {
   id: string;
   email: string;
   username?: string | null;
+  display_name?: string | null;
   avatar_url?: string | null;
   cover_url?: string | null;
   units: string;
@@ -50,6 +51,7 @@ type UserMe = {
 
 type FormState = {
   username: string;
+  display_name: string;
   bio: string;
   location: string;
   home_gym: string;
@@ -95,6 +97,7 @@ export default function EditProfileView() {
 
   const [form, setForm] = useState<FormState>({
     username: "",
+    display_name: "",
     bio: "",
     location: "",
     home_gym: "",
@@ -123,6 +126,7 @@ export default function EditProfileView() {
         setMe(u);
         setForm({
           username: (u.username ?? "").toString(),
+          display_name: (u.display_name ?? "").toString(),
           bio: (u.bio ?? "").toString(),
           location: (u.location ?? "").toString(),
           home_gym: (u.home_gym ?? "").toString(),
@@ -181,7 +185,7 @@ export default function EditProfileView() {
       const isRemoteUrl = (url: string) => /^https?:\/\//.test(url);
 
       const payload = {
-        username: form.username.trim() || null,
+        display_name: form.display_name.trim() || null,
         bio: form.bio.trim() || null,
         location: form.location.trim() || null,
         home_gym: form.home_gym.trim() || null,
@@ -214,6 +218,7 @@ export default function EditProfileView() {
       setMe(updated);
       setForm({
         username: (updated.username ?? "").toString(),
+        display_name: (updated.display_name ?? "").toString(),
         bio: (updated.bio ?? "").toString(),
         location: (updated.location ?? "").toString(),
         home_gym: (updated.home_gym ?? "").toString(),
@@ -343,11 +348,19 @@ export default function EditProfileView() {
 
         {/* 表单 */}
         <View style={styles.formGroup}>
+          {/* Username — read-only */}
+          <View style={styles.inputItem}>
+            <Text style={styles.inputLabel}>Username</Text>
+            <View style={[styles.inputBox, { backgroundColor: colors.backgroundSecondary }]}>
+              <Text style={[styles.linkText, { color: colors.textSecondary }]}>@{form.username}</Text>
+            </View>
+          </View>
+
           <InputItem
-            label="Username"
-            value={form.username}
-            placeholder="Add username"
-            onChangeText={(t) => setForm((s) => ({ ...s, username: t }))}
+            label="Display Name"
+            value={form.display_name}
+            placeholder="Your display name"
+            onChangeText={(t) => setForm((s) => ({ ...s, display_name: t }))}
             colors={colors}
             styles={styles}
           />

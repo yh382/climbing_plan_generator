@@ -28,6 +28,7 @@ type UserMe = {
   id: string;
   email: string;
   username?: string | null;
+  display_name?: string | null;
   avatar_url?: string | null;
   cover_url?: string | null;
   units: Units;
@@ -157,7 +158,7 @@ export default function ProfileScreen() {
   const user: HeaderViewModel = useMemo(() => {
     const username = (me?.username ?? "").trim();
     const fallbackName = me?.email ?? "Profile";
-    const displayName = username ? username : fallbackName;
+    const displayName = (me?.display_name ?? "").trim() || username || fallbackName;
 
     const boulderGrade = kpis.maxBoulder !== "—"
       ? kpis.maxBoulder
