@@ -1,7 +1,7 @@
 // src/store/useAuthStore.ts
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
-import { setApiAuthToken } from "src/lib/apiClient";
+import { setApiAuthToken, api } from "src/lib/apiClient";
 
 const ACCESS_TOKEN_KEY = "climmate_access_token";
 const REFRESH_TOKEN_KEY = "climmate_refresh_token";
@@ -18,6 +18,7 @@ type AuthState = {
   setToken: (accessToken: string, refreshToken?: string | null) => Promise<void>;
 
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   bootstrap: () => Promise<void>;
 };
 
@@ -58,6 +59,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    await Promise.all([
+      SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    ]);
+    setApiAuthToken(null);
+    set({ accessToken: null, refreshToken: null });
+  },
+
+  deleteAccount: async () => {
+    await api.del("/users/me");
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),

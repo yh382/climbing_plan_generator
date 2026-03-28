@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Linking,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
@@ -91,6 +92,7 @@ export default function Settings() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const logout = useAuthStore((s) => s.logout);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -259,11 +261,32 @@ export default function Settings() {
             <NavRow label={tr("关于", "About")} route="/settings/about" last />
           </Card>
 
-          {/* Logout */}
+          {/* Legal */}
+          <SectionTitle title={tr("法律", "Legal")} />
+          <Card style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, styles.navRowHeight]}
+              onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/")}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.label}>{tr("隐私政策", "Privacy Policy")}</Text>
+              <Ionicons name="open-outline" size={18} color="#C7C7CC" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.row, styles.navRowHeight, styles.noBorder]}
+              onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/terms")}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.label}>{tr("使用条款", "Terms of Service")}</Text>
+              <Ionicons name="open-outline" size={18} color="#C7C7CC" />
+            </TouchableOpacity>
+          </Card>
+
+          {/* Logout & Delete */}
           <View style={{ height: 16 }} />
           <Card style={styles.card}>
             <TouchableOpacity
-              style={[styles.row, styles.navRowHeight, styles.noBorder]}
+              style={[styles.row, styles.navRowHeight]}
               onPress={() => {
                 Alert.alert(
                   tr("确认退出登录？", "Confirm logout?"),
@@ -285,6 +308,55 @@ export default function Settings() {
             >
               <Text style={[styles.label, { color: "#D92D20", fontWeight: "600" }]}>
                 {tr("退出登录", "Logout")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.row, styles.navRowHeight, styles.noBorder]}
+              onPress={() => {
+                Alert.alert(
+                  tr("删除账号", "Delete Account"),
+                  tr(
+                    "此操作不可撤销，你的所有数据（训练记录、帖子、消息等）将被永久删除。确定要继续吗？",
+                    "This action cannot be undone. All your data (training logs, posts, messages, etc.) will be permanently deleted. Are you sure?"
+                  ),
+                  [
+                    { text: tr("取消", "Cancel"), style: "cancel" },
+                    {
+                      text: tr("永久删除", "Delete Forever"),
+                      style: "destructive",
+                      onPress: () => {
+                        // Double confirm
+                        Alert.alert(
+                          tr("最终确认", "Final Confirmation"),
+                          tr("请再次确认：删除后无法恢复。", "Please confirm again: this cannot be reversed."),
+                          [
+                            { text: tr("取消", "Cancel"), style: "cancel" },
+                            {
+                              text: tr("确认删除", "Confirm Delete"),
+                              style: "destructive",
+                              onPress: async () => {
+                                try {
+                                  await deleteAccount();
+                                  router.replace("/login");
+                                } catch {
+                                  Alert.alert(
+                                    tr("错误", "Error"),
+                                    tr("删除失败，请稍后重试。", "Failed to delete account. Please try again later.")
+                                  );
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      },
+                    },
+                  ]
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.label, { color: "#D92D20" }]}>
+                {tr("删除账号", "Delete Account")}
               </Text>
             </TouchableOpacity>
           </Card>
