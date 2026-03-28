@@ -71,7 +71,7 @@ export default function ExerciseLibraryCard({
                 const Icon = CLIMBING_TYPE_ICON[key];
                 return (
                   <View key={key} style={styles.miniIconPill}>
-                    <Icon size={28} color="#3C3C3C" />
+                    <Icon size={28} color={colors.textSecondary} />
                   </View>
                 );
               })}
