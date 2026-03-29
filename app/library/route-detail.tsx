@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  ActionSheetIOS,
+  TouchableOpacity,
 } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
@@ -19,9 +21,13 @@ import { useThemeColors } from "../../src/lib/useThemeColors";
 import { getColorForGrade } from "../../lib/gradeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
+import UploadProgressToast from "../../src/components/ui/UploadProgressToast";
+import { uploadLogMediaBatch } from "../../src/features/journal/api";
 import {
   readDayList,
   readSessionList,
+  writeDayList,
+  writeSessionList,
   updateDayItem,
   updateSessionItem,
 } from "../../src/features/journal/loglist/storage";
@@ -54,6 +60,8 @@ export default function RouteDetailScreen() {
   }>();
 
   const [item, setItem] = useState<LocalDayLogItem | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const climbType = (type === "toprope" || type === "lead") ? type : "boulder";
 
@@ -87,7 +95,7 @@ export default function RouteDetailScreen() {
     router.push("/community/device-media-picker");
   }, [media.length, router]);
 
-  // Consume media from device-media-picker when returning
+  // Consume media from device-media-picker when returning, then upload to R2
   useFocusEffect(
     useCallback(() => {
       const pending = consumePendingMedia();
@@ -103,14 +111,14 @@ export default function RouteDetailScreen() {
         uri: p.uri,
       }));
 
-      const updater = (old: LocalDayLogItem) => ({
-        ...old,
-        media: [...ensureMedia(old), ...toAdd],
-      });
-
       let cancelled = false;
       (async () => {
         try {
+          // Save local URIs first
+          const updater = (old: LocalDayLogItem) => ({
+            ...old,
+            media: [...ensureMedia(old), ...toAdd],
+          });
           const nextList = sessionKey
             ? await updateSessionItem(sessionKey, climbType, item.id, updater)
             : await updateDayItem(date, climbType, item.id, updater);
@@ -118,20 +126,116 @@ export default function RouteDetailScreen() {
             const updated = nextList.find((it) => it.id === itemId) ?? null;
             setItem(updated);
           }
+
+          // Upload to R2
+          setUploading(true);
+          setUploadProgress(0);
+          const results = await uploadLogMediaBatch(
+            toAdd.map((m) => ({
+              uri: m.uri,
+              contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
+            })),
+            (p) => setUploadProgress(p),
+          );
+
+          // Replace local URIs with R2 URLs
+          if (!cancelled && results.length > 0) {
+            const urlUpdater = (old: LocalDayLogItem) => {
+              const oldMedia = ensureMedia(old);
+              const newMedia = oldMedia.map((m) => {
+                const idx = toAdd.findIndex((a) => a.id === m.id);
+                if (idx >= 0 && results[idx]) {
+                  return { ...m, uri: results[idx].public_url };
+                }
+                return m;
+              });
+              return { ...old, media: newMedia };
+            };
+            const finalList = sessionKey
+              ? await updateSessionItem(sessionKey, climbType, item.id, urlUpdater)
+              : await updateDayItem(date, climbType, item.id, urlUpdater);
+            if (!cancelled && finalList) {
+              const updated = finalList.find((it) => it.id === itemId) ?? null;
+              setItem(updated);
+            }
+          }
         } catch (e) {
-          if (__DEV__) console.warn("Failed to save media to log:", e);
+          if (__DEV__) console.warn("Failed to save/upload media:", e);
+        } finally {
+          setUploading(false);
         }
       })();
       return () => { cancelled = true; };
     }, [item, sessionKey, climbType, date, itemId])
   );
 
+  const handleDeleteLog = useCallback(() => {
+    Alert.alert("Delete Log", "Are you sure you want to delete this log?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            if (sessionKey) {
+              const list = await readSessionList(sessionKey, climbType);
+              const filtered = list.filter((it) => it.id !== itemId);
+              await writeSessionList(sessionKey, climbType, filtered);
+            } else if (date) {
+              const list = await readDayList(date, climbType);
+              const filtered = list.filter((it) => it.id !== itemId);
+              await writeDayList(date, climbType, filtered);
+            }
+            router.back();
+          } catch (e) {
+            if (__DEV__) console.warn("Failed to delete log:", e);
+          }
+        },
+      },
+    ]);
+  }, [sessionKey, climbType, date, itemId, router]);
+
+  const showRouteMenu = useCallback(() => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["Edit Media", "Delete Log", "Cancel"],
+        destructiveButtonIndex: 1,
+        cancelButtonIndex: 2,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) {
+          router.push({
+            pathname: "/library/edit-log-media",
+            params: { date, itemId, type: climbType, sessionKey: sessionKey ?? "" },
+          });
+        }
+        if (buttonIndex === 1) handleDeleteLog();
+      }
+    );
+  }, [date, itemId, climbType, sessionKey, router, handleDeleteLog]);
+
+  const headerRightButton = useCallback(() => (
+    <HeaderButton
+      icon={media.length > 0 ? "pencil" : "plus.circle"}
+      onPress={() => {
+        if (media.length > 0) {
+          router.push({
+            pathname: "/library/edit-log-media",
+            params: { date, itemId, type: climbType, sessionKey: sessionKey ?? "" },
+          });
+        } else {
+          handleAddMedia();
+        }
+      }}
+    />
+  ), [media.length, date, itemId, climbType, sessionKey, router, handleAddMedia]);
+
   const s = useMemo(() => createStyles(colors), [colors]);
 
   if (!item) {
     return (
       <View style={s.container}>
-        <Stack.Screen options={{ title: "Route Detail", headerRight: () => <HeaderButton icon="plus.circle" onPress={handleAddMedia} /> }} />
+        <Stack.Screen options={{ title: "Route Detail", headerRight: headerRightButton }} />
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -179,7 +283,7 @@ export default function RouteDetailScreen() {
 
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title: "Route Detail" }} />
+      <Stack.Screen options={{ title: "Route Detail", headerRight: headerRightButton }} />
 
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Media section - always visible */}
@@ -242,7 +346,20 @@ export default function RouteDetailScreen() {
             <Text style={s.noteContent}>{note}</Text>
           </View>
         ) : null}
+
+        {/* Actions row */}
+        <View style={s.actionsRow}>
+          <TouchableOpacity onPress={showRouteMenu} style={s.menuBtn}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      <UploadProgressToast
+        visible={uploading}
+        progress={uploadProgress}
+        onDismiss={() => setUploading(false)}
+      />
     </View>
   );
 }
@@ -342,5 +459,20 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 15,
       color: colors.textPrimary,
       lineHeight: 22,
+    },
+
+    actionsRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    menuBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: "center",
+      justifyContent: "center",
     },
   });

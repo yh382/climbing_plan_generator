@@ -32,6 +32,17 @@ export async function enqueueSessionEvent(e: SessionOutboxEventInput) {
   await writeQueue(q);
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Outbox flush timeout")), ms)
+    ),
+  ]);
+}
+
+const FLUSH_TIMEOUT = 10_000;
+
 export async function flushSessionsOutbox(opts: {
   resolveServerId: (localKey: string) => string | null;
   saveServerId: (localKey: string, serverId: string) => Promise<void>;
@@ -46,9 +57,12 @@ export async function flushSessionsOutbox(opts: {
     try {
       if (ev.type === "create") {
         const existing = resolveServerId(ev.localKey);
-        if (existing) continue; // 已创建, 跳过
+        if (existing) continue;
 
-        const res = await api.post<{ id: string }>("/sessions", ev.payload);
+        const res = await withTimeout(
+          api.post<{ id: string }>("/sessions", ev.payload),
+          FLUSH_TIMEOUT
+        );
         if (res?.id) {
           await saveServerId(ev.localKey, String(res.id));
         }
@@ -58,14 +72,20 @@ export async function flushSessionsOutbox(opts: {
       if (ev.type === "end") {
         const serverId = resolveServerId(ev.localKey);
         if (!serverId) {
-          remaining.push(ev); // create 还没完成, 保留
+          remaining.push(ev);
           continue;
         }
-        await api.post(`/sessions/${serverId}/end`, {});
+        await withTimeout(
+          api.post(`/sessions/${serverId}/end`, {}),
+          FLUSH_TIMEOUT
+        );
         continue;
       }
-    } catch {
-      remaining.push(ev); // 网络失败, 保留到下次
+    } catch (err: any) {
+      // 409 = already exists → treat as success
+      const msg = String(err?.message || "");
+      if (msg.includes("409")) continue;
+      remaining.push(ev);
     }
   }
 

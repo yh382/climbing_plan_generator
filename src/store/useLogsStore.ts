@@ -10,6 +10,10 @@ import {
   setSessionServerId,
   getSessionServerId,
 } from "../features/journal/sync/sessionServerIdMap";
+import {
+  writeBackupSnapshot,
+  clearBackupSnapshot,
+} from "../features/journal/sync/localBackup";
 
 // In-flight POST /sessions promise — endSession awaits this to avoid race condition
 let _sessionCreatePromise: Promise<string | null> | null = null;
@@ -350,6 +354,15 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           activeSession: { startTime, gymName, discipline, serverId: null },
         });
 
+        // Crash recovery: write backup snapshot (fire-and-forget)
+        writeBackupSnapshot({
+          sessionKey,
+          date: localDate,
+          gymName,
+          discipline,
+          startTime,
+        }).catch(() => {});
+
         // 异步创建后端 session — promise 保存到模块变量, endSession 可 await
         _sessionCreatePromise = (async () => {
           try {
@@ -393,108 +406,148 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         const sessionKey = String(activeSession.startTime);
         const sessionDate = keyOf(new Date(activeSession.startTime));
 
-        // 1) read session lists (all 3 types)
-        const [sb, str, sl] = await Promise.all([
-          readSessionList(sessionKey, "boulder"),
-          readSessionList(sessionKey, "toprope"),
-          readSessionList(sessionKey, "lead"),
-        ]);
+        try {
+          // 1) read session lists (all 3 types)
+          const [sb, str, sl] = await Promise.all([
+            readSessionList(sessionKey, "boulder"),
+            readSessionList(sessionKey, "toprope"),
+            readSessionList(sessionKey, "lead"),
+          ]);
 
-        // 2) merge into day lists
-        const [db, dtr, dl] = await Promise.all([
-          readDayList(sessionDate, "boulder"),
-          readDayList(sessionDate, "toprope"),
-          readDayList(sessionDate, "lead"),
-        ]);
+          // 2) merge into day lists
+          const [db, dtr, dl] = await Promise.all([
+            readDayList(sessionDate, "boulder"),
+            readDayList(sessionDate, "toprope"),
+            readDayList(sessionDate, "lead"),
+          ]);
 
-        const nextDayBoulder = mergeById(db || [], sb || []);
-        const nextDayToprope = mergeById(dtr || [], str || []);
-        const nextDayLead = mergeById(dl || [], sl || []);
+          const nextDayBoulder = mergeById(db || [], sb || []);
+          const nextDayToprope = mergeById(dtr || [], str || []);
+          const nextDayLead = mergeById(dl || [], sl || []);
 
-        await Promise.all([
-          writeDayList(sessionDate, "boulder", nextDayBoulder),
-          writeDayList(sessionDate, "toprope", nextDayToprope),
-          writeDayList(sessionDate, "lead", nextDayLead),
-        ]);
+          await Promise.all([
+            writeDayList(sessionDate, "boulder", nextDayBoulder),
+            writeDayList(sessionDate, "toprope", nextDayToprope),
+            writeDayList(sessionDate, "lead", nextDayLead),
+          ]);
 
-        // 3) rebuild aggregated day logs (for rings/weekly counts)
-        const rebuilt = [
-          ...aggregateSends(sessionDate, "boulder", nextDayBoulder),
-          ...aggregateSends(sessionDate, "toprope", nextDayToprope),
-          ...aggregateSends(sessionDate, "lead", nextDayLead),
-        ];
+          // 3) rebuild aggregated day logs (for rings/weekly counts)
+          const rebuilt = [
+            ...aggregateSends(sessionDate, "boulder", nextDayBoulder),
+            ...aggregateSends(sessionDate, "toprope", nextDayToprope),
+            ...aggregateSends(sessionDate, "lead", nextDayLead),
+          ];
 
-        const kept = (logs || []).filter((l) => l.date !== sessionDate);
-        const nextLogs = [...kept, ...rebuilt];
+          const kept = (logs || []).filter((l) => l.date !== sessionDate);
+          const nextLogs = [...kept, ...rebuilt];
 
-        // 4) compute session summary (per-session card)
-        const sessionItems = [...(sb || []), ...(str || []), ...(sl || [])];
-        const sends = sessionItems.reduce((s: number, it: any) => s + inferSendCount(it), 0);
+          // 4) compute session summary (per-session card)
+          const sessionItems = [...(sb || []), ...(str || []), ...(sl || [])];
+          const sends = sessionItems.reduce((s: number, it: any) => s + inferSendCount(it), 0);
 
-        let best = "V?";
-        const bBest = sessionItems
-          .map((it: any) => String(it?.grade || "").trim())
-          .filter((g: string) => /^V\d+/i.test(g))
-          .sort((a: string, b: string) => vNumber(b) - vNumber(a))[0];
-
-        if (bBest) {
-          best = bBest;
-        } else {
-          const rBest = sessionItems
+          let best = "V?";
+          const bBest = sessionItems
             .map((it: any) => String(it?.grade || "").trim())
-            .filter((g: string) => /^5\./.test(g))
-            .sort((a: string, b: string) => ydsRank(b) - ydsRank(a))[0];
-          best = rBest || "V?";
-        }
+            .filter((g: string) => /^V\d+/i.test(g))
+            .sort((a: string, b: string) => vNumber(b) - vNumber(a))[0];
 
-        // --- 后端同步 ---
-        let serverId = activeSession.serverId;
-        if (!serverId && _sessionCreatePromise) {
-          // 等待 startSession 的 POST 完成
-          serverId = await _sessionCreatePromise;
-          _sessionCreatePromise = null;
-        }
-        if (!serverId) {
-          serverId = (await getSessionServerId(sessionKey)) ?? null;
-        }
+          if (bBest) {
+            best = bBest;
+          } else {
+            const rBest = sessionItems
+              .map((it: any) => String(it?.grade || "").trim())
+              .filter((g: string) => /^5\./.test(g))
+              .sort((a: string, b: string) => ydsRank(b) - ydsRank(a))[0];
+            best = rBest || "V?";
+          }
 
-        if (serverId) {
-          // 有 serverId → 直接调结束 API
-          api.post(`/sessions/${serverId}/end`, {}).catch(() => {
+          // --- 后端同步 ---
+          let serverId = activeSession.serverId;
+          if (!serverId && _sessionCreatePromise) {
+            serverId = await _sessionCreatePromise;
+            _sessionCreatePromise = null;
+          }
+          if (!serverId) {
+            serverId = (await getSessionServerId(sessionKey)) ?? null;
+          }
+
+          if (serverId) {
+            api.post(`/sessions/${serverId}/end`, {}).catch(() => {
+              enqueueSessionEvent({ type: "end", localKey: sessionKey });
+            });
+          } else {
             enqueueSessionEvent({ type: "end", localKey: sessionKey });
+          }
+          // --- 后端同步结束 ---
+
+          const newSession: SessionEntry = {
+            id: Date.now().toString(),
+            date: sessionDate,
+            startTime: new Date(activeSession.startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+            duration: durationStr,
+            gymName: activeSession.gymName,
+            discipline: activeSession.discipline,
+
+            sessionKey,
+            sends,
+            best,
+            climbs: sessionItems.length,
+
+            serverId: serverId,
+            isPublic: false,
+            synced: !!serverId,
+          };
+
+          set({
+            logs: nextLogs,
+            sessions: [newSession, ...sessions],
+            activeSession: null,
           });
-        } else {
-          // 无 serverId → create 还在排队, end 也入队
-          enqueueSessionEvent({ type: "end", localKey: sessionKey });
+
+          clearBackupSnapshot().catch(() => {});
+          return newSession;
+        } catch (err) {
+          console.error("[endSession] Error:", err);
+
+          // Fallback: create minimal session entry so calendar still shows it
+          let sends = 0, climbs = 0;
+          try {
+            const [sb, str, sl] = await Promise.all([
+              readSessionList(sessionKey, "boulder"),
+              readSessionList(sessionKey, "toprope"),
+              readSessionList(sessionKey, "lead"),
+            ]);
+            const items = [...(sb || []), ...(str || []), ...(sl || [])];
+            sends = items.reduce((s: number, it: any) => s + inferSendCount(it), 0);
+            climbs = items.length;
+          } catch { /* best-effort */ }
+
+          const fallbackSession: SessionEntry = {
+            id: `fallback_${Date.now()}`,
+            date: sessionDate,
+            startTime: new Date(activeSession.startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+            duration: durationStr,
+            gymName: activeSession.gymName,
+            discipline: activeSession.discipline,
+            sessionKey,
+            sends,
+            best: "V?",
+            climbs,
+            serverId: activeSession.serverId,
+            isPublic: false,
+            synced: false,
+          };
+
+          set({
+            sessions: [fallbackSession, ...sessions],
+            activeSession: null,
+          });
+
+          clearBackupSnapshot().catch(() => {});
+          return fallbackSession;
         }
-        // --- 后端同步结束 ---
-
-        const newSession: SessionEntry = {
-          id: Date.now().toString(),
-          date: sessionDate,
-          startTime: new Date(activeSession.startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
-          duration: durationStr,
-          gymName: activeSession.gymName,
-          discipline: activeSession.discipline,
-
-          sessionKey,
-          sends,
-          best,
-          climbs: sessionItems.length,
-
-          serverId: serverId,
-          isPublic: false,
-          synced: !!serverId,
-        };
-
-        set({
-          logs: nextLogs,
-          sessions: [newSession, ...sessions],
-          activeSession: null,
-        });
-
-        return newSession;
       },
 
       deleteSession: async (sessionKey) => {

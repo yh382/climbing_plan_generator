@@ -25,6 +25,7 @@ type Props = {
   innerColor?: string;
   bgColor?: string;
   style?: ViewStyle;
+  duration?: string;       // "56m", "1h 23m" 等
 };
 
 export default function DualActivityRing({
@@ -38,6 +39,7 @@ export default function DualActivityRing({
   innerColor = "#306E6F",
   bgColor,
   style,
+  duration,
 }: Props) {
   const colors = useThemeColors();
   const resolvedBgColor = bgColor ?? colors.backgroundSecondary;
@@ -129,6 +131,11 @@ export default function DualActivityRing({
         <View style={styles.centerText}>
           <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>TOTAL</Text>
           <Text style={[styles.totalCount, { color: colors.textPrimary }]}>{climbCount}</Text>
+          {!!duration && (
+            <Text style={[styles.durationLabel, { color: colors.textSecondary }]}>
+              {duration}
+            </Text>
+          )}
           {trainingPct > 0 && (
             <Text style={[styles.planLabel, { color: outerColor }]}>
               Plan {Math.round(trainingPct)}%
@@ -190,6 +197,7 @@ const styles = StyleSheet.create({
   centerText: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" },
   totalLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", letterSpacing: 1.2, marginBottom: 2 },
   totalCount: { fontSize: 36, fontFamily: "DMSans_900Black", color: "#111111", lineHeight: 40 },
+  durationLabel: { fontSize: 12, fontWeight: "500", marginTop: 2 },
   planLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
   
   barWrapper: {

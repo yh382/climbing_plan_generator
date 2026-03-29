@@ -1,6 +1,6 @@
 // app/library/log-detail.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, FlatList } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, FlatList, ActionSheetIOS } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,18 +9,19 @@ import { format, parseISO } from "date-fns";
 
 import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 import DualActivityRing from "../../src/features/journal/DualActivityRing";
-import ClimbItemCard from "../../src/components/shared/ClimbItemCard";
-import SmartBottomSheet from "../../src/features/community/components/SmartBottomSheet";
+import LogItemCard from "../../src/features/journal/loglist/LogItemCard";
 import { usePlanStore } from "../../src/store/usePlanStore";
 import useLogsStore from "../../src/store/useLogsStore";
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 import { readDayList, readSessionList } from "../../src/features/journal/loglist/storage";
 import { enqueueLogEvent } from "../../src/features/journal/sync/logsOutbox";
-import { getSessionServerId as getSessionSId, setSessionServerId as setSessionSId, readAllSessionServerIds as readAllSessionSIds } from "../../src/features/journal/sync/sessionServerIdMap";
-import { flushSessionsOutbox } from "../../src/features/journal/sync/sessionsOutbox";
+import { getSessionServerId as getSessionSId } from "../../src/features/journal/sync/sessionServerIdMap";
 import { api } from "../../src/lib/apiClient";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useFavoriteGyms } from "../../src/features/gyms/hooks";
+import { useSettings } from "../../src/contexts/SettingsContext";
+import { setPendingMediaBatch } from "../../src/features/community/pendingMedia";
+import type { PickedMediaItem } from "../../src/features/community/types";
 
 const SIDE_PAD = 16;
 
@@ -60,14 +61,18 @@ function gradeRank(g?: string): number {
   return -1;
 }
 
-const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  iconBtnInner: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+function formatDuration(startTime: number, endTime: number): string {
+  const diffMs = endTime - startTime;
+  const totalMin = Math.floor(diffMs / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-  largeTitle: { fontSize: 32, fontWeight: "800", color: colors.textPrimary, lineHeight: 38 },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   largeSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
 
-  // KPI row
   kpiRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -86,25 +91,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   kpiValue: { fontSize: 18, fontWeight: "800", color: colors.textPrimary },
   kpiLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: "600", marginTop: 2 },
   kpiDivider: { width: 1, height: 28, backgroundColor: colors.border },
-
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  menuRowText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
 });
 
 export default function LogDetailScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { tr } = useSettings();
+  const labelOf = useCallback((g: string) => g, []);
 
   const params = useLocalSearchParams<{
     date?: string;
@@ -126,7 +120,6 @@ export default function LogDetailScreen() {
 
   const [itemsB, setItemsB] = useState<any[]>([]);
   const [itemsR, setItemsR] = useState<any[]>([]);
-  const [menuVisible, setMenuVisible] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [sessionServerId, setSessionServerId] = useState<string | null>(null);
 
@@ -137,21 +130,33 @@ export default function LogDetailScreen() {
     return null;
   }, [sessions, sessionKey, date]);
 
+  // Compute duration from session entry
+  const duration = useMemo(() => {
+    if (sessionEntry?.duration) return sessionEntry.duration;
+    if (sessionEntry?.startTime) {
+      const start = typeof sessionEntry.startTime === "number"
+        ? sessionEntry.startTime
+        : new Date(sessionEntry.startTime).getTime();
+      const end = sessionEntry.endTime
+        ? (typeof sessionEntry.endTime === "number" ? sessionEntry.endTime : new Date(sessionEntry.endTime).getTime())
+        : Date.now();
+      return formatDuration(start, end);
+    }
+    return "";
+  }, [sessionEntry]);
+
   // Fetch backend session for share/privacy features
   useEffect(() => {
-    // 1. store 中已有 serverId (V7 新字段)
     if (sessionEntry?.serverId) {
       setSessionServerId(sessionEntry.serverId);
       setIsPublic(sessionEntry.isPublic ?? false);
       return;
     }
 
-    // 2. 查 sessionServerIdMap (AsyncStorage 持久化)
     if (sessionKey) {
       getSessionSId(sessionKey).then((id) => {
         if (id) {
           setSessionServerId(id);
-          // 从后端获取 visibility
           api
             .get<any>(`/sessions/${id}`)
             .then((s) => setIsPublic(s?.visibility === "public"))
@@ -161,7 +166,6 @@ export default function LogDetailScreen() {
       return;
     }
 
-    // 3. 兜底: date 查询 (兼容 V7 前的老数据)
     if (!date) return;
     api
       .get<any[]>(`/sessions/me?from=${date}&to=${date}`)
@@ -188,17 +192,17 @@ export default function LogDetailScreen() {
         if (!date && !sessionKey) return;
 
         let b: any[] = [];
-        let tr: any[] = [];
+        let topRope: any[] = [];
         let ld: any[] = [];
 
         if (sessionKey) {
-          [b, tr, ld] = await Promise.all([
+          [b, topRope, ld] = await Promise.all([
             readSessionList(sessionKey, "boulder"),
             readSessionList(sessionKey, "toprope"),
             readSessionList(sessionKey, "lead"),
           ]);
         } else if (date) {
-          [b, tr, ld] = await Promise.all([
+          [b, topRope, ld] = await Promise.all([
             readDayList(date, "boulder"),
             readDayList(date, "toprope"),
             readDayList(date, "lead"),
@@ -209,7 +213,7 @@ export default function LogDetailScreen() {
 
         const bb = Array.isArray(b) ? b : [];
         const rr = [
-          ...(Array.isArray(tr) ? tr : []),
+          ...(Array.isArray(topRope) ? topRope : []),
           ...(Array.isArray(ld) ? ld : []),
         ];
 
@@ -250,7 +254,6 @@ export default function LogDetailScreen() {
     return first?.gymName || first?.gym || first?.location || "";
   }, [gymNameParam, sessionEntry, dailyLogs]);
 
-  // Resolve gymName → gymId for clickable navigation
   const { favorites: favGyms } = useFavoriteGyms();
   const gymId = useMemo(() => {
     if (!gymName) return undefined;
@@ -289,7 +292,7 @@ export default function LogDetailScreen() {
     return sorted[0]?.grade || "—";
   }, [sessionEntry, dailyLogs]);
 
-  const duration = sessionEntry?.duration || "";
+  // === Handlers ===
 
   const handleBack = () => {
     if (origin === "end_log") {
@@ -299,13 +302,9 @@ export default function LogDetailScreen() {
     router.back();
   };
 
-  const handleMenu = () => setMenuVisible(true);
-
   const handleTogglePrivacy = async () => {
-    setMenuVisible(false);
     if (!sessionKey) return;
     await useLogsStore.getState().toggleSessionPublic(sessionKey);
-    // 从 store 重新读取状态 (乐观更新已生效)
     const updated = useLogsStore.getState().sessions.find(
       (s) => s.sessionKey === sessionKey
     );
@@ -313,97 +312,69 @@ export default function LogDetailScreen() {
   };
 
   const handleShareToPost = async () => {
-    setMenuVisible(false);
-    let serverId = sessionServerId;
+    if (!sessionEntry) return;
 
-    // If no serverId yet, try to flush outbox & resolve
-    if (!serverId && sessionKey) {
-      try {
-        const sMap = await readAllSessionSIds();
-        await flushSessionsOutbox({
-          resolveServerId: (k) => sMap[k] ?? null,
-          saveServerId: async (k, id) => { await setSessionSId(k, id); sMap[k] = id; },
-        });
-        serverId = sMap[sessionKey] || (await getSessionSId(sessionKey));
-      } catch {}
-    }
+    // 1. Collect all uploaded media from session log items
+    const allTypes = ["boulder", "toprope", "lead"] as const;
+    const collected: PickedMediaItem[] = [];
 
-    // Still no serverId → try date-based lookup from backend (match by start_time)
-    if (!serverId && date && sessionEntry) {
-      try {
-        const sessions = await api.get<any[]>(`/sessions/me?from=${date}&to=${date}`);
-        if (sessions?.length) {
-          const localStart = new Date(sessionEntry.startTime).getTime();
-          const match = sessions.find((s: any) => {
-            const sStart = new Date(s.start_time).getTime();
-            return Math.abs(sStart - localStart) < 120000; // within 2 minutes
-          });
-          if (match) {
-            serverId = match.id;
-            if (sessionKey) await setSessionSId(sessionKey, serverId!);
+    for (const t of allTypes) {
+      const items = await readSessionList(sessionEntry.sessionKey, t);
+      for (const item of items) {
+        const media = Array.isArray(item.media) ? item.media : [];
+        for (const m of media) {
+          if (typeof m.uri === "string" && m.uri.startsWith("http")) {
+            collected.push({
+              id: m.id || `${item.id}-${m.uri}`,
+              uri: m.uri,
+              mediaType: m.type === "video" ? "video" : "image",
+              width: 0,
+              height: 0,
+            });
           }
         }
-      } catch {}
+      }
     }
 
-    // Still no serverId → create session on backend directly with historical timestamps
-    if (!serverId && sessionEntry) {
-      try {
-        const res = await api.post<{ id: string }>('/sessions', {
-          gym_name: sessionEntry.gymName,
-          location_type: 'gym',
-          start_time: sessionEntry.startTime,
-          end_time: sessionEntry.endTime,
-        });
-        if (res?.id) {
-          serverId = String(res.id);
-          if (sessionKey) await setSessionSId(sessionKey, serverId);
-          // Update store
-          const allSessions = useLogsStore.getState().sessions;
-          useLogsStore.setState({
-            sessions: allSessions.map((s) =>
-              s.sessionKey === sessionEntry.sessionKey
-                ? { ...s, serverId, synced: true }
-                : s
-            ),
-          });
-        }
-      } catch {}
+    // 2. Check media limit
+    const POST_MAX_MEDIA = 20;
+    if (collected.length > POST_MAX_MEDIA) {
+      Alert.alert(
+        "Too many media",
+        `Posts can have up to ${POST_MAX_MEDIA} media items. This session has ${collected.length}. The first ${POST_MAX_MEDIA} will be included.`,
+      );
+    }
+    const mediaToShare = collected.slice(0, POST_MAX_MEDIA);
+
+    // 3. Set pending media for create.tsx to consume
+    if (mediaToShare.length > 0) {
+      setPendingMediaBatch(mediaToShare);
     }
 
-    if (serverId) {
-      setSessionServerId(serverId);
-      router.push({
-        pathname: '/community/media-select',
-        params: {
-          sessionId: serverId,
-          date,
-          localGymName: sessionEntry?.gymName || gymNameParam || '',
-          localSends: String(sessionEntry?.sends ?? 0),
-          localBest: sessionEntry?.best || '',
-          localDuration: sessionEntry?.duration || '',
-        },
-      });
-    } else {
-      Alert.alert('Sync Required', 'This session has not been synced to the server yet. Please check your network and try again.');
-    }
+    // 4. Navigate to create with session attachment params
+    const durationStr = duration || "";
+    router.push({
+      pathname: "/community/create",
+      params: {
+        prefillAttachType: "session",
+        prefillAttachId: sessionServerId || "",
+        prefillAttachTitle: `${sessionEntry.gymName || gymName || "Climbing Session"} · ${displayDate}`,
+        prefillAttachSubtitle: `${sessionSends} sends · ${bestGrade} · ${durationStr}`,
+        source: "log-detail",
+      },
+    });
   };
 
-  const handleShareVia = () => {
-    setMenuVisible(false);
-    // Delay to let SmartBottomSheet dismiss before presenting system share sheet
-    setTimeout(async () => {
-      const lines = dailyLogs.length > 0
-        ? dailyLogs.slice(0, 5).map((l: any) => `${l.grade || '—'}`).join(', ')
-        : 'No logs';
-      await Share.share({
-        message: `Route Log · ${displayDate}\n${gymName ? gymName + '\n' : ''}${sessionSends} sends · Best: ${bestGrade}${duration ? ' · ' + duration : ''}\n${lines}`,
-      });
-    }, 400);
+  const handleShareVia = async () => {
+    const lines = dailyLogs.length > 0
+      ? dailyLogs.slice(0, 5).map((l: any) => `${l.grade || '—'}`).join(', ')
+      : 'No logs';
+    await Share.share({
+      message: `Route Log · ${displayDate}\n${gymName ? gymName + '\n' : ''}${sessionSends} sends · Best: ${bestGrade}${duration ? ' · ' + duration : ''}\n${lines}`,
+    });
   };
 
   const handleDeleteSession = () => {
-    setMenuVisible(false);
     Alert.alert("Delete", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -420,9 +391,49 @@ export default function LogDetailScreen() {
     ]);
   };
 
-  const renderClimbCard = ({ item }: { item: any }) => (
-    <ClimbItemCard
+  const handleEditMedia = () => {
+    Alert.alert("Coming soon", "Edit media for sessions is coming in a future update.");
+  };
+
+  // ActionSheetIOS menu (replaces SmartBottomSheet)
+  const showMenu = () => {
+    const hasPrivacyToggle = !!(sessionServerId || sessionKey);
+    const options = [
+      ...(hasPrivacyToggle ? [isPublic ? "Make Private" : "Make Public"] : []),
+      "Share to Post",
+      "Share via...",
+      "Edit Media",
+      "Delete Session",
+      "Cancel",
+    ];
+    const destructiveIndex = options.indexOf("Delete Session");
+    const cancelIndex = options.length - 1;
+
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        destructiveButtonIndex: destructiveIndex,
+        cancelButtonIndex: cancelIndex,
+      },
+      (buttonIndex) => {
+        const label = options[buttonIndex];
+        if (label === "Make Private" || label === "Make Public") handleTogglePrivacy();
+        else if (label === "Share to Post") handleShareToPost();
+        else if (label === "Share via...") handleShareVia();
+        else if (label === "Edit Media") handleEditMedia();
+        else if (label === "Delete Session") handleDeleteSession();
+      }
+    );
+  };
+
+  // === Render helpers ===
+
+  const renderLogCard = ({ item }: { item: any }) => (
+    <LogItemCard
       item={item}
+      labelOf={labelOf}
+      note={(item.note || "").trim() || undefined}
+      tr={tr}
       onPress={() => {
         router.push({
           pathname: "/library/route-detail",
@@ -437,14 +448,13 @@ export default function LogDetailScreen() {
     />
   );
 
-  // Infer display mode from param or data (fixes ring TOTAL 0 when mode not passed)
+  // Infer display mode from param or data
   const effectiveMode = useMemo(() => {
     if (modeParam === "boulder") return "boulder";
     if (modeParam === "toprope" || modeParam === "lead" || modeParam === "rope") return "route";
-    // No mode param → infer from actual data
     if (hasBoulder && !hasRoutes) return "boulder";
     if (hasRoutes && !hasBoulder) return "route";
-    return "boulder"; // mixed → default boulder
+    return "boulder";
   }, [modeParam, hasBoulder, hasRoutes]);
 
   const activeParts = useMemo(() => {
@@ -465,6 +475,7 @@ export default function LogDetailScreen() {
       climbGoal={10}
       outerColor="#A08060"
       innerColor="#306E6F"
+      duration={duration}
     />
   );
 
@@ -505,27 +516,21 @@ export default function LogDetailScreen() {
     </View>
   );
 
-  const LeftActions = (
-    <HeaderButton icon="chevron.backward" onPress={handleBack} />
-  );
-
-  const RightActions = (
-    <HeaderButton icon="ellipsis" onPress={handleMenu} />
-  );
-
   return (
     <>
       <Stack.Screen options={{
         ...NATIVE_HEADER_LARGE,
-        title: "Route Log",
-        headerLeft: () => LeftActions,
-        headerRight: () => RightActions,
+        headerTransparent: true,
+        scrollEdgeEffects: { top: "soft" },
+        title: gymName || tr("训练详情", "Session Details"),
+        headerLeft: () => <HeaderButton icon="chevron.backward" onPress={handleBack} />,
+        headerRight: () => <HeaderButton icon="ellipsis" onPress={showMenu} />,
       }} />
       <FlatList
         style={{ backgroundColor: colors.backgroundSecondary }}
         data={dailyLogs}
         keyExtractor={(item: any, index: number) => item.id || index.toString()}
-        renderItem={renderClimbCard as any}
+        renderItem={renderLogCard}
         ListHeaderComponent={
           <>
             <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
@@ -565,27 +570,6 @@ export default function LogDetailScreen() {
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       />
-
-      <SmartBottomSheet visible={menuVisible} onClose={() => setMenuVisible(false)} mode="menu">
-        {(sessionServerId || sessionKey) && (
-          <TouchableOpacity style={styles.menuRow} onPress={handleTogglePrivacy}>
-            <Ionicons name={isPublic ? "eye-outline" : "eye-off-outline"} size={20} color={colors.textPrimary} />
-            <Text style={styles.menuRowText}>{isPublic ? "Make Private" : "Make Public"}</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.menuRow} onPress={handleShareToPost}>
-          <Ionicons name="create-outline" size={20} color={colors.textPrimary} />
-          <Text style={styles.menuRowText}>Share to Post</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuRow} onPress={handleShareVia}>
-          <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
-          <Text style={styles.menuRowText}>Share via...</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuRow} onPress={handleDeleteSession}>
-          <Ionicons name="trash-outline" size={20} color="#EF4444" />
-          <Text style={[styles.menuRowText, { color: '#EF4444' }]}>Delete Session</Text>
-        </TouchableOpacity>
-      </SmartBottomSheet>
     </>
   );
 }

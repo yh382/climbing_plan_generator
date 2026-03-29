@@ -5,7 +5,9 @@ import {
   Text,
   TouchableWithoutFeedback,
   Animated,
+  KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
 } from "react-native";
 import { theme } from "@/lib/theme";
@@ -100,7 +102,11 @@ export default function ExpandableEditCardModal({
         />
       </TouchableWithoutFeedback>
 
-      <View style={styles.centerWrap} pointerEvents="box-none">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.centerWrap}
+        pointerEvents="box-none"
+      >
         <Animated.View
           style={[
             styles.card,
@@ -119,9 +125,15 @@ export default function ExpandableEditCardModal({
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
 
-          {children}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

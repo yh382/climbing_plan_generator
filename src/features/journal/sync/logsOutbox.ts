@@ -44,6 +44,17 @@ export async function enqueueLogEvent(e: OutboxEventInput) {
   await writeQueue(q);
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Outbox flush timeout")), ms)
+    ),
+  ]);
+}
+
+const FLUSH_TIMEOUT = 10_000;
+
 export async function flushLogsOutbox(opts: {
   token: string;
   resolveServerId: (localId: LocalLogId) => string | null;
@@ -69,7 +80,10 @@ export async function flushLogsOutbox(opts: {
         }
         delete ev.payload._sessionKey; // strip before sending
 
-        const created = await apiCreateLog(token, ev.payload);
+        const created = await withTimeout(
+          apiCreateLog(token, ev.payload),
+          FLUSH_TIMEOUT
+        );
         if (created?.id) {
           await saveServerId(ev.localId, String(created.id));
         }
@@ -82,21 +96,22 @@ export async function flushLogsOutbox(opts: {
           remaining.push(ev);
           continue;
         }
-        await apiRepeatLog(token, serverId);
+        await withTimeout(apiRepeatLog(token, serverId), FLUSH_TIMEOUT);
         continue;
       }
 
       if (ev.type === "delete") {
         const serverId = resolveServerId(ev.localId);
         if (!serverId) {
-          // 本地删了但后端还没建出来：直接丢弃即可
           continue;
         }
-        await apiDeleteLog(token, serverId);
+        await withTimeout(apiDeleteLog(token, serverId), FLUSH_TIMEOUT);
         continue;
       }
-    } catch {
-      // 网络/后端失败：保留事件，下一次再试
+    } catch (err: any) {
+      // 409 = already exists → treat as success for create events
+      const msg = String(err?.message || "");
+      if (msg.includes("409") && ev.type === "create") continue;
       remaining.push(ev);
     }
   }

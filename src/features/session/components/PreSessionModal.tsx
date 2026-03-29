@@ -246,7 +246,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
               )}
             </View>
           ) : (
-            items.map((gym, idx) => {
+            items.slice(0, 3).map((gym, idx) => {
               const isSelected = selectedGym === gym.name;
               const secondary = formatSecondary(gym);
               const distance = formatDistance(gym.distance_m);

@@ -26,7 +26,9 @@ import GorillaSplash from "../src/components/GorillaSplash";
 import FloatingActiveSessionTimer from "../src/features/journal/FloatingActiveSessionTimer";
 
 import { useAuthStore } from "../src/store/useAuthStore";
+import useLogsStore from "../src/store/useLogsStore";
 import { runMigrationsIfNeeded } from "../src/features/journal/loglist/storage";
+import { recoverOrphanedSessions } from "../src/features/journal/sync/localBackup";
 import { registerForPushNotifications } from "../src/lib/pushNotifications";
 import { SidebarProvider } from "../src/contexts/SidebarContext";
 import { SidebarLayout, useGestureLock } from "@/components/sidebar/Sidebar";
@@ -69,7 +71,14 @@ function RootStack() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="library" options={{ headerShown: false }} />
       <Stack.Screen name="training" options={{ headerShown: false }} />
-      <Stack.Screen name="journal" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="journal"
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          headerTransparent: true,
+          scrollEdgeEffects: { top: "soft" },
+        }}
+      />
       <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
@@ -122,7 +131,42 @@ export default function RootLayout() {
     async function prepare() {
       try {
         await Promise.all([hydrate(), runMigrationsIfNeeded()]);
-        // 模拟一些初始化加载时间
+
+        // Crash recovery: recover orphaned sessions from backup
+        try {
+          const recovery = await recoverOrphanedSessions();
+          const state = useLogsStore.getState();
+
+          if (recovery.sessions.length > 0) {
+            // Dedup: skip if session already exists
+            const existingKeys = new Set(state.sessions.map((s) => s.sessionKey));
+            const newSessions = recovery.sessions.filter(
+              (s) => !existingKeys.has(s.sessionKey)
+            );
+            if (newSessions.length > 0) {
+              const keptLogs = state.logs.filter(
+                (l) => !recovery.affectedDates.includes(l.date)
+              );
+              useLogsStore.setState({
+                sessions: [...newSessions, ...state.sessions],
+                logs: [...keptLogs, ...recovery.logEntries],
+                activeSession: null,
+              });
+            } else if (state.activeSession) {
+              useLogsStore.setState({ activeSession: null });
+            }
+          } else if (state.activeSession) {
+            // No backup but stale activeSession → try to auto-end
+            try {
+              await useLogsStore.getState().endSession();
+            } catch {
+              useLogsStore.setState({ activeSession: null });
+            }
+          }
+        } catch (e) {
+          console.warn("[recovery]", e);
+        }
+
         await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (e) {
         console.warn(e);

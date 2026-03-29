@@ -9,7 +9,20 @@ export const setPendingMedia = (items: PickedMediaItem[] | null) => {
   _pending = items;
 };
 
+// Batch set: used by Share to Post (log-detail → create.tsx)
+let _pendingBatch: PickedMediaItem[] | null = null;
+
+export const setPendingMediaBatch = (items: PickedMediaItem[]) => {
+  _pendingBatch = items;
+};
+
 export const consumePendingMedia = (): PickedMediaItem[] | null => {
+  // Batch (from Share to Post) takes priority
+  if (_pendingBatch) {
+    const batch = _pendingBatch;
+    _pendingBatch = null;
+    return batch;
+  }
   const result = _pending;
   _pending = null;
   return result;

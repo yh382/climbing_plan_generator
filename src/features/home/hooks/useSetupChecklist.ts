@@ -49,6 +49,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
   const [notifGranted, setNotifGranted] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [hasGymFavorite, setHasGymFavorite] = useState(false);
 
   const profile = useProfileStore((s) => s.profile);
   const { sessions } = useLogsStore();
@@ -60,7 +61,6 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
   const hasBodyInfo = !!(
     profile?.anthropometrics?.height || profile?.anthropometrics?.weight
   );
-  const hasHomeGym = !!profile?.preferences?.home_gym_id;
   const hasRouteLog = sessions.length > 0;
   const hasPost = myPosts.length > 0;
   const hasFollowing = followingCount > 0;
@@ -101,6 +101,10 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
           if (!cancelled) setDismissed(false);
         }
 
+        // Check gym favorite flag
+        const gymFlag = await AsyncStorage.getItem("setup_gym_favorited");
+        if (!cancelled) setHasGymFavorite(gymFlag === "true");
+
         // Check notification permission
         const { status } = await Notifications.getPermissionsAsync();
         if (!cancelled) setNotifGranted(status === "granted");
@@ -140,7 +144,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
         newProgress.body_info = true;
         changed = true;
       }
-      if (hasHomeGym && !newProgress.find_gym) {
+      if (hasGymFavorite && !newProgress.find_gym) {
         newProgress.find_gym = true;
         changed = true;
       }
@@ -179,6 +183,11 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
         .then((c) => setFollowingCount(c.following))
         .catch(() => {});
 
+      // Re-check gym favorite flag on focus
+      AsyncStorage.getItem("setup_gym_favorited").then((val) => {
+        setHasGymFavorite(val === "true");
+      });
+
       // Re-check notification permission on focus
       Notifications.getPermissionsAsync().then(({ status }) => {
         setNotifGranted(status === "granted");
@@ -189,7 +198,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
       progress,
       notifGranted,
       hasBodyInfo,
-      hasHomeGym,
+      hasGymFavorite,
       hasRouteLog,
       hasPost,
       hasFollowing,

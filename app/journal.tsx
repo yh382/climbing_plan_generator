@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo,useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,7 +22,6 @@ import { useSettings } from "src/contexts/SettingsContext";
 // Components
 import CollapsibleCalendarOverlay from "../components/CollapsibleCalendarOverlay";
 import DualMiniRings from "../components/DualMiniRings";
-import CollapsibleLargeHeader from "../src/components/CollapsibleLargeHeader";
 import LogSendModal, { LogSendDraft } from "../src/features/journal/LogSendModal";
 import QuickLogCard from "../src/features/journal/QuickLogCard";
 import { TodayDetailsList } from "../src/features/journal/loglist";
@@ -40,11 +40,14 @@ import { useAuthStore } from "../src/store/useAuthStore";
 import { readDayList } from "../src/features/journal/loglist/storage";
 import { computeDailyIntensity, saveIntensityForDate } from "../src/services/stats/intensityCalculator";
 
+// Native header
+import { withHeaderTheme } from "../src/lib/nativeHeaderOptions";
+import { HeaderButton } from "../src/components/ui/HeaderButton";
+import { useThemeColors } from "../src/lib/useThemeColors";
+
 // Utils
 import { colorForBoulder, colorForYDS } from "../lib/gradeColors";
 
-
-// ... (省略 YDS_GROUPS, Mappings, pad, dateStr 等辅助函数，保持不变) ...
 
 const YDS_GROUPS = {
   Beginner: ["5.6", "5.7", "5.8", "5.9"],
@@ -85,28 +88,6 @@ const formatBarLabel = (d: Date, isZH: boolean) => {
   return isZH ? `${mm}/${dd} · ${wCN}` : `${wEN}, ${mm}/${dd}`;
 };
 
-const VISUAL = {
-  bg: "#F8FAFC",
-  card: "#FFFFFF",
-  primary: "#0B1220",
-  secondary: "#64748B",
-  border: "#E2E8F0",
-  shadow: {
-    shadowColor: "#64748B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  shadowSmall: {
-    shadowColor: "#64748B",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  }
-};
-
 // ✅ 本地 note key（与 LogSendModal 保持一致）
 const NOTE_BY_ROUTE_KEY = (routeName: string) => `logsend_note_by_route_${routeName}`;
 
@@ -116,6 +97,8 @@ const isFeel = (x: any): x is Feel => x === "soft" || x === "solid" || x === "ha
 export default function Journal() {
   const { boulderScale, ropeScale, lang } = useSettings();
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const router = useRouter();
   const navigation = useNavigation();
@@ -203,9 +186,98 @@ export default function Journal() {
     }, [])
   );
 
+  const handleBack = () => router.back();
+
+  const handleEndSession = () => {
+    Alert.alert(tr("结束训练?", "End Session?"), tr("这就结束今天的训练了吗？", "Are you done climbing for today?"), [
+      { text: tr("取消", "Cancel"), style: "cancel" },
+      {
+        text: tr("结束并保存", "End & Save"),
+        style: "destructive",
+          onPress: async () => {
+            // 1) 先把 Journal 页面的"追加态"清掉，避免残留
+            setPendingAppend(null);
+
+            // 2) 触发 TodayDetailsList 重新 load
+            setRefreshNonce((n) => n + 1);
+
+            // 3) 再真正结束 session（写入 storage / 后端）
+            const newSession = await endSession();
+
+            // 4) Compute & save intensity for today (fire-and-forget)
+            const intensityDate = todayKey;
+            Promise.all(
+              (["boulder", "toprope", "lead"] as const).map(async (t) => {
+                const items = await readDayList(intensityDate, t);
+                const result = computeDailyIntensity(items);
+                if (result) await saveIntensityForDate(intensityDate, t, result);
+              })
+            ).catch(() => {});
+
+            // 5) Flush outbox → backend: sessions FIRST (so logs can resolve session_id)
+            const token = useAuthStore.getState().accessToken;
+            if (token) {
+              try {
+                const sMap = await readAllSessionServerIds();
+                await flushSessionsOutbox({
+                  resolveServerId: (k) => sMap[k] ?? null,
+                  saveServerId: async (k, id) => {
+                    await setSessionSId(k, id);
+                    sMap[k] = id;
+                  },
+                });
+              } catch {}
+
+              try {
+                const idMap = await readAllServerIds();
+                await flushLogsOutbox({
+                  token,
+                  resolveServerId: (localId) => idMap[localId] ?? null,
+                  saveServerId: async (localId, serverId) => {
+                    await setServerId(localId, serverId);
+                    idMap[localId] = serverId;
+                  },
+                });
+              } catch {}
+            }
+
+            if (newSession) {
+              router.replace({
+                pathname: "/library/log-detail",
+                params: {
+                  date: newSession.date,
+                  origin: "end_log",
+                  gymName: newSession.gymName ?? activeSession?.gymName ?? "",
+                  sessionKey: newSession.sessionKey,
+                },
+              });
+            }
+          }
+
+      },
+    ]);
+  };
+
+  // ===== Native header =====
   useLayoutEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, [navigation]);
+    navigation.setOptions({
+      ...withHeaderTheme(colors),
+      headerTitle: activeSession
+        ? tr("训练记录中", "Logging Session")
+        : tr("训练日志", "Journal"),
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={handleBack} />
+      ),
+      headerRight: activeSession
+        ? () => (
+            <HeaderButton
+              icon="stop.circle"
+              onPress={handleEndSession}
+            />
+          )
+        : undefined,
+    });
+  }, [activeSession, colors, navigation, tr]);
 
   const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
   const logType = mode; // "boulder" | "toprope" | "lead"
@@ -219,9 +291,8 @@ export default function Journal() {
       .reduce((acc: number, cur: any) => acc + cur.count, 0);
   }, [logs, todayKey, logType]);
 
-  // ✅ 用于 Today's Details：拿当天「单条 log」列表
+  // ✅ 用于 Session's Details：拿当天「单条 log」列表
   const todayLogs = useMemo(() => {
-    // 如果你 store 里并没有 type 字段，也不会崩：我们做兼容
     return logs.filter((l: any) => l?.date === todayKey && (l?.type ? l.type === logType : true));
   }, [logs, todayKey, logType]);
 
@@ -308,125 +379,6 @@ export default function Journal() {
     setSendModalOpen(true);
   };
 
-  const titleGym = useMemo(() => {
-    if (activeSession?.gymName) return `${activeSession.gymName}`;
-    return tr("未选择岩馆", "No gym selected");
-  }, [activeSession?.gymName, tr]);
-
-  const handleBack = () => router.back();
-
-  const handleEndSession = () => {
-    Alert.alert(tr("结束训练?", "End Session?"), tr("这就结束今天的训练了吗？", "Are you done climbing for today?"), [
-      { text: tr("取消", "Cancel"), style: "cancel" },
-      {
-        text: tr("结束并保存", "End & Save"),
-        style: "destructive",
-          onPress: async () => {
-            // 1) 先把 Journal 页面的“追加态”清掉，避免残留
-            setPendingAppend(null);
-
-            // 2) 触发 TodayDetailsList 重新 load（你现在已经把 refreshKey 用起来了）
-            setRefreshNonce((n) => n + 1);
-
-            // （可选但更强）如果你有 activeSession 的本地展示状态，也在这里清理
-            // setActiveSession(null);
-
-            // 3) 再真正结束 session（写入 storage / 后端）
-            const newSession = await endSession();
-
-
-            // 4) Compute & save intensity for today (fire-and-forget)
-            const intensityDate = todayKey;
-            Promise.all(
-              (["boulder", "toprope", "lead"] as const).map(async (t) => {
-                const items = await readDayList(intensityDate, t);
-                const result = computeDailyIntensity(items);
-                if (result) await saveIntensityForDate(intensityDate, t, result);
-              })
-            ).catch(() => {});
-
-            // 5) Flush outbox → backend: sessions FIRST (so logs can resolve session_id)
-            const token = useAuthStore.getState().accessToken;
-            if (token) {
-              try {
-                const sMap = await readAllSessionServerIds();
-                await flushSessionsOutbox({
-                  resolveServerId: (k) => sMap[k] ?? null,
-                  saveServerId: async (k, id) => {
-                    await setSessionSId(k, id);
-                    sMap[k] = id;
-                  },
-                });
-              } catch {}
-
-              try {
-                const idMap = await readAllServerIds();
-                await flushLogsOutbox({
-                  token,
-                  resolveServerId: (localId) => idMap[localId] ?? null,
-                  saveServerId: async (localId, serverId) => {
-                    await setServerId(localId, serverId);
-                    idMap[localId] = serverId;
-                  },
-                });
-              } catch {}
-            }
-
-            if (newSession) {
-              router.replace({
-                pathname: "/library/log-detail",
-                params: {
-                  date: newSession.date,
-                  origin: "end_log",
-                  gymName: newSession.gymName ?? activeSession?.gymName ?? "",
-                  sessionKey: newSession.sessionKey,
-                },
-              });
-            }
-          }
-
-      },
-    ]);
-  };
-
-  const LeftBackBtn = () => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={handleBack}
-      style={styles.leftCapsuleIconOnly}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-    >
-      <Ionicons name="chevron-back" size={20} color={VISUAL.primary} />
-    </TouchableOpacity>
-  );
-
-  const CenterTimer = () => (
-    <View style={styles.timerRow}>
-      {activeSession ? (
-        <>
-          <View style={styles.liveDot} />
-          <Text style={styles.timerText}>{sessionDuration}</Text>
-        </>
-      ) : (
-        <Text style={styles.dateText}>
-          {formatBarLabel(selectedDate, lang === "zh")}
-        </Text>
-      )}
-    </View>
-  );
-
-  const RightEnd = () => (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={activeSession ? handleEndSession : () => setCalendarOpen(true)}
-      style={[styles.endBtn, !activeSession && styles.endBtnSecondary]}
-    >
-      <Text style={[styles.endText, !activeSession && styles.endTextSecondary]}>
-        {activeSession ? tr("结束", "End") : tr("日期", "Date")}
-      </Text>
-    </TouchableOpacity>
-  );
-
   const sessionKey = useMemo(
     () => (activeSession ? String(activeSession.startTime) : "nosession"),
     [activeSession]
@@ -437,8 +389,8 @@ export default function Journal() {
     if (feelRaw === "solid") return null;
     const text = feelRaw === "soft" ? "SOFT" : "HARD";
     return (
-      <View style={[styles.feelPill, { backgroundColor: '#1C1C1E' }]}>
-        <Text style={[styles.feelPillText, { color: '#FFFFFF' }]}>{text}</Text>
+      <View style={[styles.feelPill, { backgroundColor: colors.cardDark }]}>
+        <Text style={[styles.feelPillText, { color: colors.pillText }]}>{text}</Text>
       </View>
     );
   };
@@ -468,14 +420,12 @@ export default function Journal() {
               </Text>
               {feelPill(feel)}
             </View>
-
-            {/* 你如果想在这里顺手显示 grade / attempts 也很方便，但按你要求先不加 */}
           </View>
         </View>
 
         {note ? (
           <View style={styles.noteBubble}>
-            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#64748B" />
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.textSecondary} />
             <Text style={styles.noteText} numberOfLines={2}>
               {note}
             </Text>
@@ -486,7 +436,7 @@ export default function Journal() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: VISUAL.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <CollapsibleCalendarOverlay
         visible={calendarOpen}
         onClose={() => setCalendarOpen(false)}
@@ -502,68 +452,57 @@ export default function Journal() {
         onMonthChange={() => {}}
       />
 
-      <CollapsibleLargeHeader
-        backgroundColor={VISUAL.bg}
-        headerHeight={40}
-        threshold={42}
-        leftActions={<LeftBackBtn />}
-        rightActions={<RightEnd />}
-        leftSlotWidth={80}
-        rightSlotWidth={80}
-        smallTitle={<CenterTimer />}
-        disableSnapEffect={true}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-        largeTitle={
-          <Text style={styles.largeTitle} numberOfLines={2} ellipsizeMode="tail">
-            {titleGym}
-          </Text>
-        }
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1, backgroundColor: colors.background }}
       >
-        <View style={{ marginTop: 12 }}>
-          <FirstLogTooltip />
-          <View style={styles.quickLogWrapper}>
-            <QuickLogCard
-              mode={mode}
-              tr={tr}
-              labelOf={labelOf}
-              onPickGrade={openForGrade}
-              cardPadding={16}
-            />
-          </View>
-        </View>
-
-        {/* Today's Details */}
-        <View style={{ marginTop: 24 }}>
-          {/* header row: title + badge */}
-          <View style={styles.detailsRow}>
-            <Text style={styles.sectionTitle}>{tr("今日明细", "Today's Details")}</Text>
-            <View style={styles.countBadge}>
-              <Text style={styles.detailsCount}>{(activeSession ? sessionDetailCount : 0)} sends</Text>
-            </View>
-          </View>
-
-          {/* list below */}
-          {activeSession ? (
-            <View style={{ marginTop: 12, width: "100%" }}>
-              <TodayDetailsList
-                key={`${todayKey}_${logType}_${sessionKey}_${refreshNonce}`}
-                sessionKey={sessionKey}
-                date={todayKey}
-                logType={logType}
-                labelOf={labelOf}
+        <View style={{ paddingHorizontal: 16 }}>
+          <View style={{ marginTop: 12 }}>
+            <FirstLogTooltip />
+            <View>
+              <QuickLogCard
+                mode={mode}
                 tr={tr}
-                pendingAppend={pendingAppend}
-                onAppended={() => setPendingAppend(null)}
-                refreshKey={refreshNonce}
-                onCountChange={setSessionDetailCount}
+                labelOf={labelOf}
+                onPickGrade={openForGrade}
+                cardPadding={16}
               />
             </View>
-          ) : (
-            <View style={[styles.emptyBox, { marginTop: 12 }]}>{/* 你原来的 empty UI */}</View>
-          )}
-        </View>
+          </View>
 
-      </CollapsibleLargeHeader>
+          {/* Session's Details */}
+          <View style={{ marginTop: 24 }}>
+            {/* header row: title + badge */}
+            <View style={styles.detailsRow}>
+              <Text style={styles.sectionTitle}>{tr("本次详情", "Session's Details")}</Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.detailsCount}>{(activeSession ? sessionDetailCount : 0)} sends</Text>
+              </View>
+            </View>
+
+            {/* list below */}
+            {activeSession ? (
+              <View style={{ marginTop: 12, width: "100%" }}>
+                <TodayDetailsList
+                  key={`${todayKey}_${logType}_${sessionKey}_${refreshNonce}`}
+                  sessionKey={sessionKey}
+                  date={todayKey}
+                  logType={logType}
+                  labelOf={labelOf}
+                  tr={tr}
+                  pendingAppend={pendingAppend}
+                  onAppended={() => setPendingAppend(null)}
+                  refreshKey={refreshNonce}
+                  onCountChange={setSessionDetailCount}
+                />
+              </View>
+            ) : (
+              <View style={[styles.emptyBox, { marginTop: 12 }]}>{/* empty UI */}</View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       <LogSendModal
         visible={sendModalOpen}
@@ -582,10 +521,8 @@ export default function Journal() {
           lastSubmitAtRef.current = now;
           submitSeqRef.current += 1;
 
-          // ✅ 这里仍然不动你的计数逻辑（保持现状）
           upsertCount({ date: todayKey, type: logType, grade: pendingGrade, delta: 1 });
 
-          // Prefer crypto.randomUUID when available; fallback to time + random + seq.
           // @ts-ignore
           const uuid = (globalThis as any)?.crypto?.randomUUID?.() as string | undefined;
 
@@ -604,6 +541,7 @@ export default function Journal() {
 
             attemptsTotal: draft.attempts ?? 1,
             note: (draft.note || "").trim(),
+            media: draft.media,
             createdAt: now,
           };
 
@@ -624,122 +562,75 @@ export default function Journal() {
   );
 }
 
-const styles = StyleSheet.create({
-  leftCapsuleIconOnly: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#FFFFFF",
-    ...VISUAL.shadowSmall,
-    shadowOpacity: 0.04,
-  },
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    detailsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 2,
+      marginBottom: 14,
+    },
+    sectionTitle: { fontSize: 18, fontFamily: "DMSans_900Black", color: colors.textPrimary, letterSpacing: -0.5 },
+    countBadge: {
+      backgroundColor: colors.border,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    detailsCount: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
 
-  timerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" },
-  timerText: { fontSize: 16, fontFamily: "DMSans_500Medium", color: VISUAL.primary, fontVariant: ["tabular-nums"] },
-  dateText: { fontSize: 16, fontFamily: "DMSans_500Medium", color: VISUAL.primary },
+    detailCard: {
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 12,
+      flexDirection: "row",
+      overflow: "hidden",
+    },
+    detailImageWrap: { width: 96, height: 96 },
+    detailImage: { width: "100%", height: "100%" },
+    noImage: { backgroundColor: colors.cardDark, alignItems: "center", justifyContent: "center" },
+    noImageText: { fontSize: 16, fontFamily: "DMMono_500Medium", color: colors.textSecondary },
 
-  endBtn: {
-    height: 38,
-    paddingHorizontal: 18,
-    borderRadius: 19,
-    backgroundColor: "#1C1C1E",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  endBtnSecondary: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-  },
-  endText: { color: "#fff", fontSize: 14, fontFamily: "DMSans_700Bold" },
-  endTextSecondary: { color: "#888888" },
+    detailInfo: { flex: 1, padding: 12, justifyContent: "center" },
+    detailTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
+    routeName: { flex: 1, fontSize: 15, fontFamily: "DMSans_900Black", color: colors.textPrimary, letterSpacing: -0.2 },
 
-  largeTitle: {
-    fontSize: 26,
-    fontFamily: "DMSans_900Black",
-    color: VISUAL.primary,
-    letterSpacing: -0.5,
-  },
-  quickLogWrapper: {},
+    feelPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      alignSelf: "flex-start",
+    },
+    feelPillText: {
+      fontSize: 11,
+      fontWeight: "900",
+      letterSpacing: 0.8,
+    },
 
-  detailsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 2,
-    marginBottom: 14
-  },
-  sectionTitle: { fontSize: 18, fontFamily: "DMSans_900Black", color: VISUAL.primary, letterSpacing: -0.5 },
-  countBadge: {
-    backgroundColor: "#E2E8F0",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  detailsCount: { color: "#475569", fontSize: 12, fontWeight: "700" },
+    noteBubble: {
+      marginTop: 8,
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    noteText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: "700",
+    },
 
-  // ✅ 新：Today's Details card（对齐 log-detail 风格）
-  detailCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    flexDirection: "row",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  detailImageWrap: { width: 96, height: 96 },
-  detailImage: { width: "100%", height: "100%" },
-  noImage: { backgroundColor: "#272727", alignItems: "center", justifyContent: "center" },
-  noImageText: { fontSize: 16, fontFamily: "DMMono_500Medium", color: "#888888" },
-
-  detailInfo: { flex: 1, padding: 12, justifyContent: "center" },
-  detailTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
-  routeName: { flex: 1, fontSize: 15, fontFamily: "DMSans_900Black", color: "#000000", letterSpacing: -0.2 },
-
-  feelPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    alignSelf: "flex-start",
-  },
-  feelPillText: {
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-  },
-
-  noteBubble: {
-    marginTop: 8,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  noteText: {
-    flex: 1,
-    color: "#334155",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  emptyBox: {
-    padding: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    borderStyle: "dashed",
-    borderWidth: 2,
-    borderColor: "#E2E8F0",
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.5)"
-  },
-});
+    emptyBox: {
+      padding: 30,
+      alignItems: "center",
+      justifyContent: "center",
+      borderStyle: "dashed",
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderRadius: 20,
+    },
+  });

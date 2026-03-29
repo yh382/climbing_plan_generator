@@ -33,7 +33,7 @@ const AUDIENCE_OPTIONS = [
   { value: 'private' as const, label: 'Private', icon: 'lock-closed-outline' as const },
 ];
 
-const MAX_MEDIA = 10;
+const MAX_MEDIA = 20;
 
 const VISIBILITY_TO_AUDIENCE: Record<string, 'public' | 'followers' | 'private'> = {
   'public': 'public',
@@ -90,6 +90,7 @@ export default function CreatePostScreen() {
     prefillAttachTitle?: string;
     prefillAttachSubtitle?: string;
     fromPicker?: string;
+    source?: string;
   }>();
   const isEditMode = !!params.postId;
   const { createPost, updatePost } = useCommunityStore();
@@ -259,8 +260,8 @@ export default function CreatePostScreen() {
       }
       if (params.fromPicker === '1') {
         router.dismiss(2); // pop create + picker back to community tab
-      } else if (params.prefillAttachType) {
-        router.dismiss(2);
+      } else if (params.prefillAttachType && params.source !== 'log-detail') {
+        router.dismiss(2); // pop create + media-select
       } else {
         router.back();
       }
@@ -378,6 +379,14 @@ export default function CreatePostScreen() {
             onChangeText={setContent}
             textAlignVertical="top"
           />
+
+          {/* Source Badge (from Share to Post) */}
+          {params.source === 'log-detail' && (
+            <View style={styles.sourceBadge}>
+              <Ionicons name="fitness-outline" size={14} color={colors.accent} />
+              <Text style={styles.sourceText}>Shared from session</Text>
+            </View>
+          )}
 
           {/* Attached Widget Preview */}
           {attachedWidget && (
@@ -670,6 +679,18 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '600',
     fontFamily: theme.fonts.medium,
     color: colors.textPrimary,
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  sourceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
   },
   mediaRow: {
     gap: 10,

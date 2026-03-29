@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { gymCommunityApi, RecentGym, GymSummary } from './api';
 
 // ---- Recent Gym (Home card) ----
@@ -117,6 +118,7 @@ export function useGymFavoriteToggle() {
       if (wasFav) await gymCommunityApi.unfavoriteGym(gymId);
       else {
         await gymCommunityApi.favoriteGym(gymId);
+        AsyncStorage.setItem("setup_gym_favorited", "true");
         onFavorited?.();
       }
     } catch {

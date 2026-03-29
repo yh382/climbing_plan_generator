@@ -203,7 +203,7 @@ export default function HomeGymPickerSheet({ visible, onClose, onSelect, title =
   return (
     <TrueSheet
       ref={sheetRef}
-      detents={[0.4, 0.9]}
+      detents={[0.6, 0.9]}
       backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed
