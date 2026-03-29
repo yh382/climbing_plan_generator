@@ -71,6 +71,7 @@ function RootStack() {
       <Stack.Screen name="training" options={{ headerShown: false }} />
       <Stack.Screen name="journal" options={{ headerShown: false }} />
       <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
+      <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
       <Stack.Screen
         name="gyms-sheet"

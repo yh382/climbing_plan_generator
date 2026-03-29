@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import { View, TextInput, StyleSheet, Keyboard, Platform, TouchableOpacity, Text } from "react-native";
 import { NativeSearchBar } from "../../../../modules/native-input/src";
 import { Ionicons } from "@expo/vector-icons";
-
 interface GymSearchBarProps {
   query: string;
   onChangeText: (text: string) => void;

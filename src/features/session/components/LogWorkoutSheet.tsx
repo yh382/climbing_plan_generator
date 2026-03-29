@@ -69,7 +69,7 @@ export default function LogWorkoutSheet({ visible, exerciseName, onSave, onClose
     <TrueSheet
       ref={bottomSheetRef}
       detents={[0.4, 0.9]}
-      backgroundColor={colors.background}
+      backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       onDidDismiss={onClose}
     >

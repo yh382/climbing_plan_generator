@@ -23,6 +23,8 @@ export interface NativeSearchBarProps extends Omit<ViewProps, "onFocus" | "onBlu
   autoCapitalize?: "none" | "words" | "sentences" | "all";
   /** Custom height for the search field */
   searchFieldHeight?: number;
+  /** Background color for the search text field (hex) */
+  searchFieldBackgroundColor?: string;
 
   /** Fired on every text change */
   onChangeText?: (e: { nativeEvent: { text: string } }) => void;

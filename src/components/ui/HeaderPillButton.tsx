@@ -1,6 +1,7 @@
 // src/components/ui/HeaderPillButton.tsx
 import { Host, Button } from "@expo/ui/swift-ui";
 import type { StyleProp, ViewStyle } from "react-native";
+import { useThemeColors } from "../../lib/useThemeColors";
 
 interface HeaderPillButtonProps {
   title: string;
@@ -12,13 +13,14 @@ interface HeaderPillButtonProps {
 
 /**
  * Native SwiftUI pill button for topbar text actions (Save, Post, etc.).
- * Auto-follows system dark/light mode.
+ * Uses theme-aware pill colors for dark/light mode.
  */
 export function HeaderPillButton({ title, onPress, disabled, loading, style }: HeaderPillButtonProps) {
+  const colors = useThemeColors();
   const extraProps = {
     variant: "borderedProminent",
     controlSize: "small",
-    color: "#1C1C1E",
+    color: colors.pillBackground,
     disabled: disabled || loading,
   } as Record<string, unknown>;
 

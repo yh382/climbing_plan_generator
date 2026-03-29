@@ -28,6 +28,8 @@ class NativeSearchBarView: ExpoView, UISearchBarDelegate {
     searchBar.autocorrectionType = .no
     searchBar.autocapitalizationType = .none
     searchBar.spellCheckingType = .no
+    // Use systemGray5 so the field is visible in both light & dark mode
+    searchBar.searchTextField.backgroundColor = .systemGray5
 
     addSubview(searchBar)
   }

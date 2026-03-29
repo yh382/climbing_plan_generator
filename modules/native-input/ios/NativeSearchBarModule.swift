@@ -41,6 +41,12 @@ public class NativeSearchBarModule: Module {
         view.searchTextFieldHeight = CGFloat(value ?? 40)
       }
 
+      Prop("searchFieldBackgroundColor") { (view, value: String?) in
+        if let hex = value {
+          view.searchBar.searchTextField.backgroundColor = UIColor(hex: hex)
+        }
+      }
+
       Prop("autoCapitalize") { (view, value: String?) in
         switch value {
         case "none":

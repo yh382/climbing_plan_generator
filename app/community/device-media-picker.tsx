@@ -482,7 +482,7 @@ export default function DeviceMediaPickerScreen() {
       <TrueSheet
         ref={albumSheetRef}
         detents={["auto"]}
-        backgroundColor={colors.background}
+        backgroundColor={colors.sheetBackground}
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         dimmed
         dimmedDetentIndex={0}

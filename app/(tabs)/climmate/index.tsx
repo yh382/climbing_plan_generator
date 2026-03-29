@@ -217,6 +217,7 @@ export default function ClimmateScreen() {
           paddingBottom: bottomBarHeight,
           paddingTop: 6,
         }}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
         onContentSizeChange={handleContentSizeChange}

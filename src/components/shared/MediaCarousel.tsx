@@ -1,13 +1,14 @@
 // src/components/shared/MediaCarousel.tsx
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Image,
   FlatList,
   StyleSheet,
   TouchableWithoutFeedback,
-  ViewToken,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 
 interface MediaCarouselProps {
@@ -25,16 +26,15 @@ export default function MediaCarousel({
 }: MediaCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        setActiveIndex(viewableItems[0].index);
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const page = Math.round(e.nativeEvent.contentOffset.x / width);
+      if (page >= 0 && page < images.length) {
+        setActiveIndex(page);
       }
     },
-    []
+    [width, images.length],
   );
-
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   const renderItem = useCallback(
     ({ item, index }: { item: string; index: number }) => (
@@ -68,8 +68,8 @@ export default function MediaCarousel({
         renderItem={renderItem}
         keyExtractor={(_, i) => String(i)}
         getItemLayout={getItemLayout}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       />
 
       {/* Dot indicators — only show for multi-image */}

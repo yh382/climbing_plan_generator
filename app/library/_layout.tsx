@@ -10,14 +10,14 @@ export default function LibraryLayout() {
       <Stack.Screen name="exercise-detail" />
       <Stack.Screen name="exercise-favorites" />
       <Stack.Screen name="exercises" />
-      <Stack.Screen name="plan-builder" />
+      <Stack.Screen name="plan-builder" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="plan-detail" />
       <Stack.Screen name="plan-history" />
       <Stack.Screen name="plan-overview" />
       <Stack.Screen name="plan-view" />
       <Stack.Screen name="plans" />
       <Stack.Screen name="route-detail" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
-      <Stack.Screen name="trending-plans" />
+      <Stack.Screen name="trending-plans" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="log-detail" />
     </Stack>
   );

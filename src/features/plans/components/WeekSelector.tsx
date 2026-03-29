@@ -1,6 +1,8 @@
 // src/features/plans/components/WeekSelector.tsx
 
+import { useMemo } from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { useThemeColors } from "../../../lib/useThemeColors";
 
 interface Props {
   totalWeeks: number;
@@ -11,6 +13,8 @@ interface Props {
 }
 
 export function WeekSelector({ totalWeeks, selectedWeek, onSelectWeek, sessionCounts }: Props) {
+  const colors = useThemeColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const weeks = Array.from({ length: totalWeeks }, (_, i) => i + 1);
 
   return (
@@ -49,23 +53,25 @@ export function WeekSelector({ totalWeeks, selectedWeek, onSelectWeek, sessionCo
   );
 }
 
-const s = StyleSheet.create({
-  wrapper: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+type Colors = ReturnType<typeof useThemeColors>;
+
+const createStyles = (colors: Colors) => StyleSheet.create({
+  wrapper: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
   content: { paddingHorizontal: 16, gap: 8 },
   pill: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.cardBackground,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
-  pillActive: { backgroundColor: "#111" },
-  pillText: { fontSize: 13, fontWeight: "700", color: "#6B7280" },
-  pillTextActive: { color: "#FFF" },
+  pillActive: { backgroundColor: colors.pillBackground },
+  pillText: { fontSize: 13, fontWeight: "700", color: colors.textSecondary },
+  pillTextActive: { color: colors.pillText },
   dotsRow: { flexDirection: "row", gap: 3 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#D1D5DB" },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.borderTertiary },
   dotActive: { backgroundColor: "#306E6F" },
 });

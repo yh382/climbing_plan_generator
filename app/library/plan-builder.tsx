@@ -1,6 +1,6 @@
 // app/library/plan-builder.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,31 +9,23 @@ import {
   TextInput,
   StyleSheet,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { HeaderPillButton } from "../../src/components/ui/HeaderPillButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
+import { withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
+import { useSettings } from "../../src/contexts/SettingsContext";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { WeekSelector } from "../../src/features/plans/components/WeekSelector";
 import { ExercisePickerModal } from "../../src/features/plans/components/ExercisePickerModal";
 import type { PlanV3, PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
 import type { ActionSummary } from "../../src/features/home/exercises/model/types";
-
-function detectLocale(): "zh" | "en" {
-  try {
-    const loc = Intl.DateTimeFormat().resolvedOptions().locale || "en";
-    return loc.toLowerCase().startsWith("zh") ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
 
 function makeId() {
   return `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -54,29 +46,21 @@ function createEmptySession(index: number): PlanV3Session {
 const INTENSITY_OPTIONS = ["Light", "Moderate", "Hard", "Max"];
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-
-  saveBtnWrap: {
-    backgroundColor: "#1C1C1E",
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-  },
-  saveBtn: { fontSize: 14, fontWeight: "600", color: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: colors.background },
 
   // Meta
-  metaSection: { backgroundColor: "#FFF", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 },
+  metaSection: { backgroundColor: colors.background, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 },
   titleInput: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#111",
+    color: colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.divider,
     paddingBottom: 6,
   },
   metaRow: { flexDirection: "row", gap: 16 },
   metaItem: { flex: 1 },
-  metaLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 4 },
+  metaLabel: { fontSize: 12, fontWeight: "600", color: colors.textSecondary, marginBottom: 4 },
   stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
   stepBtn: {
     width: 32,
@@ -96,7 +80,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     minWidth: 40,
     textAlign: "center" as const,
   },
-  metaSummary: { fontSize: 13, fontWeight: "600", color: "#6B7280", paddingVertical: 2 },
+  metaSummary: { fontSize: 13, fontWeight: "600", color: colors.textSecondary, paddingVertical: 2 },
   collapseBtn: {
     alignSelf: "flex-end",
     padding: 2,
@@ -113,13 +97,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderWidth: 0.5,
     borderColor: colors.border,
   },
-  intensityPillActive: { backgroundColor: "#111" },
-  intensityText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  intensityTextActive: { color: "#FFF" },
+  intensityPillActive: { backgroundColor: colors.pillBackground },
+  intensityText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  intensityTextActive: { color: colors.pillText },
 
   // Sessions
   sessionsContainer: { paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
-  weekTitle: { fontSize: 16, fontWeight: "700", color: "#374151", marginBottom: 16 },
+  weekTitle: { fontSize: 16, fontWeight: "700", color: colors.textPrimary, marginBottom: 16 },
 
   deleteSessionBtn: {
     flexDirection: "row",
@@ -147,12 +131,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
 export default function PlanBuilderScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const locale = useMemo(() => detectLocale(), []);
+  const { tr, isZH } = useSettings();
+  const locale = isZH ? "zh" : "en";
 
-  const [title, setTitle] = useState(locale === "zh" ? "我的自定义计划" : "My Custom Plan");
+  const [title, setTitle] = useState(tr("我的自定义计划", "My Custom Plan"));
   const [weeks, setWeeks] = useState(4);
   const [sessLow, setSessLow] = useState(2); // displayed as "2~3"
   const [intensity, setIntensity] = useState("Moderate");
@@ -292,9 +278,9 @@ export default function PlanBuilderScreen() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!title.trim()) {
-      Alert.alert("Error", locale === "zh" ? "请输入计划名称" : "Please enter a plan title");
+      Alert.alert("Error", tr("请输入计划名称", "Please enter a plan title"));
       return;
     }
 
@@ -305,7 +291,7 @@ export default function PlanBuilderScreen() {
       0
     );
     if (totalExercises === 0) {
-      Alert.alert("Error", locale === "zh" ? "请至少添加一个动作" : "Please add at least one exercise");
+      Alert.alert("Error", tr("请至少添加一个动作", "Please add at least one exercise"));
       return;
     }
 
@@ -345,8 +331,8 @@ export default function PlanBuilderScreen() {
       });
 
       Alert.alert(
-        locale === "zh" ? "成功" : "Success",
-        locale === "zh" ? "计划已保存" : "Plan saved!",
+        tr("成功", "Success"),
+        tr("计划已保存", "Plan saved!"),
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (e: any) {
@@ -354,21 +340,25 @@ export default function PlanBuilderScreen() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [title, weekSessions, sessLow, weeks, intensity, tr, router]);
+
+  // --- Native header ---
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      ...withHeaderTheme(colors),
+      title: tr("自定义计划", "Custom Plan"),
+    });
+  }, [navigation, colors, tr]);
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: locale === "zh" ? "自定义计划" : "Custom Plan",
-        headerRight: () => (
-          <HeaderPillButton
-            title={locale === "zh" ? "保存" : "Save"}
-            onPress={handleSave}
-            disabled={saving}
-            loading={saving}
-          />
-        ),
-      }} />
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="checkmark"
+          onPress={handleSave}
+          disabled={saving}
+        />
+      </Stack.Toolbar>
 
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Plan Meta — collapsible */}
@@ -377,8 +367,8 @@ export default function PlanBuilderScreen() {
             style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
-            placeholder={locale === "zh" ? "计划名称" : "Plan Title"}
-            placeholderTextColor="#9CA3AF"
+            placeholder={tr("计划名称", "Plan Title")}
+            placeholderTextColor={colors.textTertiary}
           />
 
           {metaOpen ? (
@@ -446,7 +436,7 @@ export default function PlanBuilderScreen() {
             <Ionicons
               name={metaOpen ? "chevron-up" : "chevron-down"}
               size={18}
-              color="#9CA3AF"
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         </View>
@@ -486,7 +476,7 @@ export default function PlanBuilderScreen() {
                 >
                   <Ionicons name="trash-outline" size={14} color="#EF4444" />
                   <Text style={styles.deleteSessionText}>
-                    {locale === "zh" ? "删除 Session" : "Remove Session"}
+                    {tr("删除 Session", "Remove Session")}
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -497,7 +487,7 @@ export default function PlanBuilderScreen() {
           <TouchableOpacity style={styles.addSessionBtn} onPress={addSession} activeOpacity={0.7}>
             <Ionicons name="add-circle-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.addSessionText}>
-              {locale === "zh" ? "新增 Session" : "Add Session"}
+              {tr("新增 Session", "Add Session")}
             </Text>
           </TouchableOpacity>
         </View>

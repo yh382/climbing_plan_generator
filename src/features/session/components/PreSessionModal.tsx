@@ -190,26 +190,17 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   return (
     <TrueSheet
       ref={sheetRef}
-      detents={[0.4, 0.9]}
-      backgroundColor={colors.background}
+      detents={[0.5, 0.9]}
+      backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed
       dimmedDetentIndex={0}
       onDidDismiss={handleDismiss}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Start Session</Text>
-          <Text style={styles.subTitle}>Where are you climbing today?</Text>
-        </View>
-        <TouchableOpacity onPress={() => sheetRef.current?.dismiss()} style={styles.closeBtn}>
-          <Ionicons name="close" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.subTitle}>Where are you climbing today?</Text>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 12 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 0, paddingBottom: insets.bottom + 12 }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Search */}
@@ -269,7 +260,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
                     <Ionicons
                       name="business"
                       size={16}
-                      color={isSelected ? colors.pillText : colors.textTertiary}
+                      color={isSelected ? '#FFFFFF' : colors.textTertiary}
                     />
                   </View>
                   <View style={{ flex: 1, justifyContent: "center" }}>
@@ -302,32 +293,19 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
         </View>
 
         {/* Discipline */}
-        <Text style={[styles.sectionLabel, { marginTop: 12 }]}>DISCIPLINE</Text>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <TouchableOpacity
-            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "boulder" && styles.gymItemActive]}
-            onPress={() => setDiscipline("boulder")}
-          >
-            <Text style={[styles.gymName, discipline === "boulder" && styles.gymNameActive]}>
-              Boulder
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "toprope" && styles.gymItemActive]}
-            onPress={() => setDiscipline("toprope")}
-          >
-            <Text style={[styles.gymName, discipline === "toprope" && styles.gymNameActive]}>
-              Top Rope
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gymItem, { flex: 1, justifyContent: "center", paddingVertical: 10 }, discipline === "lead" && styles.gymItemActive]}
-            onPress={() => setDiscipline("lead")}
-          >
-            <Text style={[styles.gymName, discipline === "lead" && styles.gymNameActive]}>
-              Lead
-            </Text>
-          </TouchableOpacity>
+        <Text style={[styles.sectionLabel, { marginTop: 10 }]}>DISCIPLINE</Text>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {(["boulder", "toprope", "lead"] as Discipline[]).map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[styles.disciplineBtn, discipline === d && styles.disciplineBtnActive]}
+              onPress={() => setDiscipline(d)}
+            >
+              <Text style={[styles.disciplineBtnText, discipline === d && styles.disciplineBtnTextActive]}>
+                {d === "toprope" ? "Top Rope" : d.charAt(0).toUpperCase() + d.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Button */}
@@ -345,40 +323,22 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    fontFamily: theme.fonts.black,
-    color: colors.textPrimary,
-  },
   subTitle: {
     fontSize: 14,
     fontFamily: theme.fonts.regular,
     color: colors.textSecondary,
-    marginTop: 4,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
+    textAlign: "center",
   },
-  closeBtn: {
-    padding: 4,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 20,
-  },
-
-
   searchWrap: {
     height: 40,
     borderRadius: theme.borderRadius.pill,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.sheetCardBackground,
     marginBottom: 12,
   },
   searchInput: {
@@ -435,14 +395,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: theme.borderRadius.card,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
+    backgroundColor: colors.sheetCardBackground,
+    borderWidth: 1.5,
     borderColor: "transparent",
     gap: 8,
   },
   gymItemActive: {
     backgroundColor: colors.cardDark,
-    borderColor: colors.cardDark,
+    borderColor: colors.accent,
   },
   gymIconWrap: {
     width: 32,
@@ -459,7 +419,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.medium,
     color: colors.textPrimary,
   },
-  gymNameActive: { color: colors.pillText },
+  gymNameActive: { color: '#FFFFFF' },
   gymAddr: {
     fontSize: 11,
     lineHeight: 14,
@@ -467,8 +427,32 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
   },
 
+  disciplineBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: colors.sheetCardBackground,
+    borderRadius: 22,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  disciplineBtnActive: {
+    backgroundColor: colors.cardDark,
+    borderColor: colors.accent,
+  },
+  disciplineBtnText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    fontFamily: theme.fonts.medium,
+    color: colors.textPrimary,
+  },
+  disciplineBtnTextActive: {
+    color: '#FFFFFF',
+  },
+
   startBtn: {
-    marginTop: 16,
+    marginTop: 12,
     height: 52,
     backgroundColor: colors.cardDark,
     borderRadius: 26,

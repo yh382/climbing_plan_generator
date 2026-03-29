@@ -2,6 +2,8 @@ export const theme = {
   colors: {
     accent: '#306E6F',
     background: '#FFFFFF',
+    sheetBackground: '#FFFFFF',
+    sheetCardBackground: '#F7F7F7',
     backgroundSecondary: '#F7F7F7',
     cardDark: '#1C1C1E',
     cardDarkImage: '#272727',

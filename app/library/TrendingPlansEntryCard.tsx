@@ -1,7 +1,8 @@
-import React from "react";
+import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 
 type Props = {
   title?: string;
@@ -13,6 +14,8 @@ export default function TrendingPlansEntryCard({
   subtitle = "See what the community is training this week",
 }: Props) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <TouchableOpacity
@@ -29,38 +32,41 @@ export default function TrendingPlansEntryCard({
         </View>
 
         <View style={styles.iconWrap}>
-          <Ionicons name="trending-up" size={20} color="#111" />
+          <Ionicons name="trending-up" size={20} color={colors.textPrimary} />
         </View>
       </View>
 
       <View style={styles.ctaRow}>
         <Text style={styles.ctaText}>Explore</Text>
-        <Ionicons name="chevron-forward" size={18} color="#111" />
+        <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    marginBottom: 12,
-  },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  title: { fontSize: 16, fontWeight: "900", color: "#111" },
-  subtitle: { marginTop: 4, fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaRow: { marginTop: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 },
-  ctaText: { fontSize: 13, fontWeight: "800", color: "#111" },
-});
+type Colors = ReturnType<typeof useThemeColors>;
+
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.cardBackground,
+      padding: 14,
+      marginBottom: 12,
+    },
+    row: { flexDirection: "row", alignItems: "center", gap: 12 },
+    title: { fontSize: 16, fontWeight: "900", color: colors.textPrimary },
+    subtitle: { marginTop: 4, fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 999,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ctaRow: { marginTop: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 },
+    ctaText: { fontSize: 13, fontWeight: "800", color: colors.textPrimary },
+  });

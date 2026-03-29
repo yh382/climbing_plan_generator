@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,15 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { HeaderButton } from "../src/components/ui/HeaderButton";
+import { NativeSegmentedControl } from "../src/components/ui";
+import { NativeSearchBar } from "../modules/native-input/src";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { searchApi, type SearchUserResult, type RecommendedUser } from "@/features/search/api";
@@ -21,18 +25,14 @@ import type { ChallengeOut } from "@/features/community/challenges/types";
 import type { EventOut } from "@/features/community/events/types";
 
 type SearchTab = "community" | "activity" | "knowledge";
-
-const TABS: { key: SearchTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: "community", label: "Community", icon: "people" },
-  { key: "activity", label: "Activity", icon: "trophy" },
-  { key: "knowledge", label: "Knowledge", icon: "book" },
-];
+const TAB_KEYS: SearchTab[] = ["community", "activity", "knowledge"];
+const TAB_LABELS = ["Community", "Activity", "Knowledge"];
 
 export default function UniversalSearchScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<SearchTab>("community");
   const [loading, setLoading] = useState(false);
@@ -51,6 +51,19 @@ export default function UniversalSearchScreen() {
   const [recEvent, setRecEvent] = useState<EventOut | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Native header with scroll edge effects
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
+      title: "",
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
+    });
+  }, [navigation, router]);
 
   // Load recommended content on mount
   useEffect(() => {
@@ -104,10 +117,36 @@ export default function UniversalSearchScreen() {
     [doSearch, activeTab]
   );
 
+  // NativeSearchBar event handlers
+  const handleNativeChangeText = useCallback(
+    (e: { nativeEvent: { text: string } }) => {
+      onChangeText(e.nativeEvent.text);
+    },
+    [onChangeText]
+  );
+
+  const handleNativeSubmit = useCallback(
+    (e: { nativeEvent: { text: string } }) => {
+      if (query.trim()) doSearch(query, activeTab);
+    },
+    [query, activeTab, doSearch]
+  );
+
+  const handleClear = useCallback(() => {
+    setQuery("");
+    setUsers([]);
+    setChallenges([]);
+    setEvents([]);
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    handleClear();
+    Keyboard.dismiss();
+  }, [handleClear]);
+
   const onTabChange = useCallback(
     (tab: SearchTab) => {
       setActiveTab(tab);
-      // Re-search with current query under new tab
       if (query.trim()) {
         doSearch(query, tab);
       }
@@ -115,69 +154,76 @@ export default function UniversalSearchScreen() {
     [query, doSearch]
   );
 
-  const onClear = useCallback(() => {
-    setQuery("");
-    setUsers([]);
-    setChallenges([]);
-    setEvents([]);
-  }, []);
-
   const hasQuery = query.trim().length > 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
-          <TextInput
-            style={styles.input}
-            placeholder="Search everything..."
-            autoFocus
-            value={query}
-            onChangeText={onChangeText}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* Native Search Bar */}
+        {Platform.OS === "ios" ? (
+          <View style={styles.searchWrap} collapsable={false}>
+            <NativeSearchBar
+              style={styles.nativeSearchBar}
+              placeholder="Search everything..."
+              text={query}
+              showsCancelButton
+              autoCapitalize="none"
+              searchFieldHeight={40}
+              onChangeText={handleNativeChangeText}
+              onSubmitSearch={handleNativeSubmit}
+              onCancel={handleCancel}
+              onClear={handleClear}
+            />
+          </View>
+        ) : (
+          <View style={styles.androidSearchWrap}>
+            <View style={styles.androidSearchRow}>
+              <Ionicons name="search" size={18} color="#9CA3AF" style={{ marginLeft: 12 }} />
+              <TextInput
+                style={styles.androidInput}
+                value={query}
+                onChangeText={onChangeText}
+                onSubmitEditing={() => { if (query.trim()) doSearch(query, activeTab); }}
+                placeholder="Search everything..."
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                autoFocus
+                returnKeyType="search"
+              />
+              {hasQuery && (
+                <TouchableOpacity onPress={handleClear} style={styles.androidClear} activeOpacity={0.7}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Native Segmented Control */}
+        <View style={styles.segmentWrap}>
+          <NativeSegmentedControl
+            options={TAB_LABELS}
+            selectedIndex={TAB_KEYS.indexOf(activeTab)}
+            onSelect={(i) => onTabChange(TAB_KEYS[i])}
+            style={{ height: 32 }}
           />
-          {hasQuery && (
-            <TouchableOpacity onPress={onClear}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
         </View>
-      </View>
 
-      {/* Tabs */}
-      <View style={styles.tabRow}>
-        {TABS.map((t) => {
-          const active = activeTab === t.key;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.tabChip, active && styles.tabChipActive]}
-              onPress={() => onTabChange(t.key)}
-            >
-              <Ionicons name={t.icon} size={14} color={active ? "#FFF" : "#6B7280"} />
-              <Text style={[styles.tabChipText, active && styles.tabChipTextActive]}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        {/* Loading */}
+        {loading && (
+          <View style={styles.centerInline}>
+            <ActivityIndicator size="large" color={colors.textSecondary} />
+          </View>
+        )}
 
-      {/* Loading */}
-      {loading && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#111" />
-        </View>
-      )}
-
-      {/* Tab Content */}
-      {!loading && (
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 }}
-          keyboardShouldPersistTaps="handled"
-        >
+        {/* Tab Content */}
+        {!loading && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
           {/* ===== Community Tab ===== */}
           {activeTab === "community" && (
             <>
@@ -185,7 +231,7 @@ export default function UniversalSearchScreen() {
                 <View style={{ gap: 8 }}>
                   <Text style={styles.sectionLabel}>Suggested Climbers</Text>
                   {recLoading ? (
-                    <ActivityIndicator size="small" color="#111" style={{ marginTop: 20 }} />
+                    <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginTop: 20 }} />
                   ) : recommended.length > 0 ? (
                     recommended.map((u) => (
                       <UserRecommendCard
@@ -196,14 +242,14 @@ export default function UniversalSearchScreen() {
                     ))
                   ) : (
                     <View style={styles.hintBox}>
-                      <Ionicons name="search" size={32} color="#E5E7EB" />
+                      <Ionicons name="search" size={32} color={colors.textTertiary} />
                       <Text style={styles.hintText}>Search for climbers by name</Text>
                     </View>
                   )}
                 </View>
               ) : users.length === 0 ? (
                 <View style={styles.hintBox}>
-                  <Ionicons name="search-outline" size={40} color="#E5E7EB" />
+                  <Ionicons name="search-outline" size={40} color={colors.textTertiary} />
                   <Text style={styles.emptyText}>No users found</Text>
                 </View>
               ) : (
@@ -293,7 +339,7 @@ export default function UniversalSearchScreen() {
                 </View>
               ) : challenges.length === 0 && events.length === 0 ? (
                 <View style={styles.hintBox}>
-                  <Ionicons name="search-outline" size={40} color="#E5E7EB" />
+                  <Ionicons name="search-outline" size={40} color={colors.textTertiary} />
                   <Text style={styles.emptyText}>No results found</Text>
                 </View>
               ) : (
@@ -367,73 +413,66 @@ export default function UniversalSearchScreen() {
           {/* ===== Knowledge Tab ===== */}
           {activeTab === "knowledge" && (
             <View style={styles.comingSoon}>
-              <Ionicons name="book-outline" size={32} color="#D1D5DB" />
+              <Ionicons name="book-outline" size={32} color={colors.textTertiary} />
               <Text style={styles.comingSoonText}>Coming Soon</Text>
               <Text style={styles.comingSoonSub}>
                 Blog, exercises, and training plans
               </Text>
             </View>
           )}
-        </ScrollView>
-      )}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
+  // Native search bar
+  searchWrap: {
+    paddingHorizontal: 8,
+    paddingTop: 4,
   },
-  searchBar: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.backgroundSecondary,
-    height: 40,
-    borderRadius: theme.borderRadius.pill,
+  nativeSearchBar: {
+    height: 56,
+  },
+  // Android search bar fallback
+  androidSearchWrap: {
     paddingHorizontal: 12,
+    paddingTop: 4,
   },
-  input: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    height: "100%",
-  },
-
-  // Tabs
-  tabRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  tabChip: {
+  androidSearchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    height: 40,
+    borderRadius: 14,
     backgroundColor: colors.backgroundSecondary,
   },
-  tabChipActive: { backgroundColor: colors.cardDark },
-  tabChipText: {
-    fontSize: 13,
-    fontWeight: "600",
-    fontFamily: theme.fonts.medium,
-    color: colors.textSecondary,
-  },
-  tabChipTextActive: { color: "#FFF" },
-
-  center: {
+  androidInput: {
     flex: 1,
+    height: 40,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  androidClear: {
+    paddingHorizontal: 12,
+    height: 40,
+    justifyContent: "center",
+  },
+
+  // Segmented control
+  segmentWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+
+  centerInline: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 60,
     gap: 12,
   },
   emptyText: {

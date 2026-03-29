@@ -66,7 +66,7 @@ export default function AvatarPickerSheet({
     <TrueSheet
       ref={sheetRef}
       detents={['auto']}
-      backgroundColor={colors.background}
+      backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed
       dimmedDetentIndex={0}

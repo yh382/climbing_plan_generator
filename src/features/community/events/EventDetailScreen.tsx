@@ -244,7 +244,7 @@ export default function EventDetailScreen() {
           </View>
 
           {/* Floating Thumbnail (Challenge Style) */}
-          <View style={styles.thumbFloating}>
+          <View style={[styles.thumbFloating, { top: COVER_H - THUMB_SIZE / 2 - headerHeight }]}>
             <View style={styles.thumbOuter}>
               {thumb ? (
                 <Image

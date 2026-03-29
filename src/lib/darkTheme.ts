@@ -6,6 +6,8 @@ import type { ThemeColors } from './theme';
 export const darkColors: ThemeColors = {
   accent: '#306E6F',              // unchanged — brand color
   background: '#000000',          // pure black (OLED friendly)
+  sheetBackground: '#1C1C1E',    // iOS elevated surface for sheets
+  sheetCardBackground: '#2C2C2E', // card/input backgrounds inside sheets
   backgroundSecondary: '#1C1C1E', // iOS systemGroupedBackground dark
   cardDark: '#2C2C2E',           // iOS secondarySystemGroupedBackground dark
   cardDarkImage: '#3A3A3C',      // slightly lighter dark gray

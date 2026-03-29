@@ -1,14 +1,15 @@
 // src/components/GorillaSplash.tsx
 
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Image, Dimensions } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
+import { View, StyleSheet, Image, useColorScheme } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
   withDelay,
   Easing
 } from 'react-native-reanimated';
+import { useThemeColors } from '../lib/useThemeColors';
 
 // 引用图片 (保持 require 写法)
 const gorillaHeadImg = require('../../assets/images/gorilla_head.png');
@@ -19,6 +20,8 @@ interface Props {
 }
 
 export default function GorillaSplash({ onAnimationFinish }: Props) {
+  const colors = useThemeColors();
+  const isDark = useColorScheme() === 'dark';
   // 1. 猩猩动画状态
   const gorillaOpacity = useSharedValue(0); 
   const gorillaTranslateY = useSharedValue(20); 
@@ -58,7 +61,7 @@ export default function GorillaSplash({ onAnimationFinish }: Props) {
   }));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 主内容容器 
          - width: 限制内容宽度，确保文字和猩猩不会离得太远
          - marginTop: 整体往下移 (调整这个值控制垂直位置)
@@ -67,17 +70,17 @@ export default function GorillaSplash({ onAnimationFinish }: Props) {
         
         {/* 文字区域：利用 Flex 自身对齐放到左边 */}
         <Animated.View style={[styles.textWrapper, textStyle]}>
-          <Image 
-              source={climbMateTextImg} 
-              style={styles.textImage}
-              resizeMode="contain" 
+          <Image
+              source={climbMateTextImg}
+              style={[styles.textImage, isDark && { tintColor: '#A0A0A0' }]}
+              resizeMode="contain"
           />
         </Animated.View>
 
         {/* 猩猩区域：利用 Margin 把它挤到右边去 */}
-        <Animated.Image 
-          source={gorillaHeadImg} 
-          style={[styles.gorillaImage, gorillaStyle]}
+        <Animated.Image
+          source={gorillaHeadImg}
+          style={[styles.gorillaImage, gorillaStyle, isDark && { tintColor: '#A0A0A0' }]}
           resizeMode="contain"
         />
         
