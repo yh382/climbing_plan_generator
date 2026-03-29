@@ -1,17 +1,13 @@
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-} from "react-native";
+import { useEffect, useState, useCallback, useLayoutEffect, useMemo } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { communityApi } from "../../src/features/community/api";
+import { useThemeColors } from "../../src/lib/useThemeColors";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { useSettings } from "src/contexts/SettingsContext";
+import type { ThemeColors } from "../../src/lib/theme";
 
 interface MyComment {
   id: string;
@@ -34,8 +30,20 @@ function timeAgo(iso: string): string {
 
 export default function MyComments() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const { lang } = useSettings();
+  const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [comments, setComments] = useState<MyComment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: tr("我的评论", "My Comments"),
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+    });
+  }, [navigation, lang]);
 
   const load = useCallback(async () => {
     try {
@@ -67,21 +75,15 @@ export default function MyComments() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>My Comments</Text>
-        <View style={styles.headerBtn} />
-      </View>
-
+    <View style={styles.container}>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#111" />
+          <ActivityIndicator size="large" color={colors.textSecondary} />
         </View>
       ) : comments.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="chatbubble-outline" size={48} color="#E5E7EB" />
-          <Text style={styles.emptyText}>No comments yet</Text>
+          <Ionicons name="chatbubble-outline" size={48} color={colors.textTertiary} />
+          <Text style={styles.emptyText}>{tr("暂无评论", "No comments yet")}</Text>
         </View>
       ) : (
         <FlatList
@@ -89,38 +91,29 @@ export default function MyComments() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 16 }}
+          contentInsetAdjustmentBehavior="automatic"
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F2F2F6" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    height: 48,
-    backgroundColor: "#F2F2F6",
-  },
-  headerBtn: { width: 40 },
-  headerTitle: { fontSize: 17, fontWeight: "600" },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   commentCard: {
     padding: 16,
     marginBottom: 12,
     borderRadius: 12,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBackground,
   },
-  commentText: { fontSize: 15, color: "#1E293B", marginBottom: 12 },
-  divider: { height: 1, backgroundColor: "#F1F5F9", marginBottom: 10 },
-  meta: { fontSize: 13, color: "#64748B" },
+  commentText: { fontSize: 15, color: colors.textPrimary, marginBottom: 12 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginBottom: 10 },
+  meta: { fontSize: 13, color: colors.textSecondary },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
   },
-  emptyText: { color: "#9CA3AF", fontSize: 15 },
+  emptyText: { color: colors.textSecondary, fontSize: 15 },
 });

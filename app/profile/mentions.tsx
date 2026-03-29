@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, ActivityIndicator } from "react-native";
+import { useEffect, useState, useLayoutEffect, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { Card } from "@components/ui/Card";
+import { useNavigation } from "@react-navigation/native";
 import { communityApi } from "../../src/features/community/api";
 import type { MentionOut } from "../../src/features/community/types";
+import { useThemeColors } from "../../src/lib/useThemeColors";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { useSettings } from "src/contexts/SettingsContext";
+import type { ThemeColors } from "../../src/lib/theme";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -18,8 +21,20 @@ function timeAgo(dateStr: string): string {
 
 export default function Mentions() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const { lang } = useSettings();
+  const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mentions, setMentions] = useState<MentionOut[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: tr("提及", "Mentions"),
+      headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+    });
+  }, [navigation, lang]);
 
   useEffect(() => {
     (async () => {
@@ -33,19 +48,16 @@ export default function Mentions() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>Mentions</Text>
-        <View style={styles.headerBtn} />
-      </View>
-
+    <View style={styles.container}>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.textSecondary} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          contentInsetAdjustmentBehavior="automatic"
+        >
           {mentions.map((item) => (
-            <Card key={item.id} style={styles.mentionCard}>
+            <View key={item.id} style={styles.mentionCard}>
               <View style={styles.row}>
                 {item.mentionerAvatar ? (
                   <Image source={{ uri: item.mentionerAvatar }} style={styles.avatarPlaceholder} />
@@ -55,7 +67,7 @@ export default function Mentions() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.mentionText}>
                     <Text style={styles.bold}>{item.mentionerName}</Text>{" "}
-                    mentioned you in a {item.contentType}
+                    {tr("在", "mentioned you in a ")}{item.contentType}{tr("中提到了你", "")}
                   </Text>
                   {item.contentPreview ? (
                     <Text style={styles.preview} numberOfLines={1}>{item.contentPreview}</Text>
@@ -63,28 +75,33 @@ export default function Mentions() {
                   <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
                 </View>
               </View>
-            </Card>
+            </View>
           ))}
           {mentions.length === 0 && (
-            <Text style={{ textAlign: 'center', color: '#94A3B8', marginTop: 40 }}>No mentions yet</Text>
+            <Text style={styles.emptyText}>{tr("暂无提及", "No mentions yet")}</Text>
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F2F2F6" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, height: 48, backgroundColor: "#F2F2F6" },
-  headerBtn: { width: 40 },
-  headerTitle: { fontSize: 17, fontWeight: "600" },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16 },
-  mentionCard: { padding: 16, marginBottom: 12, borderRadius: 12, backgroundColor: '#FFF' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#CBD5E1' },
-  mentionText: { fontSize: 15, color: '#1E293B', lineHeight: 20 },
-  bold: { fontWeight: '600' },
-  preview: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  time: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
+  mentionCard: {
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.cardBorder },
+  mentionText: { fontSize: 15, color: colors.textPrimary, lineHeight: 20 },
+  bold: { fontWeight: "600" },
+  preview: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  time: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  emptyText: { textAlign: "center", color: colors.textSecondary, marginTop: 40 },
 });

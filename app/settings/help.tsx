@@ -1,103 +1,158 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Image, KeyboardAvoidingView, Platform } from "react-native";
-import { useRouter } from "expo-router";
+import { useState, useLayoutEffect, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, TextInput, Image, TouchableOpacity, Linking } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { Segmented } from "@components/ui/Segmented"; // 复用你的 Segmented
+import { NativeSegmentedControl } from "../../src/components/ui/NativeSegmentedControl";
+import { useThemeColors } from "../../src/lib/useThemeColors";
+import { useSettings } from "src/contexts/SettingsContext";
+import type { ThemeColors } from "../../src/lib/theme";
 
 export default function HelpCenter() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("Q&A");
+  const navigation = useNavigation();
+  const colors = useThemeColors();
+  const { lang } = useSettings();
+  const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+  const [tabIndex, setTabIndex] = useState(0);
   const [msg, setMsg] = useState("");
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const renderQA = () => (
-    <View style={styles.tabContent}>
-      {/* 搜索栏 */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={20} color="#94A3B8" />
-        <TextInput 
-          style={styles.searchInput} 
-          placeholder="Search articles..." 
-          placeholderTextColor="#94A3B8"
-        />
-      </View>
-      {/* 模拟文章列表 */}
-      <Text style={{color: '#64748B', marginTop: 20, textAlign: 'center'}}>Popular Articles...</Text>
-    </View>
-  );
+  const tabs = useMemo(() => ["Q&A", tr("提问", "Ask")], [lang]);
 
-  const renderAsk = () => (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.askContainer}>
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingTop: 40 }}>
-        {/* 客服头像 */}
-        <Image 
-          source={{ uri: "https://i.pravatar.cc/300?u=support" }} 
-          style={styles.avatar} 
-        />
-        <Text style={styles.askTitle}>How can we help?</Text>
-        
-        {/* 消息输入框 */}
-        <View style={styles.inputWrapper}>
-            <TextInput
-            style={styles.msgInput}
-            multiline
-            placeholder="Add your messages here, we will try our best to response in a day or two."
-            placeholderTextColor="#94A3B8"
-            value={msg}
-            onChangeText={setMsg}
-            textAlignVertical="top"
-            />
-        </View>
-      </ScrollView>
-
-      {/* 底部发送按钮 */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.sendBtn}>
-          <Text style={styles.sendText}>Send</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
-  );
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: tr("帮助", "Help") });
+  }, [navigation, lang]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <HeaderButton icon="chevron.backward" onPress={() => router.canGoBack() ? router.back() : router.navigate("/(tabs)/profile")} />
-        
-        {/* 顶部 Segmented 切换 */}
-        <View style={{ width: 160 }}>
-          <Segmented 
-            value={activeTab} 
-            onChange={setActiveTab} 
-            options={[{ label: "Q&A", value: "Q&A" }, { label: "Ask", value: "Ask" }]} 
-          />
-        </View>
-        
-        <View style={styles.headerBtn} />
+    <ScrollView
+      style={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+    >
+      {/* Segmented Control */}
+      <View style={styles.segmentWrapper}>
+        <NativeSegmentedControl
+          options={tabs}
+          selectedIndex={tabIndex}
+          onSelect={setTabIndex}
+        />
       </View>
 
-      <View style={{ flex: 1 }}>
-        {activeTab === "Q&A" ? renderQA() : renderAsk()}
-      </View>
-    </SafeAreaView>
+      {tabIndex === 0 ? (
+        <View style={styles.tabContent}>
+          {/* Search bar */}
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={tr("搜索文章...", "Search articles...")}
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          {/* Articles */}
+          <TouchableOpacity style={styles.articleCard} activeOpacity={0.7} onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/help#getting-started")}>
+            <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.articleTitle}>{tr("如何开始使用 ClimMate？", "How to get started with ClimMate?")}</Text>
+              <Text style={styles.articleDesc}>{tr("了解基本功能和操作流程", "Learn about basic features and workflows")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.articleCard} activeOpacity={0.7} onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/help#logging-climbs")}>
+            <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.articleTitle}>{tr("如何记录攀爬日志？", "How to log your climbs?")}</Text>
+              <Text style={styles.articleDesc}>{tr("快速记录你的每次攀爬", "Quickly log each climbing session")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.articleCard} activeOpacity={0.7} onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/help#training-plans")}>
+            <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.articleTitle}>{tr("训练计划怎么用？", "How to use training plans?")}</Text>
+              <Text style={styles.articleDesc}>{tr("定制和跟踪你的训练进度", "Customize and track your training progress")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.askContent}>
+          <Image
+            source={{ uri: "https://i.pravatar.cc/300?u=support" }}
+            style={styles.avatar}
+          />
+          <Text style={styles.askTitle}>{tr("有什么可以帮助你？", "How can we help?")}</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.msgInput}
+              multiline
+              placeholder={tr(
+                "请在此输入你的问题，我们会尽快回复。",
+                "Type your question here, we will try our best to respond soon."
+              )}
+              placeholderTextColor={colors.textSecondary}
+              value={msg}
+              onChangeText={setMsg}
+              textAlignVertical="top"
+            />
+          </View>
+          <TouchableOpacity style={styles.sendBtn} activeOpacity={0.8}>
+            <Text style={styles.sendText}>{tr("发送", "Send")}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, height: 50, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  headerBtn: { width: 40 },
-  tabContent: { padding: 16 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 10, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: '#0F172A' },
-  
-  // Ask 样式
-  askContainer: { flex: 1, justifyContent: 'space-between' },
-  avatar: { width: 80, height: 80, borderRadius: 40, marginBottom: 16, backgroundColor: '#eee' },
-  askTitle: { fontSize: 20, fontWeight: '700', color: '#0F172A', marginBottom: 24 },
-  inputWrapper: { width: '90%', height: 200, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  msgInput: { flex: 1, fontSize: 16, color: '#334155' },
-  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  sendBtn: { backgroundColor: '#000', borderRadius: 25, height: 50, alignItems: 'center', justifyContent: 'center' },
-  sendText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    segmentWrapper: { paddingHorizontal: 16, paddingVertical: 12 },
+    tabContent: { paddingHorizontal: 16 },
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.inputBackground,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      height: 36,
+      marginBottom: 20,
+    },
+    searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: colors.textPrimary },
+    articleCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 14,
+      marginBottom: 10,
+      borderRadius: 12,
+      backgroundColor: colors.cardBackground,
+    },
+    articleTitle: { fontSize: 15, fontWeight: "600", color: colors.textPrimary, marginBottom: 2 },
+    articleDesc: { fontSize: 13, color: colors.textSecondary },
+    askContent: { alignItems: "center", paddingTop: 32, paddingHorizontal: 16 },
+    avatar: { width: 72, height: 72, borderRadius: 36, marginBottom: 16, backgroundColor: colors.cardBackground },
+    askTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary, marginBottom: 24 },
+    inputWrapper: {
+      width: "100%",
+      height: 180,
+      backgroundColor: colors.cardBackground,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+    },
+    msgInput: { flex: 1, fontSize: 16, color: colors.textPrimary },
+    sendBtn: {
+      width: "100%",
+      backgroundColor: colors.pillBackground,
+      borderRadius: 12,
+      height: 48,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    sendText: { color: colors.pillText, fontSize: 16, fontWeight: "600" },
+  });

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,8 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderButton } from "../../../components/ui/HeaderButton";
+import { useNavigation } from "@react-navigation/native";
 import { authApi } from "../api";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -21,9 +20,13 @@ export default function ChangePasswordScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { lang } = useSettings();
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: tr("修改密码", "Change Password") });
+  }, [navigation, lang]);
 
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -73,15 +76,9 @@ export default function ChangePasswordScreen() {
 
   return (
     <View style={styles.page}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>{tr("修改密码", "Change Password")}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: insets.bottom + 28 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40 }}
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
         <Card style={styles.card}>
@@ -158,32 +155,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    fontFamily: theme.fonts.bold,
-    color: colors.textPrimary,
-  },
   card: {
     borderRadius: 14,
     padding: 0,
     overflow: "hidden",
+    backgroundColor: colors.cardBackground,
+    borderColor: colors.cardBorder,
   },
   fieldWrap: {
     paddingHorizontal: 16,
@@ -223,10 +200,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1C1C1E",
+    backgroundColor: colors.pillBackground,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: colors.pillText,
     fontSize: 15,
     fontWeight: "800",
   },
