@@ -168,11 +168,11 @@ function CalendarDayRing({
         </Text>
       </View>
 
-      {/* Bottom indicator: today dot takes priority, then plan dot */}
-      {isToday ? (
+      {/* Bottom indicator: plan dot > today dot (plan status is more informative) */}
+      {dotColor ? (
+        <View style={[isToday ? styles.todayDot : styles.planDot, { backgroundColor: isSelected ? "#FFFFFF" : dotColor }]} />
+      ) : isToday ? (
         <View style={[styles.todayDot, { backgroundColor: todayDotColor }]} />
-      ) : dotColor ? (
-        <View style={[styles.planDot, { backgroundColor: dotColor }]} />
       ) : (
         <View style={styles.dotSpacer} />
       )}

@@ -16,7 +16,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { HomeBlogBannerCarousel, type HomeBlogBannerItem } from "@/features/home/components/HomeBlogBannerCarousel";
 import { MOCK_BLOGS } from "@/features/home/blog/component/mockBlogs";
 import useLogsStore from "@/store/useLogsStore";
-import { getMaxGrade } from "../../../src/services/stats/gradeAnalyzer";
+import { getGradeScore } from "../../../src/services/stats/gradeAnalyzer";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
@@ -54,19 +54,30 @@ function ThisWeekSnapshot() {
   const weekStart = useMemo(getWeekStart, []);
   const weekEnd = useMemo(() => getWeekEnd(weekStart), [weekStart]);
 
-  const { sessions, logs } = useLogsStore();
+  const { sessions } = useLogsStore();
 
   const stats = useMemo(() => {
     const weekSessions = sessions.filter((se) => se.date >= weekStart && se.date < weekEnd);
-    const weekLogs = logs.filter((l) => l.date >= weekStart && l.date < weekEnd);
-    const totalSends = weekLogs.reduce((sum: number, l) => sum + l.count, 0);
-    const best = weekLogs.length > 0 ? getMaxGrade(weekLogs, "boulder") || "—" : "—";
+    const totalSends = weekSessions.reduce((sum, se) => sum + se.sends, 0);
+
+    let best = "—";
+    let bestScore = -1;
+    for (const se of weekSessions) {
+      if (se.best && se.best !== "—" && se.best !== "V?") {
+        const score = getGradeScore(se.best, se.discipline);
+        if (score > bestScore) {
+          bestScore = score;
+          best = se.best;
+        }
+      }
+    }
+
     return {
       sessions: weekSessions.length,
       sends: totalSends,
       best,
     };
-  }, [sessions, logs, weekStart, weekEnd]);
+  }, [sessions, weekStart, weekEnd]);
 
   return (
     <View style={s.snapshotSection}>

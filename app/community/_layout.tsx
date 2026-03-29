@@ -17,6 +17,7 @@ export default function CommunityLayout() {
       <Stack.Screen name="events/index" />
       <Stack.Screen name="media-select" options={{ headerShown: false }} />
       <Stack.Screen name="device-media-picker" options={{ title: 'Select Media', scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="arrange" options={{ title: 'Arrange', scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="u/[id]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="public-plan" />

@@ -18,6 +18,7 @@ import { useChatStore } from "../../store/useChatStore";
 import { RankTab } from "./rank";
 import GymsTab from "./gyms/GymsTab";
 import EventsTab from "./events/EventsTab";
+import UploadProgressBanner from "./components/UploadProgressBanner";
 
 type TopTab = "Post" | "Rank" | "Gyms" | "Events";
 
@@ -170,6 +171,7 @@ export default function CommunityScreen() {
     )}
     </View>
 
+    <UploadProgressBanner />
     </View>
   ), [topTab, feedMode, feedSort, colors, styles]);
 
@@ -300,7 +302,7 @@ export default function CommunityScreen() {
   return (
     <>
       <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button icon="plus" onPress={() => router.push("/community/create")} />
+        <Stack.Toolbar.Button icon="plus" onPress={() => router.push("/community/device-media-picker?mode=initial")} />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button icon="paperplane" onPress={() => router.push("/chat" as any)}>

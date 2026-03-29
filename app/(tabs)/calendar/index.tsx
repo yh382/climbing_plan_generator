@@ -61,6 +61,11 @@ export default function CalendarScreen() {
   // Climb items for selected date (inline detail)
   const [climbItems, setClimbItems] = useState<LocalDayLogItem[]>([]);
 
+  const handleCalendarCollapse = useCallback(() => {
+    setSelectedDate(null);
+    setTimeFilter("month");
+  }, []);
+
   const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -207,7 +212,7 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <StatusBar style="auto" />
-        <ExpandableCalendar onDateSelect={handleDateSelect} activeDate={selectedDate} />
+        <ExpandableCalendar onDateSelect={handleDateSelect} onCollapse={handleCalendarCollapse} activeDate={selectedDate} />
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{isZH ? "当前训练" : "Current Training"}</Text>

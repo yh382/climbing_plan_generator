@@ -1,6 +1,6 @@
 // src/features/profile/components/ProfilePostGrid.tsx
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "@/lib/useThemeColors";
 import type { FeedPost as FeedPostType } from "../../../types/community";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -28,16 +29,18 @@ interface ProfilePostGridProps {
 function GridItem({
   post,
   onPress,
+  colors,
 }: {
   post: FeedPostType;
   onPress: () => void;
+  colors: ReturnType<typeof useThemeColors>;
 }) {
   const hasImages = post.images && post.images.length > 0;
   const hasAttachment = !!post.attachment;
 
   return (
     <TouchableOpacity
-      style={styles.gridItem}
+      style={[styles.gridItem, { backgroundColor: colors.backgroundSecondary }]}
       activeOpacity={0.8}
       onPress={onPress}
     >
@@ -66,7 +69,7 @@ function GridItem({
           )}
         </>
       ) : hasAttachment ? (
-        <View style={styles.textCell}>
+        <View style={[styles.textCell, { backgroundColor: colors.backgroundSecondary }]}>
           <Ionicons
             name={
               post.attachment!.type === "plan"
@@ -76,15 +79,15 @@ function GridItem({
                 : "trophy"
             }
             size={24}
-            color="#9CA3AF"
+            color={colors.textTertiary}
           />
-          <Text style={styles.attachTitle} numberOfLines={2}>
+          <Text style={[styles.attachTitle, { color: colors.textSecondary }]} numberOfLines={2}>
             {post.attachment!.title}
           </Text>
         </View>
       ) : (
-        <View style={styles.textCell}>
-          <Text style={styles.textPreview} numberOfLines={4}>
+        <View style={[styles.textCell, { backgroundColor: colors.backgroundSecondary }]}>
+          <Text style={[styles.textPreview, { color: colors.textSecondary }]} numberOfLines={4}>
             {post.content}
           </Text>
         </View>
@@ -98,17 +101,19 @@ export default function ProfilePostGrid({
   onPressPost,
   loading,
 }: ProfilePostGridProps) {
+  const colors = useThemeColors();
+
   const renderItem = useCallback(
     ({ item }: { item: FeedPostType }) => (
-      <GridItem post={item} onPress={() => onPressPost(item)} />
+      <GridItem post={item} onPress={() => onPressPost(item)} colors={colors} />
     ),
-    [onPressPost]
+    [onPressPost, colors]
   );
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#9CA3AF" />
+        <ActivityIndicator size="small" color={colors.textTertiary} />
       </View>
     );
   }
@@ -116,8 +121,8 @@ export default function ProfilePostGrid({
   if (posts.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="images-outline" size={48} color="#D1D5DB" />
-        <Text style={styles.emptyText}>No posts yet</Text>
+        <Ionicons name="images-outline" size={48} color={colors.border} />
+        <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No posts yet</Text>
       </View>
     );
   }
@@ -142,7 +147,6 @@ const styles = StyleSheet.create({
     width: ITEM_SIZE - GAP,
     height: (ITEM_SIZE - GAP) * (4 / 3),
     margin: GAP / 2,
-    backgroundColor: "#F3F4F6",
     overflow: "hidden",
   },
   gridImage: {
@@ -170,18 +174,15 @@ const styles = StyleSheet.create({
     padding: 8,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
   },
   textPreview: {
     fontSize: 11,
     lineHeight: 15,
-    color: "#374151",
     textAlign: "center",
   },
   attachTitle: {
     fontSize: 11,
     lineHeight: 15,
-    color: "#6B7280",
     textAlign: "center",
     marginTop: 4,
   },
@@ -196,6 +197,5 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: "#9CA3AF",
   },
 });

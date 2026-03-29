@@ -1,5 +1,5 @@
 // app/community/device-media-picker.tsx
-// Custom media picker: Select photos/videos from device library → Reorder → Return to create.tsx
+// Custom media picker: Select photos/videos from device library → Return to caller
 
 import React, {
   useState,
@@ -18,26 +18,16 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  LayoutAnimation,
-  Platform,
-  UIManager,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useThemeColors } from "src/lib/useThemeColors";
 import { theme } from "src/lib/theme";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { setPendingMedia } from "src/features/community/pendingMedia";
 import type { PickedMediaItem } from "src/features/community/types";
-
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // --- Types ---
 type AssetItem = {
@@ -60,9 +50,6 @@ const LOAD_MORE_SIZE = 200;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SELECT_COLUMNS = 3;
 const SELECT_ITEM_SIZE = (SCREEN_WIDTH - (SELECT_COLUMNS - 1) * 2) / SELECT_COLUMNS;
-const REORDER_COLUMNS = 3;
-const REORDER_ITEM_SIZE =
-  (SCREEN_WIDTH - 32 - (REORDER_COLUMNS - 1) * 8) / REORDER_COLUMNS;
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -75,9 +62,8 @@ export default function DeviceMediaPickerScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const navigation = useNavigation();
-
-  // --- Mode ---
-  const [mode, setMode] = useState<"select" | "reorder">("select");
+  const { mode: routeMode } = useLocalSearchParams<{ mode?: string }>();
+  const isInitial = routeMode === "initial";
 
   // --- Media Library ---
   const [ml, setMl] = useState<MediaLibraryModule | null>(null);
@@ -101,9 +87,6 @@ export default function DeviceMediaPickerScreen() {
 
   // --- Selection (ordered array) ---
   const [selectedItems, setSelectedItems] = useState<AssetItem[]>([]);
-
-  // --- Reorder swap ---
-  const [swapSource, setSwapSource] = useState<number | null>(null);
 
   // --- Selected lookup for O(1) ---
   const selectedIdSet = useMemo(
@@ -268,42 +251,8 @@ export default function DeviceMediaPickerScreen() {
     });
   }, []);
 
-  // --- Reorder swap ---
-  const handleReorderTap = useCallback(
-    (index: number) => {
-      if (swapSource === null) {
-        setSwapSource(index);
-      } else if (swapSource === index) {
-        setSwapSource(null);
-      } else {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setSelectedItems((prev) => {
-          const next = [...prev];
-          const temp = next[swapSource];
-          next[swapSource] = next[index];
-          next[index] = temp;
-          return next;
-        });
-        setSwapSource(null);
-      }
-    },
-    [swapSource]
-  );
-
-  // --- Mode transitions ---
+  // --- Next handler ---
   const handleNext = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setMode("reorder");
-    setSwapSource(null);
-  }, []);
-
-  const handleBackToSelect = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setMode("select");
-    setSwapSource(null);
-  }, []);
-
-  const handleDone = useCallback(() => {
     const mapped: PickedMediaItem[] = selectedItems.map((a) => ({
       id: a.id,
       uri: a.uri,
@@ -313,85 +262,66 @@ export default function DeviceMediaPickerScreen() {
       duration: a.duration || undefined,
     }));
     setPendingMedia(mapped);
-    router.back();
-  }, [selectedItems, router]);
+
+    if (isInitial) {
+      // From Community "+": push forward to create page
+      router.push('/community/create?fromPicker=1');
+    } else {
+      // From Create "Add Media": go back to create
+      router.back();
+    }
+  }, [selectedItems, router, isInitial]);
 
   // --- Stable refs for header ---
   const handleNextRef = useRef(handleNext);
   handleNextRef.current = handleNext;
-  const handleDoneRef = useRef(handleDone);
-  handleDoneRef.current = handleDone;
-  const handleBackToSelectRef = useRef(handleBackToSelect);
-  handleBackToSelectRef.current = handleBackToSelect;
 
   // --- Native header ---
   useLayoutEffect(() => {
-    if (mode === "select") {
-      navigation.setOptions({
-        headerTitle: () => (
-          <TouchableOpacity
-            style={styles.albumPickerBtn}
-            activeOpacity={0.7}
-            onPress={() => albumSheetRef.current?.present()}
-          >
-            <Text style={styles.albumPickerText}>
-              {selectedAlbum?.title ?? "All Photos"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={14}
-              color={colors.textPrimary}
-            />
-          </TouchableOpacity>
-        ),
-        headerRight: () => (
-          <Pressable
-            onPress={() => handleNextRef.current()}
-            disabled={selectedItems.length === 0}
-            style={({ pressed }) => [
-              styles.headerPill,
-              selectedItems.length === 0 && styles.headerPillDisabled,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={styles.headerPillText}>
-              {selectedItems.length > 0 ? `Next (${selectedItems.length})` : "Next"}
-            </Text>
-          </Pressable>
-        ),
-      });
-    } else {
-      navigation.setOptions({
-        headerTitle: () => (
-          <Text style={styles.reorderTitle}>Arrange</Text>
-        ),
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => handleBackToSelectRef.current()}
-            style={{ padding: 8 }}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color={colors.textPrimary}
-            />
-          </TouchableOpacity>
-        ),
-        headerRight: () => (
-          <Pressable
-            onPress={() => handleDoneRef.current()}
-            style={({ pressed }) => [
-              styles.headerPill,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={styles.headerPillText}>Done</Text>
-          </Pressable>
-        ),
-      });
-    }
-  }, [mode, navigation, selectedAlbum, selectedItems.length, colors]);
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: () => (
+        <TouchableOpacity
+          style={styles.albumPickerBtn}
+          activeOpacity={0.7}
+          onPress={() => albumSheetRef.current?.present()}
+        >
+          <Text style={styles.albumPickerText}>
+            {selectedAlbum?.title ?? "All Photos"}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={14}
+            color={colors.textPrimary}
+          />
+        </TouchableOpacity>
+      ),
+      headerLeft: () => (
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+        >
+          <Ionicons name="chevron-back" size={28} color={colors.textPrimary} />
+        </Pressable>
+      ),
+      headerRight: () => (
+        <Pressable
+          onPress={() => handleNextRef.current()}
+          disabled={selectedItems.length === 0}
+          style={({ pressed }) => [
+            styles.headerPill,
+            selectedItems.length === 0 && styles.headerPillDisabled,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Text style={styles.headerPillText}>
+            {selectedItems.length > 0 ? `Next (${selectedItems.length})` : "Next"}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, selectedAlbum, selectedItems.length, colors, isInitial]);
 
   const permissionDenied = permissionGranted === false;
 
@@ -451,53 +381,18 @@ export default function DeviceMediaPickerScreen() {
     [selectedIdSet, selectedIndexMap, selectedItems.length, toggleSelect]
   );
 
-  // --- Render: reorder grid cell ---
-  const renderReorderItem = useCallback(
-    ({ item, index }: { item: AssetItem; index: number }) => {
-      const isSwapSource = swapSource === index;
-
-      return (
-        <TouchableOpacity
-          onPress={() => handleReorderTap(index)}
-          activeOpacity={0.8}
-          style={[
-            styles.reorderCell,
-            {
-              width: REORDER_ITEM_SIZE,
-              height: REORDER_ITEM_SIZE,
-            },
-            isSwapSource && styles.reorderCellActive,
-          ]}
-        >
-          <Image
-            source={{ uri: item.uri }}
-            style={styles.reorderImage}
-            recyclingKey={item.id}
-          />
-
-          {/* Number badge */}
-          <View
-            style={[
-              styles.reorderNumberBadge,
-              isSwapSource && styles.reorderNumberBadgeActive,
-            ]}
-          >
-            <Text style={styles.numberBadgeText}>{index + 1}</Text>
-          </View>
-
-          {/* Video duration */}
-          {item.mediaType === "video" && item.duration > 0 && (
-            <View style={styles.durationBadge}>
-              <Text style={styles.durationText}>
-                {formatDuration(item.duration)}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      );
-    },
-    [swapSource, handleReorderTap]
-  );
+  const listHeader = useMemo(() => (
+    <View style={styles.hintRow}>
+      <Text style={styles.hintText}>
+        Select up to {MAX_SELECT} photos & videos
+      </Text>
+      {selectedItems.length > 0 && (
+        <Text style={styles.hintCount}>
+          {selectedItems.length}/{MAX_SELECT}
+        </Text>
+      )}
+    </View>
+  ), [selectedItems.length, styles]);
 
   // --- Fallback: module unavailable ---
   if (mlError) {
@@ -537,131 +432,93 @@ export default function DeviceMediaPickerScreen() {
     );
   }
 
-  // --- SELECT MODE ---
-  if (mode === "select") {
-    return (
-      <View style={styles.container}>
-        {/* Hint */}
-        <View style={styles.hintRow}>
-          <Text style={styles.hintText}>
-            Select up to {MAX_SELECT} photos & videos
-          </Text>
-          {selectedItems.length > 0 && (
-            <Text style={styles.hintCount}>
-              {selectedItems.length}/{MAX_SELECT}
-            </Text>
-          )}
-        </View>
-
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator />
-            <Text style={styles.muted}>Loading photos...</Text>
-          </View>
-        ) : permissionDenied ? (
-          <View style={styles.center}>
-            <Ionicons
-              name="images-outline"
-              size={40}
-              color={colors.textTertiary}
-            />
-            <Text style={styles.muted}>Photo permission denied.</Text>
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={async () => {
-                if (!ml) return;
-                const res = await ml.requestPermissionsAsync();
-                setPermissionGranted(res.granted);
-                if (res.granted) {
-                  await loadAssets(ml);
-                  await loadAlbums(ml);
-                }
-              }}
-            >
-              <Text style={styles.primaryBtnText}>Grant permission</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={assets}
-            keyExtractor={(it) => it.id}
-            renderItem={renderSelectItem}
-            numColumns={SELECT_COLUMNS}
-            columnWrapperStyle={{ gap: 2 }}
-            contentContainerStyle={{ gap: 2, paddingBottom: 40 }}
-            showsVerticalScrollIndicator={false}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            contentInsetAdjustmentBehavior="automatic"
-          />
-        )}
-
-        {/* Album picker sheet */}
-        <TrueSheet
-          ref={albumSheetRef}
-          detents={["auto"]}
-          backgroundColor={colors.background}
-          grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
-          dimmed
-          dimmedDetentIndex={0}
-        >
-          <View style={styles.albumSheetHeader}>
-            <Text style={styles.albumSheetTitle}>Albums</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.albumRow,
-              !selectedAlbum && styles.albumRowActive,
-            ]}
-            activeOpacity={0.75}
-            onPress={() => handleAlbumSelect(null)}
-          >
-            <Text style={styles.albumRowText}>All Photos</Text>
-          </TouchableOpacity>
-
-          {albums.map((a) => (
-            <TouchableOpacity
-              key={a.id}
-              style={[
-                styles.albumRow,
-                selectedAlbum?.id === a.id && styles.albumRowActive,
-              ]}
-              activeOpacity={0.75}
-              onPress={() => handleAlbumSelect(a)}
-            >
-              <Text style={styles.albumRowText}>{a.title}</Text>
-              <Text style={styles.albumRowCount}>{a.assetCount}</Text>
-            </TouchableOpacity>
-          ))}
-
-          <View style={{ height: 20 }} />
-        </TrueSheet>
-      </View>
-    );
-  }
-
-  // --- REORDER MODE ---
   return (
     <View style={styles.container}>
-      {/* Hint */}
-      <View style={styles.hintRow}>
-        <Text style={styles.hintText}>
-          Tap two items to swap their order
-        </Text>
-        <Text style={styles.hintCount}>{selectedItems.length} items</Text>
-      </View>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator />
+          <Text style={styles.muted}>Loading photos...</Text>
+        </View>
+      ) : permissionDenied ? (
+        <View style={styles.center}>
+          <Ionicons
+            name="images-outline"
+            size={40}
+            color={colors.textTertiary}
+          />
+          <Text style={styles.muted}>Photo permission denied.</Text>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={async () => {
+              if (!ml) return;
+              const res = await ml.requestPermissionsAsync();
+              setPermissionGranted(res.granted);
+              if (res.granted) {
+                await loadAssets(ml);
+                await loadAlbums(ml);
+              }
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Grant permission</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={assets}
+          keyExtractor={(it) => it.id}
+          renderItem={renderSelectItem}
+          numColumns={SELECT_COLUMNS}
+          ListHeaderComponent={listHeader}
+          columnWrapperStyle={{ gap: 2 }}
+          contentContainerStyle={{ gap: 2, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          contentInsetAdjustmentBehavior="automatic"
+        />
+      )}
 
-      <FlatList
-        data={selectedItems}
-        keyExtractor={(it) => it.id}
-        renderItem={renderReorderItem}
-        numColumns={REORDER_COLUMNS}
-        columnWrapperStyle={styles.reorderColumnWrapper}
-        contentContainerStyle={styles.reorderContent}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-      />
+      {/* Album picker sheet */}
+      <TrueSheet
+        ref={albumSheetRef}
+        detents={["auto"]}
+        backgroundColor={colors.background}
+        grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
+        dimmed
+        dimmedDetentIndex={0}
+      >
+        <View style={styles.albumSheetHeader}>
+          <Text style={styles.albumSheetTitle}>Albums</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.albumRow,
+            !selectedAlbum && styles.albumRowActive,
+          ]}
+          activeOpacity={0.75}
+          onPress={() => handleAlbumSelect(null)}
+        >
+          <Text style={styles.albumRowText}>All Photos</Text>
+        </TouchableOpacity>
+
+        {albums.map((a) => (
+          <TouchableOpacity
+            key={a.id}
+            style={[
+              styles.albumRow,
+              selectedAlbum?.id === a.id && styles.albumRowActive,
+            ]}
+            activeOpacity={0.75}
+            onPress={() => handleAlbumSelect(a)}
+          >
+            <Text style={styles.albumRowText}>{a.title}</Text>
+            <Text style={styles.albumRowCount}>{a.assetCount}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <View style={{ height: 20 }} />
+      </TrueSheet>
     </View>
   );
 }
@@ -698,14 +555,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       gap: 4,
     },
     albumPickerText: {
-      fontSize: 16,
-      fontWeight: "700",
-      fontFamily: theme.fonts.bold,
-      color: colors.textPrimary,
-    },
-
-    // --- Reorder title ---
-    reorderTitle: {
       fontSize: 16,
       fontWeight: "700",
       fontFamily: theme.fonts.bold,
@@ -767,46 +616,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       color: "#fff",
       fontSize: 10,
       fontFamily: theme.fonts.monoMedium,
-    },
-
-    // --- Reorder grid ---
-    reorderColumnWrapper: {
-      gap: 8,
-      paddingHorizontal: 16,
-    },
-    reorderContent: {
-      gap: 8,
-      paddingBottom: 40,
-    },
-    reorderCell: {
-      borderRadius: 12,
-      overflow: "hidden",
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    reorderCellActive: {
-      borderColor: "#306E6F",
-      transform: [{ scale: 0.95 }],
-    },
-    reorderImage: {
-      width: "100%",
-      height: "100%",
-    },
-    reorderNumberBadge: {
-      position: "absolute",
-      top: 6,
-      right: 6,
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      backgroundColor: "#306E6F",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: "#fff",
-    },
-    reorderNumberBadgeActive: {
-      backgroundColor: colors.cardDark,
     },
 
     // --- Album sheet ---

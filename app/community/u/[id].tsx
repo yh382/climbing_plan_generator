@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useI18N } from "../../../lib/i18n";
 import { HeaderButton } from "../../../src/components/ui/HeaderButton";
+import { useThemeColors } from "../../../src/lib/useThemeColors";
 
 import Animated, {
   useSharedValue,
@@ -236,20 +237,23 @@ export default function PublicProfileScreen() {
   // Privacy helpers
   const privacy = profile?.privacy;
 
+  const colors = useThemeColors();
+  const dynStyles = useMemo(() => createDynStyles(colors), [colors]);
+
   // --------------------- Loading / Error states ---------------------
   if (loading && !profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#111" />
+      <View style={[dynStyles.screenRoot, { paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color={colors.textPrimary} />
       </View>
     );
   }
 
   if (!profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FFF", paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }}>
-        <Ionicons name="person-outline" size={48} color="#E5E7EB" />
-        <Text style={{ color: "#9CA3AF", marginTop: 8 }}>User not found</Text>
+      <View style={[dynStyles.screenRoot, { paddingTop: insets.top + 44, alignItems: "center", justifyContent: "center" }]}>
+        <Ionicons name="person-outline" size={48} color={colors.border} />
+        <Text style={{ color: colors.textTertiary, marginTop: 8 }}>User not found</Text>
       </View>
     );
   }
@@ -257,7 +261,7 @@ export default function PublicProfileScreen() {
   const gradeDisplay = `${profile.boulderMax || "—"}/${profile.routeMax || "—"}`;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <View style={dynStyles.screenRoot}>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -294,11 +298,12 @@ export default function PublicProfileScreen() {
         <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
 
         {/* Content */}
-        <View style={styles.contentArea}>
+        <View style={dynStyles.contentArea}>
           {activeTab === "posts" && (
             privacy?.posts === false ? (
               <PrivateSection
                 message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
+                colors={colors}
               />
             ) : (
               <ProfilePostGrid
@@ -312,6 +317,7 @@ export default function PublicProfileScreen() {
             privacy?.analysis === false ? (
               <PrivateSection
                 message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
+                colors={colors}
               />
             ) : profile ? (
               <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
@@ -322,35 +328,36 @@ export default function PublicProfileScreen() {
             privacy?.plans === false ? (
               <PrivateSection
                 message={tt({ zh: "训练计划已设为私密", en: "Plans are private" })}
+                colors={colors}
               />
             ) : plans.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="calendar-outline" size={40} color="#E5E7EB" />
-                <Text style={styles.emptyText}>
+              <View style={dynStyles.emptyState}>
+                <Ionicons name="calendar-outline" size={40} color={colors.border} />
+                <Text style={dynStyles.emptyText}>
                   {tt({ zh: "暂无公开计划", en: "No public plans" })}
                 </Text>
               </View>
             ) : (
-              <View style={styles.listContainer}>
+              <View style={dynStyles.listContainer}>
                 {plans.map((p) => (
-                  <View key={p.id} style={styles.planCard}>
-                    <View style={styles.planHeader}>
+                  <View key={p.id} style={dynStyles.planCard}>
+                    <View style={dynStyles.planHeader}>
                       <Ionicons name="calendar" size={18} color="#6366F1" />
-                      <Text style={styles.planTitle} numberOfLines={1}>{p.title}</Text>
+                      <Text style={dynStyles.planTitle} numberOfLines={1}>{p.title}</Text>
                     </View>
-                    <View style={styles.planMeta}>
+                    <View style={dynStyles.planMeta}>
                       {p.trainingType ? (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>{p.trainingType}</Text>
+                        <View style={dynStyles.tag}>
+                          <Text style={dynStyles.tagText}>{p.trainingType}</Text>
                         </View>
                       ) : null}
                       {p.durationWeeks ? (
-                        <Text style={styles.metaText}>
+                        <Text style={dynStyles.metaText}>
                           {p.durationWeeks} {tt({ zh: "周", en: "weeks" })}
                         </Text>
                       ) : null}
-                      <View style={[styles.statusDot, { backgroundColor: p.status === "active" ? "#22C55E" : "#9CA3AF" }]} />
-                      <Text style={styles.metaText}>{p.status}</Text>
+                      <View style={[dynStyles.statusDot, { backgroundColor: p.status === "active" ? "#22C55E" : "#9CA3AF" }]} />
+                      <Text style={dynStyles.metaText}>{p.status}</Text>
                     </View>
                   </View>
                 ))}
@@ -362,19 +369,20 @@ export default function PublicProfileScreen() {
             privacy?.badges === false ? (
               <PrivateSection
                 message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
+                colors={colors}
               />
             ) : badges.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="ribbon-outline" size={40} color="#E5E7EB" />
-                <Text style={styles.emptyText}>
+              <View style={dynStyles.emptyState}>
+                <Ionicons name="ribbon-outline" size={40} color={colors.border} />
+                <Text style={dynStyles.emptyText}>
                   {tt({ zh: "暂无徽章", en: "No badges yet" })}
                 </Text>
               </View>
             ) : (
               <View style={{ paddingTop: 8 }}>
                 {groupedBadges.map(group => (
-                  <View key={group.key} style={styles.badgeSectionBlock}>
-                    <Text style={styles.badgeSectionTitle}>{group.title}</Text>
+                  <View key={group.key} style={dynStyles.badgeSectionBlock}>
+                    <Text style={dynStyles.badgeSectionTitle}>{group.title}</Text>
                     <FlatList
                       data={group.badges}
                       horizontal
@@ -428,32 +436,31 @@ export default function PublicProfileScreen() {
   );
 }
 
-function PrivateSection({ message }: { message: string }) {
+function PrivateSection({ message, colors }: { message: string; colors: ReturnType<typeof useThemeColors> }) {
   return (
-    <View style={styles.privateState}>
-      <Ionicons name="lock-closed-outline" size={36} color="#D1D5DB" />
-      <Text style={styles.privateText}>{message}</Text>
+    <View style={{ padding: 48, alignItems: "center", gap: 8 }}>
+      <Ionicons name="lock-closed-outline" size={36} color={colors.border} />
+      <Text style={{ color: colors.textTertiary, fontSize: 14 }}>{message}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createDynStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  screenRoot: { flex: 1, backgroundColor: colors.background },
   contentArea: { minHeight: 400 },
   emptyState: { padding: 48, alignItems: "center" },
-  emptyText: { color: "#9CA3AF", marginTop: 8 },
-  privateState: { padding: 48, alignItems: "center", gap: 8 },
-  privateText: { color: "#9CA3AF", fontSize: 14 },
+  emptyText: { color: colors.textTertiary, marginTop: 8 },
   // Plans
   listContainer: { padding: 16, gap: 12 },
-  planCard: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, gap: 8 },
+  planCard: { backgroundColor: colors.backgroundSecondary, borderRadius: 12, padding: 14, gap: 8 },
   planHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  planTitle: { fontSize: 15, fontWeight: "600", color: "#111", flex: 1 },
+  planTitle: { fontSize: 15, fontWeight: "600", color: colors.textPrimary, flex: 1 },
   planMeta: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  tag: { backgroundColor: "#EEF2FF", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  tag: { backgroundColor: colors.backgroundSecondary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   tagText: { fontSize: 12, color: "#6366F1", fontWeight: "500" },
-  metaText: { fontSize: 12, color: "#6B7280" },
+  metaText: { fontSize: 12, color: colors.textSecondary },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   // Badges
   badgeSectionBlock: { marginBottom: 16 },
-  badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: "#666", marginBottom: 8, paddingHorizontal: 12 },
+  badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textSecondary, marginBottom: 8, paddingHorizontal: 12 },
 });

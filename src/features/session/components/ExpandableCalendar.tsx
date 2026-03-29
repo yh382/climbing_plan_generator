@@ -37,6 +37,8 @@ if (
 
 interface ExpandableCalendarProps {
   onDateSelect?: (date: Date) => void;
+  /** Called when user collapses calendar back to week strip */
+  onCollapse?: () => void;
   /** The date string (yyyy-MM-dd) actively selected by the parent, or null for month view */
   activeDate?: string | null;
 }
@@ -53,6 +55,7 @@ function parseDurationToMin(dur: string): number {
 
 export default function ExpandableCalendar({
   onDateSelect,
+  onCollapse,
   activeDate,
 }: ExpandableCalendarProps) {
   const colors = useThemeColors();
@@ -87,11 +90,16 @@ export default function ExpandableCalendar({
 
   const toggleExpand = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(!expanded);
-    if (!expanded) {
-      // When expanding, set viewMonth to selectedDate's month
+    if (expanded) {
+      // Collapsing → reset to today's week
+      setSelectedDate(new Date());
+      setViewMonth(new Date());
+      onCollapse?.();
+    } else {
+      // Expanding → set viewMonth to selectedDate's month
       setViewMonth(selectedDate);
     }
+    setExpanded(!expanded);
   };
 
   const handleDateSelect = useCallback(

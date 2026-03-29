@@ -24,6 +24,7 @@ import LocationSheet from "../../src/features/community/components/LocationSheet
 import GymTagSheet from "../../src/features/community/components/GymTagSheet";
 import { setAttachmentCallback } from "../../src/features/community/pendingAttachment";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
+import { setPostDraft } from "../../src/features/community/pendingPostDraft";
 import { uploadPostMedia } from "../../src/features/community/api";
 
 const AUDIENCE_OPTIONS = [
@@ -88,6 +89,7 @@ export default function CreatePostScreen() {
     prefillAttachId?: string;
     prefillAttachTitle?: string;
     prefillAttachSubtitle?: string;
+    fromPicker?: string;
   }>();
   const isEditMode = !!params.postId;
   const { createPost, updatePost } = useCommunityStore();
@@ -164,11 +166,15 @@ export default function CreatePostScreen() {
   useFocusEffect(
     useCallback(() => {
       const pending = consumePendingMedia();
+
       if (pending && pending.length > 0) {
+        // Returning from device picker: merge new media
         setMediaList(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const unique = pending.filter(m => !existingIds.has(m.id));
           const remaining = MAX_MEDIA - prev.length;
-          const toAdd = pending.slice(0, remaining);
-          return [...prev, ...toAdd];
+          const toAdd = unique.slice(0, remaining);
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
         });
       }
     }, [])
@@ -251,7 +257,9 @@ export default function CreatePostScreen() {
           api.post(`/sessions/${attachedWidget.id}/share`, { public: true }).catch(() => {});
         }
       }
-      if (params.prefillAttachType) {
+      if (params.fromPicker === '1') {
+        router.dismiss(2); // pop create + picker back to community tab
+      } else if (params.prefillAttachType) {
         router.dismiss(2);
       } else {
         router.back();
@@ -264,11 +272,31 @@ export default function CreatePostScreen() {
   };
 
   const canPost = mediaList.length > 0 || !!attachedWidget || (content?.trim().length ?? 0) > 0;
+  // Show "Next" when 2+ media in non-edit mode (to go to arrange page)
+  const showNext = !isEditMode && mediaList.length >= 2;
 
   const handlePostRef = useRef<() => void>(() => {});
   handlePostRef.current = handlePost;
 
+  const handleNextToArrange = useCallback(() => {
+    setPostDraft({
+      content,
+      mediaList,
+      attachedWidget,
+      location,
+      selectedGym,
+      visibility,
+    });
+    router.push('/community/arrange' as any);
+  }, [content, mediaList, attachedWidget, location, selectedGym, visibility, router]);
+
+  const handleNextToArrangeRef = useRef(handleNextToArrange);
+  handleNextToArrangeRef.current = handleNextToArrange;
+
   useLayoutEffect(() => {
+    const headerBtnLabel = posting ? '...' : isEditMode ? 'Save' : showNext ? 'Next' : 'Post';
+    const headerBtnDisabled = showNext ? false : (!canPost || posting);
+
     navigation.setOptions({
       title: isEditMode ? 'Edit Post' : 'New Post',
       headerTransparent: true,
@@ -285,22 +313,22 @@ export default function CreatePostScreen() {
       ),
       headerRight: () => (
         <TouchableOpacity
-          onPress={() => handlePostRef.current()}
-          disabled={!canPost || posting}
+          onPress={() => showNext ? handleNextToArrangeRef.current() : handlePostRef.current()}
+          disabled={headerBtnDisabled}
           activeOpacity={0.6}
           style={{
             paddingHorizontal: 16,
             paddingVertical: 8,
-            opacity: (!canPost || posting) ? 0.35 : 1,
+            opacity: headerBtnDisabled ? 0.35 : 1,
           }}
         >
           <Text style={{ fontSize: 17, fontWeight: '600', color: colors.textPrimary }}>
-            {posting ? '...' : (isEditMode ? 'Save' : 'Post')}
+            {headerBtnLabel}
           </Text>
         </TouchableOpacity>
       ),
     });
-  }, [navigation, router, isEditMode, canPost, posting]);
+  }, [navigation, router, isEditMode, canPost, posting, showNext]);
 
   const visLabel = AUDIENCE_LABEL[visibility];
   const visIcon = AUDIENCE_ICON[visibility];

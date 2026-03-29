@@ -14,3 +14,16 @@ export const consumePendingMedia = (): PickedMediaItem[] | null => {
   _pending = null;
   return result;
 };
+
+// Flag: when arrange.tsx finishes reordering, it sets this to trigger auto-post in create.tsx
+let _readyToPost = false;
+
+export const setReadyToPost = (v: boolean) => {
+  _readyToPost = v;
+};
+
+export const consumeReadyToPost = (): boolean => {
+  const r = _readyToPost;
+  _readyToPost = false;
+  return r;
+};
