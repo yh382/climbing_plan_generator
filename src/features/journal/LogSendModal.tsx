@@ -18,6 +18,7 @@ import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { consumePendingMedia } from "@/features/community/pendingMedia";
+import { toFileUri } from "@/features/journal/api";
 import type { LogMedia } from "./loglist/types";
 import type { PickedMediaItem } from "@/features/community/types";
 
@@ -41,7 +42,7 @@ type Props = {
   tr?: (zh: string, en: string) => string;
 };
 
-const LOG_MAX_MEDIA = 5;
+const LOG_MAX_MEDIA = 1;
 
 const STYLE_OPTIONS = ["Redpoint", "Onsight", "Flash"];
 const STYLE_KEYS: SendStyle[] = ["redpoint", "onsight", "flash"];
@@ -57,6 +58,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const t = useMemo(() => tr ?? ((_zh: string, en: string) => en), [tr]);
   const router = useRouter();
   const sheetRef = useRef<TrueSheet>(null);
+  const isPresented = useRef(false);
 
   const [style, setStyle] = useState<SendStyle>("redpoint");
   const [attempts, setAttempts] = useState(1);
@@ -68,16 +70,20 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
 
   // Present/dismiss based on visible prop
   useEffect(() => {
-    if (visible) {
-      sheetRef.current?.present();
+    if (visible && !isPresented.current) {
+      setTimeout(() => {
+        sheetRef.current?.present();
+        isPresented.current = true;
+      }, 50);
       setStyle("redpoint");
       setAttempts(1);
       setFeel("solid");
       setName("");
       setNote("");
       setMediaItems([]);
-    } else {
+    } else if (!visible && isPresented.current) {
       sheetRef.current?.dismiss();
+      isPresented.current = false;
     }
   }, [visible]);
 
@@ -86,11 +92,24 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     useCallback(() => {
       const items = consumePendingMedia();
       if (items && items.length > 0) {
-        setMediaItems((prev) => [...prev, ...items.map(toLogMedia)].slice(0, LOG_MAX_MEDIA));
+        // Convert ph:// → file:// before storing
+        (async () => {
+          const converted = await Promise.all(
+            items.map(async (item) => ({
+              ...item,
+              uri: await toFileUri(item.uri),
+            }))
+          );
+          setMediaItems((prev) =>
+            [...prev, ...converted.map(toLogMedia)].slice(0, LOG_MAX_MEDIA)
+          );
+        })();
       }
-      // Re-present sheet if visible (returning from media picker)
-      if (visible) {
-        sheetRef.current?.present();
+      if (visible && !isPresented.current) {
+        setTimeout(() => {
+          sheetRef.current?.present();
+          isPresented.current = true;
+        }, 50);
       }
     }, [visible])
   );
@@ -261,6 +280,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     content: {
       paddingHorizontal: theme.spacing.screenPadding,
+      paddingTop: 16,
     },
     headerRow: {
       flexDirection: "row",
@@ -270,6 +290,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     },
     title: {
       ...theme.typography.sectionTitle,
+      fontSize: 22,
+      fontWeight: "800",
       fontFamily: theme.fonts.black,
       color: colors.textPrimary,
     },

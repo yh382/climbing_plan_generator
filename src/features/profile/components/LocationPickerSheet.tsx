@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   ActivityIndicator,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -155,6 +155,7 @@ export default function LocationPickerSheet({ visible, onClose, onSelect, title 
   // Debounced search
   useEffect(() => {
     if (!visible) return;
+    if (!query.trim()) return;
     const t = setTimeout(() => {
       fetchSearch(query, coordsRef.current);
     }, 300);
@@ -206,49 +207,48 @@ export default function LocationPickerSheet({ visible, onClose, onSelect, title 
         <Text style={styles.headerTitle}>{title}</Text>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={colors.textSecondary} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search city/area"
-          placeholderTextColor={colors.textTertiary}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={() => fetchSearch(query, coordsRef.current)}
-        />
-        {!!query && (
-          <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
-            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-          <Text style={styles.hintText}>Loading…</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search city/area"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={() => fetchSearch(query, coordsRef.current)}
+          />
+          {!!query && (
+            <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyTitle}>No results</Text>
-              <Text style={styles.hintText}>
-                {errorMsg || (canUseNearby ? "Try searching." : "Enable location for nearby suggestions.")}
-              </Text>
-            </View>
-          }
-          style={{ flex: 1 }}
-          contentContainerStyle={items.length === 0 ? { flexGrow: 1 } : { paddingBottom: 16 }}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+            <Text style={styles.hintText}>Loading…</Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyTitle}>No results</Text>
+            <Text style={styles.hintText}>
+              {errorMsg || (canUseNearby ? "Try searching." : "Enable location for nearby suggestions.")}
+            </Text>
+          </View>
+        ) : (
+          items.map((item) => (
+            <React.Fragment key={item.id}>{renderItem({ item })}</React.Fragment>
+          ))
+        )}
+      </ScrollView>
     </TrueSheet>
   );
 }

@@ -3,15 +3,20 @@
 // exposing status so CommunityScreen can show a small progress banner.
 
 import { useSyncExternalStore } from "react";
-import { uploadPostMedia } from "./api";
+import {
+  uploadThumbnailToR2,
+  uploadSingleFileToR2,
+  toFileUri,
+} from "./api";
 import { api } from "../../lib/apiClient";
+import { compressVideo } from "../../lib/videoCompression";
 import { useCommunityStore } from "../../store/useCommunityStore";
 import type { PostDraft } from "./pendingPostDraft";
 import type { PickedMediaItem, UserPostCreateIn } from "./types";
 
 // ── State ──
 
-export type UploadStatus = "idle" | "uploading" | "success" | "error";
+export type UploadStatus = "idle" | "compressing" | "uploading" | "success" | "error";
 
 export type UploadState = {
   status: UploadStatus;
@@ -66,6 +71,7 @@ function buildMetricsFromWidget(
     { label: "Date", value: widget.title.split(" · ")[1] || "—" },
     { label: "Sends", value: parts[0]?.replace(" sends", "") || "—" },
     { label: "Best", value: parts[1] || "—" },
+    { label: "Duration", value: parts[2] || "—" },
   ];
 }
 
@@ -85,24 +91,76 @@ export async function submitPostInBackground(
   setState({ status: "uploading", uploaded: 0, total: sortedMedia.length, error: undefined });
 
   try {
-    // 1. Upload media one by one for progress tracking
+    // 1. Upload media one by one (compress videos → auto-thumbnail → upload)
     const localItems = sortedMedia.filter((m) => !m.uri.startsWith("http"));
     const uploadMap = new Map<string, { type: "image" | "video"; url: string }>();
+    const autoThumbMap = new Map<string, string>(); // auto-generated thumbnails
 
     if (localItems.length > 0) {
       setState({ total: localItems.length });
-      const results = await uploadPostMedia(localItems);
-      localItems.forEach((item, i) => {
-        uploadMap.set(item.id, results[i]);
-      });
-      setState({ uploaded: localItems.length });
+      for (let i = 0; i < localItems.length; i++) {
+        const item = localItems[i];
+
+        if (item.mediaType === "video") {
+          // Step 1: Compress video (HEVC→H.264)
+          setState({ status: "compressing" });
+          const compressedUri = await compressVideo(item.uri);
+
+          // Step 2: Auto-generate thumbnail if missing
+          // Uses the COMPRESSED file (H.264) so it works even when
+          // the original HEVC couldn't be decoded for thumbnails.
+          if (!item.coverUri) {
+            try {
+              const VT = await import("expo-video-thumbnails");
+              const { uri: thumbUri } = await VT.getThumbnailAsync(
+                compressedUri,
+                { time: 1000, quality: 0.7 },
+              );
+              autoThumbMap.set(item.id, thumbUri);
+            } catch { /* fallback: no thumbnail */ }
+          }
+
+          // Step 3: Upload compressed video to R2
+          setState({ status: "uploading" });
+          const publicUrl = await uploadSingleFileToR2(compressedUri, "video/mp4");
+          uploadMap.set(item.id, { type: "video", url: publicUrl });
+        } else {
+          // Image: copy ph:// → file:// then upload
+          setState({ status: "uploading" });
+          const fileUri = await toFileUri(item.uri);
+          const publicUrl = await uploadSingleFileToR2(fileUri, "image/jpeg");
+          uploadMap.set(item.id, { type: "image", url: publicUrl });
+        }
+
+        setState({ uploaded: i + 1 });
+      }
     }
 
-    const uploadedMedia = sortedMedia.map((m) =>
-      m.uri.startsWith("http")
-        ? { type: m.mediaType, url: m.uri }
-        : uploadMap.get(m.id)!,
+    // Upload cover thumbnails to R2 (manual picks + auto-generated, parallel)
+    const coverUrlMap = new Map<string, string>();
+    await Promise.all(
+      sortedMedia
+        .filter((m) => {
+          const thumb = m.coverUri || autoThumbMap.get(m.id);
+          return thumb && !thumb.startsWith("http");
+        })
+        .map(async (m) => {
+          const thumbUri = m.coverUri || autoThumbMap.get(m.id)!;
+          try {
+            coverUrlMap.set(m.id, await uploadThumbnailToR2(thumbUri));
+          } catch { /* skip — post proceeds without thumbnail */ }
+        })
     );
+
+    const uploadedMedia = sortedMedia.map((m) => {
+      const thumbUrl = coverUrlMap.get(m.id)
+        || (m.coverUri?.startsWith("http") ? m.coverUri : undefined);
+      if (m.uri.startsWith("http")) {
+        return { type: m.mediaType, url: m.uri, thumb_url: thumbUrl };
+      }
+      const uploaded = uploadMap.get(m.id)!;
+      return { ...uploaded, thumb_url: thumbUrl };
+    });
 
     // 2. Build post payload
     const w = draft.attachedWidget;

@@ -21,6 +21,7 @@ type Props = {
   pendingAppend?: LocalDayLogItem | null;
   onAppended?: () => void;
   onCountChange?: (count: number) => void;
+  onStatsChange?: (stats: { sends: number; best: string; routeCount: number }) => void;
 };
 
 function dedupeById(list: LocalDayLogItem[]) {
@@ -49,6 +50,7 @@ function TodayDetailsList({
   pendingAppend,
   onAppended,
   onCountChange,
+  onStatsChange,
 }: Props) {
   const router = useRouter();
   const [items, setItems] = useState<LocalDayLogItem[]>([]);
@@ -59,6 +61,38 @@ function TodayDetailsList({
     itemsRef.current = items;
     onCountChange?.(items.length);
   }, [items, onCountChange]);
+
+  // Live Activity stats
+  useEffect(() => {
+    if (!onStatsChange) return;
+    const sends = items.reduce((s, it) => {
+      if (typeof (it as any)?.sendCount === "number") return s + (it as any).sendCount;
+      const style = (it as any)?.style;
+      if (style === "redpoint" || style === "flash" || style === "onsight") return s + 1;
+      return s;
+    }, 0);
+
+    const grades = items
+      .map((it) => String(it?.grade || "").trim())
+      .filter((g) => g.length > 0);
+
+    let best = "";
+    if (logType === "boulder") {
+      best = grades
+        .filter((g) => /^V\d+/i.test(g))
+        .sort((a, b) => {
+          const va = parseInt(a.replace(/^V/i, ""), 10);
+          const vb = parseInt(b.replace(/^V/i, ""), 10);
+          return vb - va;
+        })[0] || "";
+    } else {
+      best = grades
+        .filter((g) => /^5\./.test(g))
+        .sort((a, b) => b.localeCompare(a))[0] || "";
+    }
+
+    onStatsChange({ sends, best, routeCount: items.length });
+  }, [items, onStatsChange, logType]);
 
   const load = useCallback(async () => {
     const raw = await readSessionList(sessionKey, logType);
@@ -159,8 +193,13 @@ function TodayDetailsList({
           tr={tr}
           onPress={() => {
             router.push({
-              pathname: "/journal/log-item-detail",
-              params: { id: it.id, date, logType, sessionKey },
+              pathname: "/library/route-detail",
+              params: {
+                date,
+                itemId: it.id,
+                type: logType,
+                sessionKey,
+              },
             });
           }}
         />

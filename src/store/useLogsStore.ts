@@ -14,6 +14,8 @@ import {
   writeBackupSnapshot,
   clearBackupSnapshot,
 } from "../features/journal/sync/localBackup";
+import { syncWidgetFromStore } from "../lib/widgetBridge";
+import { startLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
 
 // In-flight POST /sessions promise — endSession awaits this to avoid race condition
 let _sessionCreatePromise: Promise<string | null> | null = null;
@@ -81,6 +83,7 @@ type LogsState = {
   syncFromBackend: () => Promise<void>;
   isSyncing: boolean;
   hasSyncedOnce: boolean;
+  _lastEndSessionTime: number;
 
   countByDateType: (date: string, type: LogType) => number;
   countsForWeek: (weekStart: string, type: LogType) => Record<string, number>;
@@ -204,6 +207,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       activeSession: null,
       isSyncing: false,
       hasSyncedOnce: false,
+      _lastEndSessionTime: 0,
 
       awaitSessionServerId: async () => {
         const current = get().activeSession?.serverId;
@@ -216,6 +220,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
       syncFromBackend: async () => {
         if (get().isSyncing) return;
+        // Cooldown: skip sync if endSession just ran (outbox still flushing)
+        const msSinceEnd = Date.now() - (get()._lastEndSessionTime || 0);
+        if (msSinceEnd < 15_000) return;
         set({ isSyncing: true });
         try {
           // Fix orphan logs on first sync (associates NULL session_id logs with sessions)
@@ -333,12 +340,73 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             allLogEntries.push(...aggregateSends(group.date, group.type, items));
           }
 
+          // 合并策略: 后端数据优先，但保留本地未同步的 session
+          // 以及当后端 session 的 logs 尚未同步时，保留本地的统计数据
+          const existingSessions = get().sessions;
+          const backendKeys = new Set(newSessions.map(s => s.sessionKey));
+          const localOnly = existingSessions.filter(
+            s => !backendKeys.has(s.sessionKey) && (!s.synced || s.climbs > 0)
+          );
+
+          // Repair: for sessions with 0 metrics, try recomputing from AsyncStorage
+          const mergedBackendSessions = await Promise.all(newSessions.map(async (bs) => {
+            // First try: use Zustand local data
+            const local = existingSessions.find(s => s.sessionKey === bs.sessionKey);
+            if (local && local.climbs > 0 && bs.climbs === 0) {
+              return { ...bs, climbs: local.climbs, sends: local.sends, best: local.best, duration: local.duration || bs.duration };
+            }
+            // Second try: recompute from AsyncStorage session lists
+            if (bs.climbs === 0) {
+              try {
+                const [sb, str, sl] = await Promise.all([
+                  readSessionList(bs.sessionKey, "boulder"),
+                  readSessionList(bs.sessionKey, "toprope"),
+                  readSessionList(bs.sessionKey, "lead"),
+                ]);
+                const items = [...(sb || []), ...(str || []), ...(sl || [])];
+                if (items.length > 0) {
+                  const sends = items.reduce((s: number, it: any) => s + inferSendCount(it), 0);
+                  const isBoulder = bs.discipline === "boulder";
+                  const best = isBoulder
+                    ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
+                    : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
+                  return { ...bs, climbs: items.length, sends, best };
+                }
+              } catch { /* best-effort */ }
+            }
+            return bs;
+          }));
+
+          // Also repair localOnly sessions with 0 metrics
+          const repairedLocalOnly = await Promise.all(localOnly.map(async (ls) => {
+            if (ls.climbs === 0) {
+              try {
+                const [sb, str, sl] = await Promise.all([
+                  readSessionList(ls.sessionKey, "boulder"),
+                  readSessionList(ls.sessionKey, "toprope"),
+                  readSessionList(ls.sessionKey, "lead"),
+                ]);
+                const items = [...(sb || []), ...(str || []), ...(sl || [])];
+                if (items.length > 0) {
+                  const sends = items.reduce((s: number, it: any) => s + inferSendCount(it), 0);
+                  const isBoulder = ls.discipline === "boulder";
+                  const best = isBoulder
+                    ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
+                    : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
+                  return { ...ls, climbs: items.length, sends, best };
+                }
+              } catch { /* best-effort */ }
+            }
+            return ls;
+          }));
+
           set({
-            sessions: newSessions.sort((a, b) => b.startTime.localeCompare(a.startTime)),
+            sessions: [...mergedBackendSessions, ...repairedLocalOnly].sort((a, b) => b.startTime.localeCompare(a.startTime)),
             logs: allLogEntries,
             isSyncing: false,
             hasSyncedOnce: true,
           });
+          syncWidgetFromStore();
         } catch (e) {
           console.error("[syncFromBackend] FAILED:", e instanceof Error ? e.message : e,
             (e as any)?.response?.status ? `| status: ${(e as any).response.status}` : "");
@@ -353,6 +421,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         set({
           activeSession: { startTime, gymName, discipline, serverId: null },
         });
+
+        // Start Live Activity (灵动岛/锁屏)
+        startLiveActivity({ gymName, discipline, startTime });
 
         // Crash recovery: write backup snapshot (fire-and-forget)
         writeBackupSnapshot({
@@ -370,6 +441,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               gym_name: gymName,
               location_type: "gym",
               date: localDate,
+              start_time: new Date(startTime).toISOString(),
             });
             if (res?.id) {
               const sid = String(res.id);
@@ -445,20 +517,17 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           const sessionItems = [...(sb || []), ...(str || []), ...(sl || [])];
           const sends = sessionItems.reduce((s: number, it: any) => s + inferSendCount(it), 0);
 
-          let best = "V?";
-          const bBest = sessionItems
-            .map((it: any) => String(it?.grade || "").trim())
-            .filter((g: string) => /^V\d+/i.test(g))
-            .sort((a: string, b: string) => vNumber(b) - vNumber(a))[0];
-
-          if (bBest) {
-            best = bBest;
+          let best: string;
+          if (activeSession.discipline === "boulder") {
+            best = sessionItems
+              .map((it: any) => String(it?.grade || "").trim())
+              .filter((g: string) => /^V\d+/i.test(g))
+              .sort((a: string, b: string) => vNumber(b) - vNumber(a))[0] || "V?";
           } else {
-            const rBest = sessionItems
+            best = sessionItems
               .map((it: any) => String(it?.grade || "").trim())
               .filter((g: string) => /^5\./.test(g))
-              .sort((a: string, b: string) => ydsRank(b) - ydsRank(a))[0];
-            best = rBest || "V?";
+              .sort((a: string, b: string) => ydsRank(b) - ydsRank(a))[0] || "5.?";
           }
 
           // --- 后端同步 ---
@@ -472,9 +541,11 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           }
 
           if (serverId) {
-            api.post(`/sessions/${serverId}/end`, {}).catch(() => {
+            try {
+              await api.post(`/sessions/${serverId}/end`, {});
+            } catch {
               enqueueSessionEvent({ type: "end", localKey: sessionKey });
-            });
+            }
           } else {
             enqueueSessionEvent({ type: "end", localKey: sessionKey });
           }
@@ -499,13 +570,18 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             synced: !!serverId,
           };
 
+          // End Live Activity (灵动岛/锁屏)
+          endLiveActivity({ sendCount: sends, bestGrade: best, routeCount: sessionItems.length });
+
           set({
             logs: nextLogs,
             sessions: [newSession, ...sessions],
             activeSession: null,
+            _lastEndSessionTime: Date.now(),
           });
 
           clearBackupSnapshot().catch(() => {});
+          syncWidgetFromStore();
           return newSession;
         } catch (err) {
           console.error("[endSession] Error:", err);
@@ -540,12 +616,17 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             synced: false,
           };
 
+          // End Live Activity (fallback path)
+          endLiveActivity({ sendCount: sends, bestGrade: "V?", routeCount: climbs });
+
           set({
             sessions: [fallbackSession, ...sessions],
             activeSession: null,
+            _lastEndSessionTime: Date.now(),
           });
 
           clearBackupSnapshot().catch(() => {});
+          syncWidgetFromStore();
           return fallbackSession;
         }
       },

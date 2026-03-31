@@ -226,7 +226,7 @@ function SortableItem({
         ]}
       >
         <Image
-          source={{ uri: item.uri }}
+          source={{ uri: (item.mediaType === 'video' && item.coverUri) ? item.coverUri : item.uri }}
           style={styles.cellImage}
           recyclingKey={item.id}
         />
@@ -298,6 +298,8 @@ export default function ArrangeScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: "Arrange",
+      headerTransparent: true,
+      scrollEdgeEffects: { top: "soft" },
       headerRight: () => (
         <Pressable
           onPress={() => handlePostRef.current()}

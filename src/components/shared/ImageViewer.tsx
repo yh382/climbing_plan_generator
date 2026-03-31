@@ -1,6 +1,6 @@
 // src/components/shared/ImageViewer.tsx
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Modal,
@@ -15,11 +15,49 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { VideoView, useVideoPlayer } from "expo-video";
+import type { MediaItem } from "../../types/community";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
+// ── Full-screen video player (auto-plays with sound) ──
+
+function FullScreenVideoPlayer({
+  uri,
+  isActive,
+}: {
+  uri: string;
+  isActive: boolean;
+}) {
+  const player = useVideoPlayer({ uri }, (p) => {
+    p.play();
+  });
+
+  useEffect(() => {
+    if (isActive) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, player]);
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.fullImage}
+      nativeControls
+      contentFit="contain"
+    />
+  );
+}
+
+// ── Main component ──
+
 interface ImageViewerProps {
-  images: string[];
+  /** @deprecated Use media instead */
+  images?: string[];
+  /** Typed media items with video support */
+  media?: MediaItem[];
   initialIndex?: number;
   visible: boolean;
   onClose: () => void;
@@ -27,6 +65,7 @@ interface ImageViewerProps {
 
 export default function ImageViewer({
   images,
+  media,
   initialIndex = 0,
   visible,
   onClose,
@@ -35,28 +74,50 @@ export default function ImageViewer({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const flatListRef = useRef<FlatList>(null);
 
+  // Normalize: prefer media prop, fall back to images
+  const items: MediaItem[] = useMemo(() => {
+    if (media && media.length > 0) return media;
+    if (images && images.length > 0)
+      return images.map((url) => ({ type: "image" as const, url }));
+    return [];
+  }, [media, images]);
+
+  // Reset currentIndex when viewer opens with a new initialIndex
+  useEffect(() => {
+    if (visible) setCurrentIndex(initialIndex);
+  }, [visible, initialIndex]);
+
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
         setCurrentIndex(viewableItems[0].index);
       }
     },
-    []
+    [],
   );
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const viewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 50,
+  }).current;
 
   const renderItem = useCallback(
-    ({ item }: { item: string }) => (
+    ({ item, index }: { item: MediaItem; index: number }) => (
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item }}
-          style={styles.fullImage}
-          resizeMode="contain"
-        />
+        {item.type === "video" ? (
+          <FullScreenVideoPlayer
+            uri={item.url}
+            isActive={index === currentIndex}
+          />
+        ) : (
+          <Image
+            source={{ uri: item.url }}
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
+        )}
       </View>
     ),
-    []
+    [currentIndex],
   );
 
   const getItemLayout = useCallback(
@@ -65,7 +126,7 @@ export default function ImageViewer({
       offset: SCREEN_W * index,
       index,
     }),
-    []
+    [],
   );
 
   if (!visible) return null;
@@ -89,10 +150,10 @@ export default function ImageViewer({
           <Ionicons name="close" size={28} color="#FFF" />
         </TouchableOpacity>
 
-        {/* Image gallery */}
+        {/* Media gallery */}
         <FlatList
           ref={flatListRef}
-          data={images}
+          data={items}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
@@ -105,10 +166,10 @@ export default function ImageViewer({
         />
 
         {/* Indicator */}
-        {images.length > 1 && (
+        {items.length > 1 && (
           <View style={[styles.indicator, { bottom: insets.bottom + 24 }]}>
             <Text style={styles.indicatorText}>
-              {currentIndex + 1} / {images.length}
+              {currentIndex + 1} / {items.length}
             </Text>
           </View>
         )}

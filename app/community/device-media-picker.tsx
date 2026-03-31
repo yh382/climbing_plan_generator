@@ -62,8 +62,9 @@ export default function DeviceMediaPickerScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const navigation = useNavigation();
-  const { mode: routeMode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode: routeMode, maxSelect: maxSelectParam, defaultAlbum, source } = useLocalSearchParams<{ mode?: string; maxSelect?: string; defaultAlbum?: string; source?: string }>();
   const isInitial = routeMode === "initial";
+  const maxSelect = maxSelectParam ? Math.max(1, parseInt(maxSelectParam, 10) || MAX_SELECT) : MAX_SELECT;
 
   // --- Media Library ---
   const [ml, setMl] = useState<MediaLibraryModule | null>(null);
@@ -116,15 +117,29 @@ export default function DeviceMediaPickerScreen() {
 
         if (perm.granted) {
           setPermissionGranted(true);
-          await loadAssets(mod);
-          await loadAlbums(mod);
+          const albumList = await loadAlbums(mod);
+          const matchedAlbum = defaultAlbum
+            ? albumList.find((a) => a.title.toLowerCase() === defaultAlbum.toLowerCase()) ?? null
+            : null;
+          if (matchedAlbum) {
+            setSelectedAlbum(matchedAlbum);
+            selectedAlbumRef.current = matchedAlbum;
+          }
+          await loadAssets(mod, matchedAlbum);
         } else {
           const req = await mod.requestPermissionsAsync();
           if (!mounted) return;
           setPermissionGranted(req.granted);
           if (req.granted) {
-            await loadAssets(mod);
-            await loadAlbums(mod);
+            const albumList = await loadAlbums(mod);
+            const matchedAlbum = defaultAlbum
+              ? albumList.find((a) => a.title.toLowerCase() === defaultAlbum.toLowerCase()) ?? null
+              : null;
+            if (matchedAlbum) {
+              setSelectedAlbum(matchedAlbum);
+              selectedAlbumRef.current = matchedAlbum;
+            }
+            await loadAssets(mod, matchedAlbum);
           }
         }
       } catch (e: any) {
@@ -142,7 +157,7 @@ export default function DeviceMediaPickerScreen() {
     };
   }, []);
 
-  const loadAlbums = async (mod: MediaLibraryModule) => {
+  const loadAlbums = async (mod: MediaLibraryModule): Promise<AlbumItem[]> => {
     try {
       const raw = await mod.getAlbumsAsync({ includeSmartAlbums: true });
       const list: AlbumItem[] = raw
@@ -150,8 +165,10 @@ export default function DeviceMediaPickerScreen() {
         .map((a) => ({ id: a.id, title: a.title, assetCount: a.assetCount }))
         .sort((a, b) => b.assetCount - a.assetCount);
       setAlbums(list);
+      return list;
     } catch {
       // Silently fail
+      return [];
     }
   };
 
@@ -244,23 +261,60 @@ export default function DeviceMediaPickerScreen() {
       const idx = prev.findIndex((s) => s.id === item.id);
       if (idx >= 0) {
         return prev.filter((_, i) => i !== idx);
-      } else if (prev.length < MAX_SELECT) {
+      } else if (prev.length < maxSelect) {
         return [...prev, item];
       }
       return prev;
     });
-  }, []);
+  }, [maxSelect]);
 
   // --- Next handler ---
-  const handleNext = useCallback(() => {
-    const mapped: PickedMediaItem[] = selectedItems.map((a) => ({
-      id: a.id,
-      uri: a.uri,
-      mediaType: a.mediaType === "video" ? "video" : "image",
-      width: a.width,
-      height: a.height,
-      duration: a.duration || undefined,
-    }));
+  const handleNext = useCallback(async () => {
+    // For non-initial mode (route-detail / edit-log-media): if a video is selected,
+    // navigate to cover-picker so user can choose a cover frame
+    if (!isInitial && selectedItems.length === 1 && selectedItems[0].mediaType === "video") {
+      const v = selectedItems[0];
+      router.replace({
+        pathname: "/community/cover-picker",
+        params: {
+          videoUri: v.uri,
+          duration: String(v.duration || 0),
+          id: v.id,
+          width: String(v.width),
+          height: String(v.height),
+          ...(source ? { source } : {}),
+        },
+      });
+      return;
+    }
+
+    // Auto-generate thumbnails for videos (fast, ~50ms each)
+    const mapped: PickedMediaItem[] = await Promise.all(
+      selectedItems.map(async (a): Promise<PickedMediaItem> => {
+        let coverUri: string | undefined;
+        if (a.mediaType === "video") {
+          try {
+            const VT = await import("expo-video-thumbnails");
+            const { uri } = await VT.getThumbnailAsync(a.uri, {
+              time: 1000,
+              quality: 0.5,
+            });
+            coverUri = uri;
+          } catch {
+            // Silently fail — video will show without thumbnail
+          }
+        }
+        return {
+          id: a.id,
+          uri: a.uri,
+          mediaType: a.mediaType === "video" ? "video" : "image",
+          width: a.width,
+          height: a.height,
+          duration: a.duration || undefined,
+          coverUri,
+        };
+      })
+    );
     setPendingMedia(mapped);
 
     if (isInitial) {
@@ -330,7 +384,7 @@ export default function DeviceMediaPickerScreen() {
     ({ item }: { item: AssetItem }) => {
       const isSelected = selectedIdSet.has(item.id);
       const selIdx = selectedIndexMap.get(item.id);
-      const atMax = selectedItems.length >= MAX_SELECT;
+      const atMax = selectedItems.length >= maxSelect;
       const disabled = !isSelected && atMax;
 
       return (
@@ -378,21 +432,21 @@ export default function DeviceMediaPickerScreen() {
         </TouchableOpacity>
       );
     },
-    [selectedIdSet, selectedIndexMap, selectedItems.length, toggleSelect]
+    [selectedIdSet, selectedIndexMap, selectedItems.length, toggleSelect, maxSelect]
   );
 
   const listHeader = useMemo(() => (
     <View style={styles.hintRow}>
       <Text style={styles.hintText}>
-        Select up to {MAX_SELECT} photos & videos
+        {maxSelect === 1 ? "Select a photo or video" : `Select up to ${maxSelect} photos & videos`}
       </Text>
-      {selectedItems.length > 0 && (
+      {selectedItems.length > 0 && maxSelect > 1 && (
         <Text style={styles.hintCount}>
-          {selectedItems.length}/{MAX_SELECT}
+          {selectedItems.length}/{maxSelect}
         </Text>
       )}
     </View>
-  ), [selectedItems.length, styles]);
+  ), [selectedItems.length, styles, maxSelect]);
 
   // --- Fallback: module unavailable ---
   if (mlError) {

@@ -41,8 +41,8 @@ export default function SetupClimmateCard() {
           />
         </View>
 
-        {/* Task list */}
-        {tasks.map((task) => (
+        {/* Task list — hide completed tasks */}
+        {tasks.filter((t) => !t.completed).map((task) => (
           <SetupTaskRow key={task.id} task={task} colors={colors} styles={styles} />
         ))}
       </View>
@@ -67,15 +67,11 @@ function SetupTaskRow({ task, colors, styles }: { task: SetupTask; colors: Retur
       <View
         style={[
           styles.statusCircle,
-          task.completed && styles.statusCompleted,
-          !task.completed && !task.locked && styles.statusPending,
+          !task.locked && styles.statusPending,
           task.locked && styles.statusLocked,
         ]}
       >
-        {task.completed && (
-          <Ionicons name="checkmark" size={12} color="#fff" />
-        )}
-        {task.locked && !task.completed && (
+        {task.locked && (
           <Ionicons
             name="lock-closed"
             size={10}
@@ -86,23 +82,18 @@ function SetupTaskRow({ task, colors, styles }: { task: SetupTask; colors: Retur
 
       {/* Text */}
       <View style={{ flex: 1 }}>
-        <Text
-          style={[
-            styles.taskTitle,
-            task.completed && styles.taskTitleCompleted,
-          ]}
-        >
+        <Text style={styles.taskTitle}>
           {task.title}
         </Text>
         {task.locked && task.lockReason ? (
           <Text style={styles.lockReason}>{task.lockReason}</Text>
-        ) : !task.completed && task.subtitle ? (
+        ) : task.subtitle ? (
           <Text style={styles.taskSubtitle}>{task.subtitle}</Text>
         ) : null}
       </View>
 
       {/* Arrow */}
-      {!task.completed && !task.locked && (
+      {!task.locked && (
         <Ionicons
           name="chevron-forward"
           size={14}
@@ -172,9 +163,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginRight: 12,
     flexShrink: 0,
   },
-  statusCompleted: {
-    backgroundColor: "#306E6F",
-  },
   statusPending: {
     backgroundColor: colors.background,
     borderWidth: 1.5,
@@ -190,11 +178,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: "600",
     fontFamily: theme.fonts.medium,
     color: colors.textPrimary,
-  },
-  taskTitleCompleted: {
-    fontWeight: "400",
-    color: colors.textTertiary,
-    textDecorationLine: "line-through",
   },
   taskSubtitle: {
     fontSize: 12,

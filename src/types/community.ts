@@ -24,15 +24,22 @@ export interface PostAttachment {
   }[];
 }
 
+// 媒体项（图片或视频）
+export interface MediaItem {
+  type: 'image' | 'video';
+  url: string;
+  thumbUrl?: string; // 视频缩略图
+}
+
 // 帖子本体
 export interface FeedPost {
   id: string;
   user: UserProfile;
   timestamp: string;
-  
+
   content: string;    // 正文
-  images?: string[];  // 图片/视频
-  
+  media?: MediaItem[]; // 图片/视频（含类型信息）
+
   attachment?: PostAttachment; // [核心] 关联的计划/记录
 
   // Gym association

@@ -18,8 +18,10 @@ export default function CommunityLayout() {
       <Stack.Screen name="media-select" options={{ headerShown: false }} />
       <Stack.Screen name="device-media-picker" options={{ title: 'Select Media', scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="arrange" options={{ title: 'Arrange', scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="cover-picker" options={{ title: 'Choose Cover', headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="u/[id]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="user-posts" options={{ title: "Posts", scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="public-plan" />
       <Stack.Screen name="public-route-log" />
       <Stack.Screen name="workout-record" />

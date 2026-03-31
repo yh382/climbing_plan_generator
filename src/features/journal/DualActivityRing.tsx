@@ -136,11 +136,6 @@ export default function DualActivityRing({
               {duration}
             </Text>
           )}
-          {trainingPct > 0 && (
-            <Text style={[styles.planLabel, { color: outerColor }]}>
-              Plan {Math.round(trainingPct)}%
-            </Text>
-          )}
         </View>
       </View>
 
@@ -198,8 +193,6 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", letterSpacing: 1.2, marginBottom: 2 },
   totalCount: { fontSize: 36, fontFamily: "DMSans_900Black", color: "#111111", lineHeight: 40 },
   durationLabel: { fontSize: 12, fontWeight: "500", marginTop: 2 },
-  planLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
-  
   barWrapper: {
     width: '100%',
     marginTop: 20,

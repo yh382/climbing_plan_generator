@@ -1,6 +1,7 @@
 // src/features/community/api.ts
 import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../../lib/apiClient';
+import { compressVideo } from '../../lib/videoCompression';
 import type {
   UserPostCreateIn,
   UserPostOut,
@@ -15,9 +16,9 @@ import type {
 
 // --- Media upload helpers ---
 
-async function toFileUri(uri: string): Promise<string> {
+export async function toFileUri(uri: string, isVideo = false): Promise<string> {
   if (!uri.startsWith('ph://')) return uri;
-  const ext = 'jpg'; // iOS Photos Library assets
+  const ext = isVideo ? 'mp4' : 'jpg';
   const dest = `${FileSystem.cacheDirectory}upload_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
   await FileSystem.copyAsync({ from: uri, to: dest });
   return dest;
@@ -25,12 +26,59 @@ async function toFileUri(uri: string): Promise<string> {
 
 type PresignResponse = { upload_url: string; public_url: string; key: string };
 
+/** Upload a single local image (e.g. video cover thumbnail) to R2, return public URL. */
+export async function uploadThumbnailToR2(localUri: string): Promise<string> {
+  const fileUri = await toFileUri(localUri);
+  const { upload_url, public_url } = await api.post<PresignResponse>(
+    '/upload/presign',
+    { category: 'posts', content_type: 'image/jpeg' }
+  );
+  const result = await FileSystem.uploadAsync(upload_url, fileUri, {
+    httpMethod: 'PUT',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    headers: { 'Content-Type': 'image/jpeg' },
+  });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(`Thumbnail upload failed: ${result.status}`);
+  }
+  return public_url;
+}
+
+/** Upload any local file to R2, return public URL. */
+export async function uploadSingleFileToR2(
+  fileUri: string,
+  contentType: string,
+  category: string = 'posts',
+): Promise<string> {
+  const { upload_url, public_url } = await api.post<PresignResponse>(
+    '/upload/presign',
+    { category, content_type: contentType }
+  );
+  const result = await FileSystem.uploadAsync(upload_url, fileUri, {
+    httpMethod: 'PUT',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    headers: { 'Content-Type': contentType },
+  });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(`Upload failed: ${result.status}`);
+  }
+  return public_url;
+}
+
 export async function uploadPostMedia(
   items: PickedMediaItem[]
 ): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
   return Promise.all(
     items.map(async (item) => {
-      const fileUri = await toFileUri(item.uri);
+      let fileUri: string;
+      if (item.mediaType === 'video') {
+        // Compress video: HEVC→H.264, 4K→1080p, moov→front
+        const compressed = await compressVideo(item.uri);
+        fileUri = compressed;
+      } else {
+        fileUri = await toFileUri(item.uri);
+      }
+
       const contentType = item.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
 
       const { upload_url, public_url } = await api.post<PresignResponse>(

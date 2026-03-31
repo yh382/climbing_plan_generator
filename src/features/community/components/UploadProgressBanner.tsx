@@ -30,6 +30,13 @@ export default function UploadProgressBanner() {
         { backgroundColor: colors.cardDark },
       ]}
     >
+      {status === "compressing" && (
+        <>
+          <ActivityIndicator size="small" color="#fff" />
+          <Text style={styles.text}>Compressing video...</Text>
+        </>
+      )}
+
       {status === "uploading" && (
         <>
           <ActivityIndicator size="small" color="#fff" />

@@ -20,11 +20,11 @@ import {
   updateDayItem,
   updateSessionItem,
 } from "@/features/journal/loglist/storage";
-import { uploadLogMediaBatch } from "@/features/journal/api";
+import { uploadLogMediaBatch, toFileUri } from "@/features/journal/api";
 import UploadProgressToast from "@/components/ui/UploadProgressToast";
 import type { LocalDayLogItem, LogMedia } from "@/features/journal/loglist/types";
 
-const LOG_MAX_MEDIA = 2;
+const LOG_MAX_MEDIA = 1;
 
 function ensureMedia(item: LocalDayLogItem): LogMedia[] {
   const arr: LogMedia[] = Array.isArray(item.media) ? [...item.media] : [];
@@ -83,24 +83,27 @@ export default function EditLogMediaScreen() {
     };
   }, [date, itemId, climbType, sessionKey]);
 
-  // Consume pending media from device picker
+  // Consume pending media from device picker (images only — videos go through cover-picker → route-detail)
   useFocusEffect(
     useCallback(() => {
       const pending = consumePendingMedia();
       if (pending && pending.length > 0) {
-        setMediaItems((prev) => {
-          const combined = [
-            ...prev,
-            ...pending.map((p) => ({
+        // Convert ph:// → file:// before storing (preserve coverUri)
+        (async () => {
+          const converted = await Promise.all(
+            pending.map(async (p) => ({
               id: p.id,
               type: (p.mediaType === "video" ? "video" : "image") as
                 | "video"
                 | "image",
-              uri: p.uri,
-            })),
-          ];
-          return combined.slice(0, LOG_MAX_MEDIA);
-        });
+              uri: await toFileUri(p.uri),
+              coverUri: p.coverUri || undefined,
+            }))
+          );
+          setMediaItems((prev) =>
+            [...prev, ...converted].slice(0, LOG_MAX_MEDIA)
+          );
+        })();
       }
     }, [])
   );
@@ -110,7 +113,8 @@ export default function EditLogMediaScreen() {
       Alert.alert("Limit", `Max ${LOG_MAX_MEDIA} media per log`);
       return;
     }
-    router.push("/community/device-media-picker");
+    const remaining = LOG_MAX_MEDIA - mediaItems.length;
+    router.push({ pathname: "/community/device-media-picker", params: { maxSelect: String(remaining), defaultAlbum: "Videos", source: "edit-log-media" } });
   }, [mediaItems.length, router]);
 
   const handleRemove = useCallback((mediaId: string) => {
@@ -128,19 +132,45 @@ export default function EditLogMediaScreen() {
       setUploading(true);
       setUploadProgress(0);
       try {
+        // Build upload list: main media files
+        const uploadItems = toUpload.map((m) => ({
+          uri: m.uri,
+          contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
+        }));
+        // Append cover thumbnails that need uploading
+        const coverIndices: number[] = [];
+        for (const m of toUpload) {
+          if (m.coverUri && !m.coverUri.startsWith("http")) {
+            coverIndices.push(uploadItems.length);
+            uploadItems.push({ uri: m.coverUri, contentType: "image/jpeg" });
+          }
+        }
+
         const results = await uploadLogMediaBatch(
-          toUpload.map((m) => ({
-            uri: m.uri,
-            contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
-          })),
+          uploadItems,
           (p) => setUploadProgress(p)
         );
+
+        // Map cover upload results
+        let coverResultIdx = 0;
+        const coverUrls: Record<string, string> = {};
+        for (const m of toUpload) {
+          if (m.coverUri && !m.coverUri.startsWith("http") && coverIndices[coverResultIdx] !== undefined) {
+            const ri = coverIndices[coverResultIdx];
+            if (results[ri]) coverUrls[m.id] = results[ri].public_url;
+            coverResultIdx++;
+          }
+        }
 
         // Replace local URIs with R2 URLs
         finalMedia = mediaItems.map((m) => {
           const uploadIdx = toUpload.findIndex((u) => u.id === m.id);
           if (uploadIdx >= 0 && results[uploadIdx]) {
-            return { ...m, uri: results[uploadIdx].public_url };
+            return {
+              ...m,
+              uri: results[uploadIdx].public_url,
+              coverUri: coverUrls[m.id] || m.coverUri,
+            };
           }
           return m;
         });

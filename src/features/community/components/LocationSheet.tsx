@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   TextInput,
   ActivityIndicator,
   StyleSheet,
@@ -60,8 +60,8 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
 
   const sheetRef = useRef<TrueSheet>(null);
   const isPresented = useRef(false);
+  const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [items, setItems] = useState<GymItem[]>([]);
@@ -107,7 +107,7 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
   };
 
   // Search gyms
-  const fetchSearch = async (q: string, c: { lat: number; lng: number } | null) => {
+  const fetchSearch = useCallback(async (q: string, c: { lat: number; lng: number } | null) => {
     const trimmed = q.trim();
     if (!trimmed) {
       await fetchNearby(c);
@@ -129,7 +129,8 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Get coords + fetch nearby on open
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
       setErrorMsg(null);
       const c = await getDeviceCoords();
       if (!mounted) return;
-      setCoords(c);
+      coordsRef.current = c;
       await fetchNearby(c);
     })();
 
@@ -152,9 +153,18 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
   // Debounced search
   useEffect(() => {
     if (!visible) return;
-    const t = setTimeout(() => { fetchSearch(query, coords); }, 300);
+    if (!query.trim()) return;
+    const t = setTimeout(() => {
+      fetchSearch(query, coordsRef.current);
+    }, 300);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
+
+  const handleClearSearch = useCallback(() => {
+    setQuery('');
+    fetchNearby(coordsRef.current);
+  }, []);
 
   const handleSelect = useCallback((item: GymItem) => {
     onSelect({
@@ -194,7 +204,7 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
   return (
     <TrueSheet
       ref={sheetRef}
-      detents={[0.4, 0.9]}
+      detents={[0.6, 0.9]}
 
       backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
@@ -206,48 +216,48 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
         <Text style={styles.headerTitle}>Add Location</Text>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={colors.textSecondary} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search gyms"
-          placeholderTextColor={colors.textTertiary}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {!!query && (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={10}>
-            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {loading ? (
-        <View style={styles.centerPad}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-          <Text style={styles.hintText}>Loading…</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search gyms"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={() => fetchSearch(query, coordsRef.current)}
+          />
+          {!!query && (
+            <TouchableOpacity onPress={handleClearSearch} hitSlop={10}>
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item: GymItem, index: number) => item.id ?? `gym-${index}`}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <View style={styles.centerPad}>
-              <Text style={styles.emptyTitle}>No results</Text>
-              <Text style={styles.hintText}>
-                {errorMsg || 'Try searching for a gym name.'}
-              </Text>
-            </View>
-          }
-          style={{ flex: 1 }}
-          contentContainerStyle={items.length === 0 ? { flex: 1 } : { paddingBottom: 16 }}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+
+        {loading ? (
+          <View style={styles.centerPad}>
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+            <Text style={styles.hintText}>Loading…</Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={styles.centerPad}>
+            <Text style={styles.emptyTitle}>No results</Text>
+            <Text style={styles.hintText}>
+              {errorMsg || 'Try searching for a gym name.'}
+            </Text>
+          </View>
+        ) : (
+          items.map((item) => (
+            <React.Fragment key={item.id}>{renderItem({ item })}</React.Fragment>
+          ))
+        )}
+      </ScrollView>
     </TrueSheet>
   );
 }

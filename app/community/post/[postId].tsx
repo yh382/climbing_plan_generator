@@ -1,30 +1,37 @@
 // app/community/post/[postId].tsx
-// Single post view — navigated from notification tap
-import React, { useEffect, useLayoutEffect, useState } from "react";
+// Single post view — navigated from notification tap / deep link
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
   Text,
+  Share,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
-import { HeaderButton } from "../../../src/components/ui/HeaderButton";
-import FeedPost from "../../../src/features/community/components/FeedPost";
-import CommentSheet from "../../../src/features/community/components/CommentSheet";
-import { communityApi } from "../../../src/features/community/api";
-import { mapRawPost, toFeedPost } from "../../../src/features/community/utils";
-import { useCommunityStore } from "../../../src/store/useCommunityStore";
-import { useUserStore } from "../../../src/store/useUserStore";
-import useLogsStore from "../../../src/store/useLogsStore";
-import { FeedPost as FeedPostType } from "../../../src/types/community";
+import { HeaderButton } from "@/components/ui/HeaderButton";
+import FeedPost from "@/features/community/components/FeedPost";
+import CommentSheet from "@/features/community/components/CommentSheet";
+import { communityApi } from "@/features/community/api";
+import { mapRawPost, toFeedPost } from "@/features/community/utils";
+import { useCommunityStore } from "@/store/useCommunityStore";
+import { useUserStore } from "@/store/useUserStore";
+import useLogsStore from "@/store/useLogsStore";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { theme } from "@/lib/theme";
+import type { FeedPost as FeedPostType } from "@/types/community";
 
 export default function SinglePostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const router = useRouter();
   const navigation = useNavigation();
-  const { toggleLike, toggleSave, updateCommentCount } = useCommunityStore();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { toggleLike, toggleSave, deletePost } = useCommunityStore();
+  const currentUserId = useUserStore((s) => s.user?.id);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -34,7 +41,6 @@ export default function SinglePostScreen() {
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
     });
   }, [navigation, router]);
-  const currentUserId = useUserStore((s) => s.user?.id);
 
   const [post, setPost] = useState<FeedPostType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +63,21 @@ export default function SinglePostScreen() {
     }
   };
 
+  const isOwn = !!currentUserId && post?.user?.id === currentUserId;
+
+  const submitReport = useCallback(async (id: string, reason: string) => {
+    try {
+      await communityApi.report("post", id, reason);
+      Alert.alert("Report Submitted", "Thank you for your feedback.");
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        Alert.alert("Already Reported", "You have already reported this.");
+      } else {
+        Alert.alert("Report Failed");
+      }
+    }
+  }, []);
+
   return (
     <ScrollView
       style={styles.container}
@@ -64,7 +85,7 @@ export default function SinglePostScreen() {
     >
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="small" color="#111" />
+          <ActivityIndicator size="small" color={colors.textPrimary} />
         </View>
       ) : !post ? (
         <View style={styles.center}>
@@ -73,6 +94,8 @@ export default function SinglePostScreen() {
       ) : (
         <FeedPost
           post={post}
+          isOwn={isOwn}
+          isVisible
           onLike={(id) => {
             toggleLike(id);
             setPost((p) => p ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p);
@@ -83,6 +106,43 @@ export default function SinglePostScreen() {
             toggleSave(id);
             setPost((p) => p ? { ...p, isSaved: !p.isSaved } : p);
           }}
+          onShare={async () => {
+            try { await Share.share({ message: "Check out this post on ClimMate!" }); } catch {}
+          }}
+          onEdit={isOwn ? () => {
+            const mediaUrls = (post.media || []).map((m) => m.url).filter(Boolean);
+            router.push({
+              pathname: "/community/create",
+              params: {
+                postId: post.id,
+                editContent: post.content || "",
+                editMedia: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : undefined,
+                editVisibility: "public",
+              },
+            });
+          } : undefined}
+          onDelete={isOwn ? () => {
+            Alert.alert("Delete Post", "Are you sure?", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: () => {
+                  deletePost(post.id);
+                  router.back();
+                },
+              },
+            ]);
+          } : undefined}
+          onReport={!isOwn ? () => {
+            Alert.alert("Select Report Reason", undefined, [
+              { text: "Spam", onPress: () => submitReport(post.id, "spam") },
+              { text: "Harassment", onPress: () => submitReport(post.id, "harassment") },
+              { text: "Inappropriate", onPress: () => submitReport(post.id, "inappropriate") },
+              { text: "Other", onPress: () => submitReport(post.id, "other") },
+              { text: "Cancel", style: "cancel" },
+            ]);
+          } : undefined}
           onPressAttachment={(p) => {
             const att = p?.attachment;
             if (!att?.id) return;
@@ -94,7 +154,6 @@ export default function SinglePostScreen() {
               return;
             }
             if (att.type === "log" || att.type === "session") {
-              const isOwn = post?.user?.id === currentUserId;
               if (isOwn) {
                 const localSession = useLogsStore.getState().sessions.find(
                   (s) => s.serverId === att.id
@@ -135,8 +194,9 @@ export default function SinglePostScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { fontSize: 14, color: "#9CA3AF" },
-});
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 120 },
+    errorText: { fontSize: 14, color: colors.textTertiary, fontFamily: theme.fonts.regular },
+  });

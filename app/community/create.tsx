@@ -17,15 +17,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useCommunityStore } from "../../src/store/useCommunityStore";
-import { api } from "../../src/lib/apiClient";
-import type { UserPostCreateIn, PickedMediaItem } from "../../src/features/community/types";
+import type { PickedMediaItem } from "../../src/features/community/types";
 import { PostAttachmentCard } from "../../src/components/shared/PostAttachmentCard";
 import LocationSheet from "../../src/features/community/components/LocationSheet";
 import GymTagSheet from "../../src/features/community/components/GymTagSheet";
 import { setAttachmentCallback } from "../../src/features/community/pendingAttachment";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
 import { setPostDraft } from "../../src/features/community/pendingPostDraft";
-import { uploadPostMedia } from "../../src/features/community/api";
+import { consumeCoverUpdate } from "../../src/features/community/pendingCoverUpdate";
+import { uploadPostMedia, uploadThumbnailToR2 } from "../../src/features/community/api";
+import { submitPostInBackground } from "../../src/features/community/postUploadManager";
 
 const AUDIENCE_OPTIONS = [
   { value: 'public' as const, label: 'Public', icon: 'globe-outline' as const },
@@ -53,26 +54,6 @@ const AUDIENCE_ICON: Record<string, string> = {
   'private': 'lock-closed-outline',
 };
 
-function buildMetricsFromWidget(widget: { type: string; title: string; subtitle: string } | null) {
-  if (!widget) return undefined;
-  if (widget.type === 'plan') {
-    const parts = widget.subtitle.split(' · ');
-    return [
-      { label: 'Weeks', value: parts[0]?.replace(' weeks', '') || '—' },
-      { label: 'Sessions/wk', value: parts[1]?.replace(' sessions/wk', '') || '—' },
-      { label: 'Type', value: parts[2] || '—' },
-    ];
-  }
-  const parts = widget.subtitle.split(' · ');
-  return [
-    { label: 'Gym', value: widget.title.split(' · ')[0] || '—' },
-    { label: 'Date', value: widget.title.split(' · ')[1] || '—' },
-    { label: 'Sends', value: parts[0]?.replace(' sends', '') || '—' },
-    { label: 'Best', value: parts[1] || '—' },
-    { label: 'Duration', value: parts[2] || '—' },
-  ];
-}
-
 export default function CreatePostScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -93,7 +74,7 @@ export default function CreatePostScreen() {
     source?: string;
   }>();
   const isEditMode = !!params.postId;
-  const { createPost, updatePost } = useCommunityStore();
+  const { updatePost } = useCommunityStore();
 
   const [content, setContent] = useState(params.editContent || "");
   const [mediaList, setMediaList] = useState<PickedMediaItem[]>(() => {
@@ -152,6 +133,34 @@ export default function CreatePostScreen() {
   const [attachPopoverPos, setAttachPopoverPos] = useState({ x: 0, y: 0 });
   const [visibilityPopoverPos, setVisibilityPopoverPos] = useState({ x: 0, y: 0 });
 
+  // Cover picker queue — navigate to cover-picker for each video sequentially
+  const coverPickerQueueRef = useRef<string[]>([]);
+  const hasVideos = useMemo(() => mediaList.some(m => m.mediaType === 'video'), [mediaList]);
+
+  const navigateToNextCoverPicker = useCallback(() => {
+    const nextId = coverPickerQueueRef.current.shift();
+    if (!nextId) return;
+    const video = mediaList.find(m => m.id === nextId);
+    if (!video) return;
+    router.push({
+      pathname: '/community/cover-picker' as any,
+      params: {
+        videoUri: video.uri,
+        duration: String(video.duration || 0),
+        id: video.id,
+        width: String(video.width),
+        height: String(video.height),
+        returnMode: 'cover',
+      },
+    });
+  }, [mediaList, router]);
+
+  const handleOpenCoverPicker = useCallback(() => {
+    const videoIds = mediaList.filter(m => m.mediaType === 'video').map(m => m.id);
+    coverPickerQueueRef.current = videoIds;
+    navigateToNextCoverPicker();
+  }, [mediaList, navigateToNextCoverPicker]);
+
   // Attachment callback: when returning from select-session/select-plan
   const setAttachedWidgetRef = useRef(setAttachedWidget);
   setAttachedWidgetRef.current = setAttachedWidget;
@@ -163,13 +172,12 @@ export default function CreatePostScreen() {
     return () => setAttachmentCallback(null);
   }, []);
 
-  // Consume media from device picker when returning
+  // Consume media from device picker or cover updates when returning
   useFocusEffect(
     useCallback(() => {
+      // 1. Consume new media from device picker
       const pending = consumePendingMedia();
-
       if (pending && pending.length > 0) {
-        // Returning from device picker: merge new media
         setMediaList(prev => {
           const existingIds = new Set(prev.map(m => m.id));
           const unique = pending.filter(m => !existingIds.has(m.id));
@@ -178,7 +186,21 @@ export default function CreatePostScreen() {
           return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
         });
       }
-    }, [])
+
+      // 2. Consume cover update from cover-picker
+      const coverUpdate = consumeCoverUpdate();
+      if (coverUpdate) {
+        setMediaList(prev =>
+          prev.map(m =>
+            m.id === coverUpdate.videoId ? { ...m, coverUri: coverUpdate.coverUri } : m
+          )
+        );
+        // If more videos queued, navigate to next cover-picker after a brief delay
+        if (coverPickerQueueRef.current.length > 0) {
+          setTimeout(() => navigateToNextCoverPicker(), 300);
+        }
+      }
+    }, [navigateToNextCoverPicker])
   );
 
   const handleAddMedia = () => {
@@ -209,67 +231,55 @@ export default function CreatePostScreen() {
     if (mediaList.length === 0 && !attachedWidget && !(content?.trim())) return;
     if (posting) return;
 
-    setPosting(true);
-    try {
-      // Upload local media to R2 if needed (preserve order)
-      let uploadedMedia: Array<{ type: 'image' | 'video'; url: string }> | undefined;
-      if (mediaList.length > 0) {
-        const localItems = mediaList.filter(m => !m.uri.startsWith('http'));
-        if (localItems.length > 0) {
-          // Upload all local items, then map back in original order
-          const uploadResults = await uploadPostMedia(localItems);
-          const uploadMap = new Map<string, { type: 'image' | 'video'; url: string }>();
-          localItems.forEach((item, i) => uploadMap.set(item.id, uploadResults[i]));
-
-          uploadedMedia = mediaList.map(m =>
-            m.uri.startsWith('http')
-              ? { type: m.mediaType, url: m.uri }
-              : uploadMap.get(m.id)!
-          );
-        } else {
-          uploadedMedia = mediaList.map(m => ({ type: m.mediaType, url: m.uri }));
+    // ── Edit mode: synchronous upload (need to confirm success) ──
+    if (isEditMode) {
+      setPosting(true);
+      try {
+        let uploadedMedia: Array<{ type: 'image' | 'video'; url: string; thumb_url?: string }> | undefined;
+        if (mediaList.length > 0) {
+          const localItems = mediaList.filter(m => !m.uri.startsWith('http'));
+          if (localItems.length > 0) {
+            const uploadResults = await uploadPostMedia(localItems);
+            const uploadMap = new Map<string, { type: 'image' | 'video'; url: string }>();
+            localItems.forEach((item, i) => uploadMap.set(item.id, uploadResults[i]));
+            const coverUrlMap = new Map<string, string>();
+            await Promise.all(
+              mediaList
+                .filter(m => m.coverUri && !m.coverUri.startsWith('http'))
+                .map(async (m) => {
+                  try { coverUrlMap.set(m.id, await uploadThumbnailToR2(m.coverUri!)); } catch { /* skip */ }
+                })
+            );
+            uploadedMedia = mediaList.map(m => {
+              const thumbUrl = coverUrlMap.get(m.id) || (m.coverUri?.startsWith('http') ? m.coverUri : undefined);
+              if (m.uri.startsWith('http')) return { type: m.mediaType, url: m.uri, thumb_url: thumbUrl };
+              const uploaded = uploadMap.get(m.id)!;
+              return { ...uploaded, thumb_url: thumbUrl };
+            });
+          } else {
+            uploadedMedia = mediaList.map(m => ({
+              type: m.mediaType, url: m.uri,
+              thumb_url: m.coverUri?.startsWith('http') ? m.coverUri : undefined,
+            }));
+          }
         }
-      }
-
-      if (isEditMode) {
-        await updatePost(params.postId!, {
-          content_text: content || undefined,
-          media: uploadedMedia,
-          visibility,
-        });
-      } else {
-        const hasValidAttachment = attachedWidget && attachedWidget.id;
-        const postData: UserPostCreateIn = {
-          content_text: content || undefined,
-          media: uploadedMedia,
-          attachment_type: hasValidAttachment ? attachedWidget.type : undefined,
-          attachment_id: hasValidAttachment ? attachedWidget.id : undefined,
-          attachment_meta: hasValidAttachment ? {
-            title: attachedWidget.title,
-            subtitle: attachedWidget.subtitle,
-            metrics: buildMetricsFromWidget(attachedWidget),
-          } : undefined,
-          visibility,
-          gym_id: selectedGym?.id || undefined,
-        };
-        await createPost(postData);
-
-        if (attachedWidget && (attachedWidget.type === 'session' || attachedWidget.type === 'log') && attachedWidget.id) {
-          api.post(`/sessions/${attachedWidget.id}/share`, { public: true }).catch(() => {});
-        }
-      }
-      if (params.fromPicker === '1') {
-        router.dismiss(2); // pop create + picker back to community tab
-      } else if (params.prefillAttachType && params.source !== 'log-detail') {
-        router.dismiss(2); // pop create + media-select
-      } else {
+        await updatePost(params.postId!, { content_text: content || undefined, media: uploadedMedia, visibility });
         router.back();
+      } catch (e: any) {
+        Alert.alert('Error', e?.message || 'Failed to update post');
+      } finally {
+        setPosting(false);
       }
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || (isEditMode ? 'Failed to update post' : 'Failed to create post'));
-    } finally {
-      setPosting(false);
+      return;
     }
+
+    // ── New post: background upload → navigate immediately ──
+    submitPostInBackground(
+      { content, mediaList, attachedWidget, location, selectedGym, visibility },
+      mediaList,
+    );
+    router.dismissAll();
+    router.navigate("/(tabs)/community" as any);
   };
 
   const canPost = mediaList.length > 0 || !!attachedWidget || (content?.trim().length ?? 0) > 0;
@@ -351,7 +361,7 @@ export default function CreatePostScreen() {
           >
             {mediaList.map((item, idx) => (
               <View key={item.id} style={styles.mediaThumbnail}>
-                <Image source={{ uri: item.uri }} style={styles.mediaThumbnailImage} contentFit="cover" />
+                <Image source={{ uri: (item.mediaType === 'video' && item.coverUri) ? item.coverUri : item.uri }} style={styles.mediaThumbnailImage} contentFit="cover" />
                 {item.mediaType === 'video' && (
                   <View style={styles.mediaVideoIcon}>
                     <Ionicons name="play-circle" size={18} color="#FFF" />
@@ -490,6 +500,21 @@ export default function CreatePostScreen() {
               />
             </TouchableOpacity>
           </View>
+
+          {/* Cover Picker — only when videos exist */}
+          {hasVideos && !isEditMode && (
+            <TouchableOpacity
+              onPress={handleOpenCoverPicker}
+              style={styles.toolbarIconBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="film-outline"
+                size={22}
+                color={colors.textTertiary}
+              />
+            </TouchableOpacity>
+          )}
 
           <View style={{ flex: 1 }} />
 

@@ -1,7 +1,7 @@
 // src/features/community/utils.ts
 // Shared helpers for mapping backend post data → UI types
 
-import { FeedPost } from '../../types/community';
+import { FeedPost, MediaItem } from '../../types/community';
 import { sanitizeImageUrl } from '../../lib/imageUtils';
 import type { UserPostOut } from './types';
 
@@ -41,7 +41,11 @@ export function toFeedPost(post: UserPostOut): FeedPost {
     },
     timestamp: post.createdAt,
     content: post.contentText || '',
-    images: post.media?.filter(m => m.type === 'image').map(m => m.url),
+    media: post.media?.map((m: any): MediaItem => ({
+      type: m.type === 'video' ? 'video' : 'image',
+      url: m.url,
+      thumbUrl: m.thumb_url || m.thumbUrl || undefined,
+    })).filter(m => !!m.url),
     gymId: post.gymId,
     gymName: post.gymName,
     attachment: post.attachmentType ? {

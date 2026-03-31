@@ -8,6 +8,7 @@ export interface PickedMediaItem {
   width: number;
   height: number;
   duration?: number;
+  coverUri?: string;
 }
 
 // --- Request types (snake_case, matching backend Pydantic models) ---

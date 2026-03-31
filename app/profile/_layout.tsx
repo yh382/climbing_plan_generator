@@ -4,6 +4,7 @@ import { NATIVE_HEADER_BASE } from "@/lib/nativeHeaderOptions";
 export default function ProfileLayout() {
   return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
+      <Stack.Screen name="qr-code" options={{ title: "QR Code", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="badges" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="blocked" options={{ title: "Blocked", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="comments" options={{ title: "My Comments", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />

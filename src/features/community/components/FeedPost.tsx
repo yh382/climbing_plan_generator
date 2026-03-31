@@ -1,6 +1,6 @@
 // src/features/community/components/FeedPost.tsx
 
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -43,7 +43,9 @@ function buildAttachmentProps(att: PostAttachment) {
       date: att.metrics?.find((m) => m.label === "Date")?.value || "—",
       sends: att.metrics?.find((m) => m.label === "Sends")?.value || "—",
       bestGrade: att.metrics?.find((m) => m.label === "Best")?.value || "—",
-      duration: att.metrics?.find((m) => m.label === "Duration")?.value || "—",
+      duration: att.metrics?.find((m) => m.label === "Duration")?.value
+        || att.subtitle?.split(" · ")[2]
+        || "—",
     },
   };
 }
@@ -65,6 +67,8 @@ interface Props {
   onDelete?: () => void;
   onReport?: () => void;
 
+  /** When false, inline video players are unmounted */
+  isVisible?: boolean;
   // [新增] 简易模式开关：用于在个人主页隐藏头像用户名
   simpleMode?: boolean;
 }
@@ -116,7 +120,7 @@ function ExpandableText({
 }
 
 
-export default function FeedPost({
+function FeedPost({
   post,
   onLike,
   onPressAttachment,
@@ -129,6 +133,7 @@ export default function FeedPost({
   onEdit,
   onDelete,
   onReport,
+  isVisible = true,
   simpleMode = false, // 默认为 false
 }: Props) {
   const colors = useThemeColors();
@@ -183,13 +188,12 @@ export default function FeedPost({
               )}
             </View>
           </TouchableOpacity>
-          {(onShare || onEdit || onDelete || onReport) ? (
+          {(onEdit || onDelete || onReport) ? (
             <TouchableOpacity
               style={{ padding: 4 }}
               onPress={() => {
                 const options: string[] = [];
                 const actions: (() => void)[] = [];
-                if (onShare) { options.push("Share"); actions.push(onShare); }
                 if (isOwn && onEdit) { options.push("Edit"); actions.push(onEdit); }
                 if (isOwn && onDelete) { options.push("Delete"); actions.push(onDelete); }
                 if (!isOwn && onReport) { options.push("Report"); actions.push(onReport); }
@@ -228,19 +232,15 @@ export default function FeedPost({
       )}
 
       {/* 2. Images / Video — carousel with full-screen viewer */}
-      {post.images && post.images.length > 0 ? (
+      {post.media && post.media.length > 0 ? (
         <View style={styles.mediaBlock}>
           <MediaCarousel
-            images={post.images}
+            media={post.media}
             width={width}
-            height={width}
+            height={Math.round(width * 4 / 3)}
             onPressImage={openViewer}
+            isVisible={isVisible}
           />
-          {post.images.length > 1 && (
-            <View style={styles.mediaBadge}>
-              <Text style={styles.mediaBadgeText}>+{post.images.length - 1}</Text>
-            </View>
-          )}
         </View>
       ) : null}
 
@@ -274,15 +274,20 @@ export default function FeedPost({
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
+        {onShare && (
+          <TouchableOpacity onPress={onShare} style={{ marginRight: 16 }}>
+            <Ionicons name="paper-plane-outline" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => onSave(post.id)}>
           <Ionicons name={post.isSaved ? "bookmark" : "bookmark-outline"} size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      {/* Full-screen image viewer modal */}
-      {post.images && post.images.length > 0 && (
+      {/* Full-screen media viewer modal */}
+      {post.media && post.media.length > 0 && (
         <ImageViewer
-          images={post.images}
+          media={post.media}
           initialIndex={viewerIndex}
           visible={viewerVisible}
           onClose={() => setViewerVisible(false)}
@@ -291,6 +296,8 @@ export default function FeedPost({
     </View>
   );
 }
+
+export default memo(FeedPost);
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
@@ -324,22 +331,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   contentText: { fontSize: theme.typography.body.fontSize, lineHeight: 22, fontFamily: theme.fonts.regular, color: colors.textPrimary },
   moreHit: { alignSelf: "flex-start", paddingTop: 6, paddingBottom: 2 },
   moreText: { fontSize: 13, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.textSecondary },
-
-  // Media badge
-  mediaBadge: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-  },
-  mediaBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
 
   footer: { flexDirection: "row", paddingHorizontal: 16, marginTop: 4, alignItems: "center", gap: 20 },
   iconRow: { flexDirection: "row", alignItems: "center", gap: 6 },

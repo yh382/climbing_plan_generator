@@ -2,6 +2,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiCreateLog, apiRepeatLog, apiDeleteLog } from "../../../../src/lib/logsApi";
 import { getSessionServerId } from "./sessionServerIdMap";
+import { handleAwardedBadges } from "../../../../src/store/useBadgeUnlockStore";
 
 export type LocalLogId = string;
 
@@ -87,6 +88,7 @@ export async function flushLogsOutbox(opts: {
         if (created?.id) {
           await saveServerId(ev.localId, String(created.id));
         }
+        handleAwardedBadges(created);
         continue;
       }
 

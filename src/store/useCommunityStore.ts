@@ -4,6 +4,7 @@ import { FeedPost } from '../types/community';
 import { communityApi } from '../features/community/api';
 import type { UserPostOut, UserPostCreateIn } from '../features/community/types';
 import { mapRawPost, toFeedPost } from '../features/community/utils';
+import { handleAwardedBadges } from './useBadgeUnlockStore';
 
 type FeedMode = 'all' | 'following';
 type FeedSort = 'latest' | 'hot';
@@ -88,12 +89,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   createPost: async (data) => {
     const raw = await communityApi.createPost(data);
+    handleAwardedBadges(raw);
     const mapped = mapRawPost(raw);
     // Optimistic: prepend to feed
     const newPost = toFeedPost(mapped);
     set((state) => ({
-      posts: [newPost, ...state.posts],
-      myPosts: [newPost, ...state.myPosts],
+      posts: [newPost, ...state.posts.filter(p => p.id !== newPost.id)],
+      myPosts: [newPost, ...state.myPosts.filter(p => p.id !== newPost.id)],
     }));
     return mapped;
   },

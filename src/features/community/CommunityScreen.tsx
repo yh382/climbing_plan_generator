@@ -1,6 +1,6 @@
 // src/features/community/CommunityScreen.tsx
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share } from "react-native";
+import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share, ViewToken } from "react-native";
 import { useFocusEffect, useNavigation, useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { communityApi } from "./api";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +18,13 @@ import { useChatStore } from "../../store/useChatStore";
 import { RankTab } from "./rank";
 import GymsTab from "./gyms/GymsTab";
 import EventsTab from "./events/EventsTab";
-import UploadProgressBanner from "./components/UploadProgressBanner";
+import UploadProgressToast from "@/components/ui/UploadProgressToast";
+import { setBlockVideoTaps } from "@/components/shared/MediaCarousel";
+import {
+  usePostUploadState,
+  retryUpload,
+  dismissUploadBanner,
+} from "./postUploadManager";
 
 type TopTab = "Post" | "Rank" | "Gyms" | "Events";
 
@@ -30,6 +36,21 @@ export default function CommunityScreen() {
   const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, feedSort, setFeedSort, deletePost } = useCommunityStore();
   const currentUserId = useUserStore((s) => s.user?.id);
   const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
+
+  // Upload progress tracking
+  const uploadState = usePostUploadState();
+  const uploadProgress = uploadState.total > 0 ? Math.min(95, (uploadState.uploaded / uploadState.total) * 100) : 0;
+  const showUploadToast = uploadState.status === "compressing" || uploadState.status === "uploading" || uploadState.status === "success";
+
+  // Show Alert on upload error
+  useEffect(() => {
+    if (uploadState.status === "error") {
+      Alert.alert("Post Failed", uploadState.error || "Upload failed", [
+        { text: "Dismiss", onPress: dismissUploadBanner },
+        { text: "Retry", onPress: retryUpload },
+      ]);
+    }
+  }, [uploadState.status]);
 
   const [refreshing, setRefreshing] = useState(false);
   const submitPostReport = useCallback(async (postId: string, reason: string) => {
@@ -85,6 +106,18 @@ export default function CommunityScreen() {
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
+
+  // Prefetch video thumbnails so covers are cached before user scrolls to them
+  useEffect(() => {
+    posts.forEach((post) => {
+      post.media?.forEach((m) => {
+        if (m.type === "video" && m.thumbUrl) {
+          Image.prefetch(m.thumbUrl);
+        }
+      });
+    });
+  }, [posts]);
+
   const [topTab, setTopTab] = useState<TopTab>("Post");
   const routeParams = useLocalSearchParams<{ tab?: string; gymId?: string }>();
 
@@ -171,14 +204,34 @@ export default function CommunityScreen() {
     )}
     </View>
 
-    <UploadProgressBanner />
     </View>
   ), [topTab, feedMode, feedSort, colors, styles]);
+
+  // Visibility tracking — only ONE post plays at a time (the most visible one)
+  // Clear active post when leaving Community tab → pauses all videos
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      return () => setActivePostId(null); // cleanup on blur
+    }, [])
+  );
+  const onViewableItemsChangedRef = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      // First viewable item is the most visible — only that one plays
+      const topId = viewableItems[0]?.item?.id ?? null;
+      setActivePostId(topId);
+    }
+  ).current;
+  const feedViewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 300,
+  }).current;
 
   const renderItem = useCallback(({ item }: any) => {
     return (
       <FeedPost
         post={item}
+        isVisible={activePostId === item.id}
         onLike={(id: string) => toggleLike(id)}
         onPress={() => router.push(`/community/u/${item.user.id}`)}
         onPressComment={(id: string) => {
@@ -189,10 +242,12 @@ export default function CommunityScreen() {
         onSave={(id: string) => toggleSave(id)}
         isOwn={!!currentUserId && item.user?.id === currentUserId}
         onShare={async () => {
+          setBlockVideoTaps(true);
           try { await Share.share({ message: 'Check out this post on ClimMate!' }); } catch {}
+          setBlockVideoTaps(false);
         }}
         onEdit={() => {
-          const mediaUrls = (item.images || []) as string[];
+          const mediaUrls = (item.media || []).map((m: any) => m.url).filter(Boolean);
           router.push({
             pathname: "/community/create",
             params: {
@@ -261,7 +316,7 @@ export default function CommunityScreen() {
         }}
       />
     );
-  }, [currentUserId, router, toggleLike, toggleSave, deletePost, submitPostReport]);
+  }, [currentUserId, router, toggleLike, toggleSave, deletePost, submitPostReport, activePostId]);
 
   const listFooter = useMemo(() => {
     const tabContent = topTab === "Events" ? <EventsTab />
@@ -331,6 +386,13 @@ export default function CommunityScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 110 }}
         ListEmptyComponent={listEmpty}
+        onViewableItemsChanged={onViewableItemsChangedRef}
+        viewabilityConfig={feedViewabilityConfig}
+      />
+      <UploadProgressToast
+        visible={showUploadToast}
+        progress={uploadState.status === "success" ? 100 : uploadProgress}
+        onDismiss={dismissUploadBanner}
       />
     </>
   );

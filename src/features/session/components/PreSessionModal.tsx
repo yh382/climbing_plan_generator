@@ -73,6 +73,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
 
   const sheetRef = useRef<TrueSheet>(null);
   const isPresented = useRef(false);
+  const userSelectedRef = useRef(false);
 
   // --- Data fetching ---
 
@@ -89,7 +90,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
         `/gyms/nearby?lat=${encodeURIComponent(c.lat)}&lng=${encodeURIComponent(c.lng)}&limit=3`
       );
       setItems(res.items ?? []);
-      if (res.items?.length) setSelectedGym(res.items[0].name);
+      if (res.items?.length && !userSelectedRef.current) setSelectedGym(res.items[0].name);
     } catch (e: any) {
       setItems([]);
       setErrorMsg(e?.message ?? "Failed to load nearby gyms");
@@ -114,8 +115,8 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
       }
       const res = await api.get<{ items: GymItem[] }>(`/gyms/search?${qs.toString()}`);
       setItems(res.items ?? []);
-      if (res.items?.length) setSelectedGym(res.items[0].name);
-      else setSelectedGym(null);
+      if (res.items?.length && !userSelectedRef.current) setSelectedGym(res.items[0].name);
+      else if (!res.items?.length) setSelectedGym(null);
     } catch (e: any) {
       setItems([]);
       setErrorMsg(e?.message ?? "Search failed");
@@ -150,6 +151,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     setErrorMsg(null);
     setSelectedGym(null);
     setDiscipline(null);
+    userSelectedRef.current = false;
 
     (async () => {
       const c = await getDeviceCoords();
@@ -254,7 +256,10 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
                 <TouchableOpacity
                   key={gym.id ?? `gym-${idx}`}
                   style={[styles.gymItem, isSelected && styles.gymItemActive]}
-                  onPress={() => setSelectedGym(gym.name)}
+                  onPress={() => {
+                    setSelectedGym(gym.name);
+                    userSelectedRef.current = true;
+                  }}
                 >
                   <View style={styles.gymIconWrap}>
                     <Ionicons

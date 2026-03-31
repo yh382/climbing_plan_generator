@@ -1,6 +1,6 @@
 // app/library/log-detail.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, FlatList, ActionSheetIOS } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, FlatList, Share } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,7 +10,6 @@ import { format, parseISO } from "date-fns";
 import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 import DualActivityRing from "../../src/features/journal/DualActivityRing";
 import LogItemCard from "../../src/features/journal/loglist/LogItemCard";
-import { usePlanStore } from "../../src/store/usePlanStore";
 import useLogsStore from "../../src/store/useLogsStore";
 import { colorForBoulder, colorForYDS } from "../../lib/gradeColors";
 import { readDayList, readSessionList } from "../../src/features/journal/loglist/storage";
@@ -114,9 +113,7 @@ export default function LogDetailScreen() {
   const gymNameParam = typeof params.gymName === "string" ? params.gymName : "";
   const modeParam = params.mode;
 
-  const { percentForDate } = usePlanStore();
   const sessions = useLogsStore((s) => s.sessions);
-  const [trainingPct, setTrainingPct] = useState(0);
 
   const [itemsB, setItemsB] = useState<any[]>([]);
   const [itemsR, setItemsR] = useState<any[]>([]);
@@ -133,14 +130,16 @@ export default function LogDetailScreen() {
   // Compute duration from session entry
   const duration = useMemo(() => {
     if (sessionEntry?.duration) return sessionEntry.duration;
-    if (sessionEntry?.startTime) {
+    if (sessionEntry?.startTime && sessionEntry?.endTime) {
       const start = typeof sessionEntry.startTime === "number"
         ? sessionEntry.startTime
         : new Date(sessionEntry.startTime).getTime();
-      const end = sessionEntry.endTime
-        ? (typeof sessionEntry.endTime === "number" ? sessionEntry.endTime : new Date(sessionEntry.endTime).getTime())
-        : Date.now();
-      return formatDuration(start, end);
+      const end = typeof sessionEntry.endTime === "number"
+        ? sessionEntry.endTime
+        : new Date(sessionEntry.endTime).getTime();
+      if (!isNaN(start) && !isNaN(end) && end > start) {
+        return formatDuration(start, end);
+      }
     }
     return "";
   }, [sessionEntry]);
@@ -233,14 +232,18 @@ export default function LogDetailScreen() {
     [itemsB, itemsR]
   );
 
-  useEffect(() => {
-    if (!date) return;
-    try {
-      percentForDate(parseISO(date)).then(setTrainingPct).catch(() => setTrainingPct(0));
-    } catch {
-      setTrainingPct(0);
-    }
-  }, [date, percentForDate]);
+  const durationPct = useMemo(() => {
+    if (!sessionEntry?.startTime || !sessionEntry?.endTime) return 0;
+    const start = typeof sessionEntry.startTime === "number"
+      ? sessionEntry.startTime
+      : new Date(sessionEntry.startTime).getTime();
+    const end = typeof sessionEntry.endTime === "number"
+      ? sessionEntry.endTime
+      : new Date(sessionEntry.endTime).getTime();
+    if (isNaN(start) || isNaN(end) || end <= start) return 0;
+    const minutes = (end - start) / 60000;
+    return Math.min(100, (minutes / 60) * 100);
+  }, [sessionEntry]);
 
   const displayDate = useMemo(() => {
     if (!date) return "Unknown Date";
@@ -330,6 +333,7 @@ export default function LogDetailScreen() {
               mediaType: m.type === "video" ? "video" : "image",
               width: 0,
               height: 0,
+              coverUri: m.coverUri || undefined,
             });
           }
         }
@@ -365,13 +369,12 @@ export default function LogDetailScreen() {
     });
   };
 
-  const handleShareVia = async () => {
-    const lines = dailyLogs.length > 0
-      ? dailyLogs.slice(0, 5).map((l: any) => `${l.grade || '—'}`).join(', ')
-      : 'No logs';
-    await Share.share({
-      message: `Route Log · ${displayDate}\n${gymName ? gymName + '\n' : ''}${sessionSends} sends · Best: ${bestGrade}${duration ? ' · ' + duration : ''}\n${lines}`,
-    });
+  const handleNativeShare = async () => {
+    const title = gymName || "Climbing Session";
+    const body = `${title} · ${displayDate}\n${sessionSends} sends · Best: ${bestGrade}${duration ? ` · ${duration}` : ""}`;
+    try {
+      await Share.share({ message: body });
+    } catch {}
   };
 
   const handleDeleteSession = () => {
@@ -389,41 +392,6 @@ export default function LogDetailScreen() {
         },
       },
     ]);
-  };
-
-  const handleEditMedia = () => {
-    Alert.alert("Coming soon", "Edit media for sessions is coming in a future update.");
-  };
-
-  // ActionSheetIOS menu (replaces SmartBottomSheet)
-  const showMenu = () => {
-    const hasPrivacyToggle = !!(sessionServerId || sessionKey);
-    const options = [
-      ...(hasPrivacyToggle ? [isPublic ? "Make Private" : "Make Public"] : []),
-      "Share to Post",
-      "Share via...",
-      "Edit Media",
-      "Delete Session",
-      "Cancel",
-    ];
-    const destructiveIndex = options.indexOf("Delete Session");
-    const cancelIndex = options.length - 1;
-
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options,
-        destructiveButtonIndex: destructiveIndex,
-        cancelButtonIndex: cancelIndex,
-      },
-      (buttonIndex) => {
-        const label = options[buttonIndex];
-        if (label === "Make Private" || label === "Make Public") handleTogglePrivacy();
-        else if (label === "Share to Post") handleShareToPost();
-        else if (label === "Share via...") handleShareVia();
-        else if (label === "Edit Media") handleEditMedia();
-        else if (label === "Delete Session") handleDeleteSession();
-      }
-    );
   };
 
   // === Render helpers ===
@@ -469,7 +437,7 @@ export default function LogDetailScreen() {
     <DualActivityRing
       size={170}
       thickness={14}
-      trainingPct={trainingPct}
+      trainingPct={durationPct}
       climbCount={activeTotal}
       parts={activeParts.length ? activeParts : []}
       climbGoal={10}
@@ -522,9 +490,9 @@ export default function LogDetailScreen() {
         ...NATIVE_HEADER_LARGE,
         headerTransparent: true,
         scrollEdgeEffects: { top: "soft" },
+        headerLargeTitleStyle: { fontSize: 24 },
         title: gymName || tr("训练详情", "Session Details"),
         headerLeft: () => <HeaderButton icon="chevron.backward" onPress={handleBack} />,
-        headerRight: () => <HeaderButton icon="ellipsis" onPress={showMenu} />,
       }} />
       <FlatList
         style={{ backgroundColor: colors.backgroundSecondary }}
@@ -566,10 +534,58 @@ export default function LogDetailScreen() {
             {listHeader}
           </>
         }
-        contentContainerStyle={{ paddingBottom: 8 }}
+        contentContainerStyle={{ paddingBottom: 8, gap: 6 }}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       />
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="square.and.arrow.up">
+          <Stack.Toolbar.MenuAction
+            icon="square.and.pencil"
+            onPress={handleShareToPost}
+          >
+            Post
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="paperplane"
+            onPress={handleNativeShare}
+          >
+            Share via...
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="photo"
+            onPress={() => router.push({
+              pathname: '/library/share-card',
+              params: {
+                date: displayDate,
+                gymName: gymName || "",
+                duration: duration || "",
+                sends: String(sessionSends),
+                bestGrade,
+                climbs: String(dailyLogs.length),
+                discipline: effectiveMode,
+              },
+            })}
+          >
+            Share as Image
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+        <Stack.Toolbar.Menu icon="ellipsis">
+          <Stack.Toolbar.MenuAction
+            icon={isPublic ? "lock" : "globe"}
+            onPress={() => handleTogglePrivacy()}
+          >
+            {isPublic ? "Make Private" : "Make Public"}
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="trash"
+            destructive
+            onPress={handleDeleteSession}
+          >
+            Delete Session
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
     </>
   );
 }

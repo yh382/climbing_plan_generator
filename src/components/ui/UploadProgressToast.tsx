@@ -1,14 +1,22 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
   withTiming,
   withSpring,
 } from "react-native-reanimated";
+import Svg, { Circle } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/lib/useThemeColors";
 
-const NATIVE_TAB_BAR_HEIGHT = 49;
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+const SIZE = 40;
+const STROKE = 3;
+const RADIUS = (SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 type Props = {
   visible: boolean;
@@ -20,59 +28,83 @@ type Props = {
 export default function UploadProgressToast({
   visible,
   progress,
-  fileName,
   onDismiss,
 }: Props) {
   const colors = useThemeColors();
-  const translateY = useSharedValue(100);
+  const scale = useSharedValue(0);
+  const animatedProgress = useSharedValue(0);
 
   useEffect(() => {
-    translateY.value = visible
-      ? withSpring(0, { damping: 20 })
-      : withTiming(100, { duration: 200 });
+    scale.value = visible
+      ? withSpring(1, { damping: 28, stiffness: 300 })
+      : withTiming(0, { duration: 150 });
   }, [visible]);
 
   useEffect(() => {
+    animatedProgress.value = withTiming(Math.min(100, progress), {
+      duration: 300,
+    });
+  }, [progress]);
+
+  useEffect(() => {
     if (progress >= 100) {
-      const timer = setTimeout(onDismiss, 1500);
+      const timer = setTimeout(onDismiss, 1200);
       return () => clearTimeout(timer);
     }
   }, [progress]);
 
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [{ scale: scale.value }],
+    opacity: scale.value,
   }));
+
+  const progressProps = useAnimatedProps(() => ({
+    strokeDashoffset:
+      CIRCUMFERENCE * (1 - animatedProgress.value / 100),
+  }));
+
+  const done = progress >= 100;
 
   return (
     <Animated.View
       style={[
         styles.container,
         animStyle,
-        {
-          backgroundColor: colors.backgroundSecondary,
-          bottom: NATIVE_TAB_BAR_HEIGHT + 60,
-        },
+        { backgroundColor: colors.backgroundSecondary },
       ]}
     >
-      <Text style={[styles.label, { color: colors.textPrimary }]}>
-        {progress >= 100
-          ? "Upload complete"
-          : `Uploading${fileName ? ` ${fileName}` : ""}...`}
-      </Text>
-      <View style={[styles.track, { backgroundColor: colors.border }]}>
-        <View
-          style={[
-            styles.bar,
-            {
-              width: `${Math.min(100, progress)}%`,
-              backgroundColor: colors.accent,
-            },
-          ]}
+      <Svg width={SIZE} height={SIZE}>
+        {/* Track */}
+        <Circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          stroke={colors.border}
+          strokeWidth={STROKE}
+          fill="none"
+        />
+        {/* Progress */}
+        <AnimatedCircle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          stroke={done ? "#34C759" : colors.accent}
+          strokeWidth={STROKE}
+          fill="none"
+          strokeDasharray={CIRCUMFERENCE}
+          animatedProps={progressProps}
+          strokeLinecap="round"
+          rotation={-90}
+          origin={`${SIZE / 2}, ${SIZE / 2}`}
+        />
+      </Svg>
+      <View style={styles.iconWrap}>
+        <Ionicons
+          name={done ? "checkmark" : "arrow-up"}
+          size={16}
+          color={done ? "#34C759" : colors.textSecondary}
         />
       </View>
-      <Text style={[styles.pct, { color: colors.textSecondary }]}>
-        {Math.round(progress)}%
-      </Text>
     </Animated.View>
   );
 }
@@ -80,18 +112,22 @@ export default function UploadProgressToast({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
+    top: 120,
     left: 16,
-    right: 16,
-    borderRadius: 12,
-    padding: 12,
+    width: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 6 },
-  track: { height: 4, borderRadius: 2, overflow: "hidden" },
-  bar: { height: 4, borderRadius: 2 },
-  pct: { fontSize: 12, marginTop: 4, textAlign: "right" },
+  iconWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

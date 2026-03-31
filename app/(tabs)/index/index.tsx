@@ -17,6 +17,8 @@ import { HomeBlogBannerCarousel, type HomeBlogBannerItem } from "@/features/home
 import { MOCK_BLOGS } from "@/features/home/blog/component/mockBlogs";
 import useLogsStore from "@/store/useLogsStore";
 import { getGradeScore } from "../../../src/services/stats/gradeAnalyzer";
+import { gradeToScore, scoreToGrade } from "@/lib/gradeSystem";
+import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
@@ -30,54 +32,84 @@ const BLOG_BANNERS: HomeBlogBannerItem[] = MOCK_BLOGS.slice(0, 3).map((blog) => 
   action: { type: "blog" as const, blogId: blog.id },
 }));
 
-// --- Helper: get Monday of current week as YYYY-MM-DD ---
-function getWeekStart(): string {
+// --- Helper: get 1st of current month as YYYY-MM-DD ---
+function getMonthStart(): string {
   const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? 6 : day - 1; // Monday = 0
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
-  return monday.toISOString().slice(0, 10);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-function getWeekEnd(weekStart: string): string {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
+function getMonthEnd(monthStart: string): string {
+  const [y, m] = monthStart.split("-").map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, "0")}-01`;
 }
 
-// --- This Week Snapshot ---
-function ThisWeekSnapshot() {
+// --- This Month Snapshot ---
+function ThisMonthSnapshot() {
   const colors = useThemeColors();
   const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const weekStart = useMemo(getWeekStart, []);
-  const weekEnd = useMemo(() => getWeekEnd(weekStart), [weekStart]);
+  const { boulderScale, ropeScale } = useSettings();
+  const monthStart = useMemo(getMonthStart, []);
+  const monthEnd = useMemo(() => getMonthEnd(monthStart), [monthStart]);
 
   const { sessions } = useLogsStore();
 
   const stats = useMemo(() => {
-    const weekSessions = sessions.filter((se) => se.date >= weekStart && se.date < weekEnd);
-    const totalSends = weekSessions.reduce((sum, se) => sum + se.sends, 0);
+    const monthSessions = sessions.filter((se) => se.date >= monthStart && se.date < monthEnd);
+    const totalSends = monthSessions.reduce((sum, se) => sum + se.sends, 0);
 
-    let best = "—";
-    let bestScore = -1;
-    for (const se of weekSessions) {
-      if (se.best && se.best !== "—" && se.best !== "V?") {
-        const score = getGradeScore(se.best, se.discipline);
-        if (score > bestScore) {
-          bestScore = score;
-          best = se.best;
-        }
+    // Find best boulder and best route separately
+    let boulderBest = "";
+    let boulderBestScore = -1;
+    let routeBest = "";
+    let routeBestScore = -1;
+
+    for (const se of monthSessions) {
+      if (!se.best || se.best === "—" || se.best === "V?") continue;
+      const score = getGradeScore(se.best, se.discipline);
+      if (se.discipline === "boulder") {
+        if (score > boulderBestScore) { boulderBestScore = score; boulderBest = se.best; }
+      } else {
+        if (score > routeBestScore) { routeBestScore = score; routeBest = se.best; }
+      }
+    }
+
+    // Convert to user's preferred grade scale
+    let boulderDisplay = "";
+    if (boulderBest) {
+      if (boulderScale === "Font") {
+        try {
+          const score = gradeToScore(boulderBest, "vscale");
+          boulderDisplay = scoreToGrade(score, "font");
+        } catch { boulderDisplay = boulderBest; }
+      } else {
+        boulderDisplay = boulderBest;
+      }
+    }
+
+    let routeDisplay = "";
+    if (routeBest) {
+      if (ropeScale === "French") {
+        try {
+          const score = gradeToScore(routeBest, "yds");
+          routeDisplay = scoreToGrade(score, "french");
+        } catch { routeDisplay = routeBest; }
+      } else {
+        routeDisplay = routeBest;
       }
     }
 
     return {
-      sessions: weekSessions.length,
+      sessions: monthSessions.length,
       sends: totalSends,
-      best,
+      boulderBest: boulderDisplay,
+      routeBest: routeDisplay,
     };
-  }, [sessions, weekStart, weekEnd]);
+  }, [sessions, monthStart, monthEnd, boulderScale, ropeScale]);
+
+  const bestDisplay = [stats.boulderBest, stats.routeBest].filter(Boolean).join(" / ") || "—";
 
   return (
     <View style={s.snapshotSection}>
@@ -85,17 +117,17 @@ function ThisWeekSnapshot() {
         <View style={s.snapshotCard}>
           <Text style={s.snapshotLabel}>Sessions</Text>
           <Text style={s.snapshotValue}>{stats.sessions}</Text>
-          <Text style={s.snapshotCaption}>this wk</Text>
+          <Text style={s.snapshotCaption}>this mo</Text>
         </View>
         <View style={s.snapshotCard}>
           <Text style={s.snapshotLabel}>Sends</Text>
           <Text style={s.snapshotValue}>{stats.sends}</Text>
-          <Text style={s.snapshotCaption}>this wk</Text>
+          <Text style={s.snapshotCaption}>this mo</Text>
         </View>
         <View style={s.snapshotCard}>
           <Text style={s.snapshotLabel}>Best</Text>
-          <Text style={s.snapshotValue}>{stats.best}</Text>
-          <Text style={s.snapshotCaption}>this wk</Text>
+          <Text style={[s.snapshotValue, bestDisplay.length > 5 && { fontSize: 16 }]}>{bestDisplay}</Text>
+          <Text style={s.snapshotCaption}>this mo</Text>
         </View>
       </View>
       <TouchableOpacity
@@ -103,7 +135,7 @@ function ThisWeekSnapshot() {
         onPress={() => router.push("/calendar")}
         hitSlop={8}
       >
-        <Text style={s.snapshotLinkText}>This week →</Text>
+        <Text style={s.snapshotLinkText}>This month →</Text>
       </TouchableOpacity>
     </View>
   );
@@ -225,8 +257,8 @@ export default function HomeScreen() {
       {/* Setup Climmate */}
         <SetupClimmateCard />
 
-        {/* This Week Snapshot */}
-        <ThisWeekSnapshot />
+        {/* This Month Snapshot */}
+        <ThisMonthSnapshot />
 
         {/* Blog — Banner Carousel */}
         <View style={{ marginBottom: theme.spacing.sectionGap }}>

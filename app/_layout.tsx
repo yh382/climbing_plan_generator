@@ -24,6 +24,7 @@ import * as Notifications from "expo-notifications";
 
 import GorillaSplash from "../src/components/GorillaSplash";
 import FloatingActiveSessionTimer from "../src/features/journal/FloatingActiveSessionTimer";
+import BadgeUnlockToast from "../src/components/ui/BadgeUnlockToast";
 
 import { useAuthStore } from "../src/store/useAuthStore";
 import useLogsStore from "../src/store/useLogsStore";
@@ -32,6 +33,7 @@ import { recoverOrphanedSessions } from "../src/features/journal/sync/localBacku
 import { registerForPushNotifications } from "../src/lib/pushNotifications";
 import { SidebarProvider } from "../src/contexts/SidebarContext";
 import { SidebarLayout, useGestureLock } from "@/components/sidebar/Sidebar";
+import { syncWidgetFromStore } from "@/lib/widgetBridge";
 
 // Set up notification handler (must be outside component)
 Notifications.setNotificationHandler({
@@ -74,8 +76,8 @@ function RootStack() {
       <Stack.Screen
         name="journal"
         options={{
+          headerShown: true,
           ...NATIVE_HEADER_LARGE,
-          headerTransparent: true,
           scrollEdgeEffects: { top: "soft" },
         }}
       />
@@ -167,6 +169,9 @@ export default function RootLayout() {
           console.warn("[recovery]", e);
         }
 
+        // Sync widget data on startup
+        syncWidgetFromStore();
+
         await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (e) {
         console.warn(e);
@@ -213,6 +218,7 @@ export default function RootLayout() {
                 <View style={{ flex: 1 }}>
                   <RootStack />
                   <FloatingTimerOverlay />
+                  <BadgeUnlockToast />
                 </View>
               </SidebarLayout>
             </ThemeProvider>

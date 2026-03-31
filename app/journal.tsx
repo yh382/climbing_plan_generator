@@ -45,6 +45,9 @@ import { withHeaderTheme } from "../src/lib/nativeHeaderOptions";
 import { HeaderButton } from "../src/components/ui/HeaderButton";
 import { useThemeColors } from "../src/lib/useThemeColors";
 
+// Live Activity
+import { updateLiveActivity } from "../src/lib/liveActivityBridge";
+
 // Utils
 import { colorForBoulder, colorForYDS } from "../lib/gradeColors";
 
@@ -111,7 +114,7 @@ export default function Journal() {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [sessionDetailCount, setSessionDetailCount] = useState(0);
-
+  const [sessionStats, setSessionStats] = useState({ sends: 0, best: "", routeCount: 0 });
 
   const { logs, upsertCount, activeSession, endSession } = useLogsStore();
   const mode = activeSession?.discipline ?? "boulder";
@@ -135,6 +138,16 @@ export default function Journal() {
     }
     return () => interval && clearInterval(interval);
   }, [activeSession]);
+
+  // Update Live Activity when session stats change
+  useEffect(() => {
+    if (!activeSession || sessionStats.routeCount === 0) return;
+    updateLiveActivity({
+      routeCount: sessionStats.routeCount,
+      sendCount: sessionStats.sends,
+      bestGrade: sessionStats.best,
+    });
+  }, [sessionStats, activeSession]);
 
   useFocusEffect(
     useCallback(() => {
@@ -187,83 +200,76 @@ export default function Journal() {
   );
 
   const handleBack = () => router.back();
+  const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
+  const logType = mode; // "boulder" | "toprope" | "lead"
 
-  const handleEndSession = () => {
+  const handleEndSession = useCallback(() => {
     Alert.alert(tr("结束训练?", "End Session?"), tr("这就结束今天的训练了吗？", "Are you done climbing for today?"), [
       { text: tr("取消", "Cancel"), style: "cancel" },
       {
         text: tr("结束并保存", "End & Save"),
         style: "destructive",
-          onPress: async () => {
-            // 1) 先把 Journal 页面的"追加态"清掉，避免残留
-            setPendingAppend(null);
+        onPress: async () => {
+          setPendingAppend(null);
+          setRefreshNonce((n) => n + 1);
 
-            // 2) 触发 TodayDetailsList 重新 load
-            setRefreshNonce((n) => n + 1);
+          const newSession = await endSession();
 
-            // 3) 再真正结束 session（写入 storage / 后端）
-            const newSession = await endSession();
-
-            // 4) Compute & save intensity for today (fire-and-forget)
-            const intensityDate = todayKey;
-            Promise.all(
-              (["boulder", "toprope", "lead"] as const).map(async (t) => {
-                const items = await readDayList(intensityDate, t);
-                const result = computeDailyIntensity(items);
-                if (result) await saveIntensityForDate(intensityDate, t, result);
-              })
-            ).catch(() => {});
-
-            // 5) Flush outbox → backend: sessions FIRST (so logs can resolve session_id)
-            const token = useAuthStore.getState().accessToken;
-            if (token) {
+          // 后台任务: intensity + flush (fire-and-forget)
+          const token = useAuthStore.getState().accessToken;
+          if (token) {
+            (async () => {
+              try {
+                const intensityDate = todayKey;
+                await Promise.all(
+                  (["boulder", "toprope", "lead"] as const).map(async (t) => {
+                    const items = await readDayList(intensityDate, t);
+                    const result = computeDailyIntensity(items);
+                    if (result) await saveIntensityForDate(intensityDate, t, result);
+                  })
+                );
+              } catch {}
               try {
                 const sMap = await readAllSessionServerIds();
                 await flushSessionsOutbox({
                   resolveServerId: (k) => sMap[k] ?? null,
-                  saveServerId: async (k, id) => {
-                    await setSessionSId(k, id);
-                    sMap[k] = id;
-                  },
+                  saveServerId: async (k, id) => { await setSessionSId(k, id); sMap[k] = id; },
                 });
               } catch {}
-
               try {
                 const idMap = await readAllServerIds();
                 await flushLogsOutbox({
                   token,
                   resolveServerId: (localId) => idMap[localId] ?? null,
-                  saveServerId: async (localId, serverId) => {
-                    await setServerId(localId, serverId);
-                    idMap[localId] = serverId;
-                  },
+                  saveServerId: async (localId, serverId) => { await setServerId(localId, serverId); idMap[localId] = serverId; },
                 });
               } catch {}
-            }
-
-            if (newSession) {
-              router.replace({
-                pathname: "/library/log-detail",
-                params: {
-                  date: newSession.date,
-                  origin: "end_log",
-                  gymName: newSession.gymName ?? activeSession?.gymName ?? "",
-                  sessionKey: newSession.sessionKey,
-                },
-              });
-            }
+            })(); // 不 await
           }
 
+          // 立即导航
+          if (newSession) {
+            router.replace({
+              pathname: "/library/log-detail",
+              params: {
+                date: newSession.date,
+                origin: "end_log",
+                gymName: newSession.gymName ?? activeSession?.gymName ?? "",
+                sessionKey: newSession.sessionKey,
+              },
+            });
+          }
+        },
       },
     ]);
-  };
+  }, [endSession, activeSession, todayKey, tr]);
 
   // ===== Native header =====
   useLayoutEffect(() => {
     navigation.setOptions({
       ...withHeaderTheme(colors),
       headerTitle: activeSession
-        ? tr("训练记录中", "Logging Session")
+        ? `${tr("训练记录中", "Logging")} · ${sessionDuration}`
         : tr("训练日志", "Journal"),
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={handleBack} />
@@ -277,10 +283,7 @@ export default function Journal() {
           )
         : undefined,
     });
-  }, [activeSession, colors, navigation, tr]);
-
-  const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
-  const logType = mode; // "boulder" | "toprope" | "lead"
+  }, [activeSession, colors, navigation, tr, sessionDuration, handleEndSession]);
 
   // 仍保留 segments 用于上方 ring/统计等逻辑（不动）
   const daySegments = useSegmentsByDate(todayKey, logType);
@@ -495,6 +498,7 @@ export default function Journal() {
                   onAppended={() => setPendingAppend(null)}
                   refreshKey={refreshNonce}
                   onCountChange={setSessionDetailCount}
+                  onStatsChange={setSessionStats}
                 />
               </View>
             ) : (

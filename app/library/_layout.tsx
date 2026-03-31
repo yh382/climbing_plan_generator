@@ -20,6 +20,7 @@ export default function LibraryLayout() {
       <Stack.Screen name="trending-plans" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="log-detail" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="edit-log-media" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="share-card" options={{ title: "Share Card", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
     </Stack>
   );
 }

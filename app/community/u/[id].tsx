@@ -308,7 +308,7 @@ export default function PublicProfileScreen() {
             ) : (
               <ProfilePostGrid
                 posts={posts as any}
-                onPressPost={(post) => router.push(`/community/post/${post.id}` as any)}
+                onPressPost={(post) => router.push({ pathname: "/community/user-posts", params: { userId: id, initialPostId: post.id } } as any)}
               />
             )
           )}

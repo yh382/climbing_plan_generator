@@ -7,25 +7,33 @@ const config: ExpoConfig = {
   slug: "climMate",
   scheme: "climMate",
   userInterfaceStyle: "automatic",
+  orientation: "portrait",
 
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.yh382.climmate",
     usesAppleSignIn: true,
-  infoPlist: {
-    NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
+    entitlements: {
+      "com.apple.security.application-groups": ["group.com.yh382.climmate"],
+    },
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription: "App 需要使用您的位置信息以显示附近岩馆。",
 
-    // ✅ 选相册（Choose from library）
-    NSPhotoLibraryUsageDescription: "ClimMate 需要访问你的相册，以便选择头像。",
+      // ✅ 选相册（Choose from library）
+      NSPhotoLibraryUsageDescription: "ClimMate 需要访问你的相册，以便选择头像。",
 
-    // ✅ 拍照（Take photo）
-    NSCameraUsageDescription: "ClimMate 需要访问你的相机，以便拍摄头像。",
+      // ✅ 拍照（Take photo）
+      NSCameraUsageDescription: "ClimMate 需要访问你的相机，以便拍摄头像。",
 
-    // （可选）只有你要“保存图片到相册”才需要
-    NSPhotoLibraryAddUsageDescription: "ClimMate 需要权限将图片保存到你的相册。",
+      // （可选）只有你要"保存图片到相册"才需要
+      NSPhotoLibraryAddUsageDescription: "ClimMate 需要权限将图片保存到你的相册。",
 
-    ITSAppUsesNonExemptEncryption: false,
-    NSAppTransportSecurity: { NSAllowsArbitraryLoads: true },
+      ITSAppUsesNonExemptEncryption: false,
+      NSAppTransportSecurity: { NSAllowsArbitraryLoads: true },
+
+      // Widget & Live Activity support
+      NSSupportsLiveActivities: true,
+      NSSupportsLiveActivitiesFrequentUpdates: true,
     },
 
   },
@@ -68,6 +76,19 @@ const config: ExpoConfig = {
     "expo-image",
     "expo-sharing",
     "expo-web-browser",
+    "expo-screen-orientation",
+    "react-native-compressor",
+    ["expo-widgets", {
+      widgets: [
+        {
+          name: "ClimMateWidget",
+          displayName: "ClimMate Stats",
+          description: "Your climbing stats at a glance",
+          supportedFamilies: ["systemSmall", "systemMedium"],
+        },
+      ],
+      groupIdentifier: "group.com.yh382.climmate",
+    }],
   ],
 
   updates: {

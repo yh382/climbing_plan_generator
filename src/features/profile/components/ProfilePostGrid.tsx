@@ -35,8 +35,13 @@ function GridItem({
   onPress: () => void;
   colors: ReturnType<typeof useThemeColors>;
 }) {
-  const hasImages = post.images && post.images.length > 0;
+  const hasMedia = post.media && post.media.length > 0;
   const hasAttachment = !!post.attachment;
+  const firstMedia = post.media?.[0];
+  // For videos: only use thumbUrl (video URL can't render as Image)
+  const thumbUri = firstMedia
+    ? (firstMedia.type === 'video' ? firstMedia.thumbUrl : firstMedia.url)
+    : undefined;
 
   return (
     <TouchableOpacity
@@ -44,15 +49,21 @@ function GridItem({
       activeOpacity={0.8}
       onPress={onPress}
     >
-      {hasImages ? (
+      {hasMedia ? (
         <>
-          <Image
-            source={{ uri: post.images![0] }}
-            style={styles.gridImage}
-            resizeMode="cover"
-          />
-          {/* Multi-image badge */}
-          {post.images!.length > 1 && (
+          {thumbUri ? (
+            <Image
+              source={{ uri: thumbUri }}
+              style={styles.gridImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.gridImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="videocam" size={24} color="rgba(255,255,255,0.4)" />
+            </View>
+          )}
+          {/* Multi-media badge */}
+          {post.media!.length > 1 && (
             <View style={styles.multiImageBadge}>
               <Ionicons name="copy-outline" size={14} color="#FFF" />
             </View>
@@ -68,7 +79,7 @@ function GridItem({
             </View>
           )}
         </>
-      ) : hasAttachment ? (
+      ) : hasAttachment && post.attachment ? (
         <View style={[styles.textCell, { backgroundColor: colors.backgroundSecondary }]}>
           <Ionicons
             name={

@@ -21,6 +21,7 @@ import { useThemeColors } from "../../src/lib/useThemeColors";
 import { withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
 import { useSettings } from "../../src/contexts/SettingsContext";
 import { plansApi } from "../../src/features/plans/api";
+import { handleAwardedBadges } from "../../src/store/useBadgeUnlockStore";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { WeekSelector } from "../../src/features/plans/components/WeekSelector";
 import { ExercisePickerModal } from "../../src/features/plans/components/ExercisePickerModal";
@@ -321,7 +322,7 @@ export default function PlanBuilderScreen() {
         },
       };
 
-      await plansApi.createPlan({
+      const result = await plansApi.createPlan({
         title: title.trim(),
         plan_json: planJson as unknown as Record<string, unknown>,
         source: "custom",
@@ -329,6 +330,7 @@ export default function PlanBuilderScreen() {
         training_type: intensity.toLowerCase(),
         duration_weeks: weeks,
       });
+      handleAwardedBadges(result);
 
       Alert.alert(
         tr("成功", "Success"),

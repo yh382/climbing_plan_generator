@@ -1,13 +1,14 @@
 import React, { useLayoutEffect } from "react";
-import { Alert, Linking, Platform } from "react-native";
+import { Alert, Linking, Platform, useColorScheme } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 
 import { Host, Form, Section, Button, Picker, Text, LabeledContent, Label, HStack, ZStack, Spacer, Image } from "@expo/ui/swift-ui";
-import { pickerStyle, tag, frame, buttonStyle, background, shapes, font, foregroundStyle } from "@expo/ui/swift-ui/modifiers";
+import { pickerStyle, tag, frame, buttonStyle, background, shapes, font, foregroundStyle, scrollContentBackground } from "@expo/ui/swift-ui/modifiers";
 
 import { useSettings } from "src/contexts/SettingsContext";
 import { useAuthStore } from "src/store/useAuthStore";
+import { useThemeColors } from "src/lib/useThemeColors";
 import { NATIVE_HEADER_LARGE } from "../../src/lib/nativeHeaderOptions";
 
 // 类型定义
@@ -31,6 +32,8 @@ const SettingIcon = ({ name, bg }: { name: string; bg: string }) => (
 export default function Settings() {
   const router = useRouter();
   const navigation = useNavigation();
+  const colors = useThemeColors();
+  const isDark = useColorScheme() === "dark";
   const logout = useAuthStore((s) => s.logout);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
 
@@ -125,7 +128,7 @@ export default function Settings() {
         />
       </Stack.Toolbar>
       <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-        <Form>
+        <Form modifiers={[scrollContentBackground("hidden"), background(isDark ? colors.background : colors.backgroundSecondary)]}>
           {/* Account */}
           <Section title={tr("账户", "Account")}>
             <Button onPress={() => router.push("/settings/notifications" as any)} modifiers={[buttonStyle("plain")]}>

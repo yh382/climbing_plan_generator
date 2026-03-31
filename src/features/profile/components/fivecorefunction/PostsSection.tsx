@@ -1,36 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { communityApi } from "../../../community/api";
-import type { UserPostOut } from "../../../community/types";
+import { toFeedPost, mapRawPost } from "../../../community/utils";
+import { useUserStore } from "../../../../store/useUserStore";
 import type { FeedPost as FeedPostType } from "../../../../types/community";
 import ProfilePostGrid from "../ProfilePostGrid";
-
-function toFeedPost(p: UserPostOut): FeedPostType {
-  return {
-    id: p.id,
-    user: {
-      id: p.userId,
-      username: p.authorName ?? "",
-      avatar: p.authorAvatar ?? "",
-    },
-    timestamp: p.createdAt,
-    content: p.contentText ?? "",
-    images: p.media?.filter((m) => m.type === "image").map((m) => m.url) ?? [],
-    attachment: p.attachmentType
-      ? {
-          type: p.attachmentType as any,
-          id: p.attachmentId ?? "",
-          title: p.attachmentMeta?.title ?? "",
-          subtitle: p.attachmentMeta?.subtitle ?? "",
-        }
-      : undefined,
-    likes: p.likeCount,
-    comments: p.commentCount,
-    isLiked: p.isLiked,
-    isSaved: p.isSaved,
-  };
-}
 
 interface PostsSectionProps {
   userId?: string;
@@ -39,6 +15,7 @@ interface PostsSectionProps {
 
 export default function PostsSection({ userId }: PostsSectionProps) {
   const router = useRouter();
+  const currentUserId = useUserStore((s) => s.user?.id);
   const [posts, setPosts] = useState<FeedPostType[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +25,7 @@ export default function PostsSection({ userId }: PostsSectionProps) {
       const raw = userId
         ? await communityApi.getUserPosts(userId)
         : await communityApi.getMyPosts();
-      setPosts((raw ?? []).map(toFeedPost));
+      setPosts((raw ?? []).map((d: any) => toFeedPost(mapRawPost(d))));
     } catch (e) {
       console.warn("PostsSection load error:", e);
       setPosts([]);
@@ -57,15 +34,21 @@ export default function PostsSection({ userId }: PostsSectionProps) {
     }
   }, [userId]);
 
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
+  // Refetch on screen focus (e.g. returning from post creation)
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts])
+  );
 
   const onPressPost = useCallback(
     (post: FeedPostType) => {
-      router.push(`/community/post/${post.id}` as any);
+      router.push({
+        pathname: "/community/user-posts",
+        params: { userId: userId ?? currentUserId, initialPostId: post.id },
+      } as any);
     },
-    [router]
+    [router, userId, currentUserId]
   );
 
   return (

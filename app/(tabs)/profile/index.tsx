@@ -322,7 +322,7 @@ export default function ProfileScreen() {
           </Stack.Toolbar.MenuAction>
           <Stack.Toolbar.MenuAction
             icon="qrcode"
-            onPress={() => console.log('QR Code logic')}
+            onPress={() => router.push('/profile/qr-code')}
           >
             QR Code
           </Stack.Toolbar.MenuAction>
