@@ -35,12 +35,10 @@ function InlineVideoPlayer({
   uri,
   thumbUri,
   shouldPlay,
-  onTapWhenNotPlaying,
 }: {
   uri: string;
   thumbUri?: string;
   shouldPlay: boolean;
-  onTapWhenNotPlaying?: () => void;
 }) {
   const [muted, setMuted] = useState(globalInlineMuted);
   const player = useVideoPlayer({ uri }, (p) => {
@@ -52,6 +50,7 @@ function InlineVideoPlayer({
 
   // Control playback + sync muted state when visibility changes
   useEffect(() => {
+    if (inFullscreen) return; // Don't interfere with fullscreen playback
     if (shouldPlay) {
       setMuted(globalInlineMuted);
       player.volume = globalInlineMuted ? 0 : 1;
@@ -59,7 +58,7 @@ function InlineVideoPlayer({
     } else {
       player.pause();
     }
-  }, [shouldPlay, player]);
+  }, [shouldPlay, player, inFullscreen]);
 
   const { status } = useEvent(player, "statusChange", { status: player.status });
   const videoReady = status === "readyToPlay";
@@ -77,9 +76,10 @@ function InlineVideoPlayer({
       <Pressable
         onPress={() => {
           if (_blockVideoTaps) return;
-          shouldPlay
-            ? viewRef.current?.enterFullscreen()
-            : onTapWhenNotPlaying?.();
+          // Always enter native iOS fullscreen for videos.
+          // Start playback if not already playing (e.g. post not yet "active").
+          if (!shouldPlay) player.play();
+          viewRef.current?.enterFullscreen();
         }}
         style={StyleSheet.absoluteFill}
       >
@@ -98,6 +98,8 @@ function InlineVideoPlayer({
             setInFullscreen(false);
             player.volume = globalInlineMuted ? 0 : 1;
             player.loop = true;
+            // If the post isn't the "active" one, pause after exiting fullscreen
+            if (!shouldPlay) player.pause();
           }}
         />
         {showThumb && thumbUri ? (
@@ -194,7 +196,6 @@ export default function MediaCarousel({
               uri={item.url}
               thumbUri={item.thumbUrl}
               shouldPlay={shouldPlay}
-              onTapWhenNotPlaying={() => onPressImage?.(index)}
             />
           ) : (
             // Image: render normally
