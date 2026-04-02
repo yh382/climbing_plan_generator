@@ -452,8 +452,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               return sid;
             }
             return null;
-          } catch {
-            // 离线: 入队稍后重试
+          } catch (err: any) {
+            // 离线或请求失败: 入队稍后重试
+            console.warn("[SESSION] Failed to create session on backend:", err?.message || err);
             await enqueueSessionEvent({
               type: "create",
               localKey: sessionKey,

@@ -84,6 +84,7 @@ export async function flushSessionsOutbox(opts: {
     } catch (err: any) {
       // 409 = already exists → treat as success
       const msg = String(err?.message || "");
+      console.warn(`[SESSIONS_OUTBOX] Failed to flush ${ev.type} event:`, msg);
       if (msg.includes("409")) continue;
       remaining.push(ev);
     }

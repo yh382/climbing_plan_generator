@@ -119,6 +119,7 @@ export async function flushLogsOutbox(opts: {
     } catch (err: any) {
       // 409 = already exists → treat as success for create events
       const msg = String(err?.message || "");
+      console.warn(`[LOGS_OUTBOX] Failed to flush ${ev.type} event:`, msg);
       if (msg.includes("409") && ev.type === "create") continue;
       remaining.push(ev);
     }
