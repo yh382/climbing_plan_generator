@@ -77,7 +77,8 @@ function RootStack() {
         name="journal"
         options={{
           headerShown: true,
-          ...NATIVE_HEADER_LARGE,
+          ...NATIVE_HEADER_BASE,
+          headerTransparent: true,
           scrollEdgeEffects: { top: "soft" },
         }}
       />

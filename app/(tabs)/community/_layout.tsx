@@ -6,7 +6,11 @@ export default function CommunityTabLayout() {
     <Stack>
       <Stack.Screen
         name="index"
-        options={NATIVE_HEADER_LARGE}
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          headerTransparent: true,
+          scrollEdgeEffects: { top: "soft" },
+        }}
       />
     </Stack>
   );

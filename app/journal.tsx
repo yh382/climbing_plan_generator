@@ -269,7 +269,14 @@ export default function Journal() {
     navigation.setOptions({
       ...withHeaderTheme(colors),
       headerTitle: activeSession
-        ? `${tr("训练记录中", "Logging")} · ${sessionDuration}`
+        ? () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
+              <Text style={{ fontSize: 17, fontWeight: "600", fontFamily: "DMSans_700Bold", color: colors.textPrimary }}>
+                {`${tr("训练记录中", "Logging")} · ${sessionDuration}`}
+              </Text>
+            </View>
+          )
         : tr("训练日志", "Journal"),
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={handleBack} />

@@ -369,7 +369,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
                   const best = isBoulder
                     ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
                     : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
-                  return { ...bs, climbs: items.length, sends, best };
+                  return { ...bs, climbs: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
                 }
               } catch { /* best-effort */ }
             }
@@ -392,7 +392,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
                   const best = isBoulder
                     ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
                     : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
-                  return { ...ls, climbs: items.length, sends, best };
+                  return { ...ls, climbs: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
                 }
               } catch { /* best-effort */ }
             }
@@ -562,7 +562,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             sessionKey,
             sends,
             best,
-            climbs: sessionItems.length,
+            climbs: sessionItems.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0),
 
             serverId: serverId,
             isPublic: false,
@@ -595,7 +595,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             ]);
             const items = [...(sb || []), ...(str || []), ...(sl || [])];
             sends = items.reduce((s: number, it: any) => s + inferSendCount(it), 0);
-            climbs = items.length;
+            climbs = items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0);
           } catch { /* best-effort */ }
 
           const fallbackSession: SessionEntry = {
