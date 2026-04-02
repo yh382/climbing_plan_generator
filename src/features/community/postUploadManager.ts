@@ -164,6 +164,9 @@ export async function submitPostInBackground(
 
     // 2. Build post payload
     const w = draft.attachedWidget;
+    if (__DEV__ && w && w.type && !w.id) {
+      console.warn("[postUploadManager] attachment has type but empty id — dropped!", w);
+    }
     const hasAttachment = !!(w && w.id && w.type);
 
     const postData: UserPostCreateIn = {

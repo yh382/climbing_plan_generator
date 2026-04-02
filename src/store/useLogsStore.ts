@@ -83,6 +83,7 @@ type LogsState = {
   syncFromBackend: () => Promise<void>;
   isSyncing: boolean;
   hasSyncedOnce: boolean;
+  _hydrated: boolean;
   _lastEndSessionTime: number;
 
   countByDateType: (date: string, type: LogType) => number;
@@ -207,6 +208,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       activeSession: null,
       isSyncing: false,
       hasSyncedOnce: false,
+      _hydrated: false,
       _lastEndSessionTime: 0,
 
       awaitSessionServerId: async () => {
@@ -219,16 +221,17 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       },
 
       syncFromBackend: async () => {
+        // Wait for persist hydration — running before hydration loses local-only sessions
+        if (!get()._hydrated) return;
         if (get().isSyncing) return;
         // Cooldown: skip sync if endSession just ran (outbox still flushing)
         const msSinceEnd = Date.now() - (get()._lastEndSessionTime || 0);
         if (msSinceEnd < 15_000) return;
         set({ isSyncing: true });
         try {
-          // Fix orphan logs on first sync (associates NULL session_id logs with sessions)
-          if (!get().hasSyncedOnce) {
-            await api.post("/climb-logs/fix-orphans", {}).catch(() => {});
-          }
+          // Fix orphan logs (associates NULL session_id logs with sessions)
+          // Run every sync — outbox-flushed logs often arrive as orphans
+          await api.post("/climb-logs/fix-orphans", {}).catch(() => {});
 
           const [sessionsData, logsData] = await Promise.all([
             api.get<any[]>("/sessions/me"),
@@ -458,7 +461,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             await enqueueSessionEvent({
               type: "create",
               localKey: sessionKey,
-              payload: { gym_name: gymName, location_type: "gym", date: localDate },
+              payload: { gym_name: gymName, location_type: "gym", date: localDate, start_time: new Date(startTime).toISOString() },
             });
             return null;
           }
@@ -776,7 +779,11 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         sessions: s.sessions,
         activeSession: s.activeSession,
         hasSyncedOnce: s.hasSyncedOnce,
+        // _hydrated intentionally excluded — always starts false
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state._hydrated = true;
+      },
     }
   )
 );

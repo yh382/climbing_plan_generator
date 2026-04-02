@@ -317,7 +317,23 @@ export default function LogDetailScreen() {
   const handleShareToPost = async () => {
     if (!sessionEntry) return;
 
-    // 1. Collect all uploaded media from session log items
+    // 0. Ensure valid server ID before sharing (Bug fix: avoid empty attachment id)
+    let resolvedServerId = sessionServerId;
+    if (!resolvedServerId && sessionKey) {
+      resolvedServerId = await getSessionSId(sessionKey);
+    }
+    if (!resolvedServerId && sessionEntry.serverId) {
+      resolvedServerId = sessionEntry.serverId;
+    }
+    if (!resolvedServerId) {
+      Alert.alert(
+        tr("请稍候", "Not Ready"),
+        tr("Session 正在同步中，请稍后再试。", "Session is still syncing. Please try again in a moment."),
+      );
+      return;
+    }
+
+    // 1. Collect all media from session log items (including local file:// URIs)
     const allTypes = ["boulder", "toprope", "lead"] as const;
     const collected: PickedMediaItem[] = [];
 
@@ -326,7 +342,7 @@ export default function LogDetailScreen() {
       for (const item of items) {
         const media = Array.isArray(item.media) ? item.media : [];
         for (const m of media) {
-          if (typeof m.uri === "string" && m.uri.startsWith("http")) {
+          if (typeof m.uri === "string" && m.uri.length > 0) {
             collected.push({
               id: m.id || `${item.id}-${m.uri}`,
               uri: m.uri,
@@ -361,7 +377,7 @@ export default function LogDetailScreen() {
       pathname: "/community/create",
       params: {
         prefillAttachType: "session",
-        prefillAttachId: sessionServerId || "",
+        prefillAttachId: resolvedServerId,
         prefillAttachTitle: `${sessionEntry.gymName || gymName || "Climbing Session"} · ${displayDate}`,
         prefillAttachSubtitle: `${sessionSends} sends · ${bestGrade} · ${durationStr}`,
         source: "log-detail",
