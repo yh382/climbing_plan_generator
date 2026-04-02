@@ -11,8 +11,22 @@ export interface GymLogItem {
   grade_text: string;
   grade_score: number;
   result: string;
-  feel?: number;
+  feel?: string;
   wall_type: string;
+  created_at: string;
+}
+
+export interface GymSessionItem {
+  id: string;
+  user_id: string;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string;
+  date: string;
+  duration_minutes?: number;
+  log_count: number;
+  send_count: number;
+  top_grade?: string;
   created_at: string;
 }
 
@@ -57,7 +71,7 @@ export interface RecentGym {
 
 export const gymCommunityApi = {
   getActivity: async (gymId: string, limit = 20, offset = 0) => {
-    const res = await api.get<{ items: GymLogItem[]; total: number }>(
+    const res = await api.get<{ items: GymSessionItem[]; total: number }>(
       `/gyms/${gymId}/activity?limit=${limit}&offset=${offset}`
     );
     res.items.forEach(i => { i.avatar_url = sanitizeImageUrl(i.avatar_url) ?? undefined; });

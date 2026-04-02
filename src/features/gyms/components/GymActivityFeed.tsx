@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-import { gymCommunityApi, GymLogItem, GymStats } from '../api';
+import { gymCommunityApi, GymSessionItem, GymStats } from '../api';
+import { useThemeColors } from '@/lib/useThemeColors';
 
 interface Props {
   gymId: string;
@@ -26,22 +27,18 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-const RESULT_LABELS: Record<string, string> = {
-  flash: 'Flash',
-  onsight: 'Onsight',
-  send: 'Send',
-  attempt: 'Attempt',
-};
-
-const WALL_LABELS: Record<string, string> = {
-  boulder: 'Boulder',
-  toprope: 'Top Rope',
-  lead: 'Lead',
-  trad: 'Trad',
-};
+function formatDuration(mins: number | undefined): string {
+  if (!mins) return '';
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
 export default function GymActivityFeed({ gymId }: Props) {
-  const [logs, setLogs] = useState<GymLogItem[]>([]);
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [sessions, setSessions] = useState<GymSessionItem[]>([]);
   const [stats, setStats] = useState<GymStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +49,7 @@ export default function GymActivityFeed({ gymId }: Props) {
         gymCommunityApi.getActivity(gymId),
         gymCommunityApi.getStats(gymId),
       ]);
-      setLogs(activityData.items);
+      setSessions(activityData.items);
       setStats(statsData);
     } catch {
       // swallow
@@ -68,7 +65,7 @@ export default function GymActivityFeed({ gymId }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="small" color="#306E6F" />
+        <ActivityIndicator size="small" color={colors.accent} />
       </View>
     );
   }
@@ -95,19 +92,19 @@ export default function GymActivityFeed({ gymId }: Props) {
         </View>
       )}
 
-      {/* Log List */}
-      {logs.length === 0 ? (
+      {/* Session List */}
+      {sessions.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="pulse-outline" size={40} color="#D1D5DB" />
-          <Text style={styles.emptyText}>No activity yet</Text>
+          <Ionicons name="pulse-outline" size={40} color={colors.tertiaryLabel} />
+          <Text style={styles.emptyText}>No sessions yet</Text>
           <Text style={styles.emptySubtext}>
-            Climb logs at this gym will appear here
+            Sessions at this gym will appear here
           </Text>
         </View>
       ) : (
         <>
-          <Text style={styles.sectionTitle}>Recent Climbs</Text>
-          {logs.map((item) => (
+          <Text style={styles.sectionTitle}>Recent Sessions</Text>
+          {sessions.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={styles.card}
@@ -119,19 +116,17 @@ export default function GymActivityFeed({ gymId }: Props) {
                   <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={16} color="#9CA3AF" />
+                    <Ionicons name="person" size={16} color={colors.tertiaryLabel} />
                   </View>
                 )}
-                <View style={styles.logInfo}>
+                <View style={styles.sessionInfo}>
                   <Text style={styles.username} numberOfLines={1}>
-                    {item.username || 'Climber'}
+                    {item.display_name || item.username || 'Climber'}
                   </Text>
-                  <Text style={styles.logDetail}>
-                    <Text style={styles.grade}>{item.grade_text}</Text>
-                    {' · '}
-                    {RESULT_LABELS[item.result] || item.result}
-                    {' · '}
-                    {WALL_LABELS[item.wall_type] || item.wall_type}
+                  <Text style={styles.sessionDetail}>
+                    {item.log_count} routes · {item.send_count} sends
+                    {item.top_grade ? ` · Top ${item.top_grade}` : ''}
+                    {item.duration_minutes ? ` · ${formatDuration(item.duration_minutes)}` : ''}
                   </Text>
                 </View>
                 <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
@@ -144,7 +139,7 @@ export default function GymActivityFeed({ gymId }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingBottom: 20,
@@ -161,15 +156,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#374151',
+    color: c.label,
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: c.tertiaryLabel,
     textAlign: 'center',
   },
-
-  // KPI
   kpiRow: {
     flexDirection: 'row',
     gap: 8,
@@ -177,39 +170,37 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: c.card,
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: c.separator,
   },
   kpiValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#111',
+    color: c.label,
   },
   kpiLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#9CA3AF',
+    color: c.tertiaryLabel,
     marginTop: 2,
   },
-
-  // Log list
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#111',
+    color: c.label,
     marginBottom: 10,
   },
   card: {
-    backgroundColor: '#FFF',
+    backgroundColor: c.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: c.separator,
   },
   row: {
     flexDirection: 'row',
@@ -222,30 +213,26 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatarPlaceholder: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: c.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logInfo: {
+  sessionInfo: {
     flex: 1,
   },
   username: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111',
+    color: c.label,
   },
-  logDetail: {
+  sessionDetail: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.secondaryLabel,
     marginTop: 1,
-  },
-  grade: {
-    fontWeight: '800',
-    color: '#306E6F',
   },
   time: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: c.tertiaryLabel,
     marginLeft: 8,
   },
 });

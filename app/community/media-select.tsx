@@ -36,11 +36,12 @@ export default function MediaSelectScreen() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { sessionId, date, localGymName, localSends, localBest, localDuration } =
+  const { sessionId, date, localGymName, localGymId, localSends, localBest, localDuration } =
     useLocalSearchParams<{
       sessionId: string;
       date: string;
       localGymName?: string;
+      localGymId?: string;
       localSends?: string;
       localBest?: string;
       localDuration?: string;
@@ -129,6 +130,7 @@ export default function MediaSelectScreen() {
         prefillAttachId: sessionId!,
         prefillAttachTitle: `${sessionInfo?.gymName} · ${dateLabel}`,
         prefillAttachSubtitle: `${sessionInfo?.sends} sends · ${sessionInfo?.bestGrade} · ${sessionInfo?.duration}`,
+        ...(localGymId && sessionInfo?.gymName ? { prefillGymId: localGymId, prefillGymName: sessionInfo.gymName } : {}),
       },
     });
   };

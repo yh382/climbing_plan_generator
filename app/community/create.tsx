@@ -70,6 +70,8 @@ export default function CreatePostScreen() {
     prefillAttachId?: string;
     prefillAttachTitle?: string;
     prefillAttachSubtitle?: string;
+    prefillGymId?: string;
+    prefillGymName?: string;
     fromPicker?: string;
     source?: string;
   }>();
@@ -116,8 +118,13 @@ export default function CreatePostScreen() {
     return null;
   });
 
-  // Gym selector
-  const [selectedGym, setSelectedGym] = useState<{ id: string; name: string } | null>(null);
+  // Gym selector — auto-populate from prefill params (e.g., share from session)
+  const [selectedGym, setSelectedGym] = useState<{ id: string; name: string } | null>(() => {
+    if (params.prefillGymId && params.prefillGymName) {
+      return { id: params.prefillGymId, name: params.prefillGymName };
+    }
+    return null;
+  });
 
   // BottomSheetModal visibility
   const [locationSheetVisible, setLocationSheetVisible] = useState(false);

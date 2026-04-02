@@ -381,6 +381,7 @@ export default function LogDetailScreen() {
         prefillAttachTitle: `${sessionEntry.gymName || gymName || "Climbing Session"} · ${displayDate}`,
         prefillAttachSubtitle: `${sessionSends} sends · ${bestGrade} · ${durationStr}`,
         source: "log-detail",
+        ...(gymId ? { prefillGymId: gymId, prefillGymName: gymName } : {}),
       },
     });
   };

@@ -9,10 +9,10 @@ import GymMemberList from '../../gyms/components/GymMemberList';
 import GymPostsView from './GymPostsView';
 
 type GymTab = 'Dashboard' | 'Activity' | 'Members';
-type ActivitySubTab = 'Climb Logs' | 'Posts';
+type ActivitySubTab = 'Sessions' | 'Posts';
 
 const GYM_TABS: GymTab[] = ['Dashboard', 'Activity', 'Members'];
-const ACTIVITY_SUB_TABS: ActivitySubTab[] = ['Climb Logs', 'Posts'];
+const ACTIVITY_SUB_TABS: ActivitySubTab[] = ['Sessions', 'Posts'];
 
 interface Props {
   gymId: string;
@@ -25,7 +25,7 @@ export default function GymCommunityTabs({ gymId, isFavorited, onToggleFavorite 
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<GymTab>('Dashboard');
-  const [activitySubTab, setActivitySubTab] = useState<ActivitySubTab>('Climb Logs');
+  const [activitySubTab, setActivitySubTab] = useState<ActivitySubTab>('Sessions');
 
   return (
     <View style={styles.container}>
@@ -55,7 +55,7 @@ export default function GymCommunityTabs({ gymId, isFavorited, onToggleFavorite 
             />
           </View>
 
-          {activitySubTab === 'Climb Logs' && <GymActivityFeed gymId={gymId} />}
+          {activitySubTab === 'Sessions' && <GymActivityFeed gymId={gymId} />}
           {activitySubTab === 'Posts' && <GymPostsView gymId={gymId} />}
         </View>
       )}
