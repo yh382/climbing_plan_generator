@@ -77,9 +77,15 @@ export async function flushLogsOutbox(opts: {
         // Resolve session_id from _sessionKey if still null (offline fallback)
         if (!ev.payload.session_id && ev.payload._sessionKey) {
           const sid = await getSessionServerId(ev.payload._sessionKey);
-          if (sid) ev.payload.session_id = sid;
+          if (sid) {
+            ev.payload.session_id = sid;
+          } else {
+            // Session not yet created on backend → keep in queue for next flush
+            remaining.push(ev);
+            continue;
+          }
         }
-        delete ev.payload._sessionKey; // strip before sending
+        delete ev.payload._sessionKey; // strip before sending (session_id is resolved)
 
         const created = await withTimeout(
           apiCreateLog(token, ev.payload),

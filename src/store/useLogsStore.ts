@@ -229,10 +229,6 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         if (msSinceEnd < 15_000) return;
         set({ isSyncing: true });
         try {
-          // Fix orphan logs (associates NULL session_id logs with sessions)
-          // Run every sync — outbox-flushed logs often arrive as orphans
-          await api.post("/climb-logs/fix-orphans", {}).catch(() => {});
-
           const [sessionsData, logsData] = await Promise.all([
             api.get<any[]>("/sessions/me"),
             api.get<any[]>("/climb-logs/me"),
