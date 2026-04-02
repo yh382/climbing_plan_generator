@@ -73,7 +73,7 @@ type LogsState = {
   remove: (id: string) => void;
   resetDay: (date: string, type?: LogType) => void;
 
-  startSession: (gymName: string, discipline: LogType) => void;
+  startSession: (gymName: string, discipline: LogType, gymId?: string | null) => void;
   endSession: () => Promise<SessionEntry | null>;
   deleteSession: (sessionKey: string) => Promise<string[]>;
   toggleSessionPublic: (sessionKey: string) => Promise<void>;
@@ -193,11 +193,53 @@ function backendLogToLocal(log: any): LocalDayLogItem {
     media: log.media?.map((m: any) => ({
       id: m.id || `m_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       type: m.type,
-      uri: m.url,
-      coverUri: m.thumbUrl,
+      uri: m.url || m.uri,           // backend uses `url`; fallback `uri` for legacy rows
+      coverUri: m.thumbUrl || m.coverUri,
     })),
     createdAt: new Date(log.created_at).getTime(),
   };
+}
+
+/**
+ * Merge backend session list with local session list.
+ * - Backend items update local items (newer data from server)
+ * - BUT: preserve local `media` if backend item has none (media may not have synced yet)
+ * - Local-only items (not on backend) are kept (outbox hasn't flushed yet)
+ */
+function mergeSessionListPreserveLocal(
+  backendItems: LocalDayLogItem[],
+  localItems: LocalDayLogItem[],
+): LocalDayLogItem[] {
+  const localById = new Map(localItems.map((it) => [it.id, it]));
+  const mergedIds = new Set<string>();
+  const result: LocalDayLogItem[] = [];
+
+  for (const bItem of backendItems) {
+    mergedIds.add(bItem.id);
+    const local = localById.get(bItem.id);
+    if (local) {
+      // Backend item exists locally — use backend data but preserve local media if backend has none
+      const hasBackendMedia = Array.isArray(bItem.media) && bItem.media.length > 0
+        && bItem.media.some((m) => !!m.uri);
+      const hasLocalMedia = Array.isArray(local.media) && local.media.length > 0
+        && local.media.some((m) => !!m.uri);
+      result.push({
+        ...bItem,
+        media: hasBackendMedia ? bItem.media : (hasLocalMedia ? local.media : bItem.media),
+      });
+    } else {
+      result.push(bItem);
+    }
+  }
+
+  // Keep local-only items (not yet synced to backend)
+  for (const local of localItems) {
+    if (!mergedIds.has(local.id)) {
+      result.push(local);
+    }
+  }
+
+  return result;
 }
 
 const useLogsStore = createWithEqualityFn<LogsState>()(
@@ -314,22 +356,27 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             // Populate sessionServerIdMap
             await setSessionServerId(sessionKey, String(s.id));
 
-            // Write session lists to AsyncStorage
+            // Write session lists to AsyncStorage — MERGE with local to preserve media
             const byType = new Map<LogType, LocalDayLogItem[]>();
             for (const l of sessionLogs) {
               const t = l.wall_type as LogType;
               if (!byType.has(t)) byType.set(t, []);
               byType.get(t)!.push(backendLogToLocal(l));
             }
-            for (const [type, items] of byType) {
-              await writeSessionList(sessionKey, type, items);
+            for (const type of (["boulder", "toprope", "lead"] as LogType[])) {
+              const backendItems = byType.get(type) || [];
+              const localItems = await readSessionList(sessionKey, type);
+              const merged = mergeSessionListPreserveLocal(backendItems, localItems);
+              await writeSessionList(sessionKey, type, merged);
             }
           }
 
-          // Write day lists to AsyncStorage
+          // Write day lists to AsyncStorage — MERGE with local to preserve media
           for (const [, group] of logsByDateType) {
-            const items = group.logs.map(backendLogToLocal);
-            await writeDayList(group.date, group.type, items);
+            const backendItems = group.logs.map(backendLogToLocal);
+            const localItems = await readDayList(group.date, group.type);
+            const merged = mergeSessionListPreserveLocal(backendItems, localItems);
+            await writeDayList(group.date, group.type, merged);
           }
 
           // Rebuild aggregated LogEntry[] for Zustand
@@ -413,7 +460,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         }
       },
 
-      startSession: (gymName, discipline) => {
+      startSession: (gymName, discipline, gymId) => {
         const startTime = Date.now();
         const sessionKey = String(startTime);
         const localDate = keyOf(new Date(startTime)); // YYYY-MM-DD in user's local timezone
@@ -434,14 +481,17 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         }).catch(() => {});
 
         // 异步创建后端 session — promise 保存到模块变量, endSession 可 await
+        const sessionPayload = {
+          gym_name: gymName,
+          location_type: "gym" as const,
+          date: localDate,
+          start_time: new Date(startTime).toISOString(),
+          ...(gymId ? { gym_id: gymId } : {}),
+        };
+
         _sessionCreatePromise = (async () => {
           try {
-            const res = await api.post<{ id: string }>("/sessions", {
-              gym_name: gymName,
-              location_type: "gym",
-              date: localDate,
-              start_time: new Date(startTime).toISOString(),
-            });
+            const res = await api.post<{ id: string }>("/sessions", sessionPayload);
             if (res?.id) {
               const sid = String(res.id);
               const current = get().activeSession;
@@ -458,7 +508,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             await enqueueSessionEvent({
               type: "create",
               localKey: sessionKey,
-              payload: { gym_name: gymName, location_type: "gym", date: localDate, start_time: new Date(startTime).toISOString() },
+              payload: sessionPayload,
             });
             return null;
           }

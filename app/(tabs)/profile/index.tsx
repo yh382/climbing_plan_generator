@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { View, StyleSheet, Share } from "react-native";
+import { View, StyleSheet, Share, useWindowDimensions } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useSharedValue, useAnimatedScrollHandler } from "react-native-reanimated";
+import PagerView from "react-native-pager-view";
 import * as Clipboard from 'expo-clipboard';
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -20,6 +21,8 @@ import { calculateKPIs } from "../../../src/services/stats";
 
 import ProfileHeader from "../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
+
+const TABS = ["posts", "stats", "badges"] as const;
 
 type Units = "imperial" | "metric";
 type FollowCounts = { followers: number; following: number };
@@ -227,10 +230,12 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<string>("posts");
   const [expandBody, setExpandBody] = useState(false);
 
-  // React to navigation params (tab may already be mounted)
+  // React to navigation params
   useEffect(() => {
     if (params.initialTab === "stats" || params.initialTab === "badges") {
       setActiveTab(params.initialTab);
+      const idx = TABS.indexOf(params.initialTab);
+      pagerRef.current?.setPage(idx);
     }
     if (params.expandBody === "true") {
       setExpandBody(true);
@@ -245,6 +250,20 @@ export default function ProfileScreen() {
 
   const gradeDisplay = `${user.stats.boulderGrade}/${user.stats.routeGrade}`;
 
+  // --------------------- pager (swipe tabs) ---------------------
+  const pagerRef = useRef<PagerView>(null);
+  const { height: screenHeight } = useWindowDimensions();
+
+  const handleTabPress = useCallback((tab: string) => {
+    setActiveTab(tab);
+    const idx = TABS.indexOf(tab as (typeof TABS)[number]);
+    if (idx >= 0) pagerRef.current?.setPage(idx);
+  }, []);
+
+  const onPageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
+    const tab = TABS[e.nativeEvent.position];
+    if (tab) setActiveTab(tab);
+  }, []);
 
   // --------------------- render ---------------------
   return (
@@ -281,15 +300,25 @@ export default function ProfileScreen() {
         />
 
         {/* [1] Tab bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} />
 
-        <View style={styles.contentArea}>
-          {activeTab === "posts" && <PostsSection />}
-
-          {activeTab === "stats" && headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef as any} /> : null}
-
-          {activeTab === "badges" && <BadgesSection styles={styles} />}
-        </View>
+        <PagerView
+          ref={pagerRef}
+          style={{ minHeight: screenHeight * 0.6 }}
+          initialPage={TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts")}
+          onPageSelected={onPageSelected}
+          overdrag
+        >
+          <View key="posts" style={styles.contentArea}>
+            <PostsSection />
+          </View>
+          <View key="stats" style={styles.contentArea}>
+            {headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef as any} /> : null}
+          </View>
+          <View key="badges" style={styles.contentArea}>
+            <BadgesSection styles={styles} />
+          </View>
+        </PagerView>
       </Animated.ScrollView>
 
       {/* Native toolbar: settings + share menu */}

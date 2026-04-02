@@ -60,7 +60,11 @@ function toBackendPayload(p: CreateLogPayload) {
     attempts: p.attempts_total || 1,
     route_name: p.route_name || null,
     note: p.note || null,
-    media: p.media || null,
+    media: p.media?.map((m: any) => ({
+      type: m.type,
+      url: m.url || m.uri,             // frontend LogMedia uses `uri`; normalise to backend `url`
+      thumbUrl: m.thumbUrl || m.coverUri,
+    })) || null,
   };
 }
 

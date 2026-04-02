@@ -88,6 +88,7 @@ const config: ExpoConfig = {
           supportedFamilies: ["systemSmall", "systemMedium"],
         },
       ],
+      bundleIdentifier: "com.yh382.climmate.ClimMateWidget",
       groupIdentifier: "group.com.yh382.climmate",
     }],
   ],

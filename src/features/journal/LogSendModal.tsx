@@ -18,7 +18,7 @@ import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { consumePendingMedia } from "@/features/community/pendingMedia";
-import { toFileUri } from "@/features/journal/api";
+import { toFileUri, uploadLogMedia } from "@/features/journal/api";
 import type { LogMedia } from "./loglist/types";
 import type { PickedMediaItem } from "@/features/community/types";
 
@@ -67,6 +67,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const [note, setNote] = useState("");
   const [mediaItems, setMediaItems] = useState<LogMedia[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(-1); // -1 = hidden, 0-100 = progress
 
   // Present/dismiss based on visible prop
   useEffect(() => {
@@ -136,11 +137,36 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     setSubmitting(true);
     try {
       const finalAttempts = style === "redpoint" ? attempts : 1;
+
+      // Upload local media to R2 before saving (cloud backup)
+      let finalMedia: LogMedia[] | undefined;
+      if (mediaItems.length > 0) {
+        setUploadProgress(0);
+        const uploaded: LogMedia[] = [];
+        for (const m of mediaItems) {
+          if (m.uri.startsWith("http")) {
+            uploaded.push(m);
+          } else {
+            try {
+              const contentType = m.type === "video" ? "video/mp4" : "image/jpeg";
+              const result = await uploadLogMedia(m.uri, contentType, (p) => setUploadProgress(p));
+              uploaded.push({ ...m, uri: result.public_url });
+            } catch (err: any) {
+              console.warn("[LOG_MEDIA] Upload failed, keeping local URI:", err?.message || err);
+              uploaded.push(m); // fallback: save with local URI
+            }
+          }
+        }
+        finalMedia = uploaded;
+        setUploadProgress(100);
+      }
+
       await Promise.resolve(
-        onDone({ style, attempts: finalAttempts, feel, name, note, media: mediaItems.length > 0 ? mediaItems : undefined })
+        onDone({ style, attempts: finalAttempts, feel, name, note, media: finalMedia })
       );
     } finally {
       setSubmitting(false);
+      setUploadProgress(-1);
     }
   };
 
@@ -267,8 +293,12 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
           </View>
 
           {/* Done */}
-          <TouchableOpacity activeOpacity={0.9} onPress={handleDone} style={styles.doneBtn}>
-            <Text style={styles.doneText}>{t("完成", "Done")}</Text>
+          <TouchableOpacity activeOpacity={0.9} onPress={handleDone} style={[styles.doneBtn, submitting && { opacity: 0.6 }]} disabled={submitting}>
+            <Text style={styles.doneText}>
+              {submitting && uploadProgress >= 0
+                ? `${t("上传中", "Uploading")}${uploadProgress < 100 ? ` ${Math.round(uploadProgress)}%` : "..."}`
+                : t("完成", "Done")}
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

@@ -7,6 +7,7 @@ import * as Notifications from "expo-notifications";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import useLogsStore from "@/store/useLogsStore";
 import { useCommunityStore } from "@/store/useCommunityStore";
+import { gymCommunityApi } from "@/features/gyms/api";
 import { api } from "@/lib/apiClient";
 import { registerForPushNotifications } from "@/lib/pushNotifications";
 import { useI18N } from "../../../../lib/i18n";
@@ -101,9 +102,22 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
           if (!cancelled) setDismissed(false);
         }
 
-        // Check gym favorite flag
+        // Check gym favorite: AsyncStorage flag OR actual favorites from API
         const gymFlag = await AsyncStorage.getItem("setup_gym_favorited");
-        if (!cancelled) setHasGymFavorite(gymFlag === "true");
+        if (gymFlag === "true") {
+          if (!cancelled) setHasGymFavorite(true);
+        } else {
+          try {
+            const favData = await gymCommunityApi.getFavoriteGyms();
+            if (favData.items.length > 0) {
+              AsyncStorage.setItem("setup_gym_favorited", "true");
+              if (!cancelled) setHasGymFavorite(true);
+            }
+          } catch {}
+        }
+
+        // Load myPosts so first_post detection works
+        await useCommunityStore.getState().fetchMyPosts();
 
         // Check notification permission
         const { status } = await Notifications.getPermissionsAsync();

@@ -21,7 +21,7 @@ type Discipline = "boulder" | "toprope" | "lead";
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onStart: (gymName: string, discipline: Discipline) => void;
+  onStart: (gymName: string, discipline: Discipline, placeId: string | null) => void;
 }
 
 type GymItem = {
@@ -64,6 +64,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [selectedGym, setSelectedGym] = useState<string | null>(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [items, setItems] = useState<GymItem[]>([]);
@@ -90,7 +91,10 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
         `/gyms/nearby?lat=${encodeURIComponent(c.lat)}&lng=${encodeURIComponent(c.lng)}&limit=3`
       );
       setItems(res.items ?? []);
-      if (res.items?.length && !userSelectedRef.current) setSelectedGym(res.items[0].name);
+      if (res.items?.length && !userSelectedRef.current) {
+        setSelectedGym(res.items[0].name);
+        setSelectedPlaceId(res.items[0].id);
+      }
     } catch (e: any) {
       setItems([]);
       setErrorMsg(e?.message ?? "Failed to load nearby gyms");
@@ -115,8 +119,13 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
       }
       const res = await api.get<{ items: GymItem[] }>(`/gyms/search?${qs.toString()}`);
       setItems(res.items ?? []);
-      if (res.items?.length && !userSelectedRef.current) setSelectedGym(res.items[0].name);
-      else if (!res.items?.length) setSelectedGym(null);
+      if (res.items?.length && !userSelectedRef.current) {
+        setSelectedGym(res.items[0].name);
+        setSelectedPlaceId(res.items[0].id);
+      } else if (!res.items?.length) {
+        setSelectedGym(null);
+        setSelectedPlaceId(null);
+      }
     } catch (e: any) {
       setItems([]);
       setErrorMsg(e?.message ?? "Search failed");
@@ -150,6 +159,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
     setItems([]);
     setErrorMsg(null);
     setSelectedGym(null);
+    setSelectedPlaceId(null);
     setDiscipline(null);
     userSelectedRef.current = false;
 
@@ -184,7 +194,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
 
   const handleStart = () => {
     if (selectedGym && discipline) {
-      onStart(selectedGym, discipline);
+      onStart(selectedGym, discipline, selectedPlaceId);
     }
   };
 
@@ -258,6 +268,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
                   style={[styles.gymItem, isSelected && styles.gymItemActive]}
                   onPress={() => {
                     setSelectedGym(gym.name);
+                    setSelectedPlaceId(gym.id);
                     userSelectedRef.current = true;
                   }}
                 >

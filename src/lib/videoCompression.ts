@@ -27,18 +27,23 @@ export async function compressVideo(
     return uri;
   }
 
-  const result = await Video.compress(
-    uri,
-    {
-      compressionMethod: "manual",
-      maxSize: 1920,
-      bitrate: 6_000_000, // 6 Mbps — crisp 1080p, ~45 MB/min
-      minimumFileSizeForCompress: 10, // skip files already < 10 MB
-    },
-    (progress) => {
-      onProgress?.(progress);
-    },
-  );
-
-  return result;
+  try {
+    const result = await Video.compress(
+      uri,
+      {
+        compressionMethod: "manual",
+        maxSize: 1920,
+        bitrate: 6_000_000, // 6 Mbps — crisp 1080p, ~45 MB/min
+        minimumFileSizeForCompress: 10, // skip files already < 10 MB
+      },
+      (progress) => {
+        onProgress?.(progress);
+      },
+    );
+    return result;
+  } catch (err: any) {
+    console.warn("[VIDEO_COMPRESS] Compression failed, falling back to original:", uri, err?.message || err);
+    // Fallback: return original URI so upload can proceed uncompressed
+    return uri;
+  }
 }

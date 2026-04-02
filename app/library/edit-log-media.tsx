@@ -21,6 +21,7 @@ import {
   updateSessionItem,
 } from "@/features/journal/loglist/storage";
 import { uploadLogMediaBatch, toFileUri } from "@/features/journal/api";
+import { api } from "@/lib/apiClient";
 import UploadProgressToast from "@/components/ui/UploadProgressToast";
 import type { LocalDayLogItem, LogMedia } from "@/features/journal/loglist/types";
 
@@ -204,7 +205,18 @@ export default function EditLogMediaScreen() {
       if (__DEV__) console.warn("Failed to save media:", e);
     }
 
-    // 3. Go back
+    // 3. Sync media to backend (fire-and-forget)
+    api.patch(`/climb-logs/${item.id}`, {
+      media: finalMedia.map((m) => ({
+        type: m.type,
+        url: m.uri,
+        thumbUrl: m.coverUri,
+      })),
+    }).catch((e: any) => {
+      if (__DEV__) console.warn("[EDIT_MEDIA] Backend sync failed (will recover on next full sync):", e?.message || e);
+    });
+
+    // 4. Go back
     router.back();
   }, [item, mediaItems, sessionKey, climbType, date, router]);
 

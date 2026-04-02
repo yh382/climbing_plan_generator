@@ -28,6 +28,7 @@ import { useI18N } from "../../../lib/i18n";
 import useLogsStore, { type LogType } from "../../../src/store/useLogsStore";
 import { usePlanStore } from "../../../src/store/usePlanStore";
 import useActiveWorkoutStore from "../../../src/store/useActiveWorkoutStore";
+import { gymCommunityApi } from "../../../src/features/gyms/api";
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -139,8 +140,15 @@ export default function CalendarScreen() {
     setRefreshing(false);
   };
 
-  const handleStartSession = (gymName: string, discipline: LogType) => {
-    startSession(gymName, discipline);
+  const handleStartSession = async (gymName: string, discipline: LogType, placeId: string | null) => {
+    let gymId: string | null = null;
+    if (placeId) {
+      try {
+        const res = await gymCommunityApi.ensureGym(placeId);
+        gymId = res.gym_id;
+      } catch { /* proceed without gym_id */ }
+    }
+    startSession(gymName, discipline, gymId);
     setShowStartModal(false);
     router.push("/journal");
   };
