@@ -1,7 +1,7 @@
 // app/_layout.tsx
 import "react-native-gesture-handler";
 import React, { useEffect, useState, useCallback } from "react";
-import { View, StyleSheet, useColorScheme } from "react-native";
+import { View, StyleSheet, useColorScheme, Platform } from "react-native";
 import { Stack, SplashScreen, useRouter, useSegments } from "expo-router";
 import { ThemeProvider, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "../src/lib/nativeHeaderOptions";
@@ -34,6 +34,7 @@ import { registerForPushNotifications } from "../src/lib/pushNotifications";
 import { SidebarProvider } from "../src/contexts/SidebarContext";
 import { SidebarLayout, useGestureLock } from "@/components/sidebar/Sidebar";
 import { syncWidgetFromStore } from "@/lib/widgetBridge";
+import { endAllLiveActivities } from "../src/lib/liveActivityBridge";
 
 // Set up notification handler (must be outside component)
 Notifications.setNotificationHandler({
@@ -85,19 +86,6 @@ function RootStack() {
       <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="gyms-sheet"
-        options={{
-          headerShown: false,
-          presentation: "formSheet",
-          gestureEnabled: false,
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: "transparent" },
-          sheetAllowedDetents: [0.125, 0.45, 0.8],
-          sheetInitialDetentIndex: 1,
-          sheetLargestUndimmedDetentIndex: 2,
-        }}
-      />
       <Stack.Screen name="analysis" options={{ ...NATIVE_HEADER_LARGE, headerShown: true }} />
       <Stack.Screen name="action" options={{ headerShown: false }} />
       <Stack.Screen name="change-password" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
@@ -168,6 +156,15 @@ export default function RootLayout() {
           }
         } catch (e) {
           console.warn("[recovery]", e);
+        }
+
+        // Live Activity reconciliation: if JS thinks no session is active,
+        // dismiss any orphan Live Activities left over from JS bundle reloads,
+        // crashes, or force-quits where end() never fired. See:
+        // - src/lib/liveActivityBridge.ts (no in-memory _hasActive flag)
+        // - modules/climmate-live-activity/ios/ClimmateLiveActivityModule.swift `endAll`
+        if (Platform.OS === "ios" && !useLogsStore.getState().activeSession) {
+          await endAllLiveActivities();
         }
 
         // Sync widget data on startup

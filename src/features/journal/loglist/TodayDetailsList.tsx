@@ -6,8 +6,6 @@ import LogItemCard from "./LogItemCard";
 import { LocalDayLogItem } from "./types";
 import { readNotesByRoutes, readSessionList, writeSessionList } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
-import useLogsStore from "../../../store/useLogsStore";
-import { getSessionServerId } from "../sync/sessionServerIdMap";
 
 type Props = {
   /** Stable id for the current session (recommended: String(activeSession.startTime)) */
@@ -138,23 +136,25 @@ function TodayDetailsList({
 
     (async () => {
       try {
-        await writeSessionList(sessionKey, logType, next);
-
         const routeName = (item.name || "").trim() || item.grade;
         const note = (item.note || "").trim();
 
-        // Resolve session server ID — await in-flight session creation to avoid NULL
-        const sessionServerId =
-          (await useLogsStore.getState().awaitSessionServerId()) ||
-          (await getSessionServerId(sessionKey)) ||
-          null;
-
+        // CRITICAL: enqueue the outbox event FIRST, before any other awaits.
+        // The previous version awaited useLogsStore.awaitSessionServerId(),
+        // which blocks on the in-flight POST /sessions promise — if a JS
+        // bundle reload happens during that wait, the enqueue never runs and
+        // the log is silently dropped from the outbox.
+        //
+        // We pass session_id: null + _sessionKey here; the outbox flush
+        // handler at logsOutbox.ts already has fallback logic to resolve
+        // session_id lazily via getSessionServerId(_sessionKey) on every
+        // flush attempt, so blocking here is unnecessary.
         await enqueueLogEvent({
           type: "create",
           localId: item.id,
           payload: {
-            session_id: sessionServerId,
-            _sessionKey: sessionKey, // fallback key for outbox flush if still null
+            session_id: null,
+            _sessionKey: sessionKey,
             date: item.date,
             log_type: item.type,
             grade_text: item.grade,
@@ -172,6 +172,11 @@ function TodayDetailsList({
             media: (item as any).media ?? null,
           },
         });
+
+        // Now that the outbox event is durably persisted, write the local
+        // session list. If this fails, the UI state already shows the item
+        // (via setItems above) and the outbox will still POST it on flush.
+        await writeSessionList(sessionKey, logType, next);
 
         queueMicrotask(() => onAppended?.());
       } catch (e) {

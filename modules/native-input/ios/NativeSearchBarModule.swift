@@ -16,6 +16,13 @@ public class NativeSearchBarModule: Module {
 
       Prop("placeholder") { (view, value: String?) in
         view.searchBar.placeholder = value
+        // Re-apply custom placeholder font whenever text changes, since
+        // setting `placeholder` resets attributedPlaceholder.
+        view.applyPlaceholderFont()
+      }
+
+      Prop("placeholderFontSize") { (view, value: Double?) in
+        view.placeholderFontSize = CGFloat(value ?? 0)
       }
 
       Prop("text") { (view, value: String?) in

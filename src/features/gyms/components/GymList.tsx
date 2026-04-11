@@ -1,19 +1,14 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from "react-native";
-import type { EdgeInsets } from "react-native-safe-area-context";
 import type { GymPlace } from "../../../../lib/poi/types";
 import { PAGE_SIZE } from "../constants";
 import { GymListItem } from "./GymListItem";
-import { GymDetailCard } from "./GymDetailCard";
 
 interface GymListProps {
   gyms: GymPlace[];
-  selectedGym: GymPlace | null;
   onSelectGym: (gym: GymPlace) => void;
-  onCloseDetail: () => void;
   loading: boolean;
   error: string | null;
-  insets: EdgeInsets;
   colors: {
     shellBg: string;
     shellBorder: string;
@@ -21,22 +16,15 @@ interface GymListProps {
     iconInactive: string;
     iconActive: string;
   };
-  primary: string;
-  primaryBg: string;
   emptyText: string;
 }
 
 export function GymList({
   gyms,
-  selectedGym,
   onSelectGym,
-  onCloseDetail,
   loading,
   error,
-  insets,
   colors,
-  primary,
-  primaryBg,
   emptyText,
 }: GymListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -55,16 +43,6 @@ export function GymList({
     }
   }, [visibleCount, gyms.length]);
 
-  const scrollToGym = useCallback(
-    (gym: GymPlace) => {
-      const i = displayedGyms.findIndex((x) => x.place_id === gym.place_id);
-      if (i >= 0) {
-        setTimeout(() => listRef.current?.scrollToIndex({ index: i, animated: true }), 200);
-      }
-    },
-    [displayedGyms],
-  );
-
   const listHeader = useMemo(() => (
     <>
       {loading && (
@@ -73,17 +51,8 @@ export function GymList({
         </View>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}
-      {selectedGym && (
-        <GymDetailCard
-          gym={selectedGym}
-          onClose={onCloseDetail}
-          colors={colors}
-          primary={primary}
-          primaryBg={primaryBg}
-        />
-      )}
     </>
-  ), [loading, error, selectedGym, onCloseDetail, colors, primary, primaryBg]);
+  ), [loading, error]);
 
   return (
     <View style={styles.listContainer}>
@@ -115,7 +84,11 @@ export function GymList({
         bounces={false}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listCardContent, { paddingBottom: insets.bottom + 12 }]}
+        // Only the 12pt visual breathing room at the bottom of the list.
+        // Safe-area bottom is handled by the parent (sheetContent in
+        // GymsScreen.tsx) so the FlatList container itself shrinks rather
+        // than overflowing into the home-indicator region.
+        contentContainerStyle={[styles.listCardContent, { paddingBottom: 12 }]}
       />
     </View>
   );

@@ -1,15 +1,28 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, Platform, StyleSheet, Alert, Linking, ActionSheetIOS, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
+  StyleSheet,
+  Alert,
+  Linking,
+  ActionSheetIOS,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { GymPlace } from "../../../../lib/poi/types";
 import { gymCommunityApi } from "../api";
+import { useGymFavoriteToggle } from "../hooks";
+import GymStatsCard from "./GymStatsCard";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "../../../contexts/SettingsContext";
 
 interface GymDetailCardProps {
   gym: GymPlace;
   onClose: () => void;
+  // Kept for API compatibility with the existing GymList props plumbing.
   colors: {
     shellBg: string;
     shellBorder: string;
@@ -21,26 +34,70 @@ interface GymDetailCardProps {
   primaryBg: string;
 }
 
-export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymDetailCardProps) {
+export function GymDetailCard({ gym, onClose, primaryBg }: GymDetailCardProps) {
   const themeColors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
-  const [navigating, setNavigating] = useState(false);
 
-  const handleViewProfile = useCallback(async () => {
+  // Light-green accent tint for the action pills — echoes the brand
+  // color (`#306E6F`) and matches the accent backgrounds used on the
+  // gym-community side page. `primaryBg` comes from useGymsColors:
+  //   light → rgba(48,110,111,0.15)
+  //   dark  → rgba(48,110,111,0.22)
+  const actionBtnBg = primaryBg;
+
+  const [gymId, setGymId] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState(false);
+  const {
+    isFavorited,
+    toggle: toggleFavorite,
+    loaded: favLoaded,
+  } = useGymFavoriteToggle();
+
+  // Resolve the internal gym_id from the Google place_id as soon as the card
+  // mounts (or the gym changes). This unlocks the Favorite button and the
+  // embedded GymStatsCard, both of which key off our internal UUID. The
+  // cancelled flag prevents stale writes if the user quickly taps another pin.
+  useEffect(() => {
+    let cancelled = false;
+    setGymId(null);
+    gymCommunityApi
+      .ensureGym(gym.place_id)
+      .then((r) => {
+        if (!cancelled) setGymId(r.gym_id);
+      })
+      .catch(() => {
+        // Swallow — the Directions button still works without gym_id, and
+        // the stats area just keeps its loading spinner.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gym.place_id]);
+
+  const handleViewCommunity = useCallback(async () => {
     setNavigating(true);
     try {
-      const result = await gymCommunityApi.ensureGym(gym.place_id);
+      const id =
+        gymId ?? (await gymCommunityApi.ensureGym(gym.place_id)).gym_id;
+      // Dismiss L2 first so the sheet slides out while the new screen
+      // pushes in — Apple Maps-style cross-fade between contexts.
+      onClose();
       router.push({
         pathname: "/gym-community",
-        params: { gymId: result.gym_id, gymName: gym.name },
+        params: { gymId: id, gymName: gym.name },
       });
     } catch {
       Alert.alert("Error", "Could not load gym page");
     } finally {
       setNavigating(false);
     }
-  }, [gym.place_id, gym.name]);
+  }, [gym.place_id, gym.name, gymId, onClose]);
+
+  const handleFavorite = useCallback(() => {
+    if (!gymId) return;
+    toggleFavorite(gymId);
+  }, [gymId, toggleFavorite]);
 
   const handleNavigate = useCallback(async () => {
     const { lat, lng } = gym.location;
@@ -79,107 +136,231 @@ export function GymDetailCard({ gym, onClose, colors, primary, primaryBg }: GymD
     );
   }, [gym]);
 
+  const distanceText =
+    gym.distance_m == null
+      ? null
+      : gym.distance_m < 1000
+        ? `${Math.round(gym.distance_m)} m`
+        : `${(gym.distance_m / 1000).toFixed(1)} km`;
+
+  const favActive = gymId ? isFavorited(gymId) : false;
+
   return (
-    <View
-      style={[
-        styles.detailCard,
-        styles.detailCardHighlight,
-        { backgroundColor: colors.shellBg, borderColor: colors.shellBorder, marginHorizontal: 16 },
-      ]}
-    >
-      <View style={[styles.detailStripe, { backgroundColor: primary }]} />
-      <Text style={[styles.detailTitle, { color: colors.iconLabel }]} numberOfLines={2}>
-        {gym.name}
-      </Text>
-      {gym.distance_m != null && (
-        <Text style={[styles.detailMeta, { color: colors.iconInactive }]}>
-          {gym.distance_m < 1000 ? `${Math.round(gym.distance_m)} m` : `${(gym.distance_m / 1000).toFixed(1)} km`}
+    <View style={styles.detail}>
+      {/* Header: name + "Climbing Gym · distance" subtitle. Right padding
+          leaves room for the pinned close X that GymsScreen renders as a
+          sibling of the ScrollView. */}
+      <View style={styles.header}>
+        <Text style={styles.name} numberOfLines={2}>
+          {gym.name}
         </Text>
-      )}
-      {!!gym.address && (
-        <Text style={[styles.detailAddr, { color: colors.iconInactive }]} numberOfLines={2}>
-          {gym.address}
-        </Text>
-      )}
-
-      <View style={styles.detailActions}>
-        <TouchableOpacity
-          onPress={handleNavigate}
-          activeOpacity={0.9}
-          style={[styles.actionBase, { flex: 1, backgroundColor: "#1C1C1E" }]}
-        >
-          <Ionicons name="navigate" size={14} color="#FFF" style={{ marginRight: 6 }} />
-          <Text style={{ fontSize: 13, fontWeight: "600", color: "#FFF" }}>Directions</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleViewProfile}
-          activeOpacity={0.9}
-          disabled={navigating}
-          style={[styles.actionBase, { flex: 1, borderWidth: 0.5, borderColor: themeColors.border }]}
-        >
-          {navigating ? (
-            <ActivityIndicator size="small" color={themeColors.textSecondary} />
-          ) : (
+        <View style={styles.subtitleRow}>
+          <Text style={styles.subtitle}>
+            {tr("攀岩馆", "Climbing Gym")}
+          </Text>
+          {distanceText && (
             <>
-              <Ionicons name="people-outline" size={14} color={themeColors.textSecondary} style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 13, fontWeight: "500", color: themeColors.textSecondary }}>Community</Text>
+              <Text style={styles.subtitleDot}>·</Text>
+              <Text style={styles.distance}>{distanceText}</Text>
             </>
           )}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={onClose} activeOpacity={0.9} style={styles.closeBtn}>
-          <Ionicons name="close" size={14} color={themeColors.textSecondary} />
-        </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Three Apple Maps-style action buttons: Directions / Community /
+          Favorite. Filled rounded squares with stacked icon + label. */}
+      <View style={styles.actionRow}>
+        <ActionButton
+          icon="navigate"
+          label={tr("导航", "Directions")}
+          onPress={handleNavigate}
+          colors={themeColors}
+          bg={actionBtnBg}
+        />
+        <ActionButton
+          icon="people-outline"
+          label={tr("社区", "Community")}
+          onPress={handleViewCommunity}
+          loading={navigating}
+          colors={themeColors}
+          bg={actionBtnBg}
+        />
+        <ActionButton
+          icon={favActive ? "heart" : "heart-outline"}
+          label={tr("收藏", "Favorite")}
+          onPress={handleFavorite}
+          disabled={!gymId || !favLoaded}
+          colors={themeColors}
+          bg={actionBtnBg}
+        />
+      </View>
+
+      {!!gym.address && (
+        <View style={styles.addressRow}>
+          <Ionicons
+            name="location-outline"
+            size={14}
+            color={themeColors.textSecondary}
+          />
+          <Text style={styles.addressText} numberOfLines={2}>
+            {gym.address}
+          </Text>
+        </View>
+      )}
+
+      {/* Community KPI block. Waits for ensureGym to resolve gym_id before
+          mounting GymStatsCard so we don't double-spinner. */}
+      {gymId ? (
+        <View style={styles.statsWrap}>
+          <GymStatsCard gymId={gymId} />
+        </View>
+      ) : (
+        <View style={styles.statsLoading}>
+          <ActivityIndicator size="small" color={themeColors.textSecondary} />
+        </View>
+      )}
     </View>
   );
 }
 
-const createStyles = (themeColors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  detailCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 12,
-    marginBottom: 10,
-    overflow: "hidden",
-  },
-  detailCardHighlight: {
-    borderColor: themeColors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: Platform.OS === "android" ? 3 : 0,
-  },
-  detailStripe: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  detailTitle: { fontSize: 17, fontWeight: "800" },
-  detailMeta: { fontSize: 13, marginTop: 2 },
-  detailAddr: { fontSize: 13, marginTop: 2 },
-  detailActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    flexWrap: "wrap",
-  },
-  actionBase: {
-    flexDirection: "row",
+// ---- Private ActionButton ----------------------------------------------
+
+interface ActionButtonProps {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  colors: ReturnType<typeof useThemeColors>;
+  bg: string;
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  loading,
+  disabled,
+  colors,
+  bg,
+}: ActionButtonProps) {
+  const isInert = disabled || loading;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={isInert}
+      activeOpacity={0.75}
+      style={[
+        actionBtnStyles.btn,
+        { backgroundColor: bg },
+        isInert && { opacity: 0.5 },
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : (
+        <>
+          <Ionicons name={icon} size={20} color={colors.accent} />
+          <Text
+            style={[actionBtnStyles.label, { color: colors.accent }]}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+const actionBtnStyles = StyleSheet.create({
+  btn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    height: 40,
-    borderRadius: 999,
-    paddingHorizontal: 12,
+    gap: 4,
   },
-  actionPrimary: { borderWidth: StyleSheet.hairlineWidth },
-  actionPrimaryText: { fontSize: 14, fontWeight: "800" },
-  actionGhost: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth },
-  actionGhostText: { fontSize: 14, fontWeight: "700" },
-  closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: themeColors.backgroundSecondary, alignItems: "center", justifyContent: "center" },
+  label: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
 });
+
+// ---- Styles -------------------------------------------------------------
+
+const createStyles = (c: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    // No shell: no background, no border, no shadow, no corner radius.
+    // GymsScreen wraps this card in a ScrollView inside the L2 detail
+    // TrueSheet; the sheet provides the liquid-glass background.
+    detail: {
+      paddingHorizontal: 22,
+      // Extra top padding so the gym name sits clearly below the sheet
+      // grabber (Apple Maps breathing room).
+      paddingTop: 22,
+      paddingBottom: 14,
+    },
+    header: {
+      // Leave room on the right for the pinned close X that GymsScreen
+      // renders as an absolute sibling of the ScrollView.
+      paddingRight: 48,
+      marginBottom: 16,
+    },
+    name: {
+      fontSize: 22,
+      fontWeight: "700",
+      lineHeight: 26,
+      color: c.textPrimary,
+      letterSpacing: -0.3,
+    },
+    subtitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 4,
+      gap: 4,
+    },
+    subtitle: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: c.textSecondary,
+    },
+    subtitleDot: {
+      fontSize: 13,
+      color: c.textSecondary,
+    },
+    distance: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: c.accent,
+    },
+    actionRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 16,
+    },
+    addressRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 6,
+      marginBottom: 14,
+      paddingHorizontal: 4,
+    },
+    addressText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.textSecondary,
+    },
+    // GymStatsCard has its own paddingHorizontal 16. Offset the outer 22
+    // so GymStatsCard's internal padding owns the horizontal layout.
+    statsWrap: {
+      marginHorizontal: -22,
+      marginTop: 4,
+    },
+    statsLoading: {
+      marginTop: 20,
+      alignItems: "center",
+    },
+  });

@@ -4,17 +4,32 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shallow } from "zustand/shallow";
 import { useCallback } from "react";
-import { api } from "../lib/apiClient";
+import { api, ApiError } from "../lib/apiClient";
 import {
   enqueueSessionEvent,
   purgeSessionOutboxByKey,
+  flushSessionsOutbox,
 } from "../features/journal/sync/sessionsOutbox";
 import {
   setSessionServerId,
   getSessionServerId,
   removeSessionServerId,
+  readAllSessionServerIds,
 } from "../features/journal/sync/sessionServerIdMap";
-import { purgeLogsOutboxBySessionKey } from "../features/journal/sync/logsOutbox";
+import {
+  markSessionDeleted,
+  unmarkSessionDeleted,
+  readDeletedSessionKeys,
+} from "../features/journal/sync/sessionDeletedKeys";
+import {
+  purgeLogsOutboxBySessionKey,
+  flushLogsOutbox,
+} from "../features/journal/sync/logsOutbox";
+import {
+  readAllServerIds,
+  setServerId,
+} from "../features/journal/sync/serverIdMap";
+import { useAuthStore } from "./useAuthStore";
 import {
   writeBackupSnapshot,
   clearBackupSnapshot,
@@ -277,20 +292,79 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         if (msSinceEnd < 15_000) return;
         set({ isSyncing: true });
         try {
-          const [sessionsData, logsData] = await Promise.all([
+          // PUSH first: flush local outboxes so any pending creates/ends/
+          // deletes reach the backend before we pull. Without this, sync is
+          // pull-only — pending logs/sessions sitting in the outbox would
+          // never get sent, and the user has to navigate to journal page to
+          // trigger flush manually. The journal-page-focus flush still runs
+          // (idempotent), this just makes sync self-contained.
+          //
+          // Order matters: sessions before logs, so that log create events
+          // can resolve their session_id from the freshly-populated map.
+          const token = useAuthStore.getState().accessToken;
+          if (token) {
+            try {
+              const sMap = await readAllSessionServerIds();
+              await flushSessionsOutbox({
+                resolveServerId: (k) => sMap[k] ?? null,
+                saveServerId: async (k, id) => {
+                  await setSessionServerId(k, id);
+                  sMap[k] = id;
+                },
+              });
+            } catch (e) {
+              if (__DEV__) console.warn("[syncFromBackend] flushSessionsOutbox failed:", e);
+            }
+            try {
+              const idMap = await readAllServerIds();
+              await flushLogsOutbox({
+                token,
+                resolveServerId: (localId) => idMap[localId] ?? null,
+                saveServerId: async (localId, serverId) => {
+                  await setServerId(localId, serverId);
+                },
+              });
+            } catch (e) {
+              if (__DEV__) console.warn("[syncFromBackend] flushLogsOutbox failed:", e);
+            }
+          }
+
+          const [sessionsData, logsData, deletedKeys] = await Promise.all([
             api.get<any[]>("/sessions/me"),
             api.get<any[]>("/climb-logs/me"),
+            readDeletedSessionKeys(),
           ]);
+
+          // Build the set of backend session IDs whose local sessionKey is
+          // tombstoned. Any log whose session_id points to one of these must
+          // be filtered out before merging into day lists, otherwise the
+          // deleted session's logs would resurface in the calendar.
+          const tombstonedServerIds = new Set<string>();
+          for (const s of sessionsData || []) {
+            const startMs = new Date(s.start_time).getTime();
+            const k = String(startMs);
+            if (deletedKeys.has(k)) {
+              tombstonedServerIds.add(String(s.id));
+            }
+          }
+          const visibleLogs = (logsData || []).filter((log: any) => {
+            if (log.session_id && tombstonedServerIds.has(String(log.session_id))) {
+              return false;
+            }
+            return true;
+          });
 
           if (__DEV__) {
             console.log("[syncFromBackend] sessions:", sessionsData?.length ?? 0,
               "| completed:", sessionsData?.filter((s: any) => s.status === "completed").length ?? 0,
-              "| logs:", logsData?.length ?? 0);
+              "| logs:", logsData?.length ?? 0,
+              "| tombstoned:", deletedKeys.size,
+              "| filtered logs:", visibleLogs.length);
           }
 
           // Group logs by session_id
           const logsBySession = new Map<string, any[]>();
-          for (const log of logsData || []) {
+          for (const log of visibleLogs) {
             if (log.session_id) {
               const key = String(log.session_id);
               if (!logsBySession.has(key)) logsBySession.set(key, []);
@@ -300,13 +374,95 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
           // Group logs by date|type for day lists
           const logsByDateType = new Map<string, { date: string; type: LogType; logs: any[] }>();
-          for (const log of logsData || []) {
+          for (const log of visibleLogs) {
             const key = `${log.date}|${log.wall_type}`;
             if (!logsByDateType.has(key)) {
               logsByDateType.set(key, { date: log.date, type: log.wall_type, logs: [] });
             }
             logsByDateType.get(key)!.logs.push(log);
           }
+
+          // ALWAYS populate the serverId map for every backend session,
+          // including "active" ones. Without this, a session left in active
+          // state by a mid-session JS bundle reload (or crash) is never
+          // associated with a serverId locally — so deleteSession() can't
+          // find a backend id to call DELETE on, and the orphan session +
+          // its logs stay on the backend forever.
+          for (const s of sessionsData || []) {
+            const startMs = new Date(s.start_time).getTime();
+            const sessionKey = String(startMs);
+            await setSessionServerId(sessionKey, String(s.id));
+          }
+
+          // Self-healing tombstone retry: any session the user previously
+          // tried to delete but whose backend DELETE never landed (offline,
+          // racing with reload, etc.) — try to delete it directly now while
+          // we have network. On success, clear the tombstone + map entry.
+          // This is a no-op when there are no stuck tombstones.
+          for (const s of sessionsData || []) {
+            const startMs = new Date(s.start_time).getTime();
+            const sessionKey = String(startMs);
+            if (!deletedKeys.has(sessionKey)) continue;
+            try {
+              await api.del(`/sessions/${String(s.id)}`);
+              await unmarkSessionDeleted(sessionKey);
+              await removeSessionServerId(sessionKey);
+              if (__DEV__) {
+                console.log("[syncFromBackend] auto-cleaned tombstoned backend session", sessionKey);
+              }
+            } catch (e: any) {
+              if (e instanceof ApiError && e.status === 404) {
+                // Already gone — clean up local bookkeeping
+                await unmarkSessionDeleted(sessionKey);
+                await removeSessionServerId(sessionKey);
+              } else if (__DEV__) {
+                console.warn("[syncFromBackend] auto-clean failed for", sessionKey, e?.message || e);
+              }
+            }
+          }
+
+          // Drop orphaned tombstones — keys in deletedKeys whose backend
+          // session is no longer present in sessionsData. The backend has
+          // already converged to the desired state (session gone), so the
+          // tombstone has nothing left to protect against.
+          const backendSessionKeys = new Set<string>();
+          for (const s of sessionsData || []) {
+            backendSessionKeys.add(String(new Date(s.start_time).getTime()));
+          }
+          const orphanedTombstones: string[] = [];
+          for (const key of deletedKeys) {
+            if (!backendSessionKeys.has(key)) {
+              orphanedTombstones.push(key);
+            }
+          }
+          for (const key of orphanedTombstones) {
+            await unmarkSessionDeleted(key);
+            await removeSessionServerId(key);
+          }
+          if (__DEV__ && orphanedTombstones.length > 0) {
+            console.log(
+              "[syncFromBackend] dropped",
+              orphanedTombstones.length,
+              "orphaned tombstone(s) (no matching backend session):",
+              orphanedTombstones,
+            );
+          }
+
+          // Diagnostic: count logs that have no session_id (orphaned logs).
+          // These can't be cleaned by the session DELETE cascade.
+          if (__DEV__) {
+            const sessionLessLogs = (logsData || []).filter((l: any) => !l.session_id).length;
+            if (sessionLessLogs > 0) {
+              console.log(
+                "[syncFromBackend] WARNING:",
+                sessionLessLogs,
+                "log(s) on backend have no session_id (orphaned, won't be cleaned by session DELETE)",
+              );
+            }
+          }
+
+          // Re-read tombstones after auto-clean above (some may have been removed)
+          const liveDeletedKeys = await readDeletedSessionKeys();
 
           // Convert backend sessions → SessionEntry[]
           const newSessions: SessionEntry[] = [];
@@ -315,6 +471,15 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
             const startMs = new Date(s.start_time).getTime();
             const sessionKey = String(startMs);
+
+            // Skip sessions the user locally deleted but whose backend delete
+            // hasn't landed yet (either queued in outbox or awaiting retry).
+            if (liveDeletedKeys.has(sessionKey)) {
+              if (__DEV__) {
+                console.log("[syncFromBackend] skipping tombstoned session", sessionKey);
+              }
+              continue;
+            }
             const durationMin = s.duration_minutes || 0;
             const h = Math.floor(durationMin / 60);
             const m = durationMin % 60;
@@ -359,8 +524,8 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               synced: true,
             });
 
-            // Populate sessionServerIdMap
-            await setSessionServerId(sessionKey, String(s.id));
+            // (sessionServerIdMap already populated for ALL backend sessions
+            // — including active ones — at the top of this function.)
 
             // Write session lists to AsyncStorage — MERGE with local to preserve media
             const byType = new Map<LogType, LocalDayLogItem[]>();
@@ -786,6 +951,10 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
         const date = session.date;
 
+        // 0) Mark tombstone BEFORE any async work so a concurrent
+        // syncFromBackend() can't re-add the session under us.
+        await markSessionDeleted(sessionKey);
+
         // 1) read session lists to get item IDs
         const [sb, str, sl] = await Promise.all([
           readSessionList(sessionKey, "boulder"),
@@ -829,6 +998,80 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           sessions: sessions.filter((s) => s.sessionKey !== sessionKey),
           logs: nextLogs,
         });
+
+        // 5) Backend delete. Purge any pending create/end outbox events for
+        // this session first, so they don't race us and re-create the session
+        // on backend after we just asked to delete it.
+        await purgeSessionOutboxByKey(sessionKey);
+
+        // Resolve serverId: prefer the in-memory session.serverId, fall back
+        // to the persistent map (which is what the outbox flush path uses).
+        let serverId: string | null = session.serverId;
+        const inMemoryServerId = serverId;
+        if (!serverId) {
+          serverId = await getSessionServerId(sessionKey);
+        }
+        if (__DEV__) {
+          console.log(
+            "[deleteSession] resolve serverId — sessionKey:", sessionKey,
+            "| session.serverId:", inMemoryServerId,
+            "| map fallback:", serverId,
+          );
+        }
+
+        if (!serverId) {
+          // Session was never created on backend (offline create, or create
+          // still in-flight and hasn't yet populated the map). Enqueue a
+          // delete event — flush will resolve serverId later if/when create
+          // completes. If it truly never existed, the flush handler drops
+          // the event and clears the tombstone.
+          if (__DEV__) {
+            console.log("[deleteSession] no serverId → enqueueing delete event");
+          }
+          try {
+            await enqueueSessionEvent({ type: "delete", localKey: sessionKey });
+          } catch (e) {
+            if (__DEV__) console.warn("[deleteSession] enqueue failed:", e);
+          }
+          return Array.from(sessionItemIds);
+        }
+
+        // We have a serverId → try to delete on backend immediately.
+        try {
+          await api.del(`/sessions/${serverId}`);
+          await unmarkSessionDeleted(sessionKey);
+          await removeSessionServerId(sessionKey);
+          if (__DEV__) {
+            console.log("[deleteSession] backend DELETE ok — tombstone cleared:", sessionKey);
+          }
+        } catch (err: any) {
+          const status = err instanceof ApiError ? err.status : null;
+          if (status === 404) {
+            // Already gone server-side → desired state reached.
+            await unmarkSessionDeleted(sessionKey);
+            await removeSessionServerId(sessionKey);
+            if (__DEV__) {
+              console.log("[deleteSession] backend 404 — already gone:", sessionKey);
+            }
+          } else {
+            // Network / transient failure → enqueue for retry. Keep tombstone
+            // so syncFromBackend won't re-add this session while we wait.
+            try {
+              await enqueueSessionEvent({
+                type: "delete",
+                localKey: sessionKey,
+                serverId,
+              });
+            } catch {}
+            if (__DEV__) {
+              console.warn(
+                "[deleteSession] backend delete failed, enqueued:",
+                "status:", status,
+                "msg:", err?.message || err
+              );
+            }
+          }
+        }
 
         return Array.from(sessionItemIds);
       },

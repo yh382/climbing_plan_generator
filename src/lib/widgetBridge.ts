@@ -22,8 +22,8 @@ function getWidget(): Widget<WidgetData> | null {
 }
 
 export type WidgetData = {
-  weekClimbDays: number;
-  weekSends: number;
+  monthClimbDays: number;
+  monthSends: number;
   streak: number;
   lastSessionGym: string;
   lastSessionDate: string;
@@ -32,12 +32,10 @@ export type WidgetData = {
   hasActiveSession: boolean;
 };
 
-/** 获取本周一 00:00 */
-function getWeekStart(now: Date): Date {
+/** 获取本月 1 号 00:00 */
+function getMonthStart(now: Date): Date {
   const d = new Date(now);
-  const day = d.getDay(); // 0=Sun, 1=Mon, ...
-  const diff = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - diff);
+  d.setDate(1);
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -80,21 +78,21 @@ export function computeWidgetData(
   activeSession: { startTime: number; gymName: string } | null
 ): WidgetData {
   const now = new Date();
-  const weekStart = getWeekStart(now);
+  const monthStart = getMonthStart(now);
 
-  const weekSessions = sessions.filter(
-    (s) => new Date(s.date) >= weekStart
+  const monthSessions = sessions.filter(
+    (s) => new Date(s.date) >= monthStart
   );
 
-  const weekClimbDays = new Set(weekSessions.map((s) => s.date)).size;
-  const weekSends = weekSessions.reduce((sum, s) => sum + s.sends, 0);
+  const monthClimbDays = new Set(monthSessions.map((s) => s.date)).size;
+  const monthSends = monthSessions.reduce((sum, s) => sum + s.sends, 0);
   const streak = computeStreak(sessions);
 
   const last = sessions[0];
 
   return {
-    weekClimbDays,
-    weekSends,
+    monthClimbDays,
+    monthSends,
     streak,
     lastSessionGym: last?.gymName ?? "",
     lastSessionDate: last?.date ?? "",

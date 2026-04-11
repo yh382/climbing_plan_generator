@@ -15,7 +15,13 @@ async function authedFetch(path: string, token: string, init?: RequestInit) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `HTTP ${res.status}`);
+    // Attach status code so downstream handlers (e.g. apiDeleteLog's 404
+    // idempotency check) can classify the failure reliably. The body is
+    // often JSON like `{"detail":"..."}` and doesn't include the numeric
+    // status, so string-matching on the message is unreliable.
+    const err = new Error(text || `HTTP ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -84,8 +90,11 @@ export async function apiDeleteLog(token: string, serverId: string) {
   try {
     return await authedFetch(`/climb-logs/${serverId}`, token, { method: "DELETE" });
   } catch (e: any) {
-    // 404 = already deleted or never existed → goal achieved
-    if (e?.message?.includes("404")) return { ok: true };
+    // 404 = already deleted or never existed → goal achieved (idempotent).
+    // Check status code attached by authedFetch, since the body text is a
+    // JSON detail like `{"detail":"Climb log not found"}` that does NOT
+    // include the literal "404" string.
+    if (e?.status === 404) return { ok: true };
     throw e;
   }
 }

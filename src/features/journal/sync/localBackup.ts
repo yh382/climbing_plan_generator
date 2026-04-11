@@ -7,6 +7,7 @@ import {
   writeDayList,
 } from "../loglist/storage";
 import type { LocalDayLogItem } from "../loglist/types";
+import { getSessionServerId } from "./sessionServerIdMap";
 
 const BACKUP_KEY = "SESSION_BACKUP_V1";
 
@@ -209,8 +210,13 @@ export async function recoverOrphanedSessions(): Promise<RecoveryResult> {
   const m = Math.floor((durationMs % 3600000) / 60000);
   const durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
+  // If startSession's POST /sessions completed before the crash/reload, the
+  // serverId was persisted to sessionServerIdMap. Pick it up so deleteSession
+  // can call backend DELETE on the recovered session without waiting for sync.
+  const recoveredServerId = await getSessionServerId(sessionKey);
+
   const session: RecoveredSession = {
-    id: `recovered_${Date.now()}`,
+    id: recoveredServerId || `recovered_${Date.now()}`,
     date,
     startTime: new Date(startTime).toISOString(),
     endTime: new Date(endTime).toISOString(),
@@ -221,7 +227,7 @@ export async function recoverOrphanedSessions(): Promise<RecoveryResult> {
     sends,
     best,
     climbs: allItems.length,
-    serverId: null,
+    serverId: recoveredServerId,
     isPublic: false,
     synced: false,
   };

@@ -135,10 +135,27 @@ export async function flushLogsOutbox(opts: {
         continue;
       }
     } catch (err: any) {
-      // 409 = already exists → treat as success for create events
+      const status = typeof err?.status === "number" ? err.status : null;
       const msg = String(err?.message || "");
-      console.warn(`[LOGS_OUTBOX] Failed to flush ${ev.type} event:`, msg);
-      if (msg.includes("409") && ev.type === "create") continue;
+      console.warn(
+        `[LOGS_OUTBOX] Failed to flush ${ev.type} event:`,
+        status !== null ? `${status} ${msg}` : msg,
+      );
+
+      if (ev.type === "create") {
+        // 4xx → client-side error, retry will never succeed. Drop the event
+        // to prevent the outbox from wedging forever. Examples:
+        //   - 409 Conflict: row already exists
+        //   - 404 Session not found: stale _sessionKey pointing to a deleted
+        //     session (outbox event outlived its session)
+        //   - 400 Bad Request: malformed payload (e.g. unknown grade)
+        // 5xx → treat as transient and keep in queue.
+        if (status !== null && status >= 400 && status < 500) continue;
+        if (msg.includes("409")) continue; // legacy string-match fallback
+      }
+
+      if (ev.type === "delete" && status === 404) continue;
+
       remaining.push(ev);
     }
   }

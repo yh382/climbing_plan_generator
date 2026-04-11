@@ -95,6 +95,7 @@
     "dotenv": "^17.2.3",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
+    "expo-module-scripts": "^55.0.2",
     "typescript": "~5.9.2"
   }
 }

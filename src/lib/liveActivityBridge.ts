@@ -1,90 +1,76 @@
 // src/lib/liveActivityBridge.ts
 import { Platform } from "react-native";
+import ClimmateLiveActivity from "../../modules/climmate-live-activity/src";
 
-type LAProps = {
-  gymName: string;
-  discipline: string;
-  startTime: number;
-  routeCount: number;
-  sendCount: number;
-  bestGrade: string;
-};
+// Note: we intentionally do NOT track an in-memory "_hasActive" flag here.
+// JS bundle reloads (dev FastRefresh, hot reload) would reset the flag and
+// short-circuit subsequent end() calls, leaving orphan Live Activities on
+// iOS. The native module already iterates `Activity<...>.activities` on every
+// call, so calling update/end when nothing is running is a cheap no-op. Let
+// ActivityKit be the single source of truth.
 
-// LiveActivityFactory-like interface (avoid import type issues with dynamic require)
-type LAFactory = {
-  start(props: LAProps): LAInstance;
-};
-type LAInstance = {
-  update(props: Partial<LAProps>): Promise<void>;
-  end(policy: string, props?: Partial<LAProps>): Promise<void>;
-};
-
-// Lazy-load to avoid crashes in dev mode (same pattern as widgetBridge.ts)
-let _factory: LAFactory | null | undefined;
-function getFactory(): LAFactory | null {
-  if (__DEV__) return null;
-  if (_factory === null) return null;
-  if (_factory) return _factory;
-  try {
-    _factory = require("../../widgets/ClimbingSession").default;
-    return _factory!;
-  } catch {
-    _factory = null;
-    return null;
-  }
-}
-
-let _instance: LAInstance | null = null;
-
-/** 开始 Live Activity (session 开始时调用) */
+/** Start Live Activity when a climbing session begins. */
 export function startLiveActivity(params: {
   gymName: string;
   discipline: string;
   startTime: number;
 }) {
   if (Platform.OS !== "ios") return;
-  try {
-    const factory = getFactory();
-    if (!factory) return;
-    _instance = factory.start({
-      gymName: params.gymName,
-      discipline: params.discipline,
-      startTime: params.startTime,
-      routeCount: 0,
-      sendCount: 0,
-      bestGrade: "",
-    });
-  } catch (e) {
-    if (__DEV__) console.warn("[liveActivity] start failed:", e);
+  if (!ClimmateLiveActivity) {
+    if (__DEV__) console.warn("[liveActivity] native module not available");
+    return;
   }
+  if (__DEV__) console.log("[liveActivity] start()", params);
+
+  ClimmateLiveActivity.start(params.gymName, params.discipline, params.startTime)
+    .then((id) => {
+      if (__DEV__) console.log("[liveActivity] start() ok id=", id);
+    })
+    .catch((e) => {
+      if (__DEV__) console.warn("[liveActivity] start failed:", e);
+    });
 }
 
-/** 更新 Live Activity (每次记录 log 时调用) */
+/** Update Live Activity whenever a log is recorded. */
 export function updateLiveActivity(params: {
   routeCount: number;
   sendCount: number;
   bestGrade: string;
 }) {
-  if (!_instance) return;
-  try {
-    _instance.update(params).catch(() => {});
-  } catch (e) {
+  if (Platform.OS !== "ios") return;
+  if (!ClimmateLiveActivity) return;
+  if (__DEV__) console.log("[liveActivity] update()", params);
+
+  ClimmateLiveActivity.update(params.routeCount, params.sendCount, params.bestGrade).catch((e) => {
     if (__DEV__) console.warn("[liveActivity] update failed:", e);
-  }
+  });
 }
 
-/** 结束 Live Activity (session 结束时调用) */
+/** End Live Activity when the session ends. */
 export function endLiveActivity(params: {
+  routeCount: number;
   sendCount: number;
   bestGrade: string;
-  routeCount: number;
 }) {
-  if (!_instance) return;
-  try {
-    _instance.end("default", params).catch(() => {});
-    _instance = null;
-  } catch (e) {
+  if (Platform.OS !== "ios") return;
+  if (!ClimmateLiveActivity) return;
+  if (__DEV__) console.log("[liveActivity] end()", params);
+
+  ClimmateLiveActivity.end(params.routeCount, params.sendCount, params.bestGrade).catch((e) => {
     if (__DEV__) console.warn("[liveActivity] end failed:", e);
-    _instance = null;
-  }
+  });
+}
+
+/**
+ * Nuclear option: immediately dismiss every Live Activity of our type.
+ * Used at app boot to clean up orphans left over from JS bundle reloads,
+ * crashes, or force-quits where the JS-side end() call never fired.
+ */
+export function endAllLiveActivities(): Promise<void> {
+  if (Platform.OS !== "ios") return Promise.resolve();
+  if (!ClimmateLiveActivity?.endAll) return Promise.resolve();
+  if (__DEV__) console.log("[liveActivity] endAll()");
+  return ClimmateLiveActivity.endAll().catch((e) => {
+    if (__DEV__) console.warn("[liveActivity] endAll failed:", e);
+  });
 }

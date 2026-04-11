@@ -13,6 +13,7 @@ export interface GymMapProps {
   styleURL: string;
   pitch: number;
   onMapIdle: (state: MapState) => void;
+  onCameraChanged?: (state: MapState) => void;
   onSelectGym: (gym: GymPlace) => void;
 }
 
@@ -29,6 +30,7 @@ export function GymMap(props: GymMapProps) {
       styleURL={props.styleURL}
       pitch={props.pitch}
       onMapIdle={props.onMapIdle}
+      onCameraChanged={props.onCameraChanged}
       onSelectGym={props.onSelectGym}
     />
   );

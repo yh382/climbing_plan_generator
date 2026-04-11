@@ -7,6 +7,11 @@ const fs = require("fs");
 const path = require("path");
 
 const NATIVE_WIDGET_DIR = "native/widget";
+// Canonical attributes file lives in the local Expo module so the main app
+// target compiles it via the ClimmateLiveActivity pod. We also copy it into
+// the widget extension target so the widget target has its own copy to
+// satisfy `ActivityConfiguration(for: ClimbingSessionAttributes.self)`.
+const MODULE_ATTRS_SOURCE = "modules/climmate-live-activity/ios/ClimbingSessionAttributes.swift";
 const TARGET_NAME = "ExpoWidgetsTarget";
 
 // source file in native/widget/ -> destination file in ios/ExpoWidgetsTarget/
@@ -15,8 +20,7 @@ const FILE_MAP = {
   "ClimMateWidgetDefinition.swift": "ClimMateWidget.swift", // replaces generated Widget
   "ClimMateWidgetEntry.swift": "ClimMateWidgetEntry.swift", // new file
   "ClimMateWidgetView.swift": "ClimMateWidgetView.swift", // new file
-  // Live Activity
-  "ClimbingSessionAttributes.swift": "ClimbingSessionAttributes.swift", // new file
+  // Live Activity widget UI (attributes copied separately from modules/)
   "ClimbingSessionLiveActivity.swift": "ClimbingSessionLiveActivity.swift", // new file
 };
 
@@ -57,6 +61,19 @@ function withCustomWidgetFiles(config) {
         }
         fs.copyFileSync(srcPath, destPath);
       }
+
+      // Copy ClimbingSessionAttributes.swift from the local Expo module
+      // (single source of truth) into the widget extension target folder.
+      // Both copies compile into their respective Swift modules; ActivityKit
+      // matches them at runtime by type name + Codable structure.
+      const attrsSource = path.join(projectRoot, MODULE_ATTRS_SOURCE);
+      const attrsDest = path.join(targetDir, "ClimbingSessionAttributes.swift");
+      if (!fs.existsSync(attrsSource)) {
+        throw new Error(
+          `[withCustomWidgetFiles] Missing attributes source: ${attrsSource}`
+        );
+      }
+      fs.copyFileSync(attrsSource, attrsDest);
 
       return config;
     },

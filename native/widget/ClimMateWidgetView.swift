@@ -37,7 +37,7 @@ struct ClimMateWidgetView: View {
 
       HStack {
         VStack(alignment: .leading) {
-          Text("\(entry.data.weekClimbDays)")
+          Text("\(entry.data.monthClimbDays)")
             .font(.system(size: 16, weight: .semibold))
           Text("days")
             .font(.system(size: 10))
@@ -45,7 +45,7 @@ struct ClimMateWidgetView: View {
         }
         Spacer()
         VStack(alignment: .trailing) {
-          Text("\(entry.data.weekSends)")
+          Text("\(entry.data.monthSends)")
             .font(.system(size: 16, weight: .semibold))
           Text("sends")
             .font(.system(size: 10))
@@ -66,7 +66,7 @@ struct ClimMateWidgetView: View {
 
   private var mediumWidget: some View {
     HStack(alignment: .top, spacing: 0) {
-      // Left: streak + weekly stats
+      // Left: streak + monthly stats
       VStack(alignment: .leading, spacing: 4) {
         Text("\(entry.data.streak)")
           .font(.system(size: 36, weight: .bold))
@@ -77,9 +77,9 @@ struct ClimMateWidgetView: View {
 
         Spacer()
 
-        Text("\(entry.data.weekClimbDays) days \u{00B7} \(entry.data.weekSends) sends")
+        Text("\(entry.data.monthClimbDays) days \u{00B7} \(entry.data.monthSends) sends")
           .font(.system(size: 14, weight: .semibold))
-        Text("this week")
+        Text("this month")
           .font(.system(size: 11))
           .foregroundColor(secondaryText)
       }

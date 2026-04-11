@@ -4,8 +4,8 @@ import Foundation
 // MARK: - Data model (matches WidgetData in widgetBridge.ts)
 
 struct ClimMateData {
-  let weekClimbDays: Int
-  let weekSends: Int
+  let monthClimbDays: Int
+  let monthSends: Int
   let streak: Int
   let lastSessionGym: String
   let lastSessionDate: String
@@ -14,17 +14,17 @@ struct ClimMateData {
   let hasActiveSession: Bool
 
   static let empty = ClimMateData(
-    weekClimbDays: 0, weekSends: 0, streak: 0,
+    monthClimbDays: 0, monthSends: 0, streak: 0,
     lastSessionGym: "", lastSessionDate: "", lastSessionBest: "",
     lastSessionDuration: "", hasActiveSession: false
   )
 
-  init(weekClimbDays: Int, weekSends: Int, streak: Int,
+  init(monthClimbDays: Int, monthSends: Int, streak: Int,
        lastSessionGym: String, lastSessionDate: String,
        lastSessionBest: String, lastSessionDuration: String,
        hasActiveSession: Bool) {
-    self.weekClimbDays = weekClimbDays
-    self.weekSends = weekSends
+    self.monthClimbDays = monthClimbDays
+    self.monthSends = monthSends
     self.streak = streak
     self.lastSessionGym = lastSessionGym
     self.lastSessionDate = lastSessionDate
@@ -34,8 +34,8 @@ struct ClimMateData {
   }
 
   init(from dict: [String: Any]) {
-    self.weekClimbDays = dict["weekClimbDays"] as? Int ?? 0
-    self.weekSends = dict["weekSends"] as? Int ?? 0
+    self.monthClimbDays = dict["monthClimbDays"] as? Int ?? 0
+    self.monthSends = dict["monthSends"] as? Int ?? 0
     self.streak = dict["streak"] as? Int ?? 0
     self.lastSessionGym = dict["lastSessionGym"] as? String ?? ""
     self.lastSessionDate = dict["lastSessionDate"] as? String ?? ""
@@ -56,7 +56,7 @@ struct ClimMateTimelineEntry: TimelineEntry {
     ClimMateTimelineEntry(
       date: Date(),
       data: ClimMateData(
-        weekClimbDays: 3, weekSends: 15, streak: 5,
+        monthClimbDays: 12, monthSends: 48, streak: 5,
         lastSessionGym: "Beta Bloc", lastSessionDate: "2024-03-20",
         lastSessionBest: "V5", lastSessionDuration: "1h 30m",
         hasActiveSession: false

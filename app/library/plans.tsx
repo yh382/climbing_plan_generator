@@ -242,6 +242,7 @@ export default function PlansHubScreen() {
             />
           </View>
         )}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         ListHeaderComponent={
           <View>
             {ListHeader}

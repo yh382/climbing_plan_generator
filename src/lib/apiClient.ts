@@ -14,6 +14,21 @@ export function setApiAuthToken(token: string | null) {
   authToken = token;
 }
 
+export class ApiError extends Error {
+  status: number;
+  detail: string | null;
+  body: string;
+
+  constructor(status: number, detail: string | null, body: string) {
+    // Preserve legacy message shape so existing `err?.message` / string-match code keeps working.
+    super(body || `HTTP ${status}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    this.body = body;
+  }
+}
+
 const ACCESS_TOKEN_KEY = "climmate_access_token";
 const REFRESH_TOKEN_KEY = "climmate_refresh_token";
 
@@ -110,7 +125,19 @@ async function request<T>(
       notifyAuthExpired();
     }
 
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new ApiError(
+      res.status,
+      typeof detail === "string" ? detail : null,
+      text
+    );
+  }
+
+  // Handle empty-body success responses (e.g. 204 No Content from DELETE
+  // endpoints). Without this, res.json() throws "JSON Parse error: Unexpected
+  // end of input" and callers mistakenly treat a successful backend mutation
+  // as a failure, triggering unnecessary retries and tombstone handling.
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
   }
 
   const contentType = res.headers.get("content-type") || "";

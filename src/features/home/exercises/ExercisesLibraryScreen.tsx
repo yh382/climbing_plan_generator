@@ -1,10 +1,11 @@
 // src/features/home/exercises/ExercisesLibraryScreen.tsx
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, FlatList } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { useSettings } from "../../../contexts/SettingsContext";
 import type { ActionSummary, BlockInventorySummary, LocaleKey } from "./model/types";
 import { GOAL_LABEL, LEVEL_LABEL } from "./model/labels";
@@ -69,6 +70,7 @@ function mapActionToCardProps(action: ActionSummary, locale: LocaleKey) {
 
 export default function ExercisesLibraryScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ big?: string }>();
   const colors = useThemeColors();
   const s = useMemo(() => createStyles(colors), [colors]);
@@ -194,6 +196,13 @@ export default function ExercisesLibraryScreen() {
 
   const bigTitle = cfg.title[locale];
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      ...withHeaderTheme(colors),
+      title: bigTitle,
+    });
+  }, [navigation, colors, bigTitle]);
+
   const ListHeader = (
     <View>
       <Text style={s.subtitleText}>
@@ -240,35 +249,32 @@ export default function ExercisesLibraryScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ ...NATIVE_HEADER_LARGE, title: bigTitle }} />
-      <FlatList
-        data={list}
-        keyExtractor={(it: ActionSummary) => it.id}
-        renderItem={({ item }: any) => {
-          const cardProps = mapActionToCardProps(item, locale);
-          return (
-            <ExerciseLibraryCard
-              {...cardProps}
-              locale={locale}
-              isFavorite={isFavorite(item.id)}
-              onToggleFavorite={() => toggleFavorite(item.id)}
-              onPress={() =>
-                router.push({
-                  pathname: "/library/exercise-detail",
-                  params: { exerciseId: item.id, context: "library" },
-                })
-              }
-            />
-          );
-        }}
-        ListHeaderComponent={<>{ListHeader}{TabsHeader}</>}
-        contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 28 }}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-        style={{ backgroundColor: colors.background }}
-      />
-    </>
+    <FlatList
+      data={list}
+      keyExtractor={(it: ActionSummary) => it.id}
+      renderItem={({ item }: any) => {
+        const cardProps = mapActionToCardProps(item, locale);
+        return (
+          <ExerciseLibraryCard
+            {...cardProps}
+            locale={locale}
+            isFavorite={isFavorite(item.id)}
+            onToggleFavorite={() => toggleFavorite(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: "/library/exercise-detail",
+                params: { exerciseId: item.id, context: "library" },
+              })
+            }
+          />
+        );
+      }}
+      ListHeaderComponent={<>{ListHeader}{TabsHeader}</>}
+      contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 28 }}
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}
+      style={{ backgroundColor: colors.background }}
+    />
   );
 }
 

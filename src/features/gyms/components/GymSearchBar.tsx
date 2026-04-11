@@ -69,7 +69,11 @@ export function GymSearchBar({
         text={query}
         showsCancelButton
         autoCapitalize="none"
-        searchFieldHeight={48}
+        searchFieldHeight={44}
+        // Light gray with alpha so the liquid glass shows through.
+        // Hex format is RRGGBBAA — 0xFFFFFF26 = white @ 15% alpha.
+        searchFieldBackgroundColor="FFFFFF26"
+        placeholderFontSize={15}
         onChangeText={handleChangeText}
         onSubmitSearch={handleSubmit}
         onCancel={handleCancel}
@@ -81,11 +85,20 @@ export function GymSearchBar({
 
 const styles = StyleSheet.create({
   searchWrap: {
-    paddingHorizontal: 8,
-    paddingTop: 10,
+    // Uniform 12pt margin on all four sides so the search-bar pill sits
+    // concentric inside the sheet's rounded corners. 12pt is the minimum
+    // paddingTop that clears the grabber (topMargin 6 + height 3 = y=9)
+    // with a little breathing room.
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   searchBar: {
-    height: 66,
+    // Must equal searchFieldHeight so the RN wrapper view doesn't add
+    // invisible vertical padding around the native UISearchBar pill.
+    // layoutSubviews in NativeSearchBarView.swift centers the text field
+    // vertically inside `bounds`, so a bigger wrapper becomes dead space.
+    height: 44,
   },
   androidWrap: {
     paddingHorizontal: 12,

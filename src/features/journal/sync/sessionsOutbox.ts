@@ -1,9 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "../../../lib/apiClient";
+import { api, ApiError } from "../../../lib/apiClient";
+import { unmarkSessionDeleted } from "./sessionDeletedKeys";
+import { removeSessionServerId } from "./sessionServerIdMap";
 
 export type SessionOutboxEventInput =
   | { type: "create"; localKey: string; payload: { gym_name: string; location_type: string; gym_id?: string; date?: string; start_time?: string; end_time?: string } }
-  | { type: "end"; localKey: string };
+  | { type: "end"; localKey: string }
+  | { type: "delete"; localKey: string; serverId?: string };
 
 type SessionOutboxEvent = SessionOutboxEventInput & { id: string; createdAt: number };
 
@@ -89,11 +92,69 @@ export async function flushSessionsOutbox(opts: {
         );
         continue;
       }
+
+      if (ev.type === "delete") {
+        // Prefer the serverId embedded at enqueue time; fall back to the map
+        // (in case the create event ran in a previous flush of this same pass).
+        const serverId = ev.serverId || resolveServerId(ev.localKey);
+        if (!serverId) {
+          // No backend session exists (never created, or create never succeeded).
+          // Nothing to delete — drop the tombstone and move on.
+          await unmarkSessionDeleted(ev.localKey);
+          continue;
+        }
+        await withTimeout(
+          api.del(`/sessions/${serverId}`),
+          FLUSH_TIMEOUT
+        );
+        // Success → clean up tombstone and server id mapping.
+        await unmarkSessionDeleted(ev.localKey);
+        await removeSessionServerId(ev.localKey);
+        continue;
+      }
     } catch (err: any) {
-      // 409 = already exists → treat as success
+      // Classify idempotent "already-in-final-state" failures as success so they
+      // don't get re-queued forever. Fallback to string matching on err.message
+      // for backward-compatibility with any non-ApiError throw.
+      const status = err instanceof ApiError ? err.status : null;
+      const detail = err instanceof ApiError ? err.detail : null;
       const msg = String(err?.message || "");
+
+      if (ev.type === "end") {
+        // Backend already marked the session completed → desired state reached.
+        if (status === 400 && detail === "Session is not active") {
+          console.info(
+            `[SESSIONS_OUTBOX] end event for ${ev.localKey} already completed on backend — treated as success`
+          );
+          continue;
+        }
+        // Session no longer exists on backend (deleted) → nothing to end.
+        if (status === 404) {
+          console.info(
+            `[SESSIONS_OUTBOX] end event for ${ev.localKey} target session not found — treated as success`
+          );
+          continue;
+        }
+      }
+
+      if (ev.type === "create") {
+        // 409 Conflict = already exists → treat as success.
+        if (status === 409 || msg.includes("409")) continue;
+      }
+
+      if (ev.type === "delete") {
+        // Backend session already gone → desired state reached.
+        if (status === 404) {
+          console.info(
+            `[SESSIONS_OUTBOX] delete event for ${ev.localKey} target session not found — treated as success`
+          );
+          await unmarkSessionDeleted(ev.localKey);
+          await removeSessionServerId(ev.localKey);
+          continue;
+        }
+      }
+
       console.warn(`[SESSIONS_OUTBOX] Failed to flush ${ev.type} event:`, msg);
-      if (msg.includes("409")) continue;
       remaining.push(ev);
     }
   }

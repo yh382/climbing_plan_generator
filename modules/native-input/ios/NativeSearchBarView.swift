@@ -18,6 +18,27 @@ class NativeSearchBarView: ExpoView, UISearchBarDelegate {
     didSet { setNeedsLayout() }
   }
 
+  /// Placeholder font point size. 0 means "use system default".
+  var placeholderFontSize: CGFloat = 0 {
+    didSet { applyPlaceholderFont() }
+  }
+
+  /// Rebuilds the attributed placeholder whenever placeholder text or font
+  /// size changes, so the custom font sticks even when the placeholder text
+  /// is updated from JS.
+  func applyPlaceholderFont() {
+    guard placeholderFontSize > 0, let text = searchBar.placeholder, !text.isEmpty else {
+      return
+    }
+    searchBar.searchTextField.attributedPlaceholder = NSAttributedString(
+      string: text,
+      attributes: [
+        .font: UIFont.systemFont(ofSize: placeholderFontSize),
+        .foregroundColor: UIColor.placeholderText,
+      ]
+    )
+  }
+
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
     clipsToBounds = true

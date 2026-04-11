@@ -1,15 +1,29 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_BASE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 
 export default function LibraryLayout() {
   return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen name="generator" />
       <Stack.Screen name="my-plans" />
-      <Stack.Screen name="exercise-categories" />
+      <Stack.Screen
+        name="exercise-categories"
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          headerTransparent: true,
+          scrollEdgeEffects: { top: 'soft' },
+        }}
+      />
       <Stack.Screen name="exercise-detail" />
       <Stack.Screen name="exercise-favorites" />
-      <Stack.Screen name="exercises" />
+      <Stack.Screen
+        name="exercises"
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          headerTransparent: true,
+          scrollEdgeEffects: { top: 'soft' },
+        }}
+      />
       <Stack.Screen name="plan-builder" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="plan-detail" />
       <Stack.Screen name="plan-history" />

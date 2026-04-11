@@ -6,10 +6,12 @@ import { useThemeColors } from '@/lib/useThemeColors';
 
 interface GymDropdownPillProps {
   gymName: string;
-  onPress: () => void;
+  onPress?: () => void;
   weeklyActive?: number;
   totalSends?: number;
   gradeFeel?: string;
+  /** When true, renders as a static card with no chevron or press handler. */
+  readonly?: boolean;
 }
 
 export default function GymDropdownPill({
@@ -18,15 +20,19 @@ export default function GymDropdownPill({
   weeklyActive,
   totalSends,
   gradeFeel,
+  readonly = false,
 }: GymDropdownPillProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const Wrapper: any = readonly ? View : TouchableOpacity;
+  const wrapperProps = readonly ? {} : { onPress, activeOpacity: 0.7 };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <Wrapper style={styles.card} {...wrapperProps}>
       <View style={styles.topRow}>
         <Text style={styles.name} numberOfLines={1}>{gymName}</Text>
-        <Ionicons name="chevron-down" size={14} color="#FFF" />
+        {!readonly && <Ionicons name="chevron-down" size={14} color="#FFF" />}
       </View>
       <View style={styles.kpiRow}>
         <View style={styles.kpiCard}>
@@ -46,7 +52,7 @@ export default function GymDropdownPill({
           <Text style={styles.kpiLabel}>Feel</Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </Wrapper>
   );
 }
 
