@@ -17,7 +17,12 @@ type BoulderScale = "V" | "Font";
 type RopeScale = "YDS" | "French";
 
 // iOS Settings 风格图标：彩色圆角方块 + 白色 SF Symbol
-const SettingIcon = ({ name, bg }: { name: string; bg: string }) => (
+// `name` is typed to the exact SF Symbol union the Image component expects,
+// so TypeScript catches typos at compile time instead of silently falling
+// through as `string`.
+type SFSymbolName = NonNullable<React.ComponentProps<typeof Image>["systemName"]>;
+
+const SettingIcon = ({ name, bg }: { name: SFSymbolName; bg: string }) => (
   <ZStack
     alignment="center"
     modifiers={[

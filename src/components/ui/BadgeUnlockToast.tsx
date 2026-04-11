@@ -37,7 +37,7 @@ export default function BadgeUnlockToast() {
   const router = useRouter();
   const pending = useBadgeUnlockStore((s) => s.pending);
   const dismiss = useBadgeUnlockStore((s) => s.dismiss);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const translateY = useSharedValue(-120);
   const opacity = useSharedValue(0);

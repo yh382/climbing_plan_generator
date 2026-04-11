@@ -8,7 +8,10 @@ import { useThemeColors } from '@/lib/useThemeColors';
 import type { GymSummary } from '../../gyms/api';
 
 interface GymSelectSheetProps {
-  sheetRef: React.RefObject<TrueSheet>;
+  // React 19's useRef<T>(null) yields RefObject<T | null>, so we accept the
+  // nullable variant to match what callers can produce. The `.current`
+  // access sites below already use optional chaining.
+  sheetRef: React.RefObject<TrueSheet | null>;
   gyms: GymSummary[];
   selectedGymId: string | null;
   onSelect: (gymId: string) => void;

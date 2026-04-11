@@ -31,6 +31,7 @@
       "@/lib/*": ["src/lib/*"],
       "@/contexts/*": ["src/contexts/*"],
       "@/services/*": ["src/services/*"],
+      "@/types/*": ["src/types/*"],
       "@/assets/*": ["app/assets/*"]
     },
     "types": [
