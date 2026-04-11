@@ -28,6 +28,8 @@ export interface NativeTextViewProps extends Omit<ViewProps, "onFocus" | "onBlur
   tintColor?: string;
   /** Placeholder text color (hex) */
   placeholderColor?: string;
+  /** When true, programmatically focuses the text view (shows keyboard) */
+  focused?: boolean;
 
   /** Fired on every text change */
   onChangeText?: (e: { nativeEvent: { text: string } }) => void;

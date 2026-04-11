@@ -3,7 +3,8 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
+  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,12 +31,13 @@ const NO_GYM_ITEM: GymListItem = { gym_id: '__none__', name: 'No gym', isNoGym: 
 export default function GymTagSheet({ visible, onClose, selectedGymId, onSelect }: GymTagSheetProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { favorites: favoriteGyms } = useFavoriteGyms();
+  const { favorites: favoriteGyms, loading, refresh } = useFavoriteGyms();
 
   const sheetRef = useRef<TrueSheet>(null);
   const isPresented = useRef(false);
 
   const listData: GymListItem[] = useMemo(() => {
+    if (favoriteGyms.length === 0) return [];
     const gyms = favoriteGyms.map((g) => ({ gym_id: g.gym_id, name: g.name }));
     return [NO_GYM_ITEM, ...gyms];
   }, [favoriteGyms]);
@@ -51,6 +53,13 @@ export default function GymTagSheet({ visible, onClose, selectedGymId, onSelect 
     }
   }, [visible]);
 
+  // Re-fetch favorites when sheet opens
+  useEffect(() => {
+    if (visible) {
+      refresh();
+    }
+  }, [visible, refresh]);
+
   const handleDismiss = useCallback(() => {
     isPresented.current = false;
     onClose();
@@ -65,10 +74,11 @@ export default function GymTagSheet({ visible, onClose, selectedGymId, onSelect 
     sheetRef.current?.dismiss();
   }, [onSelect]);
 
-  const renderItem = useCallback(({ item }: { item: GymListItem }) => {
+  const renderRow = useCallback((item: GymListItem) => {
     const isSelected = item.isNoGym ? !selectedGymId : selectedGymId === item.gym_id;
     return (
       <TouchableOpacity
+        key={item.gym_id}
         style={[styles.row, isSelected && styles.rowSelected]}
         onPress={() => handleItemPress(item)}
         activeOpacity={0.7}
@@ -107,19 +117,23 @@ export default function GymTagSheet({ visible, onClose, selectedGymId, onSelect 
         <Text style={styles.headerTitle}>Select Gym</Text>
       </View>
 
-      <FlatList
-        data={listData}
-        keyExtractor={(item: GymListItem) => item.gym_id}
-        renderItem={renderItem}
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>No favorite gyms yet</Text>
-          </View>
-        }
-        style={{ flex: 1 }}
+      <ScrollView
         contentContainerStyle={{ paddingBottom: 16 }}
         keyboardShouldPersistTaps="handled"
-      />
+      >
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+          </View>
+        ) : listData.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>No favorite gyms yet</Text>
+            <Text style={styles.hintText}>Favorite a gym to tag it here.</Text>
+          </View>
+        ) : (
+          listData.map((item) => renderRow(item))
+        )}
+      </ScrollView>
     </TrueSheet>
   );
 }
@@ -172,15 +186,27 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '700',
     fontFamily: theme.fonts.bold,
   },
-  emptyWrap: {
-    flex: 1,
+  loadingWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    paddingVertical: 60,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 60,
   },
   emptyText: {
     fontSize: 14,
     fontFamily: theme.fonts.regular,
     color: colors.textTertiary,
+  },
+  hintText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.regular,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 6,
   },
 });

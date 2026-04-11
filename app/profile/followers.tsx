@@ -1,6 +1,6 @@
 // app/profile/followers.tsx
 
-import { useState, useEffect, useCallback, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import { communityApi } from "../../src/features/community/api";
 import { api } from "../../src/lib/apiClient";
+import { useThemeColors } from "../../src/lib/useThemeColors";
 
 interface FollowerUser {
   user_id: string;
@@ -30,6 +31,8 @@ export default function FollowersScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [users, setUsers] = useState<FollowerUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +108,7 @@ export default function FollowersScreen() {
           disabled={toggling.has(item.user_id)}
         >
           {toggling.has(item.user_id) ? (
-            <ActivityIndicator size="small" color="#FFF" />
+            <ActivityIndicator size="small" color={colors.pillText} />
           ) : (
             <Text style={[styles.followBtnText, styles.followBtnTextFilled]}>Follow</Text>
           )}
@@ -124,7 +127,10 @@ export default function FollowersScreen() {
         disabled={toggling.has(item.user_id)}
       >
         {toggling.has(item.user_id) ? (
-          <ActivityIndicator size="small" color={isFollowingBack ? "#111" : "#FFF"} />
+          <ActivityIndicator
+            size="small"
+            color={isFollowingBack ? colors.textPrimary : colors.pillText}
+          />
         ) : (
           <Text
             style={[
@@ -149,7 +155,7 @@ export default function FollowersScreen() {
         <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, styles.avatarPlaceholder]}>
-          <Ionicons name="person" size={20} color="#9CA3AF" />
+          <Ionicons name="person" size={20} color={colors.textSecondary} />
         </View>
       )}
       <View style={styles.info}>
@@ -163,14 +169,14 @@ export default function FollowersScreen() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#111" />
+          <ActivityIndicator size="large" color={colors.textPrimary} />
         </View>
       ) : users.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="people-outline" size={48} color="#E5E7EB" />
+          <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
           <Text style={styles.emptyText}>No followers yet</Text>
         </View>
       ) : (
@@ -186,38 +192,40 @@ export default function FollowersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyText: { color: "#9CA3AF", marginTop: 8, fontSize: 14 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F3F4F6",
-  },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#F3F4F6" },
-  avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
-  info: { flex: 1, marginLeft: 12 },
-  username: { fontSize: 15, fontWeight: "700", color: "#111" },
-  handle: { fontSize: 13, color: "#9CA3AF", marginTop: 1 },
-  followBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-    minWidth: 96,
-    alignItems: "center",
-  },
-  followBtnFilled: {
-    backgroundColor: "#111",
-  },
-  followBtnOutline: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFF",
-  },
-  followBtnText: { fontSize: 13, fontWeight: "600" },
-  followBtnTextFilled: { color: "#FFF" },
-  followBtnTextOutline: { color: "#111" },
-});
+const createStyles = (c: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    emptyText: { color: c.textSecondary, marginTop: 8, fontSize: 14 },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+    },
+    avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.backgroundSecondary },
+    avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
+    info: { flex: 1, marginLeft: 12 },
+    username: { fontSize: 15, fontWeight: "700", color: c.textPrimary },
+    handle: { fontSize: 13, color: c.textSecondary, marginTop: 1 },
+    followBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 8,
+      minWidth: 96,
+      alignItems: "center",
+    },
+    followBtnFilled: {
+      backgroundColor: c.pillBackground,
+    },
+    followBtnOutline: {
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      backgroundColor: c.cardBackground,
+    },
+    followBtnText: { fontSize: 13, fontWeight: "600" },
+    followBtnTextFilled: { color: c.pillText },
+    followBtnTextOutline: { color: c.textPrimary },
+  });

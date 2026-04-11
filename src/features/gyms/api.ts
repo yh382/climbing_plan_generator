@@ -37,7 +37,8 @@ export interface GymStats {
   boulder_distribution: Array<{ grade_text: string; grade_score: number; count: number }>;
   rope_distribution: Array<{ grade_text: string; grade_score: number; count: number }>;
   popular_grades: string[];
-  difficulty_index: number;
+  grade_feel?: string;        // "Soft" | "Fair" | "Stiff" | null
+  grade_feel_score?: number;  // raw [-1, 1]
 }
 
 export interface GymMember {

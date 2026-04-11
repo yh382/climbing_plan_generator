@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Stack } from "expo-router";
 import { GlassView } from "expo-glass-effect";
@@ -9,7 +9,6 @@ import { NativeTextView } from "../../../modules/native-input/src";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
-import { MenuButton } from "@/components/sidebar/Sidebar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCoachChatStore } from "@/features/coachChat/state/coachChatStore";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -38,6 +37,9 @@ export default function ClimmateScreen() {
   const [inputText, setInputText] = useState("");
   const [inputHeight, setInputHeight] = useState(48);
   const [inputFocused, setInputFocused] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [wantsFocus, setWantsFocus] = useState(false);
+  const androidInputRef = useRef<TextInput>(null);
 
   const coach = useCoachChatStore((s) => s.state);
   const createConversation = useCoachChatStore((s) => s.createConversation);
@@ -48,17 +50,23 @@ export default function ClimmateScreen() {
   const setOverlayOpen = useCoachChatStore((s) => s.setOverlayOpen);
   const setMode = useCoachChatStore((s) => s.setMode);
 
-  const { tr } = useSettings();
+  const { tr, lang } = useSettings();
   const accessToken = useAuthStore((s) => s.accessToken);
 
   const bottomBarRef = useRef<View>(null);
+  const touchStartRef = useRef({ x: 0, y: 0 });
+
+  // Dismiss keyboard by resigning NativeTextView first responder
+  const dismissKeyboard = useCallback(() => {
+    setWantsFocus(false);
+  }, []);
 
   // ── Native header ──────────────────────────────────────────────────────────
   useLayoutEffect(() => {
     navigation.setOptions({
       ...withHeaderTheme(colors),
       title: "Coach Paddi",
-      headerLeft: () => <MenuButton />,
+      headerLeft: () => null,
     });
   }, [navigation, colors]);
 
@@ -66,6 +74,29 @@ export default function ClimmateScreen() {
   useEffect(() => {
     if (accessToken) loadConversations();
   }, [accessToken, loadConversations]);
+
+  // Track keyboard visibility for padding adjustment
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardWillHide", () => {
+      setKeyboardVisible(false);
+      setWantsFocus(false);
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  // Auto-focus input when tab gains focus
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        setWantsFocus(true);
+        if (Platform.OS === "android") {
+          androidInputRef.current?.focus();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }, []),
+  );
 
   const mode = coach.mode;
 
@@ -97,10 +128,10 @@ export default function ClimmateScreen() {
   // Layer mutual exclusion: close modals when overlay opens
   const handleOpenOverlay = useCallback(() => {
     setListOpen(false);
-    Keyboard.dismiss();
+    dismissKeyboard();
     setPreviewOpen(true);
     setOverlayOpen(true);
-  }, [setOverlayOpen]);
+  }, [setOverlayOpen, dismissKeyboard]);
 
   const handleCloseOverlay = useCallback(() => {
     setPreviewOpen(false);
@@ -139,25 +170,25 @@ export default function ClimmateScreen() {
       // Auto-send starter prompt when activating a mode (not deactivating)
       if (m !== "none" && prevMode === "none" && !useCoachChatStore.getState().state.isBusy) {
         const prompt = MODE_STARTER_PROMPTS[m];
-        sendFromDock(tr(prompt.zh, prompt.en));
+        sendFromDock(tr(prompt.zh, prompt.en), lang);
         requestAnimationFrame(() => {
           scrollRef.current?.scrollToEnd({ animated: true });
         });
       }
     },
-    [setMode, sendFromDock, tr],
+    [setMode, sendFromDock, tr, lang],
   );
 
   const handleSendMessage = useCallback(() => {
     const t = inputText.trim();
     if (!t || coach.isBusy) return;
     setInputText("");
-    Keyboard.dismiss();
-    sendFromDock(t);
+    dismissKeyboard();
+    sendFromDock(t, lang);
     requestAnimationFrame(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     });
-  }, [inputText, coach.isBusy, sendFromDock]);
+  }, [inputText, coach.isBusy, sendFromDock, dismissKeyboard, lang]);
 
   const handleNativeChangeText = useCallback((e: { nativeEvent: { text: string } }) => {
     setInputText(e.nativeEvent.text);
@@ -221,6 +252,15 @@ export default function ClimmateScreen() {
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
         onContentSizeChange={handleContentSizeChange}
+        onScrollBeginDrag={dismissKeyboard}
+        onTouchStart={(e) => {
+          touchStartRef.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        }}
+        onTouchEnd={(e) => {
+          const dx = Math.abs(e.nativeEvent.pageX - touchStartRef.current.x);
+          const dy = Math.abs(e.nativeEvent.pageY - touchStartRef.current.y);
+          if (dx < 10 && dy < 10 && keyboardVisible) dismissKeyboard();
+        }}
       >
         {realMessages.map((m) => (
           <MessageBubble key={m.id} msg={m} />
@@ -229,7 +269,7 @@ export default function ClimmateScreen() {
       </ScrollView>
 
       {/* Greeting — absolutely positioned with explicit height */}
-      {showGreeting && !showThinking && (
+      {showGreeting && !showThinking && !inputFocused && (
         <View
           pointerEvents="none"
           style={{
@@ -264,7 +304,7 @@ export default function ClimmateScreen() {
         style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
         keyboardVerticalOffset={0}
       >
-        <View ref={bottomBarRef} style={{ paddingBottom: insets.bottom + 12 }}>
+        <View ref={bottomBarRef} style={{ paddingBottom: keyboardVisible ? 12 : insets.bottom + 12 }}>
           {/* TaskBar — flow layout */}
           <TaskBar currentMode={mode} onToggleMode={handleToggleMode} visible={coach.taskBarVisible} />
 
@@ -289,7 +329,7 @@ export default function ClimmateScreen() {
             )}
             {Platform.OS === "ios" ? (
               <NativeTextView
-                style={{ flex: 1 }}
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
                 text={inputText}
                 placeholder="Ask Paddi"
                 maxHeight={110}
@@ -298,6 +338,7 @@ export default function ClimmateScreen() {
                 fontSize={15}
                 textColor={colors.textPrimary}
                 tintColor={colors.accent}
+                focused={wantsFocus}
                 onChangeText={handleNativeChangeText}
                 onSubmitEditing={handleNativeSubmit}
                 onHeightChange={handleNativeHeightChange}
@@ -306,6 +347,7 @@ export default function ClimmateScreen() {
               />
             ) : (
               <TextInput
+                ref={androidInputRef}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Ask Paddi"

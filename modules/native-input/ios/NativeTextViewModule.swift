@@ -78,6 +78,11 @@ public class NativeTextViewModule: Module {
           view.placeholderLabel.textColor = UIColor(hex: hex)
         }
       }
+
+      Prop("focused") { (view, value: Bool?) in
+        view.wantsFocus = value ?? false
+        view.updateFocus()
+      }
     }
   }
 }

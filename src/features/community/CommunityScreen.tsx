@@ -1,12 +1,12 @@
 // src/features/community/CommunityScreen.tsx
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from "react";
-import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share, ViewToken } from "react-native";
+import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share, ViewToken, LayoutAnimation, Platform, UIManager } from "react-native";
 import { useFocusEffect, useNavigation, useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { communityApi } from "./api";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
+import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import FeedPost from "./components/FeedPost";
 import { NativeSegmentedControl } from "@/components/ui";
 import CommentSheet from "./components/CommentSheet";
@@ -26,7 +26,13 @@ import {
   dismissUploadBanner,
 } from "./postUploadManager";
 
-type TopTab = "Post" | "Rank" | "Gyms" | "Events";
+// Enable LayoutAnimation on Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type TopTab = "Post" | "Rank" | "Events";
+type Mode = "feed" | "gyms";
 
 export default function CommunityScreen() {
   const colors = useThemeColors();
@@ -118,27 +124,34 @@ export default function CommunityScreen() {
     });
   }, [posts]);
 
+  const [mode, setMode] = useState<Mode>("feed");
   const [topTab, setTopTab] = useState<TopTab>("Post");
   const routeParams = useLocalSearchParams<{ tab?: string; gymId?: string }>();
 
-  // Auto-switch to Gyms tab when navigated with tab=gyms param
+  // Auto-switch to Gyms mode when navigated with tab=gyms param
   useEffect(() => {
     if (routeParams.tab === 'gyms') {
-      setTopTab('Gyms');
+      setMode('gyms');
     }
   }, [routeParams.tab]);
 
-  const TOP_TABS: TopTab[] = ["Post", "Rank", "Gyms", "Events"];
+  const toggleMode = useCallback(() => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(150, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
+    );
+    setMode((m) => (m === "feed" ? "gyms" : "feed"));
+  }, []);
+
+  const TOP_TABS: TopTab[] = ["Post", "Rank", "Events"];
 
 
-  // Native iOS large-title header
+  // Native iOS header (no large title — Toolbar button shows mode)
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({
-      ...NATIVE_HEADER_LARGE,
       ...withHeaderTheme(colors),
       headerShown: true,
-      title: "Community",
+      headerTitle: "",
     });
   }, [navigation, colors]);
 
@@ -148,64 +161,66 @@ export default function CommunityScreen() {
     setRefreshing(false);
   };
 
-    const listData = useMemo(() => {
+  const feedListData = useMemo(() => {
     if (topTab === "Post") return posts;
-    return []; // Rank / Gyms use Footer rendering, not list items
-    }, [topTab, posts]);
+    return [];
+  }, [topTab, posts]);
 
 
   // Memoize header to prevent @expo/ui SwiftUI Host components (NativeSegmentedControl)
   // from being remounted when unrelated state changes (e.g. commentPostId for CommentSheet)
-  const listHeader = useMemo(() => (
-    <View>
-    {/* Post / Rank / Gyms / Events — native segmented control */}
-    <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
-      <View style={styles.topTabsWrap}>
+  const feedListHeader = useMemo(() => {
+    return (
+      <View>
+      {/* Post / Rank / Events — native segmented control */}
+      <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
+        <View style={styles.topTabsWrap}>
+            <NativeSegmentedControl
+              options={TOP_TABS}
+              selectedIndex={TOP_TABS.indexOf(topTab)}
+              onSelect={(i) => setTopTab(TOP_TABS[i])}
+              style={{ height: 32 }}
+            />
+        </View>
+
+      {/* Feed scope — only when Post tab is active */}
+      {topTab === "Post" && (
+        <View style={styles.feedScopeRow}>
           <NativeSegmentedControl
-            options={TOP_TABS}
-            selectedIndex={TOP_TABS.indexOf(topTab)}
-            onSelect={(i) => setTopTab(TOP_TABS[i])}
-            style={{ height: 32 }}
+            options={["All", "Following"]}
+            selectedIndex={feedMode === "all" ? 0 : 1}
+            onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
+            style={{ width: 180, height: 28 }}
           />
+
+          {/* Sort toggle — only in "All" mode (kept as pills — has icons) */}
+          {feedMode === "all" && (
+            <View style={styles.sortToggle}>
+              <TouchableOpacity
+                style={[styles.sortPill, feedSort === "hot" && styles.sortPillActive]}
+                onPress={() => setFeedSort("hot")}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : colors.textSecondary} />
+                <Text style={feedSort === "hot" ? styles.sortTextActive : styles.sortText}>Hot</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortPill, feedSort === "latest" && styles.sortPillActive]}
+                onPress={() => setFeedSort("latest")}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : colors.textSecondary} />
+                <Text style={feedSort === "latest" ? styles.sortTextActive : styles.sortText}>Latest</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
       </View>
 
-    {/* Feed scope — only when Post tab is active */}
-    {topTab === "Post" && (
-      <View style={styles.feedScopeRow}>
-        <NativeSegmentedControl
-          options={["All", "Following"]}
-          selectedIndex={feedMode === "all" ? 0 : 1}
-          onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
-          style={{ width: 180, height: 28 }}
-        />
-
-        {/* Sort toggle — only in "All" mode (kept as pills — has icons) */}
-        {feedMode === "all" && (
-          <View style={styles.sortToggle}>
-            <TouchableOpacity
-              style={[styles.sortPill, feedSort === "hot" && styles.sortPillActive]}
-              onPress={() => setFeedSort("hot")}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : colors.textSecondary} />
-              <Text style={feedSort === "hot" ? styles.sortTextActive : styles.sortText}>Hot</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.sortPill, feedSort === "latest" && styles.sortPillActive]}
-              onPress={() => setFeedSort("latest")}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : colors.textSecondary} />
-              <Text style={feedSort === "latest" ? styles.sortTextActive : styles.sortText}>Latest</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
-    )}
-    </View>
-
-    </View>
-  ), [topTab, feedMode, feedSort, colors, styles]);
+    );
+  }, [topTab, feedMode, feedSort, colors, styles]);
 
   // Visibility tracking — only ONE post plays at a time (the most visible one)
   // Clear active post when leaving Community tab → pauses all videos
@@ -318,30 +333,19 @@ export default function CommunityScreen() {
     );
   }, [currentUserId, router, toggleLike, toggleSave, deletePost, submitPostReport, activePostId]);
 
-  const listFooter = useMemo(() => {
-    const tabContent = topTab === "Events" ? <EventsTab />
-      : topTab === "Rank" ? (
-          <RankTab onPressUser={(userId) => router.push(`/community/u/${userId}`)} />
-        )
-      : topTab === "Gyms" ? (
-          <GymsTab initialGymId={routeParams.tab === 'gyms' ? routeParams.gymId : undefined} />
-        )
-      : null;
-    return (
-      <>
-        {tabContent}
-        <CommentSheet
-          visible={!!commentPostId}
-          onClose={() => { setCommentPostId(null); setCommentPostOwnerId(undefined); setCommentPostCount(undefined); }}
-          postId={commentPostId ?? ''}
-          postOwnerId={commentPostOwnerId}
-          commentCount={commentPostCount}
-        />
-      </>
-    );
-  }, [topTab, routeParams.tab, routeParams.gymId, router, commentPostId, commentPostOwnerId, commentPostCount]);
+  const feedListFooter = useMemo(() => {
+    if (topTab === "Events") return <EventsTab />;
+    if (topTab === "Rank") {
+      return <RankTab onPressUser={(userId) => router.push(`/community/u/${userId}`)} />;
+    }
+    return null;
+  }, [topTab, router]);
 
-  const listEmpty = useMemo(() => {
+  const gymsListFooter = useMemo(() => (
+    <GymsTab initialGymId={routeParams.tab === 'gyms' ? routeParams.gymId : undefined} />
+  ), [routeParams.tab, routeParams.gymId]);
+
+  const feedListEmpty = useMemo(() => {
     if (topTab !== "Post") return null;
     return (
       <View style={{ padding: 40, alignItems: "center" }}>
@@ -356,39 +360,86 @@ export default function CommunityScreen() {
 
   return (
     <>
+      {/* 左侧: [+] [⇌ Feed/Gyms] — 两个独立胶囊 */}
       <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button icon="plus" onPress={() => router.push("/community/device-media-picker?mode=initial")} />
+        <Stack.Toolbar.Button
+          icon="plus"
+          onPress={() => router.push("/community/device-media-picker?mode=initial")}
+        />
+        <Stack.Toolbar.Button
+          separateBackground
+          onPress={toggleMode}
+          style={{ fontWeight: "700" }}
+        >
+          {mode === "feed" ? "⇌ Feed" : "⇌ Gyms"}
+        </Stack.Toolbar.Button>
       </Stack.Toolbar>
+
+      {/* 右侧: [paperplane bell] — 合并成一个胶囊 */}
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button icon="paperplane" onPress={() => router.push("/chat" as any)}>
+        <Stack.Toolbar.Button
+          icon="paperplane"
+          onPress={() => router.push("/chat" as any)}
+        >
           {totalUnread > 0 && (
-            <Stack.Toolbar.Badge>{totalUnread > 99 ? '99+' : String(totalUnread)}</Stack.Toolbar.Badge>
+            <Stack.Toolbar.Badge style={{ fontSize: 1 }}>
+              {totalUnread > 99 ? '99+' : String(totalUnread)}
+            </Stack.Toolbar.Badge>
           )}
         </Stack.Toolbar.Button>
         <Stack.Toolbar.Button
           icon="bell"
           onPress={() => { setUnreadNotifCount(0); router.push("/community/notifications"); }}
         >
-          {unreadNotifCount > 0 && <Stack.Toolbar.Badge>{' '}</Stack.Toolbar.Badge>}
+          {unreadNotifCount > 0 && <Stack.Toolbar.Badge style={{ fontSize: 1 }}>{''}</Stack.Toolbar.Badge>}
         </Stack.Toolbar.Button>
-        <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search" as any)} />
       </Stack.Toolbar>
+
+      {/* Feed FlatList (mode === "gyms" 时隐藏) */}
       <FlatList
-        style={{ flex: 1, backgroundColor: colors.background }}
-        data={listData as any[]}
+        style={[
+          { flex: 1, backgroundColor: colors.background },
+          mode === "gyms" && ({ display: "none" } as const),
+        ]}
+        data={feedListData as any[]}
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
+        ListHeaderComponent={feedListHeader}
+        ListFooterComponent={feedListFooter}
+        ListEmptyComponent={feedListEmpty}
         contentInsetAdjustmentBehavior="automatic"
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 110 }}
-        ListEmptyComponent={listEmpty}
         onViewableItemsChanged={onViewableItemsChangedRef}
         viewabilityConfig={feedViewabilityConfig}
       />
+
+      {/* Gyms FlatList (mode === "feed" 时隐藏) */}
+      <FlatList
+        style={[
+          { flex: 1, backgroundColor: colors.background },
+          mode === "feed" && ({ display: "none" } as const),
+        ]}
+        data={[]}
+        keyExtractor={() => "gyms-empty"}
+        renderItem={() => null}
+        ListFooterComponent={gymsListFooter}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 110 }}
+      />
+
+      {/* CommentSheet 外提为全局兄弟节点 */}
+      <CommentSheet
+        visible={!!commentPostId}
+        onClose={() => { setCommentPostId(null); setCommentPostOwnerId(undefined); setCommentPostCount(undefined); }}
+        postId={commentPostId ?? ''}
+        postOwnerId={commentPostOwnerId}
+        commentCount={commentPostCount}
+      />
+
       <UploadProgressToast
         visible={showUploadToast}
         progress={uploadState.status === "success" ? 100 : uploadProgress}
@@ -435,6 +486,21 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 12,
     fontFamily: theme.fonts.medium,
     color: "#FFF",
+  },
+
+  modePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: colors.backgroundSecondary,
+  },
+  modePillText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.medium,
+    color: colors.textSecondary,
   },
 
   badge: {

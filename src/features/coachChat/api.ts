@@ -4,6 +4,7 @@ export interface CoachChatRequest {
   conversationId?: string | null;
   message: string;
   mode?: string | null;
+  language?: "zh" | "en" | null;
 }
 
 export interface CoachChatResponse {
@@ -40,6 +41,7 @@ export const coachApi = {
       conversation_id: data.conversationId,
       message: data.message,
       mode: data.mode,
+      language: data.language ?? undefined,
     }),
 
   listConversations: (skip = 0, limit = 20) =>

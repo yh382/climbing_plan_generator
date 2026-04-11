@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-import { gymCommunityApi, GymSessionItem, GymStats } from '../api';
+import { gymCommunityApi, GymSessionItem } from '../api';
 import { useThemeColors } from '@/lib/useThemeColors';
 
 interface Props {
@@ -39,18 +39,13 @@ export default function GymActivityFeed({ gymId }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [sessions, setSessions] = useState<GymSessionItem[]>([]);
-  const [stats, setStats] = useState<GymStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [activityData, statsData] = await Promise.all([
-        gymCommunityApi.getActivity(gymId),
-        gymCommunityApi.getStats(gymId),
-      ]);
+      const activityData = await gymCommunityApi.getActivity(gymId);
       setSessions(activityData.items);
-      setStats(statsData);
     } catch {
       // swallow
     } finally {
@@ -72,30 +67,10 @@ export default function GymActivityFeed({ gymId }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* KPI Row */}
-      {stats && (
-        <View style={styles.kpiRow}>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>
-              {stats.total_sends.toLocaleString()}
-            </Text>
-            <Text style={styles.kpiLabel}>Total Sends</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>{stats.weekly_active}</Text>
-            <Text style={styles.kpiLabel}>Weekly Active</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>{stats.difficulty_index.toFixed(2)}</Text>
-            <Text style={styles.kpiLabel}>Difficulty</Text>
-          </View>
-        </View>
-      )}
-
       {/* Session List */}
       {sessions.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="pulse-outline" size={40} color={colors.tertiaryLabel} />
+          <Ionicons name="pulse-outline" size={40} color={colors.textTertiary} />
           <Text style={styles.emptyText}>No sessions yet</Text>
           <Text style={styles.emptySubtext}>
             Sessions at this gym will appear here
@@ -116,7 +91,7 @@ export default function GymActivityFeed({ gymId }: Props) {
                   <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={16} color={colors.tertiaryLabel} />
+                    <Ionicons name="person" size={16} color={colors.textTertiary} />
                   </View>
                 )}
                 <View style={styles.sessionInfo}>
@@ -141,7 +116,7 @@ export default function GymActivityFeed({ gymId }: Props) {
 
 const createStyles = (c: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 22,
     paddingBottom: 20,
   },
   loadingWrap: {
@@ -156,61 +131,35 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) => StyleSheet.create
   emptyText: {
     fontSize: 16,
     fontWeight: '700',
-    color: c.label,
+    color: c.textPrimary,
   },
   emptySubtext: {
     fontSize: 13,
-    color: c.tertiaryLabel,
+    color: c.textTertiary,
     textAlign: 'center',
   },
-  kpiRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  kpiCard: {
-    flex: 1,
-    backgroundColor: c.card,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: c.separator,
-  },
-  kpiValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: c.label,
-  },
-  kpiLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: c.tertiaryLabel,
-    marginTop: 2,
-  },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: c.label,
-    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: '900',
+    color: c.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: 12,
   },
   card: {
-    backgroundColor: c.card,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: c.separator,
+    backgroundColor: c.cardBackground,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
   },
   avatarPlaceholder: {
     backgroundColor: c.backgroundSecondary,
@@ -221,18 +170,19 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) => StyleSheet.create
     flex: 1,
   },
   username: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: c.label,
+    color: c.textPrimary,
   },
   sessionDetail: {
     fontSize: 13,
-    color: c.secondaryLabel,
-    marginTop: 1,
+    fontWeight: '500',
+    color: c.textSecondary,
+    marginTop: 2,
   },
   time: {
     fontSize: 12,
-    color: c.tertiaryLabel,
+    color: c.textTertiary,
     marginLeft: 8,
   },
 });

@@ -8,11 +8,9 @@ import GymActivityFeed from '../../gyms/components/GymActivityFeed';
 import GymMemberList from '../../gyms/components/GymMemberList';
 import GymPostsView from './GymPostsView';
 
-type GymTab = 'Dashboard' | 'Activity' | 'Members';
-type ActivitySubTab = 'Sessions' | 'Posts';
+type GymTab = 'Dashboard' | 'Sessions' | 'Activity' | 'Members';
 
-const GYM_TABS: GymTab[] = ['Dashboard', 'Activity', 'Members'];
-const ACTIVITY_SUB_TABS: ActivitySubTab[] = ['Sessions', 'Posts'];
+const GYM_TABS: GymTab[] = ['Dashboard', 'Sessions', 'Activity', 'Members'];
 
 interface Props {
   gymId: string;
@@ -25,7 +23,6 @@ export default function GymCommunityTabs({ gymId, isFavorited, onToggleFavorite 
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<GymTab>('Dashboard');
-  const [activitySubTab, setActivitySubTab] = useState<ActivitySubTab>('Sessions');
 
   return (
     <View style={styles.container}>
@@ -43,22 +40,9 @@ export default function GymCommunityTabs({ gymId, isFavorited, onToggleFavorite 
         <GymDashboardTab isFavorited={isFavorited} onToggleFavorite={onToggleFavorite} />
       )}
 
-      {activeTab === 'Activity' && (
-        <View>
-          {/* Sub-tab switcher — native segmented control */}
-          <View style={styles.subSegmentWrap}>
-            <NativeSegmentedControl
-              options={ACTIVITY_SUB_TABS}
-              selectedIndex={ACTIVITY_SUB_TABS.indexOf(activitySubTab)}
-              onSelect={(i) => setActivitySubTab(ACTIVITY_SUB_TABS[i])}
-              style={{ width: 200, height: 28 }}
-            />
-          </View>
+      {activeTab === 'Sessions' && <GymActivityFeed gymId={gymId} />}
 
-          {activitySubTab === 'Sessions' && <GymActivityFeed gymId={gymId} />}
-          {activitySubTab === 'Posts' && <GymPostsView gymId={gymId} />}
-        </View>
-      )}
+      {activeTab === 'Activity' && <GymPostsView gymId={gymId} />}
 
       {activeTab === 'Members' && (
         <GymMemberList
@@ -78,10 +62,5 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
-  },
-  subSegmentWrap: {
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
   },
 });

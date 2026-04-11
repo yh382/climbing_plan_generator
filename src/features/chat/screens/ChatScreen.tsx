@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -16,10 +17,18 @@ export default function ChatScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const router = useRouter();
   const navigation = useNavigation();
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const myUserId = useUserStore((s) => s.user?.id ?? "");
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardWillHide", () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const {
     messages,
@@ -91,13 +100,18 @@ export default function ChatScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={0}
+    >
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        contentInsetAdjustmentBehavior="automatic"
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -106,10 +120,10 @@ export default function ChatScreen() {
         }
       />
 
-      <View style={{ paddingBottom: insets.bottom }}>
+      <View style={{ paddingBottom: keyboardVisible ? 0 : insets.bottom }}>
         <ChatInput onSend={handleSend} />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

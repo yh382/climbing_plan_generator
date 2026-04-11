@@ -5,11 +5,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shallow } from "zustand/shallow";
 import { useCallback } from "react";
 import { api } from "../lib/apiClient";
-import { enqueueSessionEvent } from "../features/journal/sync/sessionsOutbox";
+import {
+  enqueueSessionEvent,
+  purgeSessionOutboxByKey,
+} from "../features/journal/sync/sessionsOutbox";
 import {
   setSessionServerId,
   getSessionServerId,
+  removeSessionServerId,
 } from "../features/journal/sync/sessionServerIdMap";
+import { purgeLogsOutboxBySessionKey } from "../features/journal/sync/logsOutbox";
 import {
   writeBackupSnapshot,
   clearBackupSnapshot,
@@ -75,6 +80,7 @@ type LogsState = {
 
   startSession: (gymName: string, discipline: LogType, gymId?: string | null) => void;
   endSession: () => Promise<SessionEntry | null>;
+  discardActiveSession: () => Promise<void>;
   deleteSession: (sessionKey: string) => Promise<string[]>;
   toggleSessionPublic: (sessionKey: string) => Promise<void>;
 
@@ -678,6 +684,98 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           clearBackupSnapshot().catch(() => {});
           syncWidgetFromStore();
           return fallbackSession;
+        }
+      },
+
+      discardActiveSession: async () => {
+        const { activeSession, logs } = get();
+        if (!activeSession) return;
+
+        const sessionKey = String(activeSession.startTime);
+        const sessionDate = keyOf(new Date(activeSession.startTime));
+
+        // 1) Await any in-flight POST /sessions so we can DELETE by serverId.
+        //    Mirrors endSession's pattern.
+        let serverId = activeSession.serverId;
+        if (!serverId && _sessionCreatePromise) {
+          try {
+            serverId = await _sessionCreatePromise;
+          } catch {
+            serverId = null;
+          }
+          _sessionCreatePromise = null;
+        }
+        if (!serverId) {
+          serverId = (await getSessionServerId(sessionKey)) ?? null;
+        }
+
+        // 2) Read session lists to collect the IDs to remove from day lists.
+        const [sb, str, sl] = await Promise.all([
+          readSessionList(sessionKey, "boulder"),
+          readSessionList(sessionKey, "toprope"),
+          readSessionList(sessionKey, "lead"),
+        ]);
+        const sessionItemIds = new Set(
+          [...(sb || []), ...(str || []), ...(sl || [])].map((it: any) => it.id)
+        );
+
+        // 3) Subtract from day lists + clear session lists.
+        const [db, dtr, dl] = await Promise.all([
+          readDayList(sessionDate, "boulder"),
+          readDayList(sessionDate, "toprope"),
+          readDayList(sessionDate, "lead"),
+        ]);
+        const nextDb = (db || []).filter((it) => !sessionItemIds.has(it.id));
+        const nextDtr = (dtr || []).filter((it) => !sessionItemIds.has(it.id));
+        const nextDl = (dl || []).filter((it) => !sessionItemIds.has(it.id));
+
+        await Promise.all([
+          writeDayList(sessionDate, "boulder", nextDb),
+          writeDayList(sessionDate, "toprope", nextDtr),
+          writeDayList(sessionDate, "lead", nextDl),
+          clearSessionList(sessionKey, "boulder"),
+          clearSessionList(sessionKey, "toprope"),
+          clearSessionList(sessionKey, "lead"),
+        ]);
+
+        // 4) Rebuild aggregated logs[] for this date.
+        const rebuilt = [
+          ...aggregateSends(sessionDate, "boulder", nextDb),
+          ...aggregateSends(sessionDate, "toprope", nextDtr),
+          ...aggregateSends(sessionDate, "lead", nextDl),
+        ];
+        const kept = (logs || []).filter((l) => l.date !== sessionDate);
+        const nextLogs = [...kept, ...rebuilt];
+
+        // 5) Commit state.
+        set({
+          logs: nextLogs,
+          activeSession: null,
+          _lastEndSessionTime: Date.now(),
+        });
+
+        // 6) Clean up Live Activity, backup, widget.
+        endLiveActivity({ sendCount: 0, bestGrade: "", routeCount: 0 });
+        clearBackupSnapshot().catch(() => {});
+        syncWidgetFromStore();
+
+        // 7) Purge any queued outbox events for this session.
+        await purgeSessionOutboxByKey(sessionKey).catch(() => {});
+        await purgeLogsOutboxBySessionKey(sessionKey).catch(() => {});
+
+        // 8) Backend DELETE (fire-and-forget).
+        if (serverId) {
+          (async () => {
+            try {
+              await api.del(`/sessions/${serverId}`);
+            } catch (err) {
+              console.warn("[discardActiveSession] backend DELETE failed:", err);
+            } finally {
+              await removeSessionServerId(sessionKey).catch(() => {});
+            }
+          })();
+        } else {
+          removeSessionServerId(sessionKey).catch(() => {});
         }
       },
 

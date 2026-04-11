@@ -1,15 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ActivityIndicator, ScrollView,
+  View, Text, StyleSheet, ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { theme } from '@/lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
 import { useFavoriteGyms } from '../../gyms/hooks';
+import { gymCommunityApi, GymStats } from '../../gyms/api';
 import GymCommunityTabs from './GymCommunityTabs';
+import GymDropdownPill from '../components/GymDropdownPill';
+import GymSelectSheet from '../components/GymSelectSheet';
 
 interface Props {
   initialGymId?: string;
@@ -19,6 +23,7 @@ export default function GymsTab({ initialGymId }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const sheetRef = useRef<TrueSheet>(null);
   const { favorites, loading: favLoading, refresh: refreshFav } = useFavoriteGyms();
 
   useFocusEffect(
@@ -27,7 +32,6 @@ export default function GymsTab({ initialGymId }: Props) {
     }, [refreshFav]),
   );
 
-  // Only show favorited gyms in community tab
   const myGyms = useMemo(() => favorites, [favorites]);
 
   const [selectedGymId, setSelectedGymId] = useState<string | null>(null);
@@ -50,6 +54,17 @@ export default function GymsTab({ initialGymId }: Props) {
     () => myGyms.find(g => g.gym_id === selectedGymId) || null,
     [myGyms, selectedGymId],
   );
+
+  // Fetch stats for the selected gym
+  const [gymStats, setGymStats] = useState<GymStats | null>(null);
+  useEffect(() => {
+    if (!selectedGymId) { setGymStats(null); return; }
+    let cancelled = false;
+    gymCommunityApi.getStats(selectedGymId).then((s) => {
+      if (!cancelled) setGymStats(s);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedGymId]);
 
   const loading = favLoading;
 
@@ -81,52 +96,45 @@ export default function GymsTab({ initialGymId }: Props) {
     );
   }
 
-  // Single gym — show name directly
+  // Single gym — dropdown pill navigates to gym search
   if (myGyms.length === 1) {
     return (
       <View style={styles.container}>
-        <View style={styles.singleHeader}>
-          <Text style={styles.gymName}>{myGyms[0].name}</Text>
+        <View style={styles.dropdownRow}>
+          <GymDropdownPill
+            gymName={myGyms[0].name}
+            onPress={() => router.push('/gyms')}
+            weeklyActive={gymStats?.weekly_active}
+            totalSends={gymStats?.total_sends}
+            gradeFeel={gymStats?.grade_feel ?? undefined}
+          />
         </View>
         <GymCommunityTabs gymId={myGyms[0].gym_id} />
       </View>
     );
   }
 
-  // Multiple gyms — pill switcher
+  // Multiple gyms — dropdown pill + bottom sheet selector
   return (
     <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillRow}
-      >
-        {myGyms.map(g => {
-          const active = g.gym_id === selectedGymId;
-          return (
-            <TouchableOpacity
-              key={g.gym_id}
-              style={[styles.pill, active && styles.pillActive]}
-              onPress={() => setSelectedGymId(g.gym_id)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.pillText, active && styles.pillTextActive]} numberOfLines={1}>
-                {g.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-        <TouchableOpacity
-          style={styles.addPill}
-          onPress={() => router.push('/gyms')}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="add" size={18} color={colors.textSecondary} />
-          <Text style={styles.addPillText}>Add</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      <View style={styles.dropdownRow}>
+        <GymDropdownPill
+          gymName={selectedGym?.name ?? ''}
+          onPress={() => sheetRef.current?.present()}
+          weeklyActive={gymStats?.weekly_active}
+          totalSends={gymStats?.total_sends}
+          gradeFeel={gymStats?.grade_feel ?? undefined}
+        />
+      </View>
 
       {selectedGym && <GymCommunityTabs gymId={selectedGym.gym_id} />}
+
+      <GymSelectSheet
+        sheetRef={sheetRef}
+        gyms={myGyms}
+        selectedGymId={selectedGymId}
+        onSelect={(id) => setSelectedGymId(id)}
+      />
     </View>
   );
 }
@@ -171,53 +179,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.bold,
     color: '#FFF',
   },
-  singleHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  gymName: {
-    fontSize: 18,
-    fontWeight: '800',
-    fontFamily: theme.fonts.black,
-    color: colors.textPrimary,
-  },
-  pillRow: {
+  dropdownRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 8,
-  },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.backgroundSecondary,
-  },
-  pillActive: {
-    backgroundColor: colors.cardDark,
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: theme.fonts.medium,
-    color: colors.textSecondary,
-  },
-  pillTextActive: {
-    color: '#FFF',
-  },
-  addPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.backgroundSecondary,
-  },
-  addPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: theme.fonts.medium,
-    color: colors.textSecondary,
   },
 });

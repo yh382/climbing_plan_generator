@@ -1,5 +1,4 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
 
 export default function CommunityTabLayout() {
   return (
@@ -7,8 +6,9 @@ export default function CommunityTabLayout() {
       <Stack.Screen
         name="index"
         options={{
-          ...NATIVE_HEADER_LARGE,
           headerTransparent: true,
+          headerTitle: "",
+          headerLargeTitle: false,
           scrollEdgeEffects: { top: "soft" },
         }}
       />

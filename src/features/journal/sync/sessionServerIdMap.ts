@@ -24,3 +24,11 @@ export async function setSessionServerId(localKey: string, serverId: string) {
   m[localKey] = serverId;
   await AsyncStorage.setItem(KEY, JSON.stringify(m));
 }
+
+export async function removeSessionServerId(localKey: string) {
+  const m = await readMap();
+  if (localKey in m) {
+    delete m[localKey];
+    await AsyncStorage.setItem(KEY, JSON.stringify(m));
+  }
+}

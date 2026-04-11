@@ -45,6 +45,24 @@ export async function enqueueLogEvent(e: OutboxEventInput) {
   await writeQueue(q);
 }
 
+/**
+ * Remove pending "create" events whose payload belongs to a discarded session.
+ * repeat/delete events reference server IDs and are safe to leave alone
+ * (they will 404 harmlessly on the next flush).
+ */
+export async function purgeLogsOutboxBySessionKey(sessionKey: string) {
+  const q = await readQueue();
+  const next = q.filter((ev) => {
+    if (ev.type === "create") {
+      return ev.payload?._sessionKey !== sessionKey;
+    }
+    return true;
+  });
+  if (next.length !== q.length) {
+    await writeQueue(next);
+  }
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,

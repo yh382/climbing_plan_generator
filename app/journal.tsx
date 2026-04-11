@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  ActionSheetIOS,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -116,7 +118,7 @@ export default function Journal() {
   const [sessionDetailCount, setSessionDetailCount] = useState(0);
   const [sessionStats, setSessionStats] = useState({ sends: 0, best: "", routeCount: 0 });
 
-  const { logs, upsertCount, activeSession, endSession } = useLogsStore();
+  const { logs, upsertCount, activeSession, endSession, discardActiveSession } = useLogsStore();
   const mode = activeSession?.discipline ?? "boulder";
   const { monthMap } = usePlanStore();
 
@@ -203,66 +205,98 @@ export default function Journal() {
   const todayKey = useMemo(() => dateStr(selectedDate), [selectedDate]);
   const logType = mode; // "boulder" | "toprope" | "lead"
 
-  const handleEndSession = useCallback(() => {
-    Alert.alert(tr("结束训练?", "End Session?"), tr("这就结束今天的训练了吗？", "Are you done climbing for today?"), [
-      { text: tr("取消", "Cancel"), style: "cancel" },
-      {
-        text: tr("结束并保存", "End & Save"),
-        style: "destructive",
-        onPress: async () => {
-          setPendingAppend(null);
-          setRefreshNonce((n) => n + 1);
+  const performEndAndSave = useCallback(async () => {
+    setPendingAppend(null);
+    setRefreshNonce((n) => n + 1);
 
-          const newSession = await endSession();
+    const newSession = await endSession();
 
-          // 后台任务: intensity + flush (fire-and-forget)
-          const token = useAuthStore.getState().accessToken;
-          if (token) {
-            (async () => {
-              try {
-                const intensityDate = todayKey;
-                await Promise.all(
-                  (["boulder", "toprope", "lead"] as const).map(async (t) => {
-                    const items = await readDayList(intensityDate, t);
-                    const result = computeDailyIntensity(items);
-                    if (result) await saveIntensityForDate(intensityDate, t, result);
-                  })
-                );
-              } catch {}
-              try {
-                const sMap = await readAllSessionServerIds();
-                await flushSessionsOutbox({
-                  resolveServerId: (k) => sMap[k] ?? null,
-                  saveServerId: async (k, id) => { await setSessionSId(k, id); sMap[k] = id; },
-                });
-              } catch {}
-              try {
-                const idMap = await readAllServerIds();
-                await flushLogsOutbox({
-                  token,
-                  resolveServerId: (localId) => idMap[localId] ?? null,
-                  saveServerId: async (localId, serverId) => { await setServerId(localId, serverId); idMap[localId] = serverId; },
-                });
-              } catch {}
-            })(); // 不 await
-          }
+    // 后台任务: intensity + flush (fire-and-forget)
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      (async () => {
+        try {
+          const intensityDate = todayKey;
+          await Promise.all(
+            (["boulder", "toprope", "lead"] as const).map(async (t) => {
+              const items = await readDayList(intensityDate, t);
+              const result = computeDailyIntensity(items);
+              if (result) await saveIntensityForDate(intensityDate, t, result);
+            })
+          );
+        } catch {}
+        try {
+          const sMap = await readAllSessionServerIds();
+          await flushSessionsOutbox({
+            resolveServerId: (k) => sMap[k] ?? null,
+            saveServerId: async (k, id) => { await setSessionSId(k, id); sMap[k] = id; },
+          });
+        } catch {}
+        try {
+          const idMap = await readAllServerIds();
+          await flushLogsOutbox({
+            token,
+            resolveServerId: (localId) => idMap[localId] ?? null,
+            saveServerId: async (localId, serverId) => { await setServerId(localId, serverId); idMap[localId] = serverId; },
+          });
+        } catch {}
+      })(); // 不 await
+    }
 
-          // 立即导航
-          if (newSession) {
-            router.replace({
-              pathname: "/library/log-detail",
-              params: {
-                date: newSession.date,
-                origin: "end_log",
-                gymName: newSession.gymName ?? activeSession?.gymName ?? "",
-                sessionKey: newSession.sessionKey,
-              },
-            });
-          }
+    // 立即导航
+    if (newSession) {
+      router.replace({
+        pathname: "/library/log-detail",
+        params: {
+          date: newSession.date,
+          origin: "end_log",
+          gymName: newSession.gymName ?? activeSession?.gymName ?? "",
+          sessionKey: newSession.sessionKey,
         },
-      },
-    ]);
-  }, [endSession, activeSession, todayKey, tr]);
+      });
+    }
+  }, [endSession, activeSession, todayKey, router]);
+
+  const performDiscard = useCallback(async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setPendingAppend(null);
+    setRefreshNonce((n) => n + 1);
+    await discardActiveSession();
+    // 丢弃后返回上一页（通常是 Home / Calendar）
+    router.back();
+  }, [discardActiveSession, router]);
+
+  const handleEndSession = useCallback(() => {
+    const endLabel = tr("结束并保存", "End & Save");
+    const discardLabel = tr("丢弃本次训练", "Discard Session");
+    const cancelLabel = tr("取消", "Cancel");
+    const title = tr("结束训练?", "End Session?");
+    const message = tr("选择保存或丢弃本次训练。", "Save or discard this session?");
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title,
+          message,
+          options: [endLabel, discardLabel, cancelLabel],
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) performEndAndSave();
+          else if (buttonIndex === 1) performDiscard();
+          // buttonIndex === 2 → Cancel (no-op)
+        },
+      );
+    } else {
+      // Android fallback — 3-button Alert
+      Alert.alert(title, message, [
+        { text: cancelLabel, style: "cancel" },
+        { text: discardLabel, style: "destructive", onPress: performDiscard },
+        { text: endLabel, onPress: performEndAndSave },
+      ]);
+    }
+  }, [tr, performEndAndSave, performDiscard]);
 
   // ===== Native header =====
   useLayoutEffect(() => {

@@ -78,7 +78,7 @@ function mapBackendMessage(msg: { role: string; content: string; ts: string }): 
 type CoachChatStore = {
   state: CoachState;
   resetCurrentConversation: () => void;
-  sendFromDock: (text: string) => void;
+  sendFromDock: (text: string, language?: "zh" | "en") => void;
   createConversation: () => void;
   deleteConversation: (id: string) => void;
   switchConversation: (id: string) => void;
@@ -125,7 +125,7 @@ export const useCoachChatStore = create<CoachChatStore>((set, get) => ({
     });
   },
 
-  sendFromDock: (text: string) => {
+  sendFromDock: (text: string, language?: "zh" | "en") => {
     const t = text.trim();
     if (!t) return;
 
@@ -170,6 +170,7 @@ export const useCoachChatStore = create<CoachChatStore>((set, get) => ({
         conversationId: isUuid ? convId : null,
         message: t,
         mode: modeMap[prev.mode] || "general",
+        language: language ?? null,
       })
       .then((res) => {
         const cur = get().state;

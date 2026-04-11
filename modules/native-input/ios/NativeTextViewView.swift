@@ -8,6 +8,7 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
   var placeholderText = ""
   var maxContentHeight: CGFloat = 0
   var submitOnReturn = true
+  var wantsFocus = false
 
   // Event dispatchers
   let onNativeChangeText = EventDispatcher()
@@ -29,8 +30,9 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
     textView.textContainerInset = UIEdgeInsets(top: 14, left: 12, bottom: 14, right: 12)
     textView.textContainer.lineFragmentPadding = 0
     textView.returnKeyType = .send
-    textView.isScrollEnabled = false  // Start non-scrollable for auto-grow
+    textView.isScrollEnabled = true   // Always scrollable — container height drives visible area
     textView.showsVerticalScrollIndicator = false
+    textView.showsHorizontalScrollIndicator = false
 
     // Placeholder
     placeholderLabel.font = textView.font
@@ -44,6 +46,7 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
   override func layoutSubviews() {
     super.layoutSubviews()
     textView.frame = bounds
+    textView.layoutIfNeeded()
     layoutPlaceholder()
     notifyHeightChange()
   }
@@ -65,26 +68,25 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
   }
 
   func notifyHeightChange() {
+    guard textView.frame.width > 0 else { return }
     let fittingSize = CGSizeMake(textView.frame.width, CGFloat.greatestFiniteMagnitude)
-    var idealHeight = textView.sizeThatFits(fittingSize).height
+    let idealHeight = textView.sizeThatFits(fittingSize).height
 
-    // Enforce maxHeight
-    if maxContentHeight > 0 && idealHeight > maxContentHeight {
-      idealHeight = maxContentHeight
-      if !textView.isScrollEnabled {
-        textView.isScrollEnabled = true
-      }
-    } else {
-      if textView.isScrollEnabled {
-        textView.isScrollEnabled = false
-      }
-    }
+    // Clamp to maxHeight
+    let clampedHeight = (maxContentHeight > 0 && idealHeight > maxContentHeight)
+      ? maxContentHeight : idealHeight
 
     // Only notify if height actually changed (avoid loops)
-    if abs(idealHeight - lastReportedHeight) > 0.5 {
-      lastReportedHeight = idealHeight
-      onNativeHeightChange(["height": idealHeight])
+    if abs(clampedHeight - lastReportedHeight) > 0.5 {
+      lastReportedHeight = clampedHeight
+      onNativeHeightChange(["height": clampedHeight])
     }
+  }
+
+  private func scrollToCursor() {
+    guard let selectedRange = textView.selectedTextRange else { return }
+    let caretRect = textView.caretRect(for: selectedRange.end)
+    textView.scrollRectToVisible(caretRect, animated: false)
   }
 
   // MARK: - UITextViewDelegate
@@ -93,6 +95,7 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
     updatePlaceholder()
     onNativeChangeText(["text": textView.text ?? ""])
     notifyHeightChange()
+    scrollToCursor()
   }
 
   func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
@@ -110,5 +113,28 @@ class NativeTextViewView: ExpoView, UITextViewDelegate {
 
   func textViewDidEndEditing(_ textView: UITextView) {
     onTextViewBlur([:])
+  }
+
+  // MARK: - Programmatic focus
+
+  func updateFocus() {
+    if wantsFocus {
+      if textView.window != nil {
+        textView.becomeFirstResponder()
+      }
+      // If window is nil, didMoveToWindow will retry
+    } else {
+      textView.resignFirstResponder()
+    }
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil && wantsFocus {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        guard let self = self, self.wantsFocus else { return }
+        self.textView.becomeFirstResponder()
+      }
+    }
   }
 }

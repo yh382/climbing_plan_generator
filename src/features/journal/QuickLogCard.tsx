@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, LayoutChangeEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeColors } from "../../lib/useThemeColors";
 
 const V_GRADES_PRIMARY = ["VB", "V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10"];
 const V_GRADES_MORE = ["V11", "V12", "V13", "V14", "V15", "V16", "V17"];
@@ -37,6 +38,8 @@ export default function QuickLogCard({
   onPickGrade,
   cardPadding = 16,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [vMoreOpen, setVMoreOpen] = useState(false);
   const [ydsGroup, setYdsGroup] = useState<YdsGroupKey>("5.10");
 
@@ -117,7 +120,7 @@ export default function QuickLogCard({
                 activeOpacity={0.7}
                 style={styles.expandIconHit}
               >
-                <Ionicons name={vMoreOpen ? "chevron-up" : "chevron-down"} size={18} color="#9CA3AF" />
+                <Ionicons name={vMoreOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
               <View style={styles.expandLine} />
             </View>
@@ -134,7 +137,7 @@ export default function QuickLogCard({
                     style={[styles.groupTab, active && styles.groupTabActive]}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.groupText, active && { color: "#fff" }]}>{g}</Text>
+                    <Text style={[styles.groupText, active && { color: colors.toggleActiveText }]}>{g}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -151,41 +154,42 @@ export default function QuickLogCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    marginTop: 12,
-  },
-  cardTitle: { fontSize: 16, fontFamily: "DMSans_900Black", color: "#000000" },
+const createStyles = (c: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.cardBackground,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginTop: 12,
+    },
+    cardTitle: { fontSize: 16, fontFamily: "DMSans_900Black", color: c.textPrimary },
 
-  // grid layout
-  gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
+    // grid layout
+    gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
 
-  gridItem: {
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    borderRadius: 12,
-  },
-  gridText: {
-    fontFamily: "DMMono_500Medium",
-    color: "#000000",
-    fontSize: 13,
-    textAlign: "center",
-    includeFontPadding: false,
-  },
+    gridItem: {
+      paddingVertical: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.background,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 12,
+    },
+    gridText: {
+      fontFamily: "DMMono_500Medium",
+      color: c.textPrimary,
+      fontSize: 13,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
 
-  expandRow: { marginTop: 8, flexDirection: "row", alignItems: "center" },
-  expandLine: { flex: 1, height: 1, backgroundColor: "rgba(0,0,0,0.08)" },
-  expandIconHit: { paddingHorizontal: 14, paddingVertical: 8 },
+    expandRow: { marginTop: 8, flexDirection: "row", alignItems: "center" },
+    expandLine: { flex: 1, height: 1, backgroundColor: c.border },
+    expandIconHit: { paddingHorizontal: 14, paddingVertical: 8 },
 
-  groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#F7F7F7" },
-  groupTabActive: { backgroundColor: "#1C1C1E" },
-  groupText: { fontFamily: "DMSans_700Bold", color: "#888888", fontSize: 13 },
-});
+    groupTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: c.toggleBackground },
+    groupTabActive: { backgroundColor: c.toggleActiveBackground },
+    groupText: { fontFamily: "DMSans_700Bold", color: c.toggleInactiveText, fontSize: 13 },
+  });

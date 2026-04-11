@@ -75,10 +75,12 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
   const sheetRef = useRef<TrueSheet>(null);
   const isPresented = useRef(false);
   const userSelectedRef = useRef(false);
+  const fetchIdRef = useRef(0);
 
   // --- Data fetching ---
 
   const fetchNearby = async (c: { lat: number; lng: number } | null) => {
+    const id = ++fetchIdRef.current;
     try {
       setLoading(true);
       setErrorMsg(null);
@@ -90,16 +92,18 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
       const res = await api.get<{ items: GymItem[] }>(
         `/gyms/nearby?lat=${encodeURIComponent(c.lat)}&lng=${encodeURIComponent(c.lng)}&limit=3`
       );
+      if (id !== fetchIdRef.current) return; // stale response, ignore
       setItems(res.items ?? []);
       if (res.items?.length && !userSelectedRef.current) {
         setSelectedGym(res.items[0].name);
         setSelectedPlaceId(res.items[0].id);
       }
     } catch (e: any) {
+      if (id !== fetchIdRef.current) return; // stale, ignore
       setItems([]);
       setErrorMsg(e?.message ?? "Failed to load nearby gyms");
     } finally {
-      setLoading(false);
+      if (id === fetchIdRef.current) setLoading(false);
     }
   };
 
@@ -109,6 +113,7 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
       await fetchNearby(c);
       return;
     }
+    const id = ++fetchIdRef.current;
     try {
       setLoading(true);
       setErrorMsg(null);
@@ -118,19 +123,21 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
         qs.set("lng", String(c.lng));
       }
       const res = await api.get<{ items: GymItem[] }>(`/gyms/search?${qs.toString()}`);
+      if (id !== fetchIdRef.current) return; // stale response, ignore
       setItems(res.items ?? []);
       if (res.items?.length && !userSelectedRef.current) {
         setSelectedGym(res.items[0].name);
         setSelectedPlaceId(res.items[0].id);
-      } else if (!res.items?.length) {
+      } else if (!res.items?.length && !userSelectedRef.current) {
         setSelectedGym(null);
         setSelectedPlaceId(null);
       }
     } catch (e: any) {
+      if (id !== fetchIdRef.current) return; // stale, ignore
       setItems([]);
       setErrorMsg(e?.message ?? "Search failed");
     } finally {
-      setLoading(false);
+      if (id === fetchIdRef.current) setLoading(false);
     }
   };
 
@@ -172,14 +179,19 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
 
     return () => {
       mounted = false;
+      fetchIdRef.current++; // invalidate any in-flight requests
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // Debounced search
+  // Debounced search (also restores nearby when query cleared via backspace)
   useEffect(() => {
     if (!visible) return;
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      // Only restore nearby if coords are already loaded (avoids extra fetch on initial open)
+      if (coords) fetchNearby(coords);
+      return;
+    }
     const t = setTimeout(() => {
       fetchSearch(query, coords);
     }, 300);
@@ -330,8 +342,14 @@ export default function PreSessionModal({ visible, onClose, onStart }: Props) {
           onPress={handleStart}
           disabled={!selectedGym || !discipline}
         >
-          <Text style={styles.startBtnText}>START CLIMBING</Text>
-          <Ionicons name="arrow-forward" size={20} color={colors.pillText} />
+          <Text style={[styles.startBtnText, (!selectedGym || !discipline) && styles.startBtnTextDisabled]}>
+            START CLIMBING
+          </Text>
+          <Ionicons
+            name="arrow-forward"
+            size={20}
+            color={(!selectedGym || !discipline) ? colors.textTertiary : colors.pillText}
+          />
         </TouchableOpacity>
       </ScrollView>
     </TrueSheet>
@@ -424,7 +442,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: colors.toggleBackground,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -470,14 +488,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   startBtn: {
     marginTop: 12,
     height: 52,
-    backgroundColor: colors.cardDark,
+    backgroundColor: colors.pillBackground,
     borderRadius: 26,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
-  startBtnDisabled: { backgroundColor: colors.cardBorder },
+  startBtnDisabled: { backgroundColor: colors.sheetCardBackground },
   startBtnText: {
     color: colors.pillText,
     fontSize: 16,
@@ -485,5 +503,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.bold,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+  },
+  startBtnTextDisabled: {
+    color: colors.textTertiary,
   },
 });

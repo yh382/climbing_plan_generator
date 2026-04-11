@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { theme } from '../../../lib/theme';
+import { useThemeColors } from '@/lib/useThemeColors';
 import { gymCommunityApi, GymMember } from '../api';
 import { useLeaderboard } from '../../community/hooks';
 
@@ -23,7 +25,12 @@ function formatDate(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
+
 export default function GymMemberList({ gymId, onPressUser }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [members, setMembers] = useState<GymMember[]>([]);
   const [total, setTotal] = useState(0);
   const [membersLoading, setMembersLoading] = useState(true);
@@ -52,12 +59,10 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="small" color="#306E6F" />
+        <ActivityIndicator size="small" color={colors.accent} />
       </View>
     );
   }
-
-  const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
   return (
     <View style={styles.container}>
@@ -74,7 +79,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
 
       {rankItems.length === 0 ? (
         <View style={styles.emptyRank}>
-          <Ionicons name="trophy-outline" size={32} color="#D1D5DB" />
+          <Ionicons name="trophy-outline" size={32} color={colors.textTertiary} />
           <Text style={styles.emptySmallText}>No rankings yet</Text>
         </View>
       ) : (
@@ -93,7 +98,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
                     <View
                       style={[
                         styles.medal,
-                        { backgroundColor: medalColors[item.rank - 1] },
+                        { backgroundColor: MEDAL_COLORS[item.rank - 1] },
                       ]}
                     >
                       <Text style={styles.medalText}>{item.rank}</Text>
@@ -107,7 +112,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
                   <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={16} color="#9CA3AF" />
+                    <Ionicons name="person" size={16} color={colors.textTertiary} />
                   </View>
                 )}
 
@@ -131,7 +136,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
 
       {members.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="people-outline" size={40} color="#D1D5DB" />
+          <Ionicons name="people-outline" size={40} color={colors.textTertiary} />
           <Text style={styles.emptyText}>No members yet</Text>
           <Text style={styles.emptySubtext}>
             Favorite this gym to become a member!
@@ -149,7 +154,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
               <Image source={{ uri: m.avatar_url }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Ionicons name="person" size={16} color="#9CA3AF" />
+                <Ionicons name="person" size={16} color={colors.textTertiary} />
               </View>
             )}
             <View style={styles.memberInfo}>
@@ -169,7 +174,7 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingBottom: 20,
@@ -186,11 +191,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#374151',
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   emptyRank: {
@@ -200,7 +207,8 @@ const styles = StyleSheet.create({
   },
   emptySmallText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
   },
 
   // Section header
@@ -213,20 +221,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#111',
+    fontFamily: theme.fonts.black,
+    color: colors.textPrimary,
   },
   viewAll: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#306E6F',
+    fontFamily: theme.fonts.bold,
+    color: colors.accent,
   },
 
   // Rank card
   rankCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: colors.cardBorder,
     overflow: 'hidden',
   },
   rankRow: {
@@ -235,7 +245,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: colors.cardBorder,
   },
   rankCol: {
     width: 32,
@@ -245,7 +255,8 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6B7280',
+    fontFamily: theme.fonts.bold,
+    color: colors.textSecondary,
   },
   medal: {
     width: 26,
@@ -257,6 +268,7 @@ const styles = StyleSheet.create({
   medalText: {
     fontSize: 12,
     fontWeight: '800',
+    fontFamily: theme.fonts.black,
     color: '#FFF',
   },
 
@@ -268,7 +280,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatarPlaceholder: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -276,12 +288,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#111',
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
   },
   score: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#6B7280',
+    fontFamily: theme.fonts.bold,
+    color: colors.textSecondary,
     marginLeft: 8,
   },
 
@@ -291,18 +305,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 12,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: colors.cardBorder,
   },
   memberInfo: {
     flex: 1,
   },
   joinDate: {
     fontSize: 11,
-    color: '#9CA3AF',
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
     marginTop: 1,
   },
 });

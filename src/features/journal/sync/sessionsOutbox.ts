@@ -32,6 +32,14 @@ export async function enqueueSessionEvent(e: SessionOutboxEventInput) {
   await writeQueue(q);
 }
 
+export async function purgeSessionOutboxByKey(localKey: string) {
+  const q = await readQueue();
+  const next = q.filter((ev) => ev.localKey !== localKey);
+  if (next.length !== q.length) {
+    await writeQueue(next);
+  }
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,

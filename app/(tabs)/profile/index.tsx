@@ -254,6 +254,22 @@ export default function ProfileScreen() {
   const pagerRef = useRef<PagerView>(null);
   const { height: screenHeight } = useWindowDimensions();
 
+  // Track content height per tab page so PagerView grows to fit
+  const [pageHeights, setPageHeights] = useState<Record<number, number>>({});
+  const activePageIndex = TABS.indexOf(activeTab as (typeof TABS)[number]);
+  const pagerHeight = Math.max(
+    pageHeights[activePageIndex] ?? 0,
+    screenHeight * 0.6
+  );
+
+  const handlePageLayout = useCallback((pageIndex: number) => (e: { nativeEvent: { layout: { height: number } } }) => {
+    const h = e.nativeEvent.layout.height;
+    setPageHeights((prev) => {
+      if (Math.abs((prev[pageIndex] ?? 0) - h) < 2) return prev;
+      return { ...prev, [pageIndex]: h };
+    });
+  }, []);
+
   const handleTabPress = useCallback((tab: string) => {
     setActiveTab(tab);
     const idx = TABS.indexOf(tab as (typeof TABS)[number]);
@@ -304,19 +320,25 @@ export default function ProfileScreen() {
 
         <PagerView
           ref={pagerRef}
-          style={{ minHeight: screenHeight * 0.6 }}
+          style={{ height: pagerHeight }}
           initialPage={TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts")}
           onPageSelected={onPageSelected}
           overdrag
         >
           <View key="posts" style={styles.contentArea}>
-            <PostsSection />
+            <View onLayout={handlePageLayout(0)}>
+              <PostsSection />
+            </View>
           </View>
           <View key="stats" style={styles.contentArea}>
-            {headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef as any} /> : null}
+            <View onLayout={handlePageLayout(1)}>
+              {headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef as any} /> : null}
+            </View>
           </View>
           <View key="badges" style={styles.contentArea}>
-            <BadgesSection styles={styles} />
+            <View onLayout={handlePageLayout(2)}>
+              <BadgesSection styles={styles} />
+            </View>
           </View>
         </PagerView>
       </Animated.ScrollView>
