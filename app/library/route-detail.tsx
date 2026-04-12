@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 
 import { useThemeColors } from "../../src/lib/useThemeColors";
+import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { getColorForGrade } from "../../lib/gradeColors";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
 import UploadProgressToast from "../../src/components/ui/UploadProgressToast";
@@ -331,7 +332,7 @@ export default function RouteDetailScreen() {
   if (!item) {
     return (
       <View style={s.container}>
-        <Stack.Screen options={{ title: "Route Detail" }} />
+        <Stack.Screen options={{ title: "Route Detail", headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} /> }} />
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -375,7 +376,7 @@ export default function RouteDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Route Detail", headerTransparent: true, scrollEdgeEffects: { top: "soft" }, headerBackVisible: true }} />
+      <Stack.Screen options={{ title: "Route Detail", headerTransparent: true, scrollEdgeEffects: { top: "soft" }, headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} /> }} />
       <View style={s.container}>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Media section - starts at top of screen, extends behind status bar + nav bar */}

@@ -19,7 +19,7 @@ type Props = {
   pendingAppend?: LocalDayLogItem | null;
   onAppended?: () => void;
   onCountChange?: (count: number) => void;
-  onStatsChange?: (stats: { sends: number; best: string; routeCount: number }) => void;
+  onStatsChange?: (stats: { sends: number; best: string; routeCount: number; attempts: number }) => void;
 };
 
 function dedupeById(list: LocalDayLogItem[]) {
@@ -70,6 +70,14 @@ function TodayDetailsList({
       return s;
     }, 0);
 
+    // attempts = sum of attemptsTotal across all items (depth/effort metric).
+    // Each item represents one route; attemptsTotal counts how many times the
+    // user tried that route (incl. repeat actions). Defaults to 1 if missing.
+    const attempts = items.reduce(
+      (sum, it) => sum + ((it as any)?.attemptsTotal ?? (it as any)?.attempts ?? 1),
+      0,
+    );
+
     const grades = items
       .map((it) => String(it?.grade || "").trim())
       .filter((g) => g.length > 0);
@@ -89,7 +97,7 @@ function TodayDetailsList({
         .sort((a, b) => b.localeCompare(a))[0] || "";
     }
 
-    onStatsChange({ sends, best, routeCount: items.length });
+    onStatsChange({ sends, best, routeCount: items.length, attempts });
   }, [items, onStatsChange, logType]);
 
   const load = useCallback(async () => {
@@ -136,19 +144,22 @@ function TodayDetailsList({
 
     (async () => {
       try {
+        // Write to local storage FIRST — this is the dedup gate. If the
+        // component remounts (e.g. key change from refreshNonce) before
+        // enqueue finishes, the new mount loads from storage and the dedup
+        // check at line ~124 sees the item already exists → skips re-enqueue.
+        //
+        // Previous ordering (enqueue first, write second) created a race
+        // window where the item was in the outbox but NOT in storage → remount
+        // dedup failed → double-enqueue → duplicate log rows on backend.
+        await writeSessionList(sessionKey, logType, next);
+
         const routeName = (item.name || "").trim() || item.grade;
         const note = (item.note || "").trim();
 
-        // CRITICAL: enqueue the outbox event FIRST, before any other awaits.
-        // The previous version awaited useLogsStore.awaitSessionServerId(),
-        // which blocks on the in-flight POST /sessions promise — if a JS
-        // bundle reload happens during that wait, the enqueue never runs and
-        // the log is silently dropped from the outbox.
-        //
-        // We pass session_id: null + _sessionKey here; the outbox flush
-        // handler at logsOutbox.ts already has fallback logic to resolve
-        // session_id lazily via getSessionServerId(_sessionKey) on every
-        // flush attempt, so blocking here is unnecessary.
+        // Enqueue to outbox. We pass session_id: null + _sessionKey; the
+        // outbox flush handler resolves session_id lazily from
+        // sessionServerIdMap via _sessionKey on every flush attempt.
         await enqueueLogEvent({
           type: "create",
           localId: item.id,
@@ -172,11 +183,6 @@ function TodayDetailsList({
             media: (item as any).media ?? null,
           },
         });
-
-        // Now that the outbox event is durably persisted, write the local
-        // session list. If this fails, the UI state already shows the item
-        // (via setItems above) and the outbox will still POST it on flush.
-        await writeSessionList(sessionKey, logType, next);
 
         queueMicrotask(() => onAppended?.());
       } catch (e) {

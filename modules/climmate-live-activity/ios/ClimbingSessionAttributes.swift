@@ -18,9 +18,10 @@ struct ClimbingSessionAttributes: ActivityAttributes {
     var gymName: String
     var discipline: String
     var startTime: Double       // epoch ms
-    var routeCount: Int
-    var sendCount: Int
+    var routeCount: Int         // distinct routes logged (breadth)
+    var sendCount: Int          // successful sends (flash/onsight/redpoint)
     var bestGrade: String
+    var attempts: Int           // sum of item.attemptsTotal across all routes (depth/effort)
   }
 
   // Static data (set at start, never changes) — empty, all data is in ContentState

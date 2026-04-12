@@ -792,7 +792,16 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           };
 
           // End Live Activity (灵动岛/锁屏)
-          endLiveActivity({ sendCount: sends, bestGrade: best, routeCount: sessionItems.length });
+          const totalAttempts = sessionItems.reduce(
+            (sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1),
+            0,
+          );
+          endLiveActivity({
+            sendCount: sends,
+            bestGrade: best,
+            routeCount: sessionItems.length,
+            attempts: totalAttempts,
+          });
 
           set({
             logs: nextLogs,
@@ -837,8 +846,15 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             synced: false,
           };
 
-          // End Live Activity (fallback path)
-          endLiveActivity({ sendCount: sends, bestGrade: "V?", routeCount: climbs });
+          // End Live Activity (fallback path) — `climbs` here is already the
+          // sum of attemptsTotal across all items, so it doubles as the
+          // attempts metric. routeCount is the number of distinct items.
+          endLiveActivity({
+            sendCount: sends,
+            bestGrade: "V?",
+            routeCount: climbs,
+            attempts: climbs,
+          });
 
           set({
             sessions: [fallbackSession, ...sessions],
@@ -920,7 +936,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         });
 
         // 6) Clean up Live Activity, backup, widget.
-        endLiveActivity({ sendCount: 0, bestGrade: "", routeCount: 0 });
+        endLiveActivity({ sendCount: 0, bestGrade: "", routeCount: 0, attempts: 0 });
         clearBackupSnapshot().catch(() => {});
         syncWidgetFromStore();
 

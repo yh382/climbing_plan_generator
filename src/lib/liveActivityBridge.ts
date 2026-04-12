@@ -36,12 +36,18 @@ export function updateLiveActivity(params: {
   routeCount: number;
   sendCount: number;
   bestGrade: string;
+  attempts: number;
 }) {
   if (Platform.OS !== "ios") return;
   if (!ClimmateLiveActivity) return;
   if (__DEV__) console.log("[liveActivity] update()", params);
 
-  ClimmateLiveActivity.update(params.routeCount, params.sendCount, params.bestGrade).catch((e) => {
+  ClimmateLiveActivity.update(
+    params.routeCount,
+    params.sendCount,
+    params.bestGrade,
+    params.attempts,
+  ).catch((e) => {
     if (__DEV__) console.warn("[liveActivity] update failed:", e);
   });
 }
@@ -51,13 +57,23 @@ export function endLiveActivity(params: {
   routeCount: number;
   sendCount: number;
   bestGrade: string;
+  attempts: number;
 }) {
   if (Platform.OS !== "ios") return;
   if (!ClimmateLiveActivity) return;
   if (__DEV__) console.log("[liveActivity] end()", params);
 
-  ClimmateLiveActivity.end(params.routeCount, params.sendCount, params.bestGrade).catch((e) => {
-    if (__DEV__) console.warn("[liveActivity] end failed:", e);
+  ClimmateLiveActivity.end(
+    params.routeCount,
+    params.sendCount,
+    params.bestGrade,
+    params.attempts,
+  ).catch((e) => {
+    // If end() fails (e.g. Codable mismatch on schema change, or the
+    // activity is in a bad state), fall back to endAll() which uses
+    // .immediate dismissal and skips final state serialization entirely.
+    console.warn("[liveActivity] end failed, trying endAll fallback:", e);
+    ClimmateLiveActivity?.endAll?.().catch(() => {});
   });
 }
 

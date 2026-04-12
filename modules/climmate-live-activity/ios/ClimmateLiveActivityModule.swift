@@ -22,7 +22,8 @@ public class ClimmateLiveActivityModule: Module {
         startTime: startTime,
         routeCount: 0,
         sendCount: 0,
-        bestGrade: ""
+        bestGrade: "",
+        attempts: 0
       )
 
       do {
@@ -39,7 +40,7 @@ public class ClimmateLiveActivityModule: Module {
       }
     }
 
-    AsyncFunction("update") { (routeCount: Int, sendCount: Int, bestGrade: String) -> Void in
+    AsyncFunction("update") { (routeCount: Int, sendCount: Int, bestGrade: String, attempts: Int) -> Void in
       guard #available(iOS 16.2, *) else { return }
 
       for activity in Activity<ClimbingSessionAttributes>.activities {
@@ -50,13 +51,14 @@ public class ClimmateLiveActivityModule: Module {
           startTime: oldState.startTime,
           routeCount: routeCount,
           sendCount: sendCount,
-          bestGrade: bestGrade
+          bestGrade: bestGrade,
+          attempts: attempts
         )
         await activity.update(.init(state: newState, staleDate: nil))
       }
     }
 
-    AsyncFunction("end") { (routeCount: Int, sendCount: Int, bestGrade: String) -> Void in
+    AsyncFunction("end") { (routeCount: Int, sendCount: Int, bestGrade: String, attempts: Int) -> Void in
       guard #available(iOS 16.2, *) else { return }
 
       for activity in Activity<ClimbingSessionAttributes>.activities {
@@ -67,9 +69,10 @@ public class ClimmateLiveActivityModule: Module {
           startTime: oldState.startTime,
           routeCount: routeCount,
           sendCount: sendCount,
-          bestGrade: bestGrade
+          bestGrade: bestGrade,
+          attempts: attempts
         )
-        await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .default)
+        await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .immediate)
       }
     }
 

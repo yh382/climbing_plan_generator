@@ -116,7 +116,7 @@ export default function Journal() {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [sessionDetailCount, setSessionDetailCount] = useState(0);
-  const [sessionStats, setSessionStats] = useState({ sends: 0, best: "", routeCount: 0 });
+  const [sessionStats, setSessionStats] = useState({ sends: 0, best: "", routeCount: 0, attempts: 0 });
 
   const { logs, upsertCount, activeSession, endSession, discardActiveSession } = useLogsStore();
   const mode = activeSession?.discipline ?? "boulder";
@@ -148,6 +148,7 @@ export default function Journal() {
       routeCount: sessionStats.routeCount,
       sendCount: sessionStats.sends,
       bestGrade: sessionStats.best,
+      attempts: sessionStats.attempts,
     });
   }, [sessionStats, activeSession]);
 

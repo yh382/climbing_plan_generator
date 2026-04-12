@@ -2,8 +2,8 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 
 interface ClimmateLiveActivityNative {
   start(gymName: string, discipline: string, startTime: number): Promise<string | null>;
-  update(routeCount: number, sendCount: number, bestGrade: string): Promise<void>;
-  end(routeCount: number, sendCount: number, bestGrade: string): Promise<void>;
+  update(routeCount: number, sendCount: number, bestGrade: string, attempts: number): Promise<void>;
+  end(routeCount: number, sendCount: number, bestGrade: string, attempts: number): Promise<void>;
   endAll(): Promise<void>;
 }
 
