@@ -187,7 +187,7 @@ export default function CalendarScreen() {
         dateLabel: format(parseISO(s.date), "EEE · M.dd"),
         rawDate: s.date,
         duration: s.duration,
-        climbs: typeof s.climbs === "number" ? s.climbs : 0,
+        attempts: typeof s.attempts === "number" ? s.attempts : 0,
         sends: typeof s.sends === "number" ? s.sends : 0,
         max: s.best || "—",
         sessionKey: s.sessionKey || "",
@@ -324,7 +324,7 @@ export default function CalendarScreen() {
                 key={log.id}
                 dateLabel={log.dateLabel}
                 duration={log.duration}
-                climbs={log.climbs}
+                attempts={log.attempts}
                 sends={log.sends}
                 maxGrade={log.max}
                 onPress={() => {

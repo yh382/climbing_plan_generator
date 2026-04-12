@@ -13,6 +13,7 @@ export type UserLite = {
   bio?: string | null;
   units?: "metric" | "imperial";
   locale?: string;
+  pinned_badges?: string[];
 };
 
 function normalizeUser(raw: any): UserLite {
@@ -35,6 +36,7 @@ function normalizeUser(raw: any): UserLite {
     bio,                         // ← 写入
     units: u.units ?? u.pref_units ?? "metric",
     locale: u.locale ?? u.lang ?? undefined,
+    pinned_badges: Array.isArray(u.pinned_badges) ? u.pinned_badges : [],
   };
 }
 

@@ -359,6 +359,7 @@ export default function CreatePostScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Media Row */}
           <ScrollView

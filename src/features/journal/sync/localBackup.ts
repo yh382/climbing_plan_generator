@@ -32,7 +32,7 @@ export type RecoveredSession = {
   sessionKey: string;
   sends: number;
   best: string;
-  climbs: number;
+  attempts: number;
   serverId: string | null;
   isPublic: boolean;
   synced: boolean;
@@ -226,7 +226,7 @@ export async function recoverOrphanedSessions(): Promise<RecoveryResult> {
     sessionKey,
     sends,
     best,
-    climbs: allItems.length,
+    attempts: allItems.length,
     serverId: recoveredServerId,
     isPublic: false,
     synced: false,

@@ -8,13 +8,12 @@ import { createWidget } from "expo-widgets";
 import type { WidgetEnvironment } from "expo-widgets";
 
 export type ClimMateWidgetProps = {
-  monthClimbDays: number;
+  monthSessions: number;
   monthSends: number;
   streak: number;
   lastSessionGym: string;
   lastSessionDate: string;
   lastSessionBest: string;
-  lastSessionDuration: string;
   hasActiveSession: boolean;
 };
 

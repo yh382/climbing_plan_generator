@@ -3,9 +3,14 @@
 import { useMemo } from "react";
 import { View, Text, StyleSheet, FlatList, useWindowDimensions, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import BadgeCard from "../badgessection/BadgeCard";
+import BadgeDetailModal from "../badgessection/BadgeDetailModal";
 import type { Badge, BadgeSectionKey, BadgeTier } from "../badgessection/types";
 import { useBadgesProgress, BadgeProgress } from "../../../community/hooks";
+import { useUserStore } from "@/store/useUserStore";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "src/contexts/SettingsContext";
 
 /** Map backend BadgeProgress → frontend Badge type */
 function toBadge(bp: BadgeProgress): Badge {
@@ -16,11 +21,12 @@ function toBadge(bp: BadgeProgress): Badge {
     tier: (bp.tier ?? null) as BadgeTier,
     status: bp.isAwarded ? "unlocked" : "locked",
     progress: bp.progress,
-    requirement: bp.description,
+    description: bp.description,
     iconUrl: bp.iconUrl,
     awardedAt: bp.awardedAt,
     sourceType: bp.sourceType,
     sourceId: bp.sourceId,
+    rarity: (bp as any).rarity ?? undefined,
   };
 }
 
@@ -50,6 +56,8 @@ export default function BadgesSection({ styles: externalStyles }: { styles: any 
   const { width } = useWindowDimensions();
   const { badges: rawBadges, loading } = useBadgesProgress();
   const router = useRouter();
+  const colors = useThemeColors();
+  const pinnedCodes = useUserStore((s) => s.user?.pinned_badges) ?? [];
 
   const outerPadding = 12;
   const colGap = 10;
@@ -64,6 +72,14 @@ export default function BadgesSection({ styles: externalStyles }: { styles: any 
     return allBadges.filter(b => b.status === "unlocked");
   }, [allBadges]);
 
+  // Pinned / Featured badges (matched by code against loaded badge data)
+  const pinnedBadges = useMemo(() => {
+    if (pinnedCodes.length === 0) return [];
+    return pinnedCodes
+      .map((code) => allBadges.find((b) => b.id === code))
+      .filter(Boolean) as Badge[];
+  }, [pinnedCodes, allBadges]);
+
   const groupedAwarded = useMemo(() => {
     return DISPLAY_GROUPS
       .map(g => {
@@ -75,11 +91,14 @@ export default function BadgesSection({ styles: externalStyles }: { styles: any 
       .filter(g => g.badges.length > 0);
   }, [awardedBadges]);
 
+  const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+
   const onPressBadge = (badge: Badge) => {
-    if (badge.sourceType === "challenge" && badge.sourceId) {
-      router.push(`/community/challenges/${badge.sourceId}`);
-    }
+    setSelectedBadge(badge);
   };
+
+  const { lang } = useSettings();
+  const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
 
   if (loading && allBadges.length === 0) {
     return (
@@ -100,6 +119,24 @@ export default function BadgesSection({ styles: externalStyles }: { styles: any 
           <Text style={styles.showAll}>Show All →</Text>
         </Pressable>
       </View>
+
+      {/* Featured / Pinned badges */}
+      {pinnedBadges.length > 0 && (
+        <View style={styles.sectionBlock}>
+          <Text style={[styles.sectionTitle, { color: colors.accent }]}>★ Featured</Text>
+          <FlatList
+            data={pinnedBadges}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={item => `pinned_${item.id}`}
+            renderItem={({ item }) => (
+              <BadgeCard badge={item} size={cardSize} onPress={onPressBadge} />
+            )}
+            ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+            contentContainerStyle={{ paddingHorizontal: outerPadding }}
+          />
+        </View>
+      )}
 
       {awardedBadges.length === 0 ? (
         <Text style={styles.emptyText}>
@@ -123,6 +160,12 @@ export default function BadgesSection({ styles: externalStyles }: { styles: any 
           </View>
         ))
       )}
+      <BadgeDetailModal
+        badge={selectedBadge}
+        visible={!!selectedBadge}
+        onClose={() => setSelectedBadge(null)}
+        tr={tr}
+      />
     </View>
   );
 }

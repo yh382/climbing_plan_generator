@@ -1,6 +1,6 @@
 // app/community/u/[id].tsx
 
-import { useState, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import PagerView from "react-native-pager-view";
 import { useI18N } from "../../../lib/i18n";
 import { HeaderButton } from "../../../src/components/ui/HeaderButton";
 import { useThemeColors } from "../../../src/lib/useThemeColors";
@@ -82,7 +83,7 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { tt } = useI18N();
 
-  const { profile, posts, plans, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
+  const { profile, posts, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
   const { width } = useWindowDimensions();
 
   const badgeCardSize = useMemo(() => (width - 24 - 12) / 3, [width]);
@@ -209,7 +210,46 @@ export default function PublicProfileScreen() {
   }, [profile]);
 
   // Tabs
+  const TABS = ["posts", "stats", "badges"] as const;
   const [activeTab, setActiveTab] = useState("posts");
+  const pagerRef = useRef<PagerView>(null);
+  const tabScrollPosition = useSharedValue(0);
+  const { height: screenHeight } = useWindowDimensions();
+
+  const [pageHeights, setPageHeights] = useState<Record<number, number>>({});
+  const activePageIndex = TABS.indexOf(activeTab as (typeof TABS)[number]);
+  const pagerHeight = Math.max(pageHeights[activePageIndex] ?? 0, screenHeight * 0.6);
+
+  const handlePageLayout = useCallback((pageIndex: number) => (e: { nativeEvent: { layout: { height: number } } }) => {
+    const h = e.nativeEvent.layout.height;
+    setPageHeights((prev) => {
+      if (Math.abs((prev[pageIndex] ?? 0) - h) < 2) return prev;
+      return { ...prev, [pageIndex]: h };
+    });
+  }, []);
+
+  const handleTabPress = useCallback((tab: string) => {
+    const idx = TABS.indexOf(tab as (typeof TABS)[number]);
+    if (idx >= 0) pagerRef.current?.setPage(idx);
+  }, []);
+
+  const onPageScroll = useCallback((e: { nativeEvent: { position: number; offset: number } }) => {
+    tabScrollPosition.value = e.nativeEvent.position + e.nativeEvent.offset;
+  }, []);
+
+  const pendingPageRef = useRef<number | null>(null);
+
+  const onPageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
+    pendingPageRef.current = e.nativeEvent.position;
+  }, []);
+
+  const onPageScrollStateChanged = useCallback((e: { nativeEvent: { pageScrollState: string } }) => {
+    if (e.nativeEvent.pageScrollState === "idle" && pendingPageRef.current !== null) {
+      const tab = TABS[pendingPageRef.current];
+      if (tab) setActiveTab(tab);
+      pendingPageRef.current = null;
+    }
+  }, []);
 
   // --------------------- Reanimated scroll ---------------------
   const scrollY = useSharedValue(0);
@@ -295,118 +335,91 @@ export default function PublicProfileScreen() {
         />
 
         {/* [1] Tab bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
 
-        {/* Content */}
-        <View style={dynStyles.contentArea}>
-          {activeTab === "posts" && (
-            privacy?.posts === false ? (
-              <PrivateSection
-                message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
-                colors={colors}
-              />
-            ) : (
-              <ProfilePostGrid
-                posts={posts as any}
-                onPressPost={(post) => router.push({ pathname: "/community/user-posts", params: { userId: id, initialPostId: post.id } } as any)}
-              />
-            )
-          )}
+        {/* Content — PagerView for swipe + smooth tab animation */}
+        <PagerView
+          ref={pagerRef}
+          style={{ height: pagerHeight }}
+          initialPage={0}
+          onPageScroll={onPageScroll}
+          onPageSelected={onPageSelected}
+          onPageScrollStateChanged={onPageScrollStateChanged}
+          overdrag
+        >
+          <View key="posts" style={dynStyles.contentArea}>
+            <View onLayout={handlePageLayout(0)}>
+              {privacy?.posts === false ? (
+                <PrivateSection
+                  message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
+                  colors={colors}
+                />
+              ) : (
+                <ProfilePostGrid
+                  posts={posts as any}
+                  onPressPost={(post) => router.push({ pathname: "/community/user-posts", params: { userId: id, initialPostId: post.id } } as any)}
+                />
+              )}
+            </View>
+          </View>
 
-          {activeTab === "stats" && (
-            privacy?.analysis === false ? (
-              <PrivateSection
-                message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
-                colors={colors}
-              />
-            ) : profile ? (
-              <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
-            ) : null
-          )}
+          <View key="stats" style={dynStyles.contentArea}>
+            <View onLayout={handlePageLayout(1)}>
+              {privacy?.analysis === false ? (
+                <PrivateSection
+                  message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
+                  colors={colors}
+                />
+              ) : profile ? (
+                <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
+              ) : null}
+            </View>
+          </View>
 
-          {activeTab === "plans" && (
-            privacy?.plans === false ? (
-              <PrivateSection
-                message={tt({ zh: "训练计划已设为私密", en: "Plans are private" })}
-                colors={colors}
-              />
-            ) : plans.length === 0 ? (
-              <View style={dynStyles.emptyState}>
-                <Ionicons name="calendar-outline" size={40} color={colors.border} />
-                <Text style={dynStyles.emptyText}>
-                  {tt({ zh: "暂无公开计划", en: "No public plans" })}
-                </Text>
-              </View>
-            ) : (
-              <View style={dynStyles.listContainer}>
-                {plans.map((p) => (
-                  <View key={p.id} style={dynStyles.planCard}>
-                    <View style={dynStyles.planHeader}>
-                      <Ionicons name="calendar" size={18} color="#6366F1" />
-                      <Text style={dynStyles.planTitle} numberOfLines={1}>{p.title}</Text>
+          <View key="badges" style={dynStyles.contentArea}>
+            <View onLayout={handlePageLayout(2)}>
+              {privacy?.badges === false ? (
+                <PrivateSection
+                  message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
+                  colors={colors}
+                />
+              ) : badges.length === 0 ? (
+                <View style={dynStyles.emptyState}>
+                  <Ionicons name="ribbon-outline" size={40} color={colors.border} />
+                  <Text style={dynStyles.emptyText}>
+                    {tt({ zh: "暂无徽章", en: "No badges yet" })}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ paddingTop: 8 }}>
+                  {groupedBadges.map(group => (
+                    <View key={group.key} style={dynStyles.badgeSectionBlock}>
+                      <Text style={dynStyles.badgeSectionTitle}>{group.title}</Text>
+                      <FlatList
+                        data={group.badges}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={item => item.id}
+                        renderItem={({ item }) => (
+                          <BadgeCard
+                            badge={item}
+                            size={badgeCardSize}
+                            onPress={item.sourceType === "challenge" && item.sourceId
+                              ? () => router.push(`/community/challenges/${item.sourceId}`)
+                              : undefined
+                            }
+                          />
+                        )}
+                        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+                        contentContainerStyle={{ paddingHorizontal: 12 }}
+                      />
                     </View>
-                    <View style={dynStyles.planMeta}>
-                      {p.trainingType ? (
-                        <View style={dynStyles.tag}>
-                          <Text style={dynStyles.tagText}>{p.trainingType}</Text>
-                        </View>
-                      ) : null}
-                      {p.durationWeeks ? (
-                        <Text style={dynStyles.metaText}>
-                          {p.durationWeeks} {tt({ zh: "周", en: "weeks" })}
-                        </Text>
-                      ) : null}
-                      <View style={[dynStyles.statusDot, { backgroundColor: p.status === "active" ? "#22C55E" : "#9CA3AF" }]} />
-                      <Text style={dynStyles.metaText}>{p.status}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )
-          )}
-
-          {activeTab === "badges" && (
-            privacy?.badges === false ? (
-              <PrivateSection
-                message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
-                colors={colors}
-              />
-            ) : badges.length === 0 ? (
-              <View style={dynStyles.emptyState}>
-                <Ionicons name="ribbon-outline" size={40} color={colors.border} />
-                <Text style={dynStyles.emptyText}>
-                  {tt({ zh: "暂无徽章", en: "No badges yet" })}
-                </Text>
-              </View>
-            ) : (
-              <View style={{ paddingTop: 8 }}>
-                {groupedBadges.map(group => (
-                  <View key={group.key} style={dynStyles.badgeSectionBlock}>
-                    <Text style={dynStyles.badgeSectionTitle}>{group.title}</Text>
-                    <FlatList
-                      data={group.badges}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      keyExtractor={item => item.id}
-                      renderItem={({ item }) => (
-                        <BadgeCard
-                          badge={item}
-                          size={badgeCardSize}
-                          onPress={item.sourceType === "challenge" && item.sourceId
-                            ? () => router.push(`/community/challenges/${item.sourceId}`)
-                            : undefined
-                          }
-                        />
-                      )}
-                      ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-                      contentContainerStyle={{ paddingHorizontal: 12 }}
-                    />
-                  </View>
-                ))}
-              </View>
-            )
-          )}
-        </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </PagerView>
       </Animated.ScrollView>
 
       {/* Native toolbar menu (context menu from button position) */}
@@ -450,16 +463,6 @@ const createDynStyles = (colors: ReturnType<typeof useThemeColors>) => StyleShee
   contentArea: { minHeight: 400 },
   emptyState: { padding: 48, alignItems: "center" },
   emptyText: { color: colors.textTertiary, marginTop: 8 },
-  // Plans
-  listContainer: { padding: 16, gap: 12 },
-  planCard: { backgroundColor: colors.backgroundSecondary, borderRadius: 12, padding: 14, gap: 8 },
-  planHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  planTitle: { fontSize: 15, fontWeight: "600", color: colors.textPrimary, flex: 1 },
-  planMeta: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  tag: { backgroundColor: colors.backgroundSecondary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  tagText: { fontSize: 12, color: "#6366F1", fontWeight: "500" },
-  metaText: { fontSize: 12, color: colors.textSecondary },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
   // Badges
   badgeSectionBlock: { marginBottom: 16 },
   badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textSecondary, marginBottom: 8, paddingHorizontal: 12 },

@@ -9,13 +9,13 @@ import { getColorForGrade } from "../../../../lib/gradeColors";
 interface Props {
   dateLabel: string;
   duration: string;
-  climbs: number;
+  attempts: number;
   sends: number;
   maxGrade: string;
   onPress: () => void;
 }
 
-export default function DailyLogCard({ dateLabel, duration, climbs, sends, maxGrade, onPress }: Props) {
+export default function DailyLogCard({ dateLabel, duration, attempts, sends, maxGrade, onPress }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const gc = getColorForGrade(maxGrade);
@@ -34,8 +34,8 @@ export default function DailyLogCard({ dateLabel, duration, climbs, sends, maxGr
         </View>
         <View style={styles.divider} />
         <View style={styles.item}>
-          <Text style={styles.val}>{climbs}</Text>
-          <Text style={styles.label}>Climbs</Text>
+          <Text style={styles.val}>{attempts}</Text>
+          <Text style={styles.label}>Attempts</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.item}>

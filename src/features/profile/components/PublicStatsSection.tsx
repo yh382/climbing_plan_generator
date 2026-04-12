@@ -60,7 +60,7 @@ export default function PublicStatsSection({ profile, sessionSummary }: Props) {
               key={s.id}
               dateLabel={format(parseISO(s.date), "EEE · M.dd")}
               duration={formatDuration(s.durationMinutes)}
-              climbs={s.climbs}
+              attempts={s.attempts}
               sends={s.sends}
               maxGrade={s.bestGrade || "—"}
               onPress={() => router.push({ pathname: "/community/public-route-log", params: { sessionId: s.id } })}

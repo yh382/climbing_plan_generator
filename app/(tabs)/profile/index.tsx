@@ -254,6 +254,11 @@ export default function ProfileScreen() {
   const pagerRef = useRef<PagerView>(null);
   const { height: screenHeight } = useWindowDimensions();
 
+  // Shared value driven by PagerView onPageScroll for smooth tab indicator animation
+  const tabScrollPosition = useSharedValue(
+    TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts"),
+  );
+
   // Track content height per tab page so PagerView grows to fit
   const [pageHeights, setPageHeights] = useState<Record<number, number>>({});
   const activePageIndex = TABS.indexOf(activeTab as (typeof TABS)[number]);
@@ -271,14 +276,27 @@ export default function ProfileScreen() {
   }, []);
 
   const handleTabPress = useCallback((tab: string) => {
-    setActiveTab(tab);
     const idx = TABS.indexOf(tab as (typeof TABS)[number]);
     if (idx >= 0) pagerRef.current?.setPage(idx);
   }, []);
 
+  const onPageScroll = useCallback((e: { nativeEvent: { position: number; offset: number } }) => {
+    tabScrollPosition.value = e.nativeEvent.position + e.nativeEvent.offset;
+  }, []);
+
+  // Buffer the selected page index — only commit to activeTab when pager is fully idle
+  const pendingPageRef = useRef<number | null>(null);
+
   const onPageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
-    const tab = TABS[e.nativeEvent.position];
-    if (tab) setActiveTab(tab);
+    pendingPageRef.current = e.nativeEvent.position;
+  }, []);
+
+  const onPageScrollStateChanged = useCallback((e: { nativeEvent: { pageScrollState: string } }) => {
+    if (e.nativeEvent.pageScrollState === "idle" && pendingPageRef.current !== null) {
+      const tab = TABS[pendingPageRef.current];
+      if (tab) setActiveTab(tab);
+      pendingPageRef.current = null;
+    }
   }, []);
 
   // --------------------- render ---------------------
@@ -316,13 +334,15 @@ export default function ProfileScreen() {
         />
 
         {/* [1] Tab bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} />
+        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
 
         <PagerView
           ref={pagerRef}
           style={{ height: pagerHeight }}
           initialPage={TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts")}
+          onPageScroll={onPageScroll}
           onPageSelected={onPageSelected}
+          onPageScrollStateChanged={onPageScrollStateChanged}
           overdrag
         >
           <View key="posts" style={styles.contentArea}>

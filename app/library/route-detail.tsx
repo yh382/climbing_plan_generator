@@ -28,6 +28,7 @@ import { consumePendingMedia } from "../../src/features/community/pendingMedia";
 import UploadProgressToast from "../../src/components/ui/UploadProgressToast";
 import { toFileUri, uploadLogMediaBatch } from "../../src/features/journal/api";
 import { enqueueLogEvent } from "../../src/features/journal/sync/logsOutbox";
+import { syncWidgetFromStore } from "@/lib/widgetBridge";
 import useLogsStore from "../../src/store/useLogsStore";
 import {
   readDayList,
@@ -38,6 +39,7 @@ import {
   updateSessionItem,
 } from "../../src/features/journal/loglist/storage";
 import type { LocalDayLogItem, LogMedia } from "../../src/features/journal/loglist/types";
+import { recalcIntensityForDate } from "../../src/services/stats/intensityCalculator";
 
 const SCREEN_W = Dimensions.get("window").width;
 const NAV_BAR_H = 44;
@@ -278,7 +280,14 @@ export default function RouteDetailScreen() {
               const list = await readDayList(date, climbType);
               const filtered = list.filter((it) => it.id !== itemId);
               await writeDayList(date, climbType, filtered);
+              recalcIntensityForDate(date).catch(() => {});
             }
+
+            // Sync deletion to backend via outbox. If this log was never
+            // synced (serverId unknown), the flush handler skips silently.
+            await enqueueLogEvent({ type: "delete", localId: itemId });
+            syncWidgetFromStore();
+
             router.back();
           } catch (e) {
             if (__DEV__) console.warn("Failed to delete log:", e);
@@ -325,6 +334,8 @@ export default function RouteDetailScreen() {
     });
 
     await enqueueLogEvent({ type: "repeat", localId: item.id });
+
+    if (!sessionKey && date) recalcIntensityForDate(date).catch(() => {});
   }, [item, sessionKey, climbType, date, itemId]);
 
   const s = useMemo(() => createStyles(colors), [colors]);

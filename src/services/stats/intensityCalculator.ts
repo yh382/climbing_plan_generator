@@ -114,6 +114,47 @@ export async function saveIntensityForDate(
 }
 
 /**
+ * Remove a stale intensity entry for a specific date/type.
+ * Called when all logs of that type have been deleted from the day list.
+ */
+export async function removeIntensityForDate(
+  date: string,
+  type: "boulder" | "rope"
+): Promise<void> {
+  try {
+    const store = await loadIntensityData();
+    if (!store[date]) return;
+    delete store[date][type];
+    if (!store[date].boulder && !store[date].rope) delete store[date];
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Recompute intensity for ALL types on a given date from current day lists.
+ * Handles empty lists by removing the stale entry.
+ * Fire-and-forget safe — errors are swallowed.
+ */
+export async function recalcIntensityForDate(date: string): Promise<void> {
+  // Boulder
+  const boulderItems = await readDayList(date, "boulder");
+  const boulderResult = computeDailyIntensity(boulderItems);
+  if (boulderResult) await saveIntensityForDate(date, "boulder", boulderResult);
+  else await removeIntensityForDate(date, "boulder");
+
+  // Rope (toprope + lead combined, matching backfillIntensityData pattern)
+  const [trItems, leadItems] = await Promise.all([
+    readDayList(date, "toprope"),
+    readDayList(date, "lead"),
+  ]);
+  const ropeResult = computeDailyIntensity([...trItems, ...leadItems]);
+  if (ropeResult) await saveIntensityForDate(date, "toprope", ropeResult);
+  else await removeIntensityForDate(date, "rope");
+}
+
+/**
  * Backfill intensity for all given dates that don't already have data.
  * Reads full LocalDayLogItem from AsyncStorage for each missing date.
  * Returns the complete (possibly updated) store.

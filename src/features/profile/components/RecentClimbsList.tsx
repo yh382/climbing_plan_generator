@@ -25,7 +25,7 @@ export function RecentClimbsList() {
         dateLabel: format(parseISO(s.date), "EEE · M.dd"),
         rawDate: s.date,
         duration: s.duration,
-        climbs: s.climbs ?? 0,
+        attempts: s.attempts ?? 0,
         sends: s.sends ?? 0,
         best: s.best || "—",
         sessionKey: s.sessionKey || "",
@@ -51,7 +51,7 @@ export function RecentClimbsList() {
           key={s.id}
           dateLabel={s.dateLabel}
           duration={s.duration}
-          climbs={s.climbs}
+          attempts={s.attempts}
           sends={s.sends}
           maxGrade={s.best}
           onPress={() => {

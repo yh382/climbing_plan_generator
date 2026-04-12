@@ -2,14 +2,11 @@
 import type { SessionEntry } from "../store/useLogsStore";
 import type { Widget } from "expo-widgets";
 
-// Widget requires a production build — the Metro bundler compiles widget JSX to
-// a serialized string at build time. In dev mode (__DEV__), the raw function is
-// passed to the native constructor which expects a string, causing a crash.
-// Since widgets need the WidgetKit extension (only available after prebuild +
-// production build), we skip widget operations entirely in dev mode.
+// The widget stub (ClimMateWidget.tsx) returns null — all UI is pure SwiftUI.
+// We only need the expo-widgets WidgetObject to write data to shared UserDefaults
+// via updateSnapshot(). The try-catch handles any dev-mode serialization issues.
 let _widget: Widget<WidgetData> | null | undefined;
 function getWidget(): Widget<WidgetData> | null {
-  if (__DEV__) return null;
   if (_widget === null) return null; // already failed
   if (_widget) return _widget;
   try {
@@ -22,13 +19,12 @@ function getWidget(): Widget<WidgetData> | null {
 }
 
 export type WidgetData = {
-  monthClimbDays: number;
+  monthSessions: number;
   monthSends: number;
   streak: number;
   lastSessionGym: string;
   lastSessionDate: string;
   lastSessionBest: string;
-  lastSessionDuration: string;
   hasActiveSession: boolean;
 };
 
@@ -80,24 +76,23 @@ export function computeWidgetData(
   const now = new Date();
   const monthStart = getMonthStart(now);
 
-  const monthSessions = sessions.filter(
+  const filteredSessions = sessions.filter(
     (s) => new Date(s.date) >= monthStart
   );
 
-  const monthClimbDays = new Set(monthSessions.map((s) => s.date)).size;
-  const monthSends = monthSessions.reduce((sum, s) => sum + s.sends, 0);
+  const monthSessions = filteredSessions.length;
+  const monthSends = filteredSessions.reduce((sum, s) => sum + s.sends, 0);
   const streak = computeStreak(sessions);
 
   const last = sessions[0];
 
   return {
-    monthClimbDays,
+    monthSessions,
     monthSends,
     streak,
     lastSessionGym: last?.gymName ?? "",
     lastSessionDate: last?.date ?? "",
     lastSessionBest: last?.best ?? "",
-    lastSessionDuration: last?.duration ?? "",
     hasActiveSession: activeSession !== null,
   };
 }

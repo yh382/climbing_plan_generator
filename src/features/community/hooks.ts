@@ -90,6 +90,13 @@ export interface UserPost {
 let _badgeCache: { data: BadgeProgress[]; timestamp: number } | null = null;
 const BADGE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+/** Invalidate the badge progress cache so the next useBadgesProgress
+ *  consumer fetches fresh data from the backend. Called from
+ *  handleAwardedBadges when new badges are earned. */
+export function invalidateBadgeCache() {
+  _badgeCache = null;
+}
+
 export function useBadgesProgress() {
   const [badges, setBadges] = useState<BadgeProgress[]>(_badgeCache?.data ?? []);
   const [loading, setLoading] = useState(!_badgeCache);
@@ -234,7 +241,7 @@ export interface PublicBadge {
 /** @deprecated Replaced by PublicSessionSummary */
 export interface PublicDailySummary {
   date: string;
-  climbs: number;
+  attempts: number;
   sends: number;
   bestGrade: string | null;
   durationMinutes: number | null;
@@ -245,7 +252,7 @@ export interface PublicSessionSummary {
   date: string;
   gymName: string | null;
   durationMinutes: number | null;
-  climbs: number;
+  attempts: number;
   sends: number;
   bestGrade: string | null;
 }
@@ -299,7 +306,7 @@ export function usePublicProfile(userId: string | null) {
         date: s.date,
         gymName: s.gym_name ?? null,
         durationMinutes: s.duration_minutes ?? null,
-        climbs: s.summary?.total_attempts ?? s.summary?.log_count ?? 0,
+        attempts: s.summary?.total_attempts ?? s.summary?.log_count ?? 0,
         sends: s.summary?.total_sends ?? 0,
         bestGrade: s.summary?.best_grade ?? null,
       }));
@@ -308,7 +315,7 @@ export function usePublicProfile(userId: string | null) {
       setDailySummary(
         mappedSessions.map((s: PublicSessionSummary) => ({
           date: s.date,
-          climbs: s.climbs,
+          attempts: s.attempts,
           sends: s.sends,
           bestGrade: s.bestGrade,
           durationMinutes: s.durationMinutes,

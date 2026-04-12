@@ -486,8 +486,10 @@ export default function LogDetailScreen() {
       ) : null}
       <View style={styles.kpiDivider} />
       <View style={styles.kpiItem}>
-        <Text style={styles.kpiValue}>{dailyLogs.length}</Text>
-        <Text style={styles.kpiLabel}>Climbs</Text>
+        <Text style={styles.kpiValue}>
+          {dailyLogs.reduce((sum, it) => sum + ((it as any).attemptsTotal ?? (it as any).attempts ?? 1), 0)}
+        </Text>
+        <Text style={styles.kpiLabel}>Attempts</Text>
       </View>
     </View>
   );
@@ -579,7 +581,7 @@ export default function LogDetailScreen() {
                 duration: duration || "",
                 sends: String(sessionSends),
                 bestGrade,
-                climbs: String(dailyLogs.length),
+                attempts: String(dailyLogs.length),
                 discipline: effectiveMode,
               },
             })}

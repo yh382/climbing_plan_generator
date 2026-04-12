@@ -9,6 +9,16 @@ struct ClimMateWidgetView: View {
   private let secondaryText = Color(red: 0x8E/255, green: 0x8E/255, blue: 0x93/255)
   private let activeRed = Color(red: 0xFF/255, green: 0x3B/255, blue: 0x30/255)
 
+  private var formattedLastDate: String {
+    let raw = entry.data.lastSessionDate
+    guard !raw.isEmpty else { return "" }
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: raw) else { return raw }
+    fmt.dateFormat = "MMM d"
+    return fmt.string(from: d)
+  }
+
   var body: some View {
     Group {
       switch family {
@@ -37,9 +47,9 @@ struct ClimMateWidgetView: View {
 
       HStack {
         VStack(alignment: .leading) {
-          Text("\(entry.data.monthClimbDays)")
+          Text("\(entry.data.monthSessions)")
             .font(.system(size: 16, weight: .semibold))
-          Text("days")
+          Text("sessions")
             .font(.system(size: 10))
             .foregroundColor(secondaryText)
         }
@@ -77,13 +87,13 @@ struct ClimMateWidgetView: View {
 
         Spacer()
 
-        Text("\(entry.data.monthClimbDays) days \u{00B7} \(entry.data.monthSends) sends")
+        Text("\(entry.data.monthSessions) sessions \u{00B7} \(entry.data.monthSends) sends")
           .font(.system(size: 14, weight: .semibold))
         Text("this month")
           .font(.system(size: 11))
           .foregroundColor(secondaryText)
       }
-      .frame(maxWidth: 120, alignment: .leading)
+      .frame(maxWidth: 140, alignment: .leading)
 
       Spacer()
 
@@ -94,13 +104,13 @@ struct ClimMateWidgetView: View {
           .foregroundColor(secondaryText)
         Text(entry.data.lastSessionGym.isEmpty ? "No sessions yet" : entry.data.lastSessionGym)
           .font(.system(size: 14, weight: .semibold))
-          .lineLimit(1)
+          .lineLimit(2)
 
         if !entry.data.lastSessionBest.isEmpty {
           Text(entry.data.lastSessionBest)
             .font(.system(size: 20, weight: .bold))
             .foregroundColor(accent)
-          Text(entry.data.lastSessionDuration)
+          Text(formattedLastDate)
             .font(.system(size: 11))
             .foregroundColor(secondaryText)
         }

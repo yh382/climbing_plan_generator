@@ -23,8 +23,12 @@ export type Badge = {
   // 0~1，用于未解锁进度条
   progress?: number;
 
-  // 未来点进详情页用（先跑通 UI）
-  requirement?: string;
+  // Human-readable unlock requirement (e.g., "Send a V9 boulder")
+  description?: string | null;
+
+  // Raw metric values for progress display (e.g., 3 / 10)
+  currentValue?: number;
+  threshold?: number;
 
   // Custom badge icon URL from backend
   iconUrl?: string | null;
@@ -35,4 +39,7 @@ export type Badge = {
   // Source tracking (e.g., which challenge awarded this badge)
   sourceType?: string | null;
   sourceId?: string | null;
+
+  // Rarity: percentage of users who earned this badge (0-100)
+  rarity?: number;
 };

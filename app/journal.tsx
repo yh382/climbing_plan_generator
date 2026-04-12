@@ -39,8 +39,7 @@ import {
 } from "../src/features/journal/sync/sessionServerIdMap";
 import { syncAllLocalSessions } from "../src/features/journal/sync/syncAllLocalSessions";
 import { useAuthStore } from "../src/store/useAuthStore";
-import { readDayList } from "../src/features/journal/loglist/storage";
-import { computeDailyIntensity, saveIntensityForDate } from "../src/services/stats/intensityCalculator";
+import { recalcIntensityForDate } from "../src/services/stats/intensityCalculator";
 
 // Native header
 import { withHeaderTheme } from "../src/lib/nativeHeaderOptions";
@@ -108,6 +107,10 @@ export default function Journal() {
   const router = useRouter();
   const navigation = useNavigation();
   const [pendingAppend, setPendingAppend] = useState<LocalDayLogItem | null>(null);
+  // Memoized to prevent TodayDetailsList's pendingAppend effect from
+  // re-firing on every parent re-render (unstable arrow function reference
+  // was causing concurrent IIFE executions → duplicate enqueues).
+  const handleAppended = useCallback(() => setPendingAppend(null), []);
 
   const lastSubmitAtRef = useRef<number>(0);
   const submitSeqRef = useRef<number>(0);
@@ -217,14 +220,7 @@ export default function Journal() {
     if (token) {
       (async () => {
         try {
-          const intensityDate = todayKey;
-          await Promise.all(
-            (["boulder", "toprope", "lead"] as const).map(async (t) => {
-              const items = await readDayList(intensityDate, t);
-              const result = computeDailyIntensity(items);
-              if (result) await saveIntensityForDate(intensityDate, t, result);
-            })
-          );
+          await recalcIntensityForDate(todayKey);
         } catch {}
         try {
           const sMap = await readAllSessionServerIds();
@@ -537,7 +533,7 @@ export default function Journal() {
                   labelOf={labelOf}
                   tr={tr}
                   pendingAppend={pendingAppend}
-                  onAppended={() => setPendingAppend(null)}
+                  onAppended={handleAppended}
                   refreshKey={refreshNonce}
                   onCountChange={setSessionDetailCount}
                   onStatsChange={setSessionStats}

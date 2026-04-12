@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { invalidateBadgeCache } from "../features/community/hooks";
 
 export type AwardedBadge = {
   code: string;
@@ -29,7 +30,18 @@ export const useBadgeUnlockStore = create<BadgeUnlockState>((set) => ({
  */
 export function handleAwardedBadges(response: any) {
   const badges = response?.awarded_badges;
+  if (__DEV__) {
+    console.log(
+      "[badges] handleAwardedBadges:",
+      "awarded_badges field:",
+      badges === undefined ? "MISSING" : `array(${badges?.length ?? "??"})`,
+      badges?.length > 0 ? badges.map((b: any) => b.name) : "",
+    );
+  }
   if (Array.isArray(badges) && badges.length > 0) {
     useBadgeUnlockStore.getState().show(badges);
+    // Invalidate badge progress cache so the badges page shows
+    // the new badge immediately when the user navigates to it.
+    invalidateBadgeCache();
   }
 }

@@ -36,6 +36,7 @@ import {
 } from "../features/journal/sync/localBackup";
 import { syncWidgetFromStore } from "../lib/widgetBridge";
 import { startLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
+import { recalcIntensityForDate } from "../services/stats/intensityCalculator";
 
 // In-flight POST /sessions promise — endSession awaits this to avoid race condition
 let _sessionCreatePromise: Promise<string | null> | null = null;
@@ -73,7 +74,7 @@ export type SessionEntry = {
   sessionKey: string; // String(activeSession.startTime)
   sends: number;      // 本 session sends
   best: string;       // 本 session best（优先 V，否则 YDS）
-  climbs: number;     // 本 session total climb items
+  attempts: number;     // 本 session total climb items
 
   // V7-B: 后端同步
   serverId: string | null;
@@ -223,29 +224,46 @@ function backendLogToLocal(log: any): LocalDayLogItem {
 
 /**
  * Merge backend session list with local session list.
- * - Backend items update local items (newer data from server)
- * - BUT: preserve local `media` if backend item has none (media may not have synced yet)
- * - Local-only items (not on backend) are kept (outbox hasn't flushed yet)
+ *
+ * KEY INSIGHT: local items have client-generated UUIDs, backend items have
+ * server-generated UUIDs. The serverIdMap (localId → serverId) tracks the
+ * mapping. We build a reverse map (serverId → localId) so that when a
+ * backend item arrives, we can find the corresponding local item even
+ * though their `.id` fields differ.
+ *
+ * - Backend items that match a local item (via reverse ID map) → merge
+ *   (use backend data but preserve local media if backend has none)
+ * - Backend items with no local match → add (new data from another device)
+ * - Local-only items (not on backend) → keep (outbox hasn't flushed yet)
  */
 function mergeSessionListPreserveLocal(
   backendItems: LocalDayLogItem[],
   localItems: LocalDayLogItem[],
+  serverToLocalId?: Map<string, string>,
 ): LocalDayLogItem[] {
   const localById = new Map(localItems.map((it) => [it.id, it]));
-  const mergedIds = new Set<string>();
+  const consumedLocalIds = new Set<string>();
   const result: LocalDayLogItem[] = [];
 
   for (const bItem of backendItems) {
-    mergedIds.add(bItem.id);
-    const local = localById.get(bItem.id);
+    // Try to find the corresponding local item:
+    // 1. Direct ID match (same ID on both sides — rare but possible)
+    // 2. Reverse serverIdMap lookup (serverId → localId)
+    const localId = serverToLocalId?.get(bItem.id) ?? bItem.id;
+    const local = localById.get(localId) ?? localById.get(bItem.id);
+
     if (local) {
-      // Backend item exists locally — use backend data but preserve local media if backend has none
+      consumedLocalIds.add(local.id);
+      // Backend item exists locally — use backend data but preserve local media
       const hasBackendMedia = Array.isArray(bItem.media) && bItem.media.length > 0
         && bItem.media.some((m) => !!m.uri);
       const hasLocalMedia = Array.isArray(local.media) && local.media.length > 0
         && local.media.some((m) => !!m.uri);
       result.push({
         ...bItem,
+        // Keep the LOCAL id so that subsequent merges and outbox events
+        // can still reference the item by its original client-generated id.
+        id: local.id,
         media: hasBackendMedia ? bItem.media : (hasLocalMedia ? local.media : bItem.media),
       });
     } else {
@@ -255,7 +273,7 @@ function mergeSessionListPreserveLocal(
 
   // Keep local-only items (not yet synced to backend)
   for (const local of localItems) {
-    if (!mergedIds.has(local.id)) {
+    if (!consumedLocalIds.has(local.id)) {
       result.push(local);
     }
   }
@@ -503,7 +521,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               null as any,
             );
             const best = bestLog?.grade_text || (s.summary?.best_grade || "—");
-            const climbs = sessionLogs.length > 0
+            const attempts = sessionLogs.length > 0
               ? sessionLogs.reduce((sum: number, l: any) => sum + (l.attempts || 1), 0)
               : (s.summary?.total_attempts || s.summary?.log_count || 0);
 
@@ -518,7 +536,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               sessionKey,
               sends,
               best,
-              climbs,
+              attempts,
               serverId: String(s.id),
               isPublic: false,
               synced: true,
@@ -527,7 +545,16 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             // (sessionServerIdMap already populated for ALL backend sessions
             // — including active ones — at the top of this function.)
 
-            // Write session lists to AsyncStorage — MERGE with local to preserve media
+            // Write session lists to AsyncStorage — MERGE with local to preserve media.
+            // Build reverse serverIdMap (serverId → localId) so the merge can
+            // match backend items to their local counterparts even though the
+            // IDs are different (client UUID vs server UUID).
+            const allServerIds = await readAllServerIds();
+            const serverToLocal = new Map<string, string>();
+            for (const [localId, serverId] of Object.entries(allServerIds)) {
+              serverToLocal.set(serverId, localId);
+            }
+
             const byType = new Map<LogType, LocalDayLogItem[]>();
             for (const l of sessionLogs) {
               const t = l.wall_type as LogType;
@@ -537,16 +564,22 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             for (const type of (["boulder", "toprope", "lead"] as LogType[])) {
               const backendItems = byType.get(type) || [];
               const localItems = await readSessionList(sessionKey, type);
-              const merged = mergeSessionListPreserveLocal(backendItems, localItems);
+              const merged = mergeSessionListPreserveLocal(backendItems, localItems, serverToLocal);
               await writeSessionList(sessionKey, type, merged);
             }
           }
 
           // Write day lists to AsyncStorage — MERGE with local to preserve media
+          // Reuse the same reverse map for day list merges.
+          const allServerIdsForDayLists = await readAllServerIds();
+          const serverToLocalForDayLists = new Map<string, string>();
+          for (const [localId, serverId] of Object.entries(allServerIdsForDayLists)) {
+            serverToLocalForDayLists.set(serverId, localId);
+          }
           for (const [, group] of logsByDateType) {
             const backendItems = group.logs.map(backendLogToLocal);
             const localItems = await readDayList(group.date, group.type);
-            const merged = mergeSessionListPreserveLocal(backendItems, localItems);
+            const merged = mergeSessionListPreserveLocal(backendItems, localItems, serverToLocalForDayLists);
             await writeDayList(group.date, group.type, merged);
           }
 
@@ -562,18 +595,18 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           const existingSessions = get().sessions;
           const backendKeys = new Set(newSessions.map(s => s.sessionKey));
           const localOnly = existingSessions.filter(
-            s => !backendKeys.has(s.sessionKey) && (!s.synced || s.climbs > 0)
+            s => !backendKeys.has(s.sessionKey) && (!s.synced || s.attempts > 0)
           );
 
           // Repair: for sessions with 0 metrics, try recomputing from AsyncStorage
           const mergedBackendSessions = await Promise.all(newSessions.map(async (bs) => {
             // First try: use Zustand local data
             const local = existingSessions.find(s => s.sessionKey === bs.sessionKey);
-            if (local && local.climbs > 0 && bs.climbs === 0) {
-              return { ...bs, climbs: local.climbs, sends: local.sends, best: local.best, duration: local.duration || bs.duration };
+            if (local && local.attempts > 0 && bs.attempts === 0) {
+              return { ...bs, attempts: local.attempts, sends: local.sends, best: local.best, duration: local.duration || bs.duration };
             }
             // Second try: recompute from AsyncStorage session lists
-            if (bs.climbs === 0) {
+            if (bs.attempts === 0) {
               try {
                 const [sb, str, sl] = await Promise.all([
                   readSessionList(bs.sessionKey, "boulder"),
@@ -587,7 +620,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
                   const best = isBoulder
                     ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
                     : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
-                  return { ...bs, climbs: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
+                  return { ...bs, attempts: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
                 }
               } catch { /* best-effort */ }
             }
@@ -596,7 +629,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
           // Also repair localOnly sessions with 0 metrics
           const repairedLocalOnly = await Promise.all(localOnly.map(async (ls) => {
-            if (ls.climbs === 0) {
+            if (ls.attempts === 0) {
               try {
                 const [sb, str, sl] = await Promise.all([
                   readSessionList(ls.sessionKey, "boulder"),
@@ -610,7 +643,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
                   const best = isBoulder
                     ? items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^V\d+/i.test(g)).sort((a, b) => vNumber(b) - vNumber(a))[0] || "V?"
                     : items.map((it: any) => String(it?.grade || "")).filter((g: string) => /^5\./.test(g)).sort((a, b) => ydsRank(b) - ydsRank(a))[0] || "5.?";
-                  return { ...ls, climbs: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
+                  return { ...ls, attempts: items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0), sends, best };
                 }
               } catch { /* best-effort */ }
             }
@@ -784,7 +817,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             sessionKey,
             sends,
             best,
-            climbs: sessionItems.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0),
+            attempts: sessionItems.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0),
 
             serverId: serverId,
             isPublic: false,
@@ -817,7 +850,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           console.error("[endSession] Error:", err);
 
           // Fallback: create minimal session entry so calendar still shows it
-          let sends = 0, climbs = 0;
+          let sends = 0, totalAttempts = 0;
           try {
             const [sb, str, sl] = await Promise.all([
               readSessionList(sessionKey, "boulder"),
@@ -826,7 +859,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             ]);
             const items = [...(sb || []), ...(str || []), ...(sl || [])];
             sends = items.reduce((s: number, it: any) => s + inferSendCount(it), 0);
-            climbs = items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0);
+            totalAttempts = items.reduce((sum: number, it: any) => sum + (it.attemptsTotal ?? it.attempts ?? 1), 0);
           } catch { /* best-effort */ }
 
           const fallbackSession: SessionEntry = {
@@ -840,20 +873,18 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             sessionKey,
             sends,
             best: "V?",
-            climbs,
+            attempts: totalAttempts,
             serverId: activeSession.serverId,
             isPublic: false,
             synced: false,
           };
 
-          // End Live Activity (fallback path) — `climbs` here is already the
-          // sum of attemptsTotal across all items, so it doubles as the
-          // attempts metric. routeCount is the number of distinct items.
+          // End Live Activity (fallback path)
           endLiveActivity({
             sendCount: sends,
             bestGrade: "V?",
-            routeCount: climbs,
-            attempts: climbs,
+            routeCount: totalAttempts,
+            attempts: totalAttempts,
           });
 
           set({
@@ -999,6 +1030,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           clearSessionList(sessionKey, "toprope"),
           clearSessionList(sessionKey, "lead"),
         ]);
+
+        // Recalc intensity for the affected date (fire-and-forget)
+        recalcIntensityForDate(date).catch(() => {});
 
         // 3) rebuild aggregated logs for this date
         const rebuilt = [
@@ -1186,7 +1220,10 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         // _hydrated intentionally excluded — always starts false
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state._hydrated = true;
+        if (state) {
+          state._hydrated = true;
+          syncWidgetFromStore();
+        }
       },
     }
   )

@@ -4,43 +4,39 @@ import Foundation
 // MARK: - Data model (matches WidgetData in widgetBridge.ts)
 
 struct ClimMateData {
-  let monthClimbDays: Int
+  let monthSessions: Int
   let monthSends: Int
   let streak: Int
   let lastSessionGym: String
   let lastSessionDate: String
   let lastSessionBest: String
-  let lastSessionDuration: String
   let hasActiveSession: Bool
 
   static let empty = ClimMateData(
-    monthClimbDays: 0, monthSends: 0, streak: 0,
+    monthSessions: 0, monthSends: 0, streak: 0,
     lastSessionGym: "", lastSessionDate: "", lastSessionBest: "",
-    lastSessionDuration: "", hasActiveSession: false
+    hasActiveSession: false
   )
 
-  init(monthClimbDays: Int, monthSends: Int, streak: Int,
+  init(monthSessions: Int, monthSends: Int, streak: Int,
        lastSessionGym: String, lastSessionDate: String,
-       lastSessionBest: String, lastSessionDuration: String,
-       hasActiveSession: Bool) {
-    self.monthClimbDays = monthClimbDays
+       lastSessionBest: String, hasActiveSession: Bool) {
+    self.monthSessions = monthSessions
     self.monthSends = monthSends
     self.streak = streak
     self.lastSessionGym = lastSessionGym
     self.lastSessionDate = lastSessionDate
     self.lastSessionBest = lastSessionBest
-    self.lastSessionDuration = lastSessionDuration
     self.hasActiveSession = hasActiveSession
   }
 
   init(from dict: [String: Any]) {
-    self.monthClimbDays = dict["monthClimbDays"] as? Int ?? 0
+    self.monthSessions = dict["monthSessions"] as? Int ?? 0
     self.monthSends = dict["monthSends"] as? Int ?? 0
     self.streak = dict["streak"] as? Int ?? 0
     self.lastSessionGym = dict["lastSessionGym"] as? String ?? ""
     self.lastSessionDate = dict["lastSessionDate"] as? String ?? ""
     self.lastSessionBest = dict["lastSessionBest"] as? String ?? ""
-    self.lastSessionDuration = dict["lastSessionDuration"] as? String ?? ""
     self.hasActiveSession = dict["hasActiveSession"] as? Bool ?? false
   }
 }
@@ -56,10 +52,9 @@ struct ClimMateTimelineEntry: TimelineEntry {
     ClimMateTimelineEntry(
       date: Date(),
       data: ClimMateData(
-        monthClimbDays: 12, monthSends: 48, streak: 5,
+        monthSessions: 8, monthSends: 48, streak: 5,
         lastSessionGym: "Beta Bloc", lastSessionDate: "2024-03-20",
-        lastSessionBest: "V5", lastSessionDuration: "1h 30m",
-        hasActiveSession: false
+        lastSessionBest: "V5", hasActiveSession: false
       ),
       isPlaceholder: true
     )

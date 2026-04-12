@@ -266,7 +266,7 @@ export default function Settings() {
 
           {/* Legal */}
           <Section title={tr("法律", "Legal")}>
-            <Button onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/")} modifiers={[buttonStyle("plain")]}>
+            <Button onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/privacy")} modifiers={[buttonStyle("plain")]}>
               <HStack spacing={12} alignment="center">
                 <SettingIcon name="doc.text.fill" bg="#8E8E93" />
                 <Text>{tr("隐私政策", "Privacy Policy")}</Text>

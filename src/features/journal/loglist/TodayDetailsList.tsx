@@ -55,6 +55,11 @@ function TodayDetailsList({
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
 
   const itemsRef = useRef<LocalDayLogItem[]>([]);
+  // Serialization lock: prevents concurrent pendingAppend IIFE execution.
+  // Without this, a re-render that changes `onAppended` reference can fire
+  // the effect twice before the first IIFE finishes writing to storage,
+  // causing both to pass the dedup check → double enqueue.
+  const processingRef = useRef(false);
   useEffect(() => {
     itemsRef.current = items;
     onCountChange?.(items.length);
@@ -122,44 +127,47 @@ function TodayDetailsList({
 
   useEffect(() => {
     if (!pendingAppend) return;
+    if (processingRef.current) return; // another IIFE is already running
 
     const item = pendingAppend;
     const current = itemsRef.current;
 
-    // already exists -> clear pending
+    // Fast-path dedup: if itemsRef already has the item (same mount, no
+    // remount), skip immediately without touching storage.
     if (item?.id && current.some((x) => x?.id === item.id)) {
       queueMicrotask(() => onAppended?.());
       return;
     }
 
-    const next = dedupeById([item, ...current]);
-
-    // UI first
-    setItems(next);
-    itemsRef.current = next;
-
-    if (item.name && item.note) {
-      setNotesMap((prev) => ({ ...prev, [item.name]: item.note!.trim() }));
-    }
+    processingRef.current = true;
 
     (async () => {
       try {
-        // Write to local storage FIRST — this is the dedup gate. If the
-        // component remounts (e.g. key change from refreshNonce) before
-        // enqueue finishes, the new mount loads from storage and the dedup
-        // check at line ~124 sees the item already exists → skips re-enqueue.
-        //
-        // Previous ordering (enqueue first, write second) created a race
-        // window where the item was in the outbox but NOT in storage → remount
-        // dedup failed → double-enqueue → duplicate log rows on backend.
+        // AUTHORITATIVE dedup: read from AsyncStorage, not from itemsRef.
+        // After a component remount (key change from refreshNonce), itemsRef
+        // is reset to [] and load() hasn't returned yet, so the fast-path
+        // above can't catch duplicates. Reading from storage is the only
+        // reliable dedup gate — if the item was already written by the
+        // previous mount's effect, we find it here and bail.
+        const existing = await readSessionList(sessionKey, logType);
+        if (existing.some((x) => x.id === item.id)) {
+          // Already persisted by a previous mount — skip write + enqueue.
+          setItems(dedupeById(existing));
+          itemsRef.current = dedupeById(existing);
+          processingRef.current = false;
+          queueMicrotask(() => onAppended?.());
+          return;
+        }
+
+        const next = dedupeById([item, ...existing]);
+        setItems(next);
+        itemsRef.current = next;
+
         await writeSessionList(sessionKey, logType, next);
 
         const routeName = (item.name || "").trim() || item.grade;
         const note = (item.note || "").trim();
 
-        // Enqueue to outbox. We pass session_id: null + _sessionKey; the
-        // outbox flush handler resolves session_id lazily from
-        // sessionServerIdMap via _sessionKey on every flush attempt.
         await enqueueLogEvent({
           type: "create",
           localId: item.id,
@@ -187,6 +195,8 @@ function TodayDetailsList({
         queueMicrotask(() => onAppended?.());
       } catch (e) {
         console.warn("pendingAppend persist/enqueue failed:", e);
+      } finally {
+        processingRef.current = false;
       }
     })();
   }, [pendingAppend, sessionKey, logType, onAppended]);

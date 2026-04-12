@@ -64,7 +64,7 @@ export default function ShareCardScreen() {
     duration?: string;
     sends?: string;
     bestGrade?: string;
-    climbs?: string;
+    attempts?: string;
     discipline?: string;
   }>();
 
@@ -79,7 +79,7 @@ export default function ShareCardScreen() {
     duration: params.duration || "",
     sends: Number(params.sends) || 0,
     bestGrade: params.bestGrade || "—",
-    climbs: Number(params.climbs) || 0,
+    attempts: Number(params.attempts) || 0,
     discipline: params.discipline || "boulder",
   }), [params]);
 
@@ -320,7 +320,7 @@ function ShareCardContent({
     duration: string;
     sends: number;
     bestGrade: string;
-    climbs: number;
+    attempts: number;
     discipline: string;
   };
   dark: boolean;
@@ -359,8 +359,8 @@ function ShareCardContent({
           </View>
         ) : null}
         <View style={contentStyles.kpiItem}>
-          <Text style={[contentStyles.kpiValue, { color: textColor }]}>{data.climbs}</Text>
-          <Text style={[contentStyles.kpiLabel, { color: subColor }]}>Climbs</Text>
+          <Text style={[contentStyles.kpiValue, { color: textColor }]}>{data.attempts}</Text>
+          <Text style={[contentStyles.kpiLabel, { color: subColor }]}>Attempts</Text>
         </View>
       </View>
 
