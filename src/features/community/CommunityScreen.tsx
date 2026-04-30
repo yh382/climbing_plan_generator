@@ -1,11 +1,12 @@
 // src/features/community/CommunityScreen.tsx
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from "react";
-import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share, ViewToken, LayoutAnimation, Platform, UIManager } from "react-native";
+import { View, Text, Image, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share, ViewToken, LayoutAnimation, Platform, UIManager, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { useFocusEffect, useNavigation, useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { useScrollToTop } from "@react-navigation/native";
 import { communityApi } from "./api";
-import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "@/contexts/SettingsContext";
 import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import FeedPost from "./components/FeedPost";
 import { NativeSegmentedControl } from "@/components/ui";
@@ -14,11 +15,11 @@ import CommentSheet from "./components/CommentSheet";
 import { useCommunityStore } from "../../store/useCommunityStore";
 import { useUserStore } from "../../store/useUserStore";
 import useLogsStore from "../../store/useLogsStore";
+import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
 import { useChatStore } from "../../store/useChatStore";
-import { RankTab } from "./rank";
 import GymsTab from "./gyms/GymsTab";
-import EventsTab from "./events/EventsTab";
 import UploadProgressToast from "@/components/ui/UploadProgressToast";
+import ScrollToTopFab from "./components/ScrollToTopFab";
 import { setBlockVideoTaps } from "@/components/shared/MediaCarousel";
 import {
   usePostUploadState,
@@ -31,15 +32,15 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type TopTab = "Post" | "Rank" | "Events";
 type Mode = "feed" | "gyms";
 
 export default function CommunityScreen() {
   const colors = useThemeColors();
+  const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
-  const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, feedSort, setFeedSort, deletePost } = useCommunityStore();
+  const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, deletePost } = useCommunityStore();
   const currentUserId = useUserStore((s) => s.user?.id);
   const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
 
@@ -59,6 +60,33 @@ export default function CommunityScreen() {
   }, [uploadState.status]);
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // Scroll-to-top: binds the active tab icon's "tap again" gesture to the
+  // Feed FlatList (iOS standard behaviour via useScrollToTop) and powers the
+  // floating ↑ button that appears past SCROLL_TO_TOP_THRESHOLD.
+  const feedListRef = useRef<FlatList>(null);
+  useScrollToTop(feedListRef);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const SCROLL_TO_TOP_THRESHOLD = 600;
+  const handleFeedScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = e.nativeEvent.contentOffset.y;
+      setShowScrollTop(y > SCROLL_TO_TOP_THRESHOLD);
+    },
+    [],
+  );
+  const scrollToTop = useCallback(() => {
+    feedListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  // When the global FloatingActiveSessionTimer is visible (active log session
+  // and/or minimised workout), lift the scroll-to-top FAB above it so they
+  // don't overlap at bottom-right.
+  const activeLogSession = useLogsStore((s) => s.activeSession);
+  const workoutActive = useActiveWorkoutStore((s) => s.isActive);
+  const workoutMinimized = useActiveWorkoutStore((s) => s.isMinimized);
+  const floatingPillVisible =
+    !!activeLogSession || (workoutActive && workoutMinimized);
   const submitPostReport = useCallback(async (postId: string, reason: string) => {
     try {
       await communityApi.report("post", postId, reason);
@@ -86,26 +114,18 @@ export default function CommunityScreen() {
     }
   }, []);
 
-  // Poll unread count every 30s
-  useEffect(() => {
-    fetchUnreadCount();
-    pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, [fetchUnreadCount]);
-
-  // Chat unread polling
-  useEffect(() => {
-    startUnreadPolling();
-    return () => stopUnreadPolling();
-  }, [startUnreadPolling, stopUnreadPolling]);
-
-  // Refresh count when tab regains focus (e.g. returning from notifications)
+  // Poll unread count every 30s — ONLY when this screen is focused.
+  // Previously used useEffect() which kept polling in background → battery drain.
   useFocusEffect(
     useCallback(() => {
       fetchUnreadCount();
-    }, [fetchUnreadCount])
+      pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
+      startUnreadPolling();
+      return () => {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        stopUnreadPolling();
+      };
+    }, [fetchUnreadCount, startUnreadPolling, stopUnreadPolling])
   );
 
   // Fetch feed on mount
@@ -125,7 +145,6 @@ export default function CommunityScreen() {
   }, [posts]);
 
   const [mode, setMode] = useState<Mode>("feed");
-  const [topTab, setTopTab] = useState<TopTab>("Post");
   const routeParams = useLocalSearchParams<{ tab?: string; gymId?: string }>();
 
   // Auto-switch to Gyms mode when navigated with tab=gyms param
@@ -141,9 +160,6 @@ export default function CommunityScreen() {
     );
     setMode((m) => (m === "feed" ? "gyms" : "feed"));
   }, []);
-
-  const TOP_TABS: TopTab[] = ["Post", "Rank", "Events"];
-
 
   // Native iOS header (no large title — Toolbar button shows mode)
   const navigation = useNavigation();
@@ -161,66 +177,25 @@ export default function CommunityScreen() {
     setRefreshing(false);
   };
 
-  const feedListData = useMemo(() => {
-    if (topTab === "Post") return posts;
-    return [];
-  }, [topTab, posts]);
+  const feedListData = useMemo(() => posts, [posts]);
 
 
   // Memoize header to prevent @expo/ui SwiftUI Host components (NativeSegmentedControl)
   // from being remounted when unrelated state changes (e.g. commentPostId for CommentSheet)
   const feedListHeader = useMemo(() => {
     return (
-      <View>
-      {/* Post / Rank / Events — native segmented control */}
       <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
         <View style={styles.topTabsWrap}>
-            <NativeSegmentedControl
-              options={TOP_TABS}
-              selectedIndex={TOP_TABS.indexOf(topTab)}
-              onSelect={(i) => setTopTab(TOP_TABS[i])}
-              style={{ height: 32 }}
-            />
-        </View>
-
-      {/* Feed scope — only when Post tab is active */}
-      {topTab === "Post" && (
-        <View style={styles.feedScopeRow}>
           <NativeSegmentedControl
-            options={["All", "Following"]}
+            options={[tr("推荐", "For You"), tr("关注", "Following")]}
             selectedIndex={feedMode === "all" ? 0 : 1}
             onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
-            style={{ width: 180, height: 28 }}
+            style={{ height: 32 }}
           />
-
-          {/* Sort toggle — only in "All" mode (kept as pills — has icons) */}
-          {feedMode === "all" && (
-            <View style={styles.sortToggle}>
-              <TouchableOpacity
-                style={[styles.sortPill, feedSort === "hot" && styles.sortPillActive]}
-                onPress={() => setFeedSort("hot")}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="flame" size={14} color={feedSort === "hot" ? "#fff" : colors.textSecondary} />
-                <Text style={feedSort === "hot" ? styles.sortTextActive : styles.sortText}>Hot</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sortPill, feedSort === "latest" && styles.sortPillActive]}
-                onPress={() => setFeedSort("latest")}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="time" size={14} color={feedSort === "latest" ? "#fff" : colors.textSecondary} />
-                <Text style={feedSort === "latest" ? styles.sortTextActive : styles.sortText}>Latest</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
-      )}
-      </View>
-
       </View>
     );
-  }, [topTab, feedMode, feedSort, colors, styles]);
+  }, [feedMode, styles, setFeedMode, tr]);
 
   // Visibility tracking — only ONE post plays at a time (the most visible one)
   // Clear active post when leaving Community tab → pauses all videos
@@ -333,30 +308,19 @@ export default function CommunityScreen() {
     );
   }, [currentUserId, router, toggleLike, toggleSave, deletePost, submitPostReport, activePostId]);
 
-  const feedListFooter = useMemo(() => {
-    if (topTab === "Events") return <EventsTab />;
-    if (topTab === "Rank") {
-      return <RankTab onPressUser={(userId) => router.push(`/community/u/${userId}`)} />;
-    }
-    return null;
-  }, [topTab, router]);
-
   const gymsListFooter = useMemo(() => (
     <GymsTab initialGymId={routeParams.tab === 'gyms' ? routeParams.gymId : undefined} />
   ), [routeParams.tab, routeParams.gymId]);
 
-  const feedListEmpty = useMemo(() => {
-    if (topTab !== "Post") return null;
-    return (
-      <View style={{ padding: 40, alignItems: "center" }}>
-        {feedLoading ? (
-          <ActivityIndicator size="small" color={colors.textPrimary} />
-        ) : (
-          <Text style={{ color: colors.textTertiary, fontSize: 14, fontFamily: theme.fonts.regular }}>No posts yet. Pull to refresh.</Text>
-        )}
-      </View>
-    );
-  }, [topTab, feedLoading, colors]);
+  const feedListEmpty = useMemo(() => (
+    <View style={{ padding: 40, alignItems: "center" }}>
+      {feedLoading ? (
+        <ActivityIndicator size="small" color={colors.textPrimary} />
+      ) : (
+        <Text style={{ color: colors.textTertiary, fontSize: 14, fontFamily: theme.fonts.regular }}>{tr("还没有帖子，下拉刷新", "No posts yet. Pull to refresh.")}</Text>
+      )}
+    </View>
+  ), [feedLoading, colors, tr]);
 
   return (
     <>
@@ -375,28 +339,31 @@ export default function CommunityScreen() {
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
 
-      {/* 右侧: [paperplane bell] — 合并成一个胶囊 */}
+      {/* 右侧: [🏆 rank] [📥 inbox] — rank 独立页；inbox 合并 chat + notifications（AB 切到 /inbox）*/}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="paperplane"
-          onPress={() => router.push("/chat" as any)}
-        >
-          {totalUnread > 0 && (
-            <Stack.Toolbar.Badge style={{ fontSize: 1 }}>
-              {totalUnread > 99 ? '99+' : String(totalUnread)}
-            </Stack.Toolbar.Badge>
-          )}
-        </Stack.Toolbar.Button>
+          icon="trophy"
+          onPress={() => router.push("/community/rank" as any)}
+        />
         <Stack.Toolbar.Button
-          icon="bell"
-          onPress={() => { setUnreadNotifCount(0); router.push("/community/notifications"); }}
+          icon="tray"
+          onPress={() => {
+            setUnreadNotifCount(0);
+            router.push("/inbox" as any);
+          }}
         >
-          {unreadNotifCount > 0 && <Stack.Toolbar.Badge style={{ fontSize: 1 }}>{''}</Stack.Toolbar.Badge>}
+          {/* Badge 方案 A: 沿用现有 fontSize:1 + 空字符串 hack，保留默认 iOS 红点。
+              Stack.Toolbar.Badge 底层是 text badge 组件，style 无法改 backgroundColor；
+              若 A 在实机不显示，切方案 B 自绘 absolute-positioned <View style={styles.unreadDot}/>。 */}
+          {(totalUnread > 0 || unreadNotifCount > 0) && (
+            <Stack.Toolbar.Badge style={{ fontSize: 1 }}>{''}</Stack.Toolbar.Badge>
+          )}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
 
       {/* Feed FlatList (mode === "gyms" 时隐藏) */}
       <FlatList
+        ref={feedListRef}
         style={[
           { flex: 1, backgroundColor: colors.background },
           mode === "gyms" && ({ display: "none" } as const),
@@ -405,15 +372,24 @@ export default function CommunityScreen() {
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={feedListHeader}
-        ListFooterComponent={feedListFooter}
         ListEmptyComponent={feedListEmpty}
         contentInsetAdjustmentBehavior="automatic"
         scrollEventThrottle={16}
+        onScroll={handleFeedScroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 110 }}
         onViewableItemsChanged={onViewableItemsChangedRef}
         viewabilityConfig={feedViewabilityConfig}
+      />
+
+      {/* Scroll-to-top FAB — only while browsing the Post feed.
+          Elevated when the global active-session / workout pill is visible
+          so the two don't stack on top of each other. */}
+      <ScrollToTopFab
+        visible={mode === "feed" && showScrollTop}
+        onPress={scrollToTop}
+        elevated={floatingPillVisible}
       />
 
       {/* Gyms FlatList (mode === "feed" 时隐藏) */}
@@ -458,34 +434,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: "row",
     gap: 8,
     marginTop: 6,
-  },
-
-  sortToggle: {
-    flexDirection: "row",
-    marginLeft: "auto",
-    gap: 4,
-  },
-  sortPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: colors.backgroundSecondary,
-  },
-  sortPillActive: {
-    backgroundColor: colors.cardDark,
-  },
-  sortText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.medium,
-    color: colors.textSecondary,
-  },
-  sortTextActive: {
-    fontSize: 12,
-    fontFamily: theme.fonts.medium,
-    color: "#FFF",
   },
 
   modePill: {

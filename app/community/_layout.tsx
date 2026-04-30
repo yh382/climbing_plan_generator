@@ -5,6 +5,7 @@ export default function CommunityLayout() {
   return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+      <Stack.Screen name="rank" />
       <Stack.Screen name="post/[postId]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="challenges" />
       <Stack.Screen name="challenges/[challengeId]" />

@@ -66,7 +66,12 @@ export async function uploadSingleFileToR2(
 }
 
 export async function uploadPostMedia(
-  items: PickedMediaItem[]
+  items: PickedMediaItem[],
+  /** R2 presign category. Defaults to `'posts'` to preserve behavior for
+   *  existing callers (community/create, journal/LogSendModal, etc.).
+   *  New callers can pass a different category — e.g. `'outdoor_routes'`
+   *  for user-submitted route photos — without touching the other sites. */
+  category: string = 'posts'
 ): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
   return Promise.all(
     items.map(async (item) => {
@@ -83,7 +88,7 @@ export async function uploadPostMedia(
 
       const { upload_url, public_url } = await api.post<PresignResponse>(
         '/upload/presign',
-        { category: 'posts', content_type: contentType }
+        { category, content_type: contentType }
       );
 
       const result = await FileSystem.uploadAsync(upload_url, fileUri, {
@@ -103,7 +108,7 @@ export async function uploadPostMedia(
 
 export const communityApi = {
   // === Posts ===
-  getPublicPosts: (skip = 0, limit = 20, sort: 'latest' | 'hot' = 'latest') =>
+  getPublicPosts: (skip = 0, limit = 20, sort: 'recommended' | 'latest' | 'hot' = 'recommended') =>
     api.get<any[]>(`/posts?skip=${skip}&limit=${limit}&sort=${sort}`),
 
   createPost: (data: UserPostCreateIn) =>

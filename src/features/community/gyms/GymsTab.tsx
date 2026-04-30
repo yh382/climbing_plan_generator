@@ -10,6 +10,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { theme } from '@/lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
 import { useFavoriteGyms } from '../../gyms/hooks';
+import { mapHref } from '../../mapscreen/navigation';
 import { gymCommunityApi, GymStats } from '../../gyms/api';
 import GymCommunityTabs from './GymCommunityTabs';
 import GymDropdownPill from '../components/GymDropdownPill';
@@ -87,7 +88,7 @@ export default function GymsTab({ initialGymId }: Props) {
         </Text>
         <TouchableOpacity
           style={styles.findBtn}
-          onPress={() => router.push('/gyms')}
+          onPress={() => router.push(mapHref())}
           activeOpacity={0.8}
         >
           <Text style={styles.findBtnText}>Find a Gym</Text>
@@ -103,7 +104,7 @@ export default function GymsTab({ initialGymId }: Props) {
         <View style={styles.dropdownRow}>
           <GymDropdownPill
             gymName={myGyms[0].name}
-            onPress={() => router.push('/gyms')}
+            onPress={() => router.push(mapHref())}
             weeklyActive={gymStats?.weekly_active}
             totalSends={gymStats?.total_sends}
             gradeFeel={gymStats?.grade_feel ?? undefined}

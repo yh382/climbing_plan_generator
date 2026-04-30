@@ -7,7 +7,6 @@ import { mapRawPost, toFeedPost } from '../features/community/utils';
 import { handleAwardedBadges } from './useBadgeUnlockStore';
 
 type FeedMode = 'all' | 'following';
-type FeedSort = 'latest' | 'hot';
 
 interface CommunityState {
   // Feed
@@ -15,14 +14,12 @@ interface CommunityState {
   feedLoading: boolean;
   feedError: string | null;
   feedMode: FeedMode;
-  feedSort: FeedSort;
 
   // My posts
   myPosts: FeedPost[];
 
   // Actions
   setFeedMode: (mode: FeedMode) => void;
-  setFeedSort: (sort: FeedSort) => void;
   fetchFeed: (refresh?: boolean) => Promise<void>;
   fetchMyPosts: () => Promise<void>;
   createPost: (data: UserPostCreateIn) => Promise<UserPostOut>;
@@ -38,7 +35,6 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   feedLoading: false,
   feedError: null,
   feedMode: 'all' as FeedMode,
-  feedSort: 'hot' as FeedSort,
   myPosts: [],
 
   setFeedMode: (mode) => {
@@ -47,18 +43,11 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     get().fetchFeed(true);
   },
 
-  setFeedSort: (sort) => {
-    if (sort === get().feedSort) return;
-    set({ feedSort: sort });
-    get().fetchFeed(true);
-  },
-
   fetchFeed: async (refresh = false) => {
     if (get().feedLoading && !refresh) return;
     set({ feedLoading: true, feedError: null });
     try {
       const mode = get().feedMode;
-      const sort = get().feedSort;
       let posts: FeedPost[];
 
       if (mode === 'following') {
@@ -67,7 +56,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         const postItems = (res.items ?? []).filter((i: any) => i.type === 'post');
         posts = postItems.map((i: any) => toFeedPost(mapRawPost(i.item)));
       } else {
-        const raw = await communityApi.getPublicPosts(0, 50, sort);
+        const raw = await communityApi.getPublicPosts(0, 50, 'recommended');
         posts = (raw as any[]).map((r) => toFeedPost(mapRawPost(r)));
       }
 
