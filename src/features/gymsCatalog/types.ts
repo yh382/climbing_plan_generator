@@ -80,3 +80,32 @@ export type GymRouteCreatePayload = {
   set_date?: string | null;
   description?: string | null;
 };
+
+// Mirror of outdoor's RouteAscent / RouteRating shapes — same Pydantic
+// schemas on the backend so /gym/routes/{id}/ascents and /gym/routes/{id}/ratings
+// can drop straight into the same FE rendering paths used by outdoor.
+export type GymRouteAscent = {
+  id: string;
+  user_id: string;
+  username: string | null;
+  result: 'send' | 'flash' | 'onsight' | 'attempt';
+  grade_text: string | null;
+  attempts: number | null;
+  date: string;
+  note: string | null;
+};
+
+export type GymRouteRating = {
+  id: string;
+  route_id: string;
+  user_id: string;
+  stars: number;
+  comment: string | null;
+  created_at: string;
+  username: string | null;
+};
+
+export type GymRouteRatingPayload = {
+  stars: number;
+  comment?: string | null;
+};

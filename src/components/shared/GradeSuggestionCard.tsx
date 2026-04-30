@@ -1,14 +1,16 @@
-// src/features/outdoor/components/GradeSuggestionCard.tsx
+// src/components/shared/GradeSuggestionCard.tsx
 // KAYA-style aggregate card: avg stars + majority feel + grade histogram + climbers CTA.
-// Avg stars are taken from a server-computed aggregate when supplied (single
-// source of truth); histogram/feel still derive from the passed-in logs.
+// Shared between outdoor and gym route detail (Window AS) — both pass an
+// SendLog[] derived from their respective /ascents endpoints. Avg stars are
+// taken from a server-computed aggregate when supplied (single source of truth);
+// histogram/feel still derive from the passed-in logs.
 
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeColors } from '../../../lib/useThemeColors';
-import { useSettings } from '../../../contexts/SettingsContext';
-import { theme } from '../../../lib/theme';
+import { useThemeColors } from '../../lib/useThemeColors';
+import { useSettings } from '../../contexts/SettingsContext';
+import { theme } from '../../lib/theme';
 
 export type SendLog = {
   user_id: string;

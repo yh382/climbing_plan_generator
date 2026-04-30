@@ -41,6 +41,7 @@ import {
   toFileUri,
 } from '../../community/api';
 import type { PickedMediaItem } from '../../community/types';
+import { gymsCatalogApi } from '../../gymsCatalog/api';
 import { betaApi } from '../betaApi';
 
 const BETA_CATEGORY = 'route-beta';
@@ -53,11 +54,15 @@ export interface BetaShareSheetHandle {
 
 interface Props {
   routeId: string;
+  /** Discriminator: 'outdoor' (default) → /outdoor/routes/{id}/beta,
+   *  'gym' → /gym/routes/{id}/beta. Same upload pipeline, different
+   *  POST target (route_kind set server-side from the path). */
+  routeKind?: 'outdoor' | 'gym';
   onSuccess?: () => void;
 }
 
 const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
-  ({ routeId, onSuccess }, ref) => {
+  ({ routeId, routeKind = 'outdoor', onSuccess }, ref) => {
     const colors = useThemeColors();
     const { tr } = useSettings();
     const insets = useSafeAreaInsets();
@@ -136,11 +141,16 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
           BETA_CATEGORY,
         );
 
-        await betaApi.createForRoute(routeId, {
+        const body = {
           media_url: mediaUrl,
           thumbnail_url: thumbnailUrl,
           description: comment.trim() || null,
-        });
+        };
+        if (routeKind === 'gym') {
+          await gymsCatalogApi.createBeta(routeId, body);
+        } else {
+          await betaApi.createForRoute(routeId, body);
+        }
 
         sheetRef.current?.dismiss().catch(() => {});
         onSuccess?.();
@@ -151,7 +161,7 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
       } finally {
         setSubmitting(false);
       }
-    }, [comment, onSuccess, routeId, submitting, tr, video]);
+    }, [comment, onSuccess, routeId, routeKind, submitting, tr, video]);
 
     return (
       <TrueSheet

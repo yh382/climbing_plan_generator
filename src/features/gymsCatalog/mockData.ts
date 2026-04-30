@@ -5,7 +5,15 @@
 // Generator is procedural so changing wall/grade distribution is one
 // config edit, not a 60-line patch.
 
-import type { Gym, GymRoute, GymRouteStatus, WallSection } from './types';
+import type { BetaOut } from '../outdoor/betaApi';
+import type {
+  Gym,
+  GymRoute,
+  GymRouteAscent,
+  GymRouteRating,
+  GymRouteStatus,
+  WallSection,
+} from './types';
 
 export const MOCK_GYM_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -205,3 +213,86 @@ export const mockGymRoutes: GymRoute[] = [
   ...makeActiveRoutes(),
   ...makeArchivedRoutes(),
 ];
+
+// ── Window AS mock helpers — ascents / ratings / betas ────────────
+//
+// Procedural so the same routeId always produces the same lists across
+// hot reloads. We don't seed every route; only routes with rating_count
+// or send_count > 0 get populated entries (matching how a fresh gym
+// would look the day after a setting cycle).
+
+const MOCK_USERS = ['alice', 'bryan', 'cleo', 'diego', 'emi'] as const;
+const MOCK_FEELS: Array<'soft' | 'solid' | 'hard'> = ['soft', 'solid', 'hard'];
+
+function pseudoSeed(routeId: string): number {
+  // Hash the routeId to a stable integer so each route gets its own
+  // reproducible distribution of ascents/ratings.
+  let h = 0;
+  for (let i = 0; i < routeId.length; i++) {
+    h = (h * 31 + routeId.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+export function mockGymAscents(routeId: string): GymRouteAscent[] {
+  const route = mockGymRoutes.find((r) => r.id === routeId);
+  if (!route) return [];
+  const seed = pseudoSeed(routeId);
+  const count = Math.min(route.send_count, 8);
+  const out: GymRouteAscent[] = [];
+  for (let i = 0; i < count; i++) {
+    const isSend = i % 4 !== 3;
+    const username = MOCK_USERS[(seed + i) % MOCK_USERS.length];
+    out.push({
+      id: `mock-asc-${routeId}-${i}`,
+      user_id: `mock-user-${i}`,
+      username,
+      result: isSend
+        ? i === 0
+          ? 'flash'
+          : 'send'
+        : 'attempt',
+      grade_text: route.grade_text,
+      attempts: rand(seed + i, 1, 4),
+      date: isoDateMinusDays(rand(seed + i + 31, 0, 28)),
+      note: i % 3 === 0 ? 'fun line' : null,
+    });
+  }
+  return out;
+}
+
+export function mockGymRatings(routeId: string): GymRouteRating[] {
+  const route = mockGymRoutes.find((r) => r.id === routeId);
+  if (!route || !route.rating_count) return [];
+  const seed = pseudoSeed(routeId);
+  const count = Math.min(route.rating_count, 5);
+  const out: GymRouteRating[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push({
+      id: `mock-rating-${routeId}-${i}`,
+      route_id: routeId,
+      user_id: `mock-user-${i}`,
+      stars: 3 + ((seed + i) % 3),
+      comment:
+        i % 2 === 0
+          ? `${MOCK_FEELS[(seed + i) % 3]} for the grade — fun moves`
+          : null,
+      created_at: isoDatetimeMinusDays(rand(seed + i + 17, 0, 21)),
+      username: MOCK_USERS[(seed + i) % MOCK_USERS.length],
+    });
+  }
+  return out;
+}
+
+export function mockGymBetas(
+  routeId: string,
+  _params: { limit?: number; offset?: number } = {},
+): BetaOut[] {
+  // Mock has no real video URLs — return empty so the UI shows the
+  // empty state. Switching this on after we ship a sample R2 video
+  // would be a one-line edit (build a few BetaOut rows pointing at
+  // a hosted MP4).
+  void _params;
+  void routeId;
+  return [];
+}

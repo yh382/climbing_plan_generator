@@ -20,7 +20,7 @@ import { theme } from '../../src/lib/theme';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
-import GradeSuggestionCard, { type SendLog } from '../../src/features/outdoor/components/GradeSuggestionCard';
+import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
@@ -458,7 +458,7 @@ export default function OutdoorRouteDetailPage() {
               <Text style={styles.primaryBtnText}>{tr('完成', 'Send')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.secondaryBtn, { backgroundColor: colors.cardDark }]}
+              style={[styles.secondaryBtn, { backgroundColor: colors.pillBackground }]}
               onPress={handleAttempt}
               activeOpacity={0.85}
             >
@@ -476,7 +476,7 @@ export default function OutdoorRouteDetailPage() {
                 BetaShareSheet (description + submit). Separate from the
                 Send-integrated path which attaches a beta to a send log. */}
             <TouchableOpacity
-              style={[styles.cameraBtn, { backgroundColor: colors.cardDark }]}
+              style={[styles.cameraBtn, { backgroundColor: colors.pillBackground }]}
               onPress={handleDirectShareBeta}
               activeOpacity={0.85}
               hitSlop={6}
