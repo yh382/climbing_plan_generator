@@ -48,7 +48,7 @@ const STYLE_OPTIONS = ["Redpoint", "Onsight", "Flash"];
 const STYLE_KEYS: SendStyle[] = ["redpoint", "onsight", "flash"];
 
 function toLogMedia(item: PickedMediaItem): LogMedia {
-  return { id: item.id, type: item.mediaType, uri: item.uri };
+  return { id: item.id, type: item.mediaType, uri: item.uri, coverUri: item.coverUri };
 }
 
 export default function LogSendModal({ visible, title, onClose, onDone, tr }: Props) {
@@ -148,9 +148,30 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
             uploaded.push(m);
           } else {
             try {
-              const contentType = m.type === "video" ? "video/mp4" : "image/jpeg";
-              const result = await uploadLogMedia(m.uri, contentType, (p) => setUploadProgress(p));
-              uploaded.push({ ...m, uri: result.public_url });
+              if (m.type === "video") {
+                // Upload video (80% of progress)
+                const result = await uploadLogMedia(m.uri, "video/mp4", (p) => setUploadProgress(p * 0.8));
+                // Upload or generate thumbnail (remaining 20%)
+                let coverUrl = m.coverUri;
+                if (coverUrl && !coverUrl.startsWith("http")) {
+                  try {
+                    const thumbResult = await uploadLogMedia(coverUrl, "image/jpeg", (p) => setUploadProgress(80 + p * 0.2));
+                    coverUrl = thumbResult.public_url;
+                  } catch { /* keep local coverUri as fallback */ }
+                } else if (!coverUrl) {
+                  try {
+                    const VT = await import("expo-video-thumbnails");
+                    const { uri: thumbUri } = await VT.getThumbnailAsync(m.uri, { time: 1000, quality: 0.7 });
+                    const thumbResult = await uploadLogMedia(thumbUri, "image/jpeg", (p) => setUploadProgress(80 + p * 0.2));
+                    coverUrl = thumbResult.public_url;
+                  } catch { /* no thumbnail available */ }
+                }
+                uploaded.push({ ...m, uri: result.public_url, coverUri: coverUrl });
+              } else {
+                // Image upload
+                const result = await uploadLogMedia(m.uri, "image/jpeg", (p) => setUploadProgress(p));
+                uploaded.push({ ...m, uri: result.public_url });
+              }
             } catch (err: any) {
               console.warn("[LOG_MEDIA] Upload failed, keeping local URI:", err?.message || err);
               uploaded.push(m); // fallback: save with local URI

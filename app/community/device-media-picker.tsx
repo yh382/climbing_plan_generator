@@ -271,11 +271,11 @@ export default function DeviceMediaPickerScreen() {
   // --- Next handler ---
   const handleNext = useCallback(async () => {
     // For non-initial mode (route-detail / edit-log-media): if a video is selected,
-    // navigate to cover-picker so user can choose a cover frame
+    // navigate to video-trimmer → cover-picker so user can trim and choose a cover frame
     if (!isInitial && selectedItems.length === 1 && selectedItems[0].mediaType === "video") {
       const v = selectedItems[0];
       router.replace({
-        pathname: "/community/cover-picker",
+        pathname: "/community/video-trimmer" as any,
         params: {
           videoUri: v.uri,
           duration: String(v.duration || 0),
