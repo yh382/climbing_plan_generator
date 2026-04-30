@@ -30,7 +30,7 @@ interface CalendarDayRingProps {
 function CalendarDayRing({
   dayLabel,
   durationMin,
-  durationGoal = 120,
+  durationGoal = 60,
   sendCount,
   sendGoal = 10,
   planProgress,
@@ -42,12 +42,27 @@ function CalendarDayRing({
   const colors = useThemeColors();
   const isDark = colors.background === "#000000";
 
-  const outerRatio = Math.min(durationMin / durationGoal, 1);
-  const innerRatio = Math.min(sendCount / sendGoal, 1);
+  // Apple Fitness-style stacking: when value exceeds goal, show layered rings
+  const outerRaw = durationMin / durationGoal;
+  const outerFullLoops = Math.floor(outerRaw);
+  const outerRemainder = outerRaw - outerFullLoops;
+  const outerRatio = outerFullLoops > 0
+    ? (outerRemainder === 0 && durationMin > 0 ? 1 : outerRemainder)
+    : Math.min(outerRaw, 1);
+  const outerStacked = outerFullLoops > 0;
+
+  const innerRaw = sendCount / sendGoal;
+  const innerFullLoops = Math.floor(innerRaw);
+  const innerRemainder = innerRaw - innerFullLoops;
+  const innerRatio = innerFullLoops > 0
+    ? (innerRemainder === 0 && sendCount > 0 ? 1 : innerRemainder)
+    : Math.min(innerRaw, 1);
+  const innerStacked = innerFullLoops > 0;
+
   const outerDash = C_OUTER * outerRatio;
   const innerDash = C_INNER * innerRatio;
-  const hasOuter = outerRatio > 0;
-  const hasInner = innerRatio > 0;
+  const hasOuter = durationMin > 0;
+  const hasInner = sendCount > 0;
 
   // Center dot: none / accent (in progress) / brown (complete)
   const dotColor =
@@ -102,13 +117,14 @@ function CalendarDayRing({
       <View style={styles.ringWrap}>
         <Svg width={SIZE} height={SIZE}>
           <G rotation={-90} originX={SIZE / 2} originY={SIZE / 2}>
-            {/* Outer ring track */}
+            {/* Outer ring track — stacked color when loops > 0 */}
             {hasOuter && (
               <Circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_OUTER}
-                stroke={ringTrackColor}
+                stroke={outerStacked ? "#A08060" : ringTrackColor}
+                strokeOpacity={outerStacked ? 0.3 : 1}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
@@ -126,13 +142,14 @@ function CalendarDayRing({
                 strokeLinecap="round"
               />
             )}
-            {/* Inner ring track */}
+            {/* Inner ring track — stacked color when loops > 0 */}
             {hasInner && (
               <Circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
                 r={R_INNER}
-                stroke={ringTrackColor}
+                stroke={innerStacked ? innerRingColor : ringTrackColor}
+                strokeOpacity={innerStacked ? 0.3 : 1}
                 strokeWidth={THICKNESS}
                 fill="none"
               />
@@ -186,8 +203,8 @@ const styles = StyleSheet.create({
   cell: {
     width: "14%",
     alignItems: "center",
-    marginBottom: 4,
-    paddingVertical: 2,
+    marginBottom: 1,
+    paddingVertical: 0,
     borderRadius: 8,
   },
   ringWrap: {

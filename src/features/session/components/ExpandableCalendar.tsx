@@ -16,6 +16,8 @@ import {
   format,
   startOfWeek,
   startOfMonth,
+  endOfMonth,
+  differenceInCalendarWeeks,
   addDays,
   addMonths,
   subMonths,
@@ -41,6 +43,8 @@ interface ExpandableCalendarProps {
   onCollapse?: () => void;
   /** The date string (yyyy-MM-dd) actively selected by the parent, or null for month view */
   activeDate?: string | null;
+  /** When true, the calendar is always in month view with no expand/collapse toggle. */
+  alwaysExpanded?: boolean;
 }
 
 /** Parse duration string like "2h 30m" or "45m" to minutes */
@@ -57,11 +61,13 @@ export default function ExpandableCalendar({
   onDateSelect,
   onCollapse,
   activeDate,
+  alwaysExpanded = false,
 }: ExpandableCalendarProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [expanded, setExpanded] = useState(false);
+  const [expandedState, setExpanded] = useState(alwaysExpanded);
+  const expanded = alwaysExpanded || expandedState;
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMonth, setViewMonth] = useState(new Date());
 
@@ -128,19 +134,24 @@ export default function ExpandableCalendar({
     []
   );
 
-  // Compute days array
+  // Compute days array — only the weeks that actually contain the current
+  // month so we never render an entirely-next-month bottom row. Leading/
+  // trailing cells from adjacent months are rendered as empty spacers.
   const days = useMemo(() => {
     if (expanded) {
       const monthStart = startOfMonth(viewMonth);
+      const monthEnd = endOfMonth(viewMonth);
       const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-      return Array.from({ length: 42 }).map((_, i) => addDays(calStart, i));
+      const weeks =
+        differenceInCalendarWeeks(monthEnd, monthStart, { weekStartsOn: 1 }) + 1;
+      return Array.from({ length: weeks * 7 }).map((_, i) => addDays(calStart, i));
     }
     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
     return Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
   }, [expanded, viewMonth, selectedDate]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, alwaysExpanded && styles.containerTight]}>
       <View style={styles.grid}>
         {/* Month navigation header (expanded only) */}
         {expanded && (
@@ -175,12 +186,20 @@ export default function ExpandableCalendar({
         {/* Date cells */}
         <View style={styles.datesContainer}>
           {days.map((date, i) => {
-            const dateStr = toDateString(date);
-            const planProgress = monthMap[dateStr] || 0;
-            const stats = dayStats[dateStr];
             const isCurrentMonth = expanded
               ? isSameMonth(date, viewMonth)
               : true;
+
+            // Expanded mode: drop any cell from the previous/next month so
+            // users only see the current month's numerals. A blank spacer
+            // keeps the 7-column grid intact.
+            if (expanded && !isCurrentMonth) {
+              return <View key={i} style={styles.emptyCell} />;
+            }
+
+            const dateStr = toDateString(date);
+            const planProgress = monthMap[dateStr] || 0;
+            const stats = dayStats[dateStr];
 
             return (
               <CalendarDayRing
@@ -199,16 +218,18 @@ export default function ExpandableCalendar({
         </View>
       </View>
 
-      {/* Footer with expand toggle */}
-      <View style={styles.footer}>
-        <TouchableOpacity onPress={toggleExpand} style={styles.expandBtn}>
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={20}
-            color={colors.textTertiary}
-          />
-        </TouchableOpacity>
-      </View>
+      {/* Footer with expand toggle (hidden in alwaysExpanded mode) */}
+      {!alwaysExpanded && (
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={toggleExpand} style={styles.expandBtn}>
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color={colors.textTertiary}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -219,6 +240,15 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     margin: theme.spacing.screenPadding,
     borderRadius: theme.borderRadius.card,
     padding: theme.spacing.cardPadding,
+  },
+  /** Tighter margin when the calendar is a persistent month-view block
+   *  under a collapsible large title (Activity tab's Sessions / Training).
+   *  Horizontal margin matches iOS native large-title leading (16pt) so
+   *  the card aligns with the title and subtitle above. */
+  containerTight: {
+    marginTop: 2,
+    marginBottom: 8,
+    marginHorizontal: 16,
   },
   grid: { gap: 8 },
   monthNav: {
@@ -247,6 +277,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: "600",
   },
   datesContainer: { flexDirection: "row", flexWrap: "wrap" },
+  /** Empty grid cell matching CalendarDayRing width so leading/trailing
+   *  out-of-month days stay invisible without breaking the 7-column layout. */
+  emptyCell: { width: "14%" },
   footer: {
     flexDirection: "row",
     alignItems: "center",
