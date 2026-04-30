@@ -29,10 +29,9 @@ import BadgeUnlockToast from "../src/components/ui/BadgeUnlockToast";
 import { useAuthStore } from "../src/store/useAuthStore";
 import useLogsStore from "../src/store/useLogsStore";
 import { runMigrationsIfNeeded } from "../src/features/journal/loglist/storage";
-import { recoverOrphanedSessions } from "../src/features/journal/sync/localBackup";
+import { recoverOrphanedSessions, readBackupSnapshot } from "../src/features/journal/sync/localBackup";
 import { registerForPushNotifications } from "../src/lib/pushNotifications";
-import { SidebarProvider } from "../src/contexts/SidebarContext";
-import { SidebarLayout, useGestureLock } from "@/components/sidebar/Sidebar";
+import { handlePushTap, handleColdStartPushTap } from "../src/lib/pushTapHandler";
 import { syncWidgetFromStore } from "@/lib/widgetBridge";
 import { endAllLiveActivities } from "../src/lib/liveActivityBridge";
 
@@ -52,9 +51,9 @@ SplashScreen.preventAutoHideAsync();
 
 function FloatingTimerOverlay() {
   const segments = useSegments();
-  const isInTabs = segments[0] === "(tabs)";
-  if (!isInTabs) return null;
-  const currentRoute = segments[1] ?? "";
+  const tabsIdx = segments.indexOf("(tabs)" as never);
+  if (tabsIdx === -1) return null;
+  const currentRoute = (segments[tabsIdx + 1] as string) ?? "";
   return (
     <FloatingActiveSessionTimer
       currentRouteName={currentRoute}
@@ -66,11 +65,20 @@ function FloatingTimerOverlay() {
 }
 
 function RootStack() {
-  const gestureEnabled = useGestureLock();
-
+  const scheme = useColorScheme();
+  const drawerBg = scheme === "dark" ? "#1A1F17" : "#F7F8F5";
   return (
-    <Stack screenOptions={{ headerShown: false, gestureEnabled }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen
+        name="(drawer)"
+        options={{
+          headerShown: false,
+          // Match drawer bg so the rounded-corner cutout behind Home Stack
+          // blends seamlessly with the drawer when open. Otherwise
+          // react-navigation's default colors.background (#F2F2F2) shows.
+          contentStyle: { backgroundColor: drawerBg },
+        }}
+      />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="library" options={{ headerShown: false }} />
       <Stack.Screen name="training" options={{ headerShown: false }} />
@@ -86,11 +94,13 @@ function RootStack() {
       <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
+      <Stack.Screen name="map" options={{ headerShown: false }} />
       <Stack.Screen name="analysis" options={{ ...NATIVE_HEADER_LARGE, headerShown: true }} />
       <Stack.Screen name="action" options={{ headerShown: false }} />
       <Stack.Screen name="change-password" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
       <Stack.Screen name="settings" options={{ headerShown: false }} />
       <Stack.Screen name="gym-community" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
+      <Stack.Screen name="inbox" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -123,35 +133,60 @@ export default function RootLayout() {
       try {
         await Promise.all([hydrate(), runMigrationsIfNeeded()]);
 
-        // Crash recovery: recover orphaned sessions from backup
-        try {
-          const recovery = await recoverOrphanedSessions();
-          const state = useLogsStore.getState();
+        // Wait for useLogsStore hydration so activeSession is reliable.
+        if (!useLogsStore.getState()._hydrated) {
+          await new Promise<void>((resolve) => {
+            const unsub = useLogsStore.subscribe((s) => {
+              if (s._hydrated) { unsub(); resolve(); }
+            });
+            // Safety timeout: if hydration never fires within 5s, proceed anyway
+            setTimeout(() => { unsub(); resolve(); }, 5000);
+          });
+        }
 
-          if (recovery.sessions.length > 0) {
-            // Dedup: skip if session already exists
-            const existingKeys = new Set(state.sessions.map((s) => s.sessionKey));
-            const newSessions = recovery.sessions.filter(
-              (s) => !existingKeys.has(s.sessionKey)
-            );
-            if (newSessions.length > 0) {
-              const keptLogs = state.logs.filter(
-                (l) => !recovery.affectedDates.includes(l.date)
+        // Crash recovery: recover orphaned sessions from backup.
+        // KEY: If activeSession is still alive and matches the backup,
+        // this is NOT a crash — it's a normal app restart mid-session
+        // (e.g. iOS killed the app in background). Skip recovery to
+        // preserve the active session and its Live Activity.
+        try {
+          const backup = await readBackupSnapshot();
+          const state = useLogsStore.getState();
+          const activeKey = state.activeSession
+            ? String(state.activeSession.startTime)
+            : null;
+
+          if (backup && activeKey === backup.sessionKey) {
+            // Session is still active — do NOT recover or end anything.
+            if (__DEV__) console.log("[recovery] active session matches backup, skipping recovery");
+          } else {
+            const recovery = await recoverOrphanedSessions();
+
+            if (recovery.sessions.length > 0) {
+              const freshState = useLogsStore.getState();
+              const existingKeys = new Set(freshState.sessions.map((s) => s.sessionKey));
+              const newSessions = recovery.sessions.filter(
+                (s) => !existingKeys.has(s.sessionKey)
               );
-              useLogsStore.setState({
-                sessions: [...newSessions, ...state.sessions],
-                logs: [...keptLogs, ...recovery.logEntries],
-                activeSession: null,
-              });
+              if (newSessions.length > 0) {
+                const keptLogs = freshState.logs.filter(
+                  (l) => !recovery.affectedDates.includes(l.date)
+                );
+                useLogsStore.setState({
+                  sessions: [...newSessions, ...freshState.sessions],
+                  logs: [...keptLogs, ...recovery.logEntries],
+                  activeSession: null,
+                });
+              } else if (freshState.activeSession) {
+                useLogsStore.setState({ activeSession: null });
+              }
             } else if (state.activeSession) {
-              useLogsStore.setState({ activeSession: null });
-            }
-          } else if (state.activeSession) {
-            // No backup but stale activeSession → try to auto-end
-            try {
-              await useLogsStore.getState().endSession();
-            } catch {
-              useLogsStore.setState({ activeSession: null });
+              // No backup but stale activeSession → try to auto-end
+              try {
+                await useLogsStore.getState().endSession();
+              } catch {
+                useLogsStore.setState({ activeSession: null });
+              }
             }
           }
         } catch (e) {
@@ -160,9 +195,7 @@ export default function RootLayout() {
 
         // Live Activity reconciliation: if JS thinks no session is active,
         // dismiss any orphan Live Activities left over from JS bundle reloads,
-        // crashes, or force-quits where end() never fired. See:
-        // - src/lib/liveActivityBridge.ts (no in-memory _hasActive flag)
-        // - modules/climmate-live-activity/ios/ClimmateLiveActivityModule.swift `endAll`
+        // crashes, or force-quits where end() never fired.
         if (Platform.OS === "ios" && !useLogsStore.getState().activeSession) {
           await endAllLiveActivities();
         }
@@ -185,13 +218,23 @@ export default function RootLayout() {
     if (!appIsReady || isHydrating) return;
 
     if (accessToken) {
-      router.replace("/(tabs)" as any);
+      router.replace("/(drawer)/(tabs)" as any);
       // Register for push notifications after login (skip on simulator)
       registerForPushNotifications().catch(() => {});
+      // Cold-start: if the app was launched by tapping a push banner, route there once.
+      handleColdStartPushTap();
     } else {
       router.replace("/(auth)/login");
     }
   }, [appIsReady, isHydrating, accessToken, router]);
+
+  // Tap handler for push notifications while app is foreground/background.
+  // Registered once at root — module-level `router` in handler means it works
+  // regardless of current screen.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(handlePushTap);
+    return () => sub.remove();
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
@@ -208,29 +251,25 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <SettingsProvider>
-          <SidebarProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              {/* 状态栏透明沉浸式，style auto 跟随系统深色模式 */}
-              <StatusBar style="auto" translucent backgroundColor="transparent" />
-              <SidebarLayout>
-                <View style={{ flex: 1 }}>
-                  <RootStack />
-                  <FloatingTimerOverlay />
-                  <BadgeUnlockToast />
-                </View>
-              </SidebarLayout>
-            </ThemeProvider>
-              {/* 猩猩遮罩层：动画没播完前覆盖在最上层 */}
-              {!splashAnimationFinished && (
-                <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
-                  <GorillaSplash
-                    onAnimationFinish={() => {
-                      setSplashAnimationFinished(true);
-                    }}
-                  />
-                </View>
-              )}
-          </SidebarProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            {/* 状态栏透明沉浸式，style auto 跟随系统深色模式 */}
+            <StatusBar style="auto" translucent backgroundColor="transparent" />
+            <View style={{ flex: 1 }}>
+              <RootStack />
+              <FloatingTimerOverlay />
+              <BadgeUnlockToast />
+            </View>
+          </ThemeProvider>
+          {/* 猩猩遮罩层：动画没播完前覆盖在最上层 */}
+          {!splashAnimationFinished && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
+              <GorillaSplash
+                onAnimationFinish={() => {
+                  setSplashAnimationFinished(true);
+                }}
+              />
+            </View>
+          )}
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

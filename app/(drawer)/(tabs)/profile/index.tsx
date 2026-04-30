@@ -10,19 +10,20 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 // Native tab bar height constant (UITabBarController default)
 const NATIVE_TAB_BAR_HEIGHT = 49;
-import { api } from "../../../src/lib/apiClient";
+import { api } from "../../../../src/lib/apiClient";
 
-import PostsSection from "../../../src/features/profile/components/fivecorefunction/PostsSection";
-import BadgesSection from "../../../src/features/profile/components/fivecorefunction/BadgesSection";
-import StatsSection from "../../../src/features/profile/components/StatsSection";
+import PostsSection from "../../../../src/features/profile/components/fivecorefunction/PostsSection";
+import BadgesSection from "../../../../src/features/profile/components/fivecorefunction/BadgesSection";
+import StatsSection from "../../../../src/features/profile/components/StatsSection";
+import ListsSection from "../../../../src/features/outdoor/components/ListsSection";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
-import useLogsStore from "../../../src/store/useLogsStore";
-import { calculateKPIs } from "../../../src/services/stats";
+import useLogsStore from "../../../../src/store/useLogsStore";
+import { calculateKPIs } from "../../../../src/services/stats";
 
-import ProfileHeader from "../../../src/components/shared/ProfileHeader";
-import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
+import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
+import ProfileTabBar from "../../../../src/components/shared/ProfileTabBar";
 
-const TABS = ["posts", "stats", "badges"] as const;
+const TABS = ["posts", "stats", "badges", "lists"] as const;
 
 type Units = "imperial" | "metric";
 type FollowCounts = { followers: number; following: number };
@@ -144,12 +145,14 @@ export default function ProfileScreen() {
   // --------------------- log stats from store ---------------------
   const { logs, sessions: logSessions, syncFromBackend, isSyncing } = useLogsStore();
 
-  // Sync sessions/logs from backend on focus (throttled 30s, same as Calendar)
+  // Sync sessions/logs from backend on focus (throttled 2 min to cap DB load —
+  // full-sync is heavy; pull-to-refresh elsewhere triggers an immediate sync
+  // when the user explicitly wants fresh data).
   const lastSyncRef = useRef(0);
   useFocusEffect(
     useCallback(() => {
       const now = Date.now();
-      if (!isSyncing && now - lastSyncRef.current > 30_000) {
+      if (!isSyncing && now - lastSyncRef.current > 120_000) {
         lastSyncRef.current = now;
         syncFromBackend();
       }
@@ -232,7 +235,11 @@ export default function ProfileScreen() {
 
   // React to navigation params
   useEffect(() => {
-    if (params.initialTab === "stats" || params.initialTab === "badges") {
+    if (
+      params.initialTab === "stats" ||
+      params.initialTab === "badges" ||
+      params.initialTab === "lists"
+    ) {
       setActiveTab(params.initialTab);
       const idx = TABS.indexOf(params.initialTab);
       pagerRef.current?.setPage(idx);
@@ -358,6 +365,11 @@ export default function ProfileScreen() {
           <View key="badges" style={styles.contentArea}>
             <View onLayout={handlePageLayout(2)}>
               <BadgesSection styles={styles} />
+            </View>
+          </View>
+          <View key="lists" style={styles.contentArea}>
+            <View onLayout={handlePageLayout(3)} style={{ minHeight: screenHeight * 0.6 }}>
+              <ListsSection userId={viewedUserId} showCreate={isOwnProfile} contentPaddingHorizontal={16} inScrollView />
             </View>
           </View>
         </PagerView>

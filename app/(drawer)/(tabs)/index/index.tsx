@@ -1,27 +1,32 @@
-// app/(tabs)/index/index.tsx
+// app/(drawer)/(tabs)/index/index.tsx
 
 import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
-import { useSidebar } from "@/contexts/SidebarContext";
 import { challengeApi } from "@/features/community/challenges/api";
 import type { ChallengeOut } from "@/features/community/challenges/types";
 import { getChallengeStatus } from "@/features/community/challenges/types";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
+import { useDrawerStatus } from "@react-navigation/drawer";
 import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { useAuthStore } from "@/store/useAuthStore";
 import { HomeBlogBannerCarousel, type HomeBlogBannerItem } from "@/features/home/components/HomeBlogBannerCarousel";
 import { MOCK_BLOGS } from "@/features/home/blog/component/mockBlogs";
 import useLogsStore from "@/store/useLogsStore";
-import { getGradeScore } from "../../../src/services/stats/gradeAnalyzer";
+import { getGradeScore } from "../../../../src/services/stats/gradeAnalyzer";
 import { gradeToScore, scoreToGrade } from "@/lib/gradeSystem";
 import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
+import { outdoorApi } from "@/features/outdoor/api";
+import type { Area } from "@/features/outdoor/types";
+import AreaCard from "@/features/outdoor/components/AreaCard";
+import { mapHref, areaMapHref } from "@/features/mapscreen/navigation";
 
 // Derive banner data from blog source (auto-updates when blogs change)
 const BLOG_BANNERS: HomeBlogBannerItem[] = MOCK_BLOGS.slice(0, 3).map((blog) => ({
@@ -132,7 +137,7 @@ function ThisMonthSnapshot() {
       </View>
       <TouchableOpacity
         style={s.snapshotLink}
-        onPress={() => router.push("/calendar")}
+        onPress={() => router.push("/(drawer)/(tabs)/activity" as any)}
         hitSlop={8}
       >
         <Text style={s.snapshotLinkText}>This month →</Text>
@@ -149,7 +154,7 @@ function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
 
   return (
     <View style={{ marginBottom: theme.spacing.sectionGap }}>
-      <View style={[s.sectionHeaderRow, { paddingHorizontal: theme.spacing.screenPadding }]}>
+      <View style={[s.sectionHeaderRow, { paddingHorizontal: 16 }]}>
         <Text style={s.sectionTitle}>Challenges</Text>
         <TouchableOpacity onPress={() => router.push("/community/challenges")} hitSlop={8}>
           <Text style={s.ctaText}>View All →</Text>
@@ -159,7 +164,7 @@ function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: theme.spacing.screenPadding, gap: theme.spacing.cardGap }}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: theme.spacing.cardGap }}
         >
           {challenges.map((challenge) => (
             <TouchableOpacity
@@ -192,7 +197,7 @@ function ChallengesSection({ challenges }: { challenges: ChallengeOut[] }) {
           ))}
         </ScrollView>
       ) : (
-        <Text style={{ paddingHorizontal: theme.spacing.screenPadding, color: colors.textTertiary, fontSize: 13 }}>
+        <Text style={{ paddingHorizontal: 16, color: colors.textTertiary, fontSize: 13 }}>
           No active challenges
         </Text>
       )}
@@ -209,8 +214,10 @@ export default function HomeScreen() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
 
   const [featuredChallenges, setFeaturedChallenges] = useState<ChallengeOut[]>([]);
+  const [outdoorAreas, setOutdoorAreas] = useState<Area[]>([]);
 
-  const { toggleSidebar } = useSidebar();
+  const { tr } = useSettings();
+  const drawerStatus = useDrawerStatus();
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -218,8 +225,10 @@ export default function HomeScreen() {
       ...withHeaderTheme(colors),
       headerShown: true,
       title: "Hi, Climber",
+      // Test: system font for large title (rule out DM Sans Black glyph bearing)
+      headerLargeTitleStyle: { color: colors.textPrimary },
     });
-  }, [navigation, colors]);
+  }, [navigation, colors, drawerStatus]);
 
   useEffect(() => {
     bootstrap();
@@ -230,15 +239,21 @@ export default function HomeScreen() {
         setFeaturedChallenges(active);
       })
       .catch(() => {});
+    outdoorApi.listAreas().then((data) => {
+      if (data) setOutdoorAreas(data);
+    }).catch(() => {});
   }, []);
 
   return (
     <>
       <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button icon="line.3.horizontal" onPress={toggleSidebar} />
+        <Stack.Toolbar.Button
+          icon="line.3.horizontal"
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+        />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button icon="map" onPress={() => router.push("/gyms")} />
+        <Stack.Toolbar.Button icon="map" onPress={() => router.push(mapHref())} />
         <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search" as any)} />
       </Stack.Toolbar>
       <ScrollView
@@ -254,6 +269,27 @@ export default function HomeScreen() {
       {/* Subtitle (below native large title) */}
       <Text style={s.subtitleText}>Ready to send today?</Text>
 
+      {/* Dev-only: jump straight to the indoor mock gym for AR
+          screen smoke-testing. Hidden in production builds. */}
+      {__DEV__ ? (
+        <TouchableOpacity
+          style={{
+            marginHorizontal: 16,
+            marginBottom: 12,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+            backgroundColor: colors.cardDark,
+          }}
+          onPress={() => router.push('/gym/00000000-0000-0000-0000-000000000001' as any)}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#FFF', fontFamily: theme.fonts.medium, fontSize: 14 }}>
+            🧗 Open Mock Gym (DEV)
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Setup Climmate */}
         <SetupClimmateCard />
 
@@ -262,7 +298,7 @@ export default function HomeScreen() {
 
         {/* Blog — Banner Carousel */}
         <View style={{ marginBottom: theme.spacing.sectionGap }}>
-          <View style={[s.sectionHeaderRow, { paddingHorizontal: theme.spacing.screenPadding, marginBottom: 12 }]}>
+          <View style={[s.sectionHeaderRow, { paddingHorizontal: 16, marginBottom: 12 }]}>
             <Text style={s.sectionTitle}>Blog</Text>
           </View>
         </View>
@@ -278,6 +314,28 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* Outdoor Climbing */}
+        {outdoorAreas.length > 0 && (
+          <View style={{ marginBottom: theme.spacing.sectionGap }}>
+            <View style={[s.sectionHeaderRow, { paddingHorizontal: 16, marginBottom: 12 }]}>
+              <Text style={s.sectionTitle}>{tr('户外攀岩', 'Outdoor Climbing')}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+            >
+              {outdoorAreas.map((area) => (
+                <AreaCard
+                  key={area.id}
+                  area={area}
+                  onPress={() => router.push(areaMapHref(area.id, area.name))}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Challenges — dark skewed cards */}
       <ChallengesSection challenges={featuredChallenges} />
     </ScrollView>
@@ -291,13 +349,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 14,
     fontFamily: theme.fonts.regular,
     color: colors.textSecondary,
-    paddingHorizontal: theme.spacing.screenPadding,
+    paddingHorizontal: 16,
     marginBottom: theme.spacing.sectionGap,
   },
 
   // This Week Snapshot
   snapshotSection: {
-    paddingHorizontal: theme.spacing.screenPadding,
+    paddingHorizontal: 16,
     marginBottom: theme.spacing.sectionGap,
   },
   snapshotRow: {

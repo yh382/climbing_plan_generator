@@ -1,4 +1,4 @@
-// app/(tabs)/_layout.tsx
+// app/(drawer)/(tabs)/_layout.tsx
 
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useUserStore } from "../../src/store/useUserStore";
+import { useUserStore } from "../../../src/store/useUserStore";
 import { setOnAuthExpired } from "@/lib/authEvents";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -36,7 +36,7 @@ export default function TabsLayout() {
   return (
     <NativeTabs tintColor="#306E6F" minimizeBehavior="never">
       {/* 1. Home */}
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="index" contentStyle={{ backgroundColor: "transparent" }}>
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
         ) : (
@@ -48,8 +48,8 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
-      {/* 2. Calendar */}
-      <NativeTabs.Trigger name="calendar">
+      {/* 2. Activity */}
+      <NativeTabs.Trigger name="activity" contentStyle={{ backgroundColor: "transparent" }}>
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf="calendar" />
         ) : (
@@ -58,7 +58,7 @@ export default function TabsLayout() {
             selected: <NativeTabs.Trigger.VectorIcon family={MaterialCommunityIcons} name="calendar" />,
           }} />
         )}
-        <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       {/* 3. Community */}
@@ -89,7 +89,7 @@ export default function TabsLayout() {
 
       {/* 5. Climmate — separated (role="search" triggers iOS 26 floating pill) */}
       <NativeTabs.Trigger name="climmate" role="search">
-        <NativeTabs.Trigger.Icon src={require("../../assets/images/tab_climmate.png")} renderingMode="template" />
+        <NativeTabs.Trigger.Icon src={require("../../../assets/images/tab_climmate.png")} renderingMode="template" />
         <NativeTabs.Trigger.Label>Climmate</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>

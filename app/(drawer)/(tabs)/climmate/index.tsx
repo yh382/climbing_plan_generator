@@ -5,7 +5,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Stack } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { NativeTextView } from "../../../modules/native-input/src";
+import { NativeTextView } from "../../../../modules/native-input/src";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { withHeaderTheme } from "@/lib/nativeHeaderOptions";

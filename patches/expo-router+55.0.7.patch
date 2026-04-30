@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
+index 14822ae..38a2505 100644
+--- a/node_modules/expo-router/build/native-tabs/NativeTabsView.js
++++ b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
+@@ -153,6 +153,6 @@ function TabsHostWrapper(props) {
+         console.warn(`Unsupported labelVisibilityMode: ${tabBarItemLabelVisibilityMode}. Supported values are: ${types_1.SUPPORTED_TAB_BAR_ITEM_LABEL_VISIBILITY_MODES.map((mode) => `"${mode}"`).join(', ')}`);
+         tabBarItemLabelVisibilityMode = undefined;
+     }
+-    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} tabBarMinimizeBehavior={tabBarMinimizeBehavior} {...rest}/>);
++    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} tabBarMinimizeBehavior={tabBarMinimizeBehavior} nativeContainerStyle={{ backgroundColor: 'transparent' }} {...rest}/>);
+ }
+ //# sourceMappingURL=NativeTabsView.js.map
+\ No newline at end of file

@@ -78,6 +78,7 @@ const config: ExpoConfig = {
     "expo-web-browser",
     "expo-screen-orientation",
     "react-native-compressor",
+    "./plugins/withNavBarMarginsFix",
     "./plugins/withCustomWidgetFiles",
     ["expo-widgets", {
       widgets: [
