@@ -69,11 +69,11 @@ export function endLiveActivity(params: {
     params.bestGrade,
     params.attempts,
   ).catch((e) => {
-    // If end() fails (e.g. Codable mismatch on schema change, or the
-    // activity is in a bad state), fall back to endAll() which uses
-    // .immediate dismissal and skips final state serialization entirely.
-    console.warn("[liveActivity] end failed, trying endAll fallback:", e);
-    ClimmateLiveActivity?.endAll?.().catch(() => {});
+    // Log the error but do NOT call endAll() — it would kill any other
+    // Live Activity that might be running (e.g. if the user quickly
+    // starts a new session). The activity will expire naturally via
+    // staleDate if end() truly failed.
+    console.warn("[liveActivity] end failed:", e);
   });
 }
 

@@ -29,7 +29,7 @@ public class ClimmateLiveActivityModule: Module {
       do {
         let activity = try Activity.request(
           attributes: ClimbingSessionAttributes(),
-          content: .init(state: state, staleDate: nil),
+          content: .init(state: state, staleDate: Date().addingTimeInterval(8 * 3600)),
           pushType: nil
         )
         print("[ClimmateLiveActivity] started activity id=\(activity.id)")
@@ -54,7 +54,7 @@ public class ClimmateLiveActivityModule: Module {
           bestGrade: bestGrade,
           attempts: attempts
         )
-        await activity.update(.init(state: newState, staleDate: nil))
+        await activity.update(.init(state: newState, staleDate: Date().addingTimeInterval(8 * 3600)))
       }
     }
 
