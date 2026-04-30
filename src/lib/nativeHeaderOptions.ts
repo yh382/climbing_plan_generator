@@ -2,6 +2,7 @@
 // Shared native iOS header configuration for Expo Router Stack screens
 // Uses system default translucent nav bar — iOS 26 Liquid Glass applies automatically
 
+import { theme } from './theme';
 import type { useThemeColors } from './useThemeColors';
 
 /** Base header (system default translucent bar with back+title) */
@@ -14,11 +15,20 @@ export const NATIVE_HEADER_LARGE = {
   headerLargeTitleShadowVisible: false,
 } as const;
 
-/** Theme-aware header text colors — no background override, preserves native translucent bar */
+/** Theme-aware header text colors + brand DM Sans font. iOS renders the
+ *  large title and its collapsed inline title from these styles, so setting
+ *  fontFamily here applies app-wide (Home / Activity / Daily Summary / any
+ *  Stack screen using withHeaderTheme). */
 export function withHeaderTheme(colors: ReturnType<typeof useThemeColors>) {
   return {
     headerTintColor: colors.textPrimary,
-    headerTitleStyle: { color: colors.textPrimary },
-    headerLargeTitleStyle: { color: colors.textPrimary },
+    headerTitleStyle: {
+      color: colors.textPrimary,
+      fontFamily: theme.fonts.bold,
+    },
+    headerLargeTitleStyle: {
+      color: colors.textPrimary,
+      fontFamily: theme.fonts.black,
+    },
   };
 }
