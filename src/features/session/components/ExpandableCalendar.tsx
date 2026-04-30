@@ -28,7 +28,7 @@ import {
 
 import { usePlanStore, toDateString } from "../../../store/usePlanStore";
 import useLogsStore from "../../../store/useLogsStore";
-import CalendarDayRing from "./CalendarDayRing";
+import { CalendarDayRing } from "../../../../modules/climmate-activity-ring/src";
 
 if (
   Platform.OS === "android" &&
@@ -73,6 +73,29 @@ export default function ExpandableCalendar({
 
   const { monthMap, buildMonthMap } = usePlanStore();
   const sessions = useLogsStore((s) => s.sessions);
+
+  // ── Color palette for CalendarDayRing native view (Window AU). The native
+  // module is intentionally theme-unaware: it just renders whichever colors
+  // we hand it. We compute the palette once per render (cheap — useThemeColors
+  // is referentially stable) and spread it into every cell.
+  const dayRingColors = useMemo(() => {
+    const isDark = colors.background === "#000000";
+    return {
+      outerBaseColor: "#A08060",
+      outerCompletedColor: "#8B6914",
+      innerBaseColor: colors.accent,
+      innerCompletedColor: "#265858",
+      ringTrackColor: isDark ? "#38383A" : "#E5E7EB",
+      selectedBg: colors.accent,
+      dayTextColor: isDark ? "#E5E7EB" : "#374151",
+      selectedTextColor: "#FFFFFF",
+      inactiveTextColor: isDark ? "#48484A" : "#9CA3AF",
+      outsideTextColor: isDark ? "#38383A" : "#D1D5DB",
+      planDotColorComplete: "#A08060",
+      planDotColorInProgress: colors.accent,
+      todayDotColor: colors.accent,
+    } as const;
+  }, [colors]);
 
   // Build dayStats: both duration and sends from sessions (same date, no timezone split)
   const dayStats = useMemo(() => {
@@ -202,17 +225,19 @@ export default function ExpandableCalendar({
             const stats = dayStats[dateStr];
 
             return (
-              <CalendarDayRing
-                key={i}
-                dayLabel={format(date, "d")}
-                durationMin={stats?.durationMin ?? 0}
-                sendCount={stats?.sends ?? 0}
-                planProgress={planProgress}
-                isSelected={activeDate != null && activeDate === dateStr}
-                isToday={isTodayFn(date)}
-                isCurrentMonth={isCurrentMonth}
-                onPress={() => handleDateSelect(date)}
-              />
+              <View key={i} style={styles.cellWrap}>
+                <CalendarDayRing
+                  dayLabel={format(date, "d")}
+                  durationMin={stats?.durationMin ?? 0}
+                  sendCount={stats?.sends ?? 0}
+                  planProgress={planProgress}
+                  isSelected={activeDate != null && activeDate === dateStr}
+                  isToday={isTodayFn(date)}
+                  isCurrentMonth={isCurrentMonth}
+                  onPress={() => handleDateSelect(date)}
+                  {...dayRingColors}
+                />
+              </View>
             );
           })}
         </View>
@@ -277,6 +302,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: "600",
   },
   datesContainer: { flexDirection: "row", flexWrap: "wrap" },
+  /** Wrapper that gives each native CalendarDayRing the 14% column width.
+   *  The native view itself is fixed-size (50pt); the wrapper centers it
+   *  within the column. */
+  cellWrap: { width: "14%" as any, alignItems: "center", marginBottom: 1 },
   /** Empty grid cell matching CalendarDayRing width so leading/trailing
    *  out-of-month days stay invisible without breaking the 7-column layout. */
   emptyCell: { width: "14%" },

@@ -17,13 +17,9 @@ import MonthCalendar from "./MonthCalendar";
 import ActivitySegmentBar from "./ActivitySegmentBar";
 import ActivitySubtitle from "./ActivitySubtitle";
 import DailyLogCard from "../session/components/DailyLogCard";
-import ClimbItemCard from "../../components/shared/ClimbItemCard";
 import PreSessionModal from "../session/components/PreSessionModal";
 import ActiveSessionFloat from "../journal/ActiveSessionFloat";
 import StartLogPrompt, { showQuickLogComingSoonAlert } from "../journal/StartLogPrompt";
-
-import { readDayList } from "../journal/loglist/storage";
-import type { LocalDayLogItem } from "../journal/loglist/types";
 
 import { useI18N } from "../../../lib/i18n";
 import { useSettings } from "../../contexts/SettingsContext";
@@ -45,36 +41,13 @@ export default function SessionsSegment() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-  const [climbItems, setClimbItems] = useState<LocalDayLogItem[]>([]);
 
   const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    // Navigate to daily summary for any tapped date (today, past, future)
+    // Tap any cell → daily-summary. The calendar is a launcher, not a
+    // filter — there is no "select date then explore" two-step UX here.
     router.push({ pathname: "/daily-summary", params: { date: dateStr } } as any);
   }, [router]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!selectedDate) {
-        setClimbItems([]);
-        return;
-      }
-      let cancelled = false;
-      const load = async () => {
-        const [b, tr, l] = await Promise.all([
-          readDayList(selectedDate, "boulder"),
-          readDayList(selectedDate, "toprope"),
-          readDayList(selectedDate, "lead"),
-        ]);
-        if (cancelled) return;
-        setClimbItems([...(b || []), ...(tr || []), ...(l || [])]);
-      };
-      load();
-      return () => { cancelled = true; };
-    }, [selectedDate])
-  );
 
   // Throttled 2 min (was 30s) — full sync is heavy; pull-to-refresh below
   // still triggers immediate sync for explicit user intent.
@@ -121,13 +94,8 @@ export default function SessionsSegment() {
 
   const historyList = useMemo(() => {
     if (!sessions || sessions.length === 0) return [];
-    let filtered = sessions;
-    if (selectedDate) {
-      filtered = sessions.filter((s: any) => s.date === selectedDate);
-    } else {
-      filtered = sessions.filter((s: any) => new Date(s.date) >= filterDate);
-    }
-    return filtered
+    return sessions
+      .filter((s: any) => new Date(s.date) >= filterDate)
       .sort((a: any, b: any) => b.startTime.localeCompare(a.startTime))
       .map((s: any) => ({
         id: s.id,
@@ -140,7 +108,7 @@ export default function SessionsSegment() {
         sessionKey: s.sessionKey || "",
         discipline: s.discipline || "boulder",
       }));
-  }, [sessions, filterDate, selectedDate]);
+  }, [sessions, filterDate]);
 
   const filterOptions: { key: TimeFilter; label: string }[] = [
     { key: "week", label: isZH ? "本周" : "This Week" },
@@ -162,23 +130,16 @@ export default function SessionsSegment() {
       <ActivitySubtitle />
       <ActivitySegmentBar />
       <StatusBar style="auto" />
-      <MonthCalendar onDateSelect={handleDateSelect} activeDate={selectedDate} />
+      <MonthCalendar onDateSelect={handleDateSelect} activeDate={null} />
 
       <View style={styles.logSectionHeader}>
-        {selectedDate ? (
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setSelectedDate(null)}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={styles.sectionTitle}>{format(parseISO(selectedDate), "MMM dd")}</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.filterBtn}
-            onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-          >
-            <Text style={styles.sectionTitle}>{activeFilterLabel}</Text>
-            <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+        >
+          <Text style={styles.sectionTitle}>{activeFilterLabel}</Text>
+          <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
+        </TouchableOpacity>
 
         {activeSession ? (
           <ActiveSessionFloat variant="inline" />
@@ -190,7 +151,7 @@ export default function SessionsSegment() {
         )}
       </View>
 
-      {showFilterDropdown && !selectedDate && (
+      {showFilterDropdown && (
         <View style={styles.dropdown}>
           {filterOptions.map(opt => (
             <TouchableOpacity
@@ -205,22 +166,7 @@ export default function SessionsSegment() {
         </View>
       )}
 
-      {selectedDate && climbItems.length > 0 ? (
-        <View style={{ gap: 0 }}>
-          {climbItems.map((item) => (
-            <ClimbItemCard
-              key={item.id}
-              item={item}
-              onPress={() => {
-                router.push({
-                  pathname: "/library/route-detail",
-                  params: { date: selectedDate, itemId: item.id, type: item.type },
-                });
-              }}
-            />
-          ))}
-        </View>
-      ) : historyList.length > 0 && !selectedDate ? (
+      {historyList.length > 0 ? (
         <View style={{ gap: 0 }}>
           {historyList.map((log) => (
             <DailyLogCard

@@ -54,6 +54,8 @@ export function toFeedPost(post: UserPostOut): FeedPost {
       title: post.attachmentMeta?.title || '',
       subtitle: post.attachmentMeta?.subtitle || '',
       metrics: post.attachmentMeta?.metrics || undefined,
+      userId: post.attachmentMeta?.user_id || undefined,
+      date: post.attachmentMeta?.date || undefined,
     } : undefined,
     likes: post.likeCount,
     comments: post.commentCount,

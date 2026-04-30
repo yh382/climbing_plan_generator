@@ -8,8 +8,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../../lib/useThemeColors";
 import { useSettings } from "../../contexts/SettingsContext";
-import ActivityRing from "../../components/ui/ActivityRing";
-import DualActivityRing from "../journal/DualActivityRing";
+import { ActivityRing, DualActivityRing } from "../../../modules/climmate-activity-ring/src";
 
 type Props = {
   timeOnWallMin: number;
@@ -51,11 +50,15 @@ export default function RingsPage({
           trainingPct={timeOnWallPct}
           climbCount={sends}
           climbGoal={10}
-          parts={[]}
-          showDistribution={false}
           duration={formatDuration(timeOnWallMin)}
           outerColor="#A08060"
           innerColor={colors.accent}
+          bgTrackColor={colors.backgroundSecondary}
+          textColors={{
+            label: colors.textSecondary,
+            value: colors.textPrimary,
+            duration: colors.textSecondary,
+          }}
         />
         <Text style={styles.label}>{tr("墙上时间 · 完攀", "TIME · SENDS")}</Text>
         <Text style={styles.sub}>

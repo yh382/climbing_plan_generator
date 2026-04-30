@@ -91,7 +91,6 @@ function RootStack() {
           scrollEdgeEffects: { top: "soft" },
         }}
       />
-      <Stack.Screen name="journal-ring" options={{ headerShown: false }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
       <Stack.Screen name="map" options={{ headerShown: false }} />

@@ -1,7 +1,11 @@
 // app/daily-summary.tsx
 // Day-scoped summary page: persistent analysis dashboard + active session
-// card (if any) + completed session groups + quick logs. Replaces the old
-// session-detail page; Live Activity tap and endSession all land here.
+// card (if any) + completed session groups + quick logs.
+//
+// Window AY — accepts an optional `userId` query param. When present and
+// not equal to the current user's id, the page enters other-mode: it
+// fetches the target user's public daily via `/users/{userId}/daily/{date}`,
+// shows a username/avatar header, and disables edit/active-session affordances.
 
 import React, { useCallback, useLayoutEffect, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -14,6 +18,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "../src/lib/useThemeColors";
 import { useSettings } from "../src/contexts/SettingsContext";
 import { HeaderButton } from "../src/components/ui/HeaderButton";
+import { Avatar } from "../src/components/ui/Avatar";
 
 import { useDailyData } from "../src/features/dailysummary/useDailyData";
 import DailyDashboardCarousel from "../src/features/dailysummary/DailyDashboardCarousel";
@@ -21,6 +26,7 @@ import DailyDateNavBar from "../src/features/dailysummary/DailyDateNavBar";
 import ActiveSessionCard from "../src/features/dailysummary/ActiveSessionCard";
 import SessionGroupHeader from "../src/features/dailysummary/SessionGroupHeader";
 import useSettingsStore from "../src/store/useSettingsStore";
+import { useUserStore } from "../src/store/useUserStore";
 import ClimbItemCard from "../src/components/shared/ClimbItemCard";
 
 function resolveDateParam(raw: string | string[] | undefined): string {
@@ -31,17 +37,25 @@ function resolveDateParam(raw: string | string[] | undefined): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function resolveStringParam(raw: string | string[] | undefined): string | undefined {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v && v.length > 0 ? v : undefined;
+}
+
 export default function DailySummaryScreen() {
   const navigation = useNavigation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; userId?: string }>();
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const date = resolveDateParam(params.date);
+  const userIdParam = resolveStringParam(params.userId);
+  const currentUserId = useUserStore((s) => s.user?.id);
+  const isSelf = !userIdParam || userIdParam === currentUserId;
 
-  const data = useDailyData(date);
+  const data = useDailyData(date, userIdParam);
 
   const navigateDays = useCallback(
     (delta: number) => {
@@ -78,14 +92,26 @@ export default function DailySummaryScreen() {
       stickyHeaderIndices={[0]}
       contentContainerStyle={{ paddingBottom: 140 }}
     >
-      <DailyDateNavBar
-        date={date}
-        onPrev={() => navigateDays(-1)}
-        onNext={() => navigateDays(1)}
-      />
+      <View>
+        {!isSelf && data.meta && (
+          <View style={styles.userHeader}>
+            <Avatar
+              uri={data.meta.avatarUrl}
+              fallbackName={data.meta.username}
+              size={32}
+            />
+            <Text style={styles.username}>{data.meta.username}</Text>
+          </View>
+        )}
+        <DailyDateNavBar
+          date={date}
+          onPrev={() => navigateDays(-1)}
+          onNext={() => navigateDays(1)}
+        />
+      </View>
       <DailyDashboardCarousel data={data} />
 
-      {data.activeSession && (
+      {isSelf && data.activeSession && (
         <ActiveSessionCard
           startTime={data.activeSession.startTime}
           gymName={data.activeSession.gymName}
@@ -106,6 +132,7 @@ export default function DailySummaryScreen() {
               <ClimbItemCard
                 key={item.id}
                 item={item}
+                readOnly={!isSelf}
                 onPress={() => {
                   router.push({
                     pathname: "/library/route-detail",
@@ -131,6 +158,7 @@ export default function DailySummaryScreen() {
             <ClimbItemCard
               key={item.id}
               item={item}
+              readOnly={!isSelf}
               onPress={() => {
                 router.push({
                   pathname: "/library/route-detail",
@@ -144,26 +172,49 @@ export default function DailySummaryScreen() {
 
       {!hasAnyContent && (
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyText}>{tr("这一天没有记录", "Nothing logged on this day")}</Text>
+          <Text style={styles.emptyText}>
+            {isSelf
+              ? tr("这一天没有记录", "Nothing logged on this day")
+              : tr(
+                  `${data.meta?.username ?? "该用户"} 当日无公开记录`,
+                  `${data.meta?.username ?? "This user"} has no public activity on this day`
+                )}
+          </Text>
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.viewAllBtn}
-        activeOpacity={0.85}
-        onPress={() => {
-          setSegment("analysis");
-          router.push("/(drawer)/(tabs)/activity" as any);
-        }}
-      >
-        <Text style={styles.viewAllText}>{tr("查看完整分析 →", "View full analysis →")}</Text>
-      </TouchableOpacity>
+      {isSelf && (
+        <TouchableOpacity
+          style={styles.viewAllBtn}
+          activeOpacity={0.85}
+          onPress={() => {
+            setSegment("analysis");
+            router.push("/(drawer)/(tabs)/activity" as any);
+          }}
+        >
+          <Text style={styles.viewAllText}>{tr("查看完整分析 →", "View full analysis →")}</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
+    userHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 4,
+      backgroundColor: colors.background,
+    },
+    username: {
+      fontSize: 15,
+      fontFamily: theme.fonts.medium,
+      color: colors.textPrimary,
+    },
     placeholder: {
       paddingHorizontal: 16,
       paddingVertical: 12,

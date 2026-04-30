@@ -63,7 +63,7 @@ export default function PublicStatsSection({ profile, sessionSummary }: Props) {
               attempts={s.attempts}
               sends={s.sends}
               maxGrade={s.bestGrade || "—"}
-              onPress={() => router.push({ pathname: "/community/public-route-log", params: { sessionId: s.id } })}
+              onPress={() => router.push({ pathname: "/daily-summary", params: { userId: profile.id, date: s.date } })}
             />
           ))}
         </View>

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { api } from "../../src/lib/apiClient";
+import { useUserStore } from "../../src/store/useUserStore";
 
 type MediaItem = {
   id: string;
@@ -68,17 +69,41 @@ export default function MediaSelectScreen() {
 
   const loadMedia = async () => {
     try {
-      const session = await api.get<any>(`/sessions/public/${sessionId}`);
+      const userId = useUserStore.getState().user?.id;
+      if (!userId || !date) {
+        setLoading(false);
+        return;
+      }
+      const daily = await api.get<any>(`/users/${userId}/daily/${date}`);
+      const session = (daily.sessions || []).find(
+        (s: any) => String(s.id) === String(sessionId),
+      );
+      if (!session) {
+        setLoading(false);
+        return;
+      }
 
-      // Only override local data if backend has better info
-      const backendSends = session.totalSends || 0;
-      if (backendSends > 0 || !localSends) {
+      const sends = (session.logs || []).filter((l: any) =>
+        l.result === "send" || l.result === "flash" || l.result === "onsight",
+      ).length;
+      const bestGrade =
+        session.summary?.best_grade ||
+        (session.logs || []).reduce(
+          (best: { score: number; text: string }, l: any) => {
+            return l.grade_score > best.score
+              ? { score: l.grade_score, text: l.grade_text }
+              : best;
+          },
+          { score: 0, text: "" },
+        ).text;
+
+      if (sends > 0 || !localSends) {
         setSessionInfo({
-          gymName: session.gymName || localGymName || "—",
-          sends: backendSends,
-          bestGrade: session.bestGrade || localBest || "—",
-          duration: session.durationMinutes
-            ? `${session.durationMinutes}m`
+          gymName: session.gym_name || localGymName || "—",
+          sends,
+          bestGrade: bestGrade || localBest || "—",
+          duration: session.duration_minutes
+            ? `${session.duration_minutes}m`
             : localDuration || "—",
         });
       }
@@ -89,7 +114,7 @@ export default function MediaSelectScreen() {
           media.push({
             id: `${log.id}-${m.url}`,
             url: m.url,
-            thumbnail: m.thumbUrl || m.url,
+            thumbnail: m.thumbUrl || m.thumb_url || m.url,
             type: m.type || "image",
             duration: m.duration,
           });

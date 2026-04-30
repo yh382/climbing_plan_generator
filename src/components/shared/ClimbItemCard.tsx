@@ -11,6 +11,10 @@ import type { LocalDayLogItem } from "../../features/journal/loglist/types";
 interface ClimbItemCardProps {
   item: LocalDayLogItem;
   onPress: () => void;
+  /** When true, suppress edit/navigation affordances. The card still
+   *  renders the row content but doesn't react to taps and hides the
+   *  chevron — used when viewing another user's daily summary. */
+  readOnly?: boolean;
 }
 
 function styleLabel(style?: string): string {
@@ -26,7 +30,7 @@ function styleLabel(style?: string): string {
   }
 }
 
-export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
+export default function ClimbItemCard({ item, onPress, readOnly = false }: ClimbItemCardProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -45,7 +49,12 @@ export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
   const hasThumb = !!thumbUri;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={readOnly ? undefined : onPress}
+      activeOpacity={readOnly ? 1 : 0.7}
+      disabled={readOnly}
+    >
       {/* Left thumbnail - always visible */}
       <View style={styles.thumbContainer}>
         {hasThumb ? (
@@ -90,9 +99,11 @@ export default function ClimbItemCard({ item, onPress }: ClimbItemCardProps) {
       </View>
 
       {/* Chevron */}
-      <View style={styles.chevron}>
-        <Text style={{ color: colors.textTertiary, fontSize: 14 }}>›</Text>
-      </View>
+      {!readOnly && (
+        <View style={styles.chevron}>
+          <Text style={{ color: colors.textTertiary, fontSize: 14 }}>›</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }

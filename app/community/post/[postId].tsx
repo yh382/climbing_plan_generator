@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import useLogsStore from "@/store/useLogsStore";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import FeedPost from "@/features/community/components/FeedPost";
 import CommentSheet from "@/features/community/components/CommentSheet";
@@ -19,7 +20,6 @@ import { communityApi } from "@/features/community/api";
 import { mapRawPost, toFeedPost } from "@/features/community/utils";
 import { useCommunityStore } from "@/store/useCommunityStore";
 import { useUserStore } from "@/store/useUserStore";
-import useLogsStore from "@/store/useLogsStore";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
 import type { FeedPost as FeedPostType } from "@/types/community";
@@ -154,27 +154,21 @@ export default function SinglePostScreen() {
               return;
             }
             if (att.type === "log" || att.type === "session") {
-              if (isOwn) {
+              let userId = att.userId;
+              let date = att.date;
+              if ((!userId || !date) && isOwn && currentUserId) {
                 const localSession = useLogsStore.getState().sessions.find(
-                  (s) => s.serverId === att.id
+                  (s) => s.serverId === att.id,
                 );
                 if (localSession) {
-                  router.push({
-                    pathname: "/library/log-detail",
-                    params: {
-                      date: localSession.date,
-                      sessionKey: localSession.sessionKey,
-                      gymName: localSession.gymName,
-                      mode: localSession.discipline,
-                      origin: "community",
-                    },
-                  });
-                  return;
+                  userId = currentUserId;
+                  date = localSession.date;
                 }
               }
+              if (!userId || !date) return;
               router.push({
-                pathname: "/community/public-route-log",
-                params: { sessionId: att.id },
+                pathname: "/daily-summary",
+                params: { userId, date },
               });
             }
           }}

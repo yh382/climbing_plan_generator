@@ -275,31 +275,27 @@ export default function CommunityScreen() {
             return;
           }
 
-          // Route log / session
+          // Route log / session — unified to daily-summary (Window AY).
+          // Self vs other rendering is handled inside daily-summary by
+          // comparing the userId param to the current user. Own posts
+          // fall back to the local session row when the backend hasn't
+          // yet enriched attachment_meta with user_id/date (legacy posts).
           if (att.type === "log" || att.type === "session") {
-            // If own post, navigate to local log-detail (has full local data)
-            const isOwn = item.user?.id === currentUserId;
-            if (isOwn) {
+            let userId = att.userId;
+            let date = att.date;
+            if ((!userId || !date) && item.user?.id === currentUserId && currentUserId) {
               const localSession = useLogsStore.getState().sessions.find(
-                (s) => s.serverId === att.id
+                (s) => s.serverId === att.id,
               );
               if (localSession) {
-                router.push({
-                  pathname: "/library/log-detail",
-                  params: {
-                    date: localSession.date,
-                    sessionKey: localSession.sessionKey,
-                    gymName: localSession.gymName,
-                    mode: localSession.discipline,
-                    origin: "community",
-                  },
-                });
-                return;
+                userId = currentUserId;
+                date = localSession.date;
               }
             }
+            if (!userId || !date) return;
             router.push({
-              pathname: "/community/public-route-log",
-              params: { sessionId: att.id },
+              pathname: "/daily-summary",
+              params: { userId, date },
             });
             return;
           }

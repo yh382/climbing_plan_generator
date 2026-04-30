@@ -22,6 +22,12 @@ export interface PostAttachment {
     label: string;
     value: string;
   }[];
+  /** Window AY — owner of the referenced session/log. Backend
+   *  serializer fills this from the session row so callers can route
+   *  to /daily-summary?userId=...&date=... without an extra fetch. */
+  userId?: string;
+  /** Window AY — date (YYYY-MM-DD) of the referenced session. */
+  date?: string;
 }
 
 // 媒体项（图片或视频）
