@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp, FadeOutDown } from "react-native-reanimated";
@@ -42,8 +42,22 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
     if (!activeSession) return;
     const update = () => setElapsedMs(Date.now() - activeSession.startTime);
     update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | undefined = setInterval(update, 1000);
+
+    // Pause timer when app is backgrounded to save battery.
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        update();
+        if (!id) id = setInterval(update, 1000);
+      } else {
+        if (id) { clearInterval(id); id = undefined; }
+      }
+    });
+
+    return () => {
+      if (id) clearInterval(id);
+      sub.remove();
+    };
   }, [activeSession]);
 
   const hasLog = !!activeSession;
@@ -62,7 +76,8 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
   const wTopText = wTime.h >= 1 ? pad2(wTime.h) : pad2(wTime.m);
   const wBottomText = wTime.h >= 1 ? pad2(wTime.m) : pad2(wTime.s);
 
-  const handleLogPress = () => router.push("/journal");
+  const handleLogPress = () =>
+    router.push({ pathname: "/daily-summary", params: { date: "today" } } as any);
   const handleWorkoutPress = () => {
     if (sessionJson) {
       router.push({ pathname: "/library/plan-view", params: { sessionJson } } as any);

@@ -18,7 +18,7 @@ export default function EndSessionScreen() {
 
     if (!activeSession) {
       // Stale tap — session already ended elsewhere.
-      router.replace("/(tabs)/calendar" as any);
+      router.replace("/daily-summary?date=today" as any);
       return;
     }
 
@@ -35,7 +35,7 @@ export default function EndSessionScreen() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace("/(tabs)/calendar" as any);
+              router.replace("/daily-summary?date=today" as any);
             }
           },
         },
@@ -48,7 +48,7 @@ export default function EndSessionScreen() {
             } catch (e) {
               console.warn("[end-session] discard failed:", e);
             }
-            router.replace("/(tabs)/calendar" as any);
+            router.replace("/daily-summary?date=today" as any);
           },
         },
         {
@@ -59,7 +59,7 @@ export default function EndSessionScreen() {
             } catch (e) {
               console.warn("[end-session] endSession failed:", e);
             }
-            router.replace("/(tabs)/calendar" as any);
+            router.replace("/daily-summary?date=today" as any);
           },
         },
       ],
