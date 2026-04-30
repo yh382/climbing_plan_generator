@@ -33,7 +33,7 @@ export default function DailyLogHeader({
             <Text style={styles.dateTitle}>{displayDate}</Text>
             {gymId ? (
               <TouchableOpacity
-                onPress={() => router.push({ pathname: '/(tabs)/community', params: { tab: 'gyms', gymId } })}
+                onPress={() => router.push({ pathname: '/(drawer)/(tabs)/community', params: { tab: 'gyms', gymId } })}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.locationSub, { color: '#306E6F' }]}>📍 {gymName || "Gym"}</Text>

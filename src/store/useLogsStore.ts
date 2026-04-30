@@ -201,7 +201,7 @@ const RESULT_TO_STYLE: Record<string, string> = {
 
 function backendLogToLocal(log: any): LocalDayLogItem {
   return {
-    id: String(log.id),
+    id: log.client_id || String(log.id),
     date: log.date,
     type: log.wall_type as any,
     grade: log.grade_text,
@@ -243,14 +243,40 @@ function mergeSessionListPreserveLocal(
 ): LocalDayLogItem[] {
   const localById = new Map(localItems.map((it) => [it.id, it]));
   const consumedLocalIds = new Set<string>();
+  const seenBackendIds = new Set<string>();
   const result: LocalDayLogItem[] = [];
 
   for (const bItem of backendItems) {
+    // Guard: skip duplicate backend items (same id processed twice)
+    if (seenBackendIds.has(bItem.id)) continue;
+    seenBackendIds.add(bItem.id);
+
     // Try to find the corresponding local item:
-    // 1. Direct ID match (same ID on both sides — rare but possible)
-    // 2. Reverse serverIdMap lookup (serverId → localId)
+    // 1. Direct ID match — when backend returns client_id and
+    //    backendLogToLocal uses it as the item id, this is the primary path.
+    // 2. Reverse serverIdMap lookup (serverId → localId) — fallback for
+    //    old logs created before client_id was introduced.
     const localId = serverToLocalId?.get(bItem.id) ?? bItem.id;
-    const local = localById.get(localId) ?? localById.get(bItem.id);
+    let local = localById.get(localId) ?? localById.get(bItem.id);
+
+    // 3. Content-based fallback: match by grade + style + date + createdAt
+    //    within a 60-second window. Catches cases where neither client_id
+    //    nor serverIdMap produced a match (e.g. 409 during outbox flush
+    //    lost the mapping).
+    if (!local) {
+      for (const candidate of localItems) {
+        if (consumedLocalIds.has(candidate.id)) continue;
+        if (
+          candidate.grade === bItem.grade &&
+          candidate.style === bItem.style &&
+          candidate.date === bItem.date &&
+          Math.abs((candidate.createdAt || 0) - (bItem.createdAt || 0)) < 60000
+        ) {
+          local = candidate;
+          break;
+        }
+      }
+    }
 
     if (local) {
       consumedLocalIds.add(local.id);
@@ -482,6 +508,15 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           // Re-read tombstones after auto-clean above (some may have been removed)
           const liveDeletedKeys = await readDeletedSessionKeys();
 
+          // Build reverse serverIdMap ONCE (serverId → localId) for all
+          // merge operations below. Reading after outbox flush ensures the
+          // map includes any IDs written during the flush.
+          const allServerIds = await readAllServerIds();
+          const serverToLocal = new Map<string, string>();
+          for (const [localId, serverId] of Object.entries(allServerIds)) {
+            serverToLocal.set(serverId, localId);
+          }
+
           // Convert backend sessions → SessionEntry[]
           const newSessions: SessionEntry[] = [];
           for (const s of sessionsData || []) {
@@ -546,15 +581,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             // — including active ones — at the top of this function.)
 
             // Write session lists to AsyncStorage — MERGE with local to preserve media.
-            // Build reverse serverIdMap (serverId → localId) so the merge can
-            // match backend items to their local counterparts even though the
-            // IDs are different (client UUID vs server UUID).
-            const allServerIds = await readAllServerIds();
-            const serverToLocal = new Map<string, string>();
-            for (const [localId, serverId] of Object.entries(allServerIds)) {
-              serverToLocal.set(serverId, localId);
-            }
-
+            // serverToLocal reverse map is built once above the loop.
             const byType = new Map<LogType, LocalDayLogItem[]>();
             for (const l of sessionLogs) {
               const t = l.wall_type as LogType;
@@ -570,16 +597,11 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           }
 
           // Write day lists to AsyncStorage — MERGE with local to preserve media
-          // Reuse the same reverse map for day list merges.
-          const allServerIdsForDayLists = await readAllServerIds();
-          const serverToLocalForDayLists = new Map<string, string>();
-          for (const [localId, serverId] of Object.entries(allServerIdsForDayLists)) {
-            serverToLocalForDayLists.set(serverId, localId);
-          }
+          // Reuse the same reverse map built above.
           for (const [, group] of logsByDateType) {
             const backendItems = group.logs.map(backendLogToLocal);
             const localItems = await readDayList(group.date, group.type);
-            const merged = mergeSessionListPreserveLocal(backendItems, localItems, serverToLocalForDayLists);
+            const merged = mergeSessionListPreserveLocal(backendItems, localItems, serverToLocal);
             await writeDayList(group.date, group.type, merged);
           }
 

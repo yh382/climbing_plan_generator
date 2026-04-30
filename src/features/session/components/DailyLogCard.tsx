@@ -58,7 +58,9 @@ export default function DailyLogCard({ dateLabel, duration, attempts, sends, max
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   card: {
     backgroundColor: colors.backgroundSecondary,
-    marginHorizontal: theme.spacing.screenPadding,
+    // 16pt aligns with iOS native large-title leading margin (shared across
+    // Activity/Home; Profile page wrappers override as needed).
+    marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: theme.borderRadius.card,
     padding: 16,

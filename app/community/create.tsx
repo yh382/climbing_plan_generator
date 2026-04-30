@@ -286,7 +286,7 @@ export default function CreatePostScreen() {
       mediaList,
     );
     router.dismissAll();
-    router.navigate("/(tabs)/community" as any);
+    router.navigate("/(drawer)/(tabs)/community" as any);
   };
 
   const canPost = mediaList.length > 0 || !!attachedWidget || (content?.trim().length ?? 0) > 0;

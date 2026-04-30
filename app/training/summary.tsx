@@ -39,12 +39,12 @@ export default function SessionSummaryScreen() {
 
   const handleDone = () => {
     router.dismissAll();
-    router.navigate("/(tabs)/calendar");
+    router.navigate("/(drawer)/(tabs)/activity" as any);
   };
 
   const handleViewPlan = () => {
     router.dismissAll();
-    router.navigate("/(tabs)/calendar");
+    router.navigate("/(drawer)/(tabs)/activity" as any);
   };
 
   return (

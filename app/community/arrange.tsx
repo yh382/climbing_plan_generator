@@ -287,7 +287,7 @@ export default function ArrangeScreen() {
     // Fire upload in background, then navigate back to community tab
     submitPostInBackground(draft, sorted);
     router.dismissAll();
-    router.navigate("/(tabs)/community");
+    router.navigate("/(drawer)/(tabs)/community");
   }, [items, router]);
 
   // --- Stable ref for header ---

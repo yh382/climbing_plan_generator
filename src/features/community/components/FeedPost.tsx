@@ -176,7 +176,7 @@ function FeedPost({
               {post.gymName && (
                 <TouchableOpacity
                   onPress={() => router.push({
-                    pathname: '/(tabs)/community',
+                    pathname: '/(drawer)/(tabs)/community',
                     params: { tab: 'gyms', gymId: post.gymId },
                   })}
                   style={styles.gymTag}

@@ -172,6 +172,7 @@ function TodayDetailsList({
           type: "create",
           localId: item.id,
           payload: {
+            client_id: item.id,
             session_id: null,
             _sessionKey: sessionKey,
             date: item.date,

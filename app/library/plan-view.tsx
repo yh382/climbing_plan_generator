@@ -135,7 +135,7 @@ export default function PlanViewRoute() {
   const handleMinimize = useCallback(() => {
     minimizeWorkout();
     router.dismissAll();
-    router.navigate("/(tabs)/calendar");
+    router.navigate("/(drawer)/(tabs)/activity" as any);
   }, [minimizeWorkout, router]);
 
   const handleExerciseNavigate = useCallback((item: PlanV3SessionItem, index: number) => {

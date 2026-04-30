@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import {
   ActionSheetIOS,
   Alert,
+  AppState,
   Platform,
   ScrollView,
   StyleSheet,
@@ -125,23 +126,39 @@ export default function Journal() {
   const mode = activeSession?.discipline ?? "boulder";
   const { monthMap } = usePlanStore();
 
-  // timer
+  // timer — pauses when app goes to background to save battery.
+  // Duration is computed from startTime on each tick, so it's always
+  // correct when the app returns to foreground (no drift from missed ticks).
   const [sessionDuration, setSessionDuration] = useState("00:00:00");
   useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-    if (activeSession) {
-      interval = setInterval(() => {
-        const now = Date.now();
-        const diff = now - activeSession.startTime;
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        setSessionDuration(
-          `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-        );
-      }, 1000);
-    }
-    return () => interval && clearInterval(interval);
+    if (!activeSession) return;
+
+    const update = () => {
+      const diff = Date.now() - activeSession.startTime;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setSessionDuration(
+        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+      );
+    };
+
+    update(); // immediate first tick
+    let interval: ReturnType<typeof setInterval> | undefined = setInterval(update, 1000);
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        update(); // recalculate immediately on foreground
+        if (!interval) interval = setInterval(update, 1000);
+      } else {
+        if (interval) { clearInterval(interval); interval = undefined; }
+      }
+    });
+
+    return () => {
+      if (interval) clearInterval(interval);
+      sub.remove();
+    };
   }, [activeSession]);
 
   // Update Live Activity when session stats change
