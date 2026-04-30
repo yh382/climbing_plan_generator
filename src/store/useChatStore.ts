@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { AppState } from 'react-native';
 import { chatApi } from '../features/chat/api';
 import type { ChatConversationOut, ChatMessageOut } from '../features/chat/types';
 
@@ -9,7 +10,7 @@ interface ChatState {
   loading: boolean;
   totalUnread: number;
 
-  fetchConversations: () => Promise<void>;
+  fetchConversations: (opts?: { silent?: boolean }) => Promise<void>;
   selectConversation: (id: string) => void;
   fetchMessages: (conversationId: string, since?: string) => Promise<void>;
   sendMessage: (content: string, myUserId: string) => Promise<void>;
@@ -35,13 +36,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   _pollTimer: null,
   _unreadPollTimer: null,
 
-  fetchConversations: async () => {
-    set({ loading: true });
+  fetchConversations: async (opts?: { silent?: boolean }) => {
+    // silent mode: don't touch global `loading` so background fetches
+    // (pull-to-refresh, future WS reconcile) don't animate the RefreshControl.
+    if (!opts?.silent) set({ loading: true });
     try {
       const convs = await chatApi.getConversations();
       set({ conversations: convs });
     } finally {
-      set({ loading: false });
+      if (!opts?.silent) set({ loading: false });
     }
   },
 
@@ -148,7 +151,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().stopUnreadPolling();
     get().fetchUnreadCount();
     const timer = setInterval(() => {
-      get().fetchUnreadCount();
+      // Skip fetch when app is backgrounded to save battery.
+      // The timer keeps running but the network call is gated.
+      if (AppState.currentState === 'active') {
+        get().fetchUnreadCount();
+      }
     }, 30_000);
     set({ _unreadPollTimer: timer });
   },

@@ -10,8 +10,28 @@ import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { useChatStore } from "../../../store/useChatStore";
 import { useUserStore } from "../../../store/useUserStore";
 import ChatBubble from "../components/ChatBubble";
+import ChatDateSeparator from "../components/ChatDateSeparator";
 import ChatInput from "../components/ChatInput";
 import type { ChatMessageOut } from "../types";
+
+type ChatListItem =
+  | { type: "date"; key: string; iso: string }
+  | { type: "message"; key: string; msg: ChatMessageOut };
+
+function buildChatListItems(messages: ChatMessageOut[]): ChatListItem[] {
+  const items: ChatListItem[] = [];
+  let lastDateKey: string | null = null;
+  for (const m of messages) {
+    const d = new Date(m.created_at);
+    const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (dateKey !== lastDateKey) {
+      items.push({ type: "date", key: `date_${dateKey}`, iso: m.created_at });
+      lastDateKey = dateKey;
+    }
+    items.push({ type: "message", key: m.id, msg: m });
+  }
+  return items;
+}
 
 export default function ChatScreen() {
   const colors = useThemeColors();
@@ -23,6 +43,8 @@ export default function ChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const myUserId = useUserStore((s) => s.user?.id ?? "");
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Suppresses the "Start a conversation" flash between mount and first fetch resolve.
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
@@ -66,8 +88,9 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!conversationId) return;
+    setInitialized(false);
     selectConversation(conversationId);
-    fetchMessages(conversationId);
+    fetchMessages(conversationId).finally(() => setInitialized(true));
     markRead(conversationId);
     startPolling(conversationId);
     return () => {
@@ -92,10 +115,15 @@ export default function ChatScreen() {
     [sendMessage, myUserId],
   );
 
+  const listItems = useMemo(() => buildChatListItems(messages), [messages]);
+
   const renderItem = useCallback(
-    ({ item }: { item: ChatMessageOut }) => (
-      <ChatBubble message={item} isMe={item.sender_id === myUserId} />
-    ),
+    ({ item }: { item: ChatListItem }) => {
+      if (item.type === "date") {
+        return <ChatDateSeparator iso={item.iso} />;
+      }
+      return <ChatBubble message={item.msg} isMe={item.msg.sender_id === myUserId} />;
+    },
     [myUserId],
   );
 
@@ -103,20 +131,28 @@ export default function ChatScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={headerHeight}
     >
       <FlatList
         ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
+        data={listItems}
+        keyExtractor={(item) => item.key}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        contentInsetAdjustmentBehavior="automatic"
+        // `automatic` gets blocked by KeyboardAvoidingView intermediary on iOS,
+        // causing content to render under status bar until keyboard triggers a
+        // re-layout. Set insets explicitly to keep `headerTransparent` + the
+        // `scrollEdgeEffects` blur behavior working reliably on first mount.
+        contentInsetAdjustmentBehavior="never"
+        contentInset={{ top: headerHeight, bottom: 0 }}
+        scrollIndicatorInsets={{ top: headerHeight }}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>Start a conversation</Text>
-          </View>
+          initialized ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>Start a conversation</Text>
+            </View>
+          ) : null
         }
       />
 

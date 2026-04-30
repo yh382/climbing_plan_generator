@@ -1,2 +1,5 @@
-import ChatListScreen from "../../src/features/chat/screens/ChatListScreen";
-export default ChatListScreen;
+import { Redirect } from "expo-router";
+
+export default function ChatIndexRedirect() {
+  return <Redirect href={"/inbox?section=conversations" as any} />;
+}
