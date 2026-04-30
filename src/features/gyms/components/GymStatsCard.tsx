@@ -27,14 +27,7 @@ export default function GymStatsCard({ gymId }: Props) {
   // on the eye and ties both surfaces back to the brand color.
   const softBg =
     scheme === 'dark' ? 'rgba(48,110,111,0.14)' : 'rgba(48,110,111,0.06)';
-  // Divider sits on top of softBg, so it needs slightly more opacity
-  // to remain visible without looking like a hard line.
-  const softDivider =
-    scheme === 'dark' ? 'rgba(48,110,111,0.28)' : 'rgba(48,110,111,0.18)';
-  const styles = useMemo(
-    () => createStyles(c, softBg, softDivider),
-    [c, softBg, softDivider],
-  );
+  const styles = useMemo(() => createStyles(c, softBg), [c, softBg]);
 
   const [stats, setStats] = useState<GymStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,25 +75,24 @@ export default function GymStatsCard({ gymId }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* KPI row — single merged card with vertical dividers between
-          the three metrics. Visually distinct from the three action
-          buttons above (which are separate pills). */}
+      {/* KPI strip — Apple Maps-style info row. No card backgrounds
+          (the data is informational, not a button) — small label on
+          top, larger value below, left-aligned, equal-width columns
+          on the sheet's liquid-glass surface. */}
       <View style={styles.kpiRow}>
         <View style={styles.kpiCell}>
+          <Text style={styles.kpiLabel}>Total Sends</Text>
           <Text style={styles.kpiValue}>
             {stats.total_sends.toLocaleString()}
           </Text>
-          <Text style={styles.kpiLabel}>Total Sends</Text>
         </View>
-        <View style={styles.kpiDivider} />
         <View style={styles.kpiCell}>
-          <Text style={styles.kpiValue}>{stats.unique_users}</Text>
           <Text style={styles.kpiLabel}>Climbers</Text>
+          <Text style={styles.kpiValue}>{stats.unique_users}</Text>
         </View>
-        <View style={styles.kpiDivider} />
         <View style={styles.kpiCell}>
-          <Text style={styles.kpiValue}>{stats.weekly_active}</Text>
           <Text style={styles.kpiLabel}>Weekly Active</Text>
+          <Text style={styles.kpiValue}>{stats.weekly_active}</Text>
         </View>
       </View>
 
@@ -174,7 +166,6 @@ export default function GymStatsCard({ gymId }: Props) {
 const createStyles = (
   c: ReturnType<typeof useThemeColors>,
   softBg: string,
-  softDivider: string,
 ) =>
   StyleSheet.create({
     container: {
@@ -195,37 +186,28 @@ const createStyles = (
       fontWeight: '700',
       color: c.textPrimary,
     },
-    // Merged KPI card. Low-alpha accent tint reads softer than a flat
-    // neutral gray against the liquid-glass sheet, and echoes the brand
-    // color in both light & dark mode.
+    // Naked info strip — no card background or dividers; the data is
+    // informational, not a button (Apple HIG). Echoes PlaceSheetStats
+    // so all "stats" rows across the app share one visual language.
     kpiRow: {
       flexDirection: 'row',
-      alignItems: 'stretch',
-      backgroundColor: softBg,
-      borderRadius: 12,
-      paddingVertical: 14,
-      marginBottom: 16,
+      gap: 16,
+      marginBottom: 20,
     },
     kpiCell: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    kpiDivider: {
-      width: StyleSheet.hairlineWidth,
-      backgroundColor: softDivider,
-      marginVertical: 4,
+      alignItems: 'flex-start',
     },
     kpiValue: {
       fontSize: 20,
-      fontWeight: '800',
+      fontWeight: '700',
       color: c.textPrimary,
     },
     kpiLabel: {
-      fontSize: 11,
-      fontWeight: '600',
+      fontSize: 12,
+      fontWeight: '500',
       color: c.textSecondary,
-      marginTop: 2,
+      marginBottom: 2,
     },
     popularRow: {
       flexDirection: 'row',

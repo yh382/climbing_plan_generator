@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useRecentGym, useFavoriteGyms } from '../../gyms/hooks';
+import { mapHref } from '../../mapscreen/navigation';
 
 const REFRESH_THROTTLE_MS = 60_000; // 1 minute
 
@@ -67,7 +68,7 @@ export default function YourGymSection() {
         <TouchableOpacity
           style={styles.emptyCard}
           activeOpacity={0.7}
-          onPress={() => router.push('/gyms')}
+          onPress={() => router.push(mapHref())}
         >
           <View style={styles.emptyIconWrap}>
             <Ionicons name="location-outline" size={26} color="#306E6F" />

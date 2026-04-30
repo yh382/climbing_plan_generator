@@ -127,3 +127,24 @@ export function compareGrades(
 ): number {
   return gradeToScore(a.text, a.system) - gradeToScore(b.text, b.system);
 }
+
+// ── Canonical grade option arrays (for pickers) ──────────────────
+
+/** V-scale boulder grades V0 → V17, ordered easiest → hardest. */
+export const V_SCALE_GRADES: readonly string[] = Array.from(
+  { length: 18 },
+  (_, i) => `V${i}`,
+);
+
+/** YDS sport/trad grades 5.5 → 5.15d. Below 5.10 has no a/b/c/d
+ *  subdivision; 5.10 and above split into four letter grades each. */
+export const YDS_GRADES: readonly string[] = (() => {
+  const easy = ['5.5', '5.6', '5.7', '5.8', '5.9'];
+  const hard: string[] = [];
+  for (let major = 10; major <= 15; major++) {
+    for (const sub of ['a', 'b', 'c', 'd'] as const) {
+      hard.push(`5.${major}${sub}`);
+    }
+  }
+  return [...easy, ...hard];
+})();

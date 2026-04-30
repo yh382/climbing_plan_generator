@@ -54,6 +54,26 @@ public class NativeSearchBarModule: Module {
         }
       }
 
+      // `focusOnMount` rather than `autoFocus` — the latter is a well-known
+      // React Native convention that some layers (Fabric, DevTools) may
+      // intercept or ignore for custom native views.
+      Prop("focusOnMount") { (view, value: Bool?) in
+        let shouldFocus = value ?? false
+        NSLog("[NativeSearchBar] focusOnMount prop = \(shouldFocus), window=\(view.window != nil)")
+        if shouldFocus {
+          if view.window != nil {
+            view.focusWithRetry()
+          } else {
+            view.pendingAutoFocus = true
+          }
+        } else {
+          // Flipping back to false resigns focus so the keyboard hides
+          // when the parent collapses the search bar.
+          view.pendingAutoFocus = false
+          view.searchBar.resignFirstResponder()
+        }
+      }
+
       Prop("autoCapitalize") { (view, value: String?) in
         switch value {
         case "none":

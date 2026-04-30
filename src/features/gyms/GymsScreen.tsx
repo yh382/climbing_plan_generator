@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, Dimensions, ScrollView, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import MapboxGL from "@rnmapbox/maps";
 import type { MapState } from "@rnmapbox/maps";
 import * as Location from "expo-location";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
@@ -19,40 +18,26 @@ import { sortAndFilterGyms } from "./utils/sortAndFilter";
 import { distanceKm } from "./utils/distance";
 
 import { GymMap } from "./components/GymMap";
-import { MapControls } from "./components/MapHeaderControls";
-import { GymSearchBar } from "./components/GymSearchBar";
+import type { CragPin } from "./components/GymMap";
+import { MapTopBar } from "../mapscreen/components/MapTopBar";
+import { MapSearchBar } from "../mapscreen/components/MapSearchBar";
+import { useMapSheetState, DETENT_COLLAPSED } from "../mapscreen/hooks/useMapSheetState";
 import { GymList } from "./components/GymList";
 import { GymDetailCard } from "./components/GymDetailCard";
+import { AreaDetailCard } from "../outdoor/components/AreaDetailCard";
+import { outdoorApi } from "../outdoor/api";
+import type { Area } from "../outdoor/types";
 
-// Collapsed sheet should only show the search bar, like Apple Maps. The
-// collapsed detent = exactly SEARCH_BAR_HEIGHT (no safe-area padding).
-// Why no safe area: on iOS 26, any sheet with height ≤ 150 becomes a
-// "floating sheet" that does NOT attach to the bottom edge — it sits in
-// the lower portion of the screen with margins on all sides, including
-// the bottom, well above the home indicator. See TrueSheetViewController.mm
-// :130-134 where `detentBottomAdjustment` returns 0 for height ≤ 150 with
-// the comment "Floating sheets don't need adjustment". Since a floating
-// sheet never overlaps the home-indicator region, adding safe-area bottom
-// to the detent only creates dead space below the search bar that shows
-// list content. With detent = SEARCH_BAR_HEIGHT exactly, the content view
-// (flex:1 below the header) naturally resolves to 0pt.
-//
-// We still cannot use TrueSheet's `'auto'` detent — it breaks with
-// `scrollable: true` (contentHeight formula at TrueSheetViewController.mm
-// :542 resolves to 0 or full sheet). Must stay in sync with
-// GymSearchBar.tsx searchWrap: paddingTop 12 + height 44 + paddingBottom
-// 12 = 68.
-const SEARCH_BAR_HEIGHT = 68;
-// Absolute minimum collapsed height in points. Prevents the fraction from
-// going below the iOS minimum detent height on unusual devices.
-const COLLAPSED_MIN_PT = 60;
-const DETENT_COLLAPSED = 0;
-const DETENT_MEDIUM = 1;
+// Sheet detent constants + state (including auto-present, safeResize, collapseSheet)
+// live in useMapSheetState — see src/features/mapscreen/hooks/useMapSheetState.ts.
 
 export default function GymsScreen() {
   const mapRef = useRef<MapboxGL.MapView>(null);
   const camRef = useRef<MapboxGL.Camera>(null);
-  const sheetRef = useRef<TrueSheet>(null);
+  // Sheet state (ref + detents + auto-present + safeResize/collapseSheet) lives
+  // in useMapSheetState so both gyms-map and crag-map share identical behavior.
+  const sheet = useMapSheetState();
+  const sheetRef = sheet.sheetRef;
   // Second TrueSheet stacked on top of the list sheet when a gym is selected
   // (Apple Maps POI pattern). Its lifecycle is fully independent from the
   // list sheet — presenting/dismissing it never resizes the list sheet.
@@ -63,6 +48,10 @@ export default function GymsScreen() {
   // until the dismiss animation finishes.
   const [detailGym, setDetailGym] = useState<GymPlace | null>(null);
   const detailSheetPresentedRef = useRef(false);
+  // Outdoor areas for map pins
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  const [detailArea, setDetailArea] = useState<Area | null>(null);
   const insets = useSafeAreaInsets();
   const { tr } = useSettings();
   const { scheme, colors, primary, primaryBg } = useGymsColors();
@@ -81,16 +70,6 @@ export default function GymsScreen() {
   const [is3D, setIs3D] = useState(false);
   const [styleId, setStyleId] = useState<"outdoors" | "satellite">("outdoors");
 
-  // Runtime-computed detents. Collapsed = SEARCH_BAR_HEIGHT exactly (no
-  // safe-area padding — see top-of-file comment for why). Medium/large
-  // are fixed fractions of the window height.
-  const sheetDetents = useMemo(() => {
-    const windowHeight = Dimensions.get("window").height;
-    const collapsedPt = Math.max(COLLAPSED_MIN_PT, SEARCH_BAR_HEIGHT);
-    const collapsedFraction = collapsedPt / windowHeight;
-    return [collapsedFraction, 0.45, 0.8] as const;
-  }, []);
-
   // Track programmatic camera moves so we don't mistake them for user pan/zoom.
   const programmaticMoveRef = useRef(false);
   // When set, the next onMapIdle event will skip its debounced fetchNearby
@@ -98,16 +77,6 @@ export default function GymsScreen() {
   // taps a gym pin: the list should keep showing the user-centered
   // results instead of silently refocusing on the tapped gym's location.
   const suppressNextFetchRef = useRef(false);
-  // Track current sheet detent to avoid redundant resize calls.
-  const currentDetentRef = useRef<number>(DETENT_MEDIUM);
-  // Track whether the sheet's native view is actually mounted & presented.
-  // TrueSheet uses lazy native-view rendering: `resize()` has no internal
-  // guard and will reject with "No sheet found with tag" if called before
-  // `present()` has completed or after the sheet unmounts. Initial Mapbox
-  // camera events can fire before our explicit present() finishes, and
-  // navigation-back can fire `onCameraChanged` during unmount — both would
-  // surface the SHEET_NOT_FOUND promise rejection without this guard.
-  const sheetPresentedRef = useRef(false);
 
   const markProgrammaticMove = useCallback((durationMs: number) => {
     programmaticMoveRef.current = true;
@@ -116,20 +85,8 @@ export default function GymsScreen() {
     }, durationMs + 100);
   }, []);
 
-  const safeResize = useCallback((index: number) => {
-    if (!sheetPresentedRef.current) return;
-    // Catch promise rejections defensively — even with the presented guard,
-    // a resize that fires in the exact window between onDidDismiss and
-    // componentWillUnmount could still hit SHEET_NOT_FOUND, and we don't
-    // want to surface that as an unhandled rejection.
-    sheetRef.current?.resize(index).catch(() => {});
-  }, []);
-
-  const collapseSheet = useCallback(() => {
-    if (currentDetentRef.current === DETENT_COLLAPSED) return;
-    currentDetentRef.current = DETENT_COLLAPSED;
-    safeResize(DETENT_COLLAPSED);
-  }, [safeResize]);
+  // Alias hook helpers into the variable names the rest of the file expects.
+  const { safeResize, collapseSheet } = sheet;
 
   // Fetch nearby gyms
   const fetchNearby = useCallback(
@@ -164,24 +121,6 @@ export default function GymsScreen() {
     [],
   );
 
-  // Safety net for initialDetentIndex declarative auto-present. The native
-  // didMoveToWindow hook can miss its presenter lookup behind navigation
-  // transitions, and TrueSheet's initialDetentIndex is applied only once at
-  // mount. An explicit present() on the next frame guarantees the sheet
-  // reaches medium detent every time the screen mounts.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      currentDetentRef.current = DETENT_MEDIUM;
-      sheetRef.current?.present(DETENT_MEDIUM).catch(() => {});
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      // Mark unpresented so any late `onCameraChanged` fired during the
-      // unmount transition doesn't try to resize a torn-down native view.
-      sheetPresentedRef.current = false;
-    };
-  }, []);
-
   // When a gym is selected (from map pin or list tap), fly the camera to it
   // AND present the detail sheet on top of the list sheet (Apple Maps POI
   // pattern). The list sheet is intentionally NOT resized — its detent is
@@ -192,6 +131,9 @@ export default function GymsScreen() {
       // Update the local cache BEFORE presenting the sheet so that when
       // TrueSheet finishes presenting, GymDetailCard already has content.
       setDetailGym(selectedGym);
+      // Clear any selected area when a gym is tapped
+      setDetailArea(null);
+      setSelectedArea(null);
       markProgrammaticMove(600);
       // Block the debounced refetch that the camera fly-to would
       // otherwise trigger via onMapIdle. The list must keep its
@@ -246,6 +188,46 @@ export default function GymsScreen() {
       }
     })();
   }, []);
+
+  // Fetch outdoor areas for map pins (fire-and-forget, non-blocking)
+  useEffect(() => {
+    outdoorApi.listAreas({ country: 'CN', status: 'approved' }).then((data) => {
+      if (data) setAreas(data);
+    }).catch(() => {});
+  }, []);
+
+  // Convert areas to CragPin format for the map layer
+  const cragPins: CragPin[] = useMemo(
+    () =>
+      areas
+        .filter((a) => a.lat != null && a.lng != null)
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          lat: a.lat!,
+          lng: a.lng!,
+          route_count: a.route_count,
+          region: a.region,
+        })),
+    [areas],
+  );
+
+  const onSelectCrag = useCallback((pin: CragPin) => {
+    const area = areas.find((a) => a.id === pin.id);
+    if (!area) return;
+    // Clear any selected gym first
+    useGymsStore.getState().setSelectedGym(null);
+    setSelectedArea(area);
+    setDetailArea(area);
+    markProgrammaticMove(600);
+    suppressNextFetchRef.current = true;
+    camRef.current?.setCamera({
+      centerCoordinate: [pin.lng, pin.lat],
+      zoomLevel: 14,
+      animationDuration: 600,
+    });
+    detailSheetRef.current?.present(0).catch(() => {});
+  }, [areas, markProgrammaticMove]);
 
   // Debounce map pan to avoid excessive API calls
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -307,7 +289,29 @@ export default function GymsScreen() {
     useGymsStore.getState().setSelectedGym(gym);
   }, []);
 
-  const searchPlaceholder = tr("搜索附近的岩馆…", "Search nearby climbing gyms…");
+  // Item 1 (KAYA): area card in the sheet list → navigate straight to crag-map.
+  // Area pin on the map still opens AreaDetailCard via onSelectCrag (unchanged)
+  // — the detail card has its own "View Route Map" CTA.
+  const onSelectAreaFromList = useCallback((area: Area) => {
+    router.push({
+      pathname: "/outdoor/crag-map" as any,
+      params: { areaId: area.id, areaName: area.name },
+    });
+  }, []);
+
+  // Distance from current user → each area (meters), for mixed-list sort + display.
+  const areaDistances = useMemo<Record<string, number>>(() => {
+    if (!userLoc) return {};
+    const out: Record<string, number> = {};
+    for (const a of areas) {
+      if (a.lat != null && a.lng != null) {
+        out[a.id] = Math.round(distanceKm(userLoc, { lat: a.lat, lng: a.lng }) * 1000);
+      }
+    }
+    return out;
+  }, [areas, userLoc]);
+
+  const searchPlaceholder = tr("搜索岩馆或攀岩区…", "Search gyms or crags…");
   const emptyText = center
     ? tr("附近没有匹配结果", "No gyms found nearby.")
     : tr("等待定位或输入搜索关键字。", "Waiting for your location or a keyword…");
@@ -316,27 +320,35 @@ export default function GymsScreen() {
     <View style={[styles.root, { backgroundColor: scheme === "dark" ? "#0B1220" : "#E2E8F0" }]}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} translucent />
 
-      <MapControls
-        isAtUser={isAtUser}
-        styleId={styleId}
-        is3D={is3D}
-        onBack={() => {
-          router.back();
-        }}
-        onToggleStyle={() => setStyleId((s) => (s === "outdoors" ? "satellite" : "outdoors"))}
-        onToggle3D={() => setIs3D((v) => !v)}
-        onLocate={() => {
-          if (!userLoc) {
-            store.setError("定位未获取，请检查定位权限。");
-            return;
-          }
-          markProgrammaticMove(600);
-          camRef.current?.setCamera({
-            centerCoordinate: [userLoc.lng, userLoc.lat],
-            zoomLevel: 12.5,
-            animationDuration: 600,
-          });
-        }}
+      <MapTopBar
+        unionId="gyms-map-pill"
+        leftButton={{ icon: "chevron.left", onPress: () => router.back() }}
+        rightButtons={[
+          {
+            icon: styleId === "outdoors" ? "square.3.layers.3d.down.left" : "photo",
+            onPress: () => setStyleId((s) => (s === "outdoors" ? "satellite" : "outdoors")),
+          },
+          {
+            icon: is3D ? "cube.fill" : "cube",
+            onPress: () => setIs3D((v) => !v),
+          },
+          {
+            icon: "location",
+            visible: !isAtUser,
+            onPress: () => {
+              if (!userLoc) {
+                store.setError("定位未获取，请检查定位权限。");
+                return;
+              }
+              markProgrammaticMove(600);
+              camRef.current?.setCamera({
+                centerCoordinate: [userLoc.lng, userLoc.lat],
+                zoomLevel: 12.5,
+                animationDuration: 600,
+              });
+            },
+          },
+        ]}
       />
 
       <View style={styles.mapWrapper}>
@@ -344,29 +356,21 @@ export default function GymsScreen() {
           mapRef={mapRef}
           camRef={camRef}
           gyms={gyms}
+          crags={cragPins}
           styleURL={mapStyleURL}
           pitch={is3D ? 55 : 0}
           onMapIdle={onMapIdle}
           onCameraChanged={onCameraChanged}
           onSelectGym={openGymDetails}
+          onSelectCrag={onSelectCrag}
         />
       </View>
-
-      <LinearGradient
-        pointerEvents="none"
-        colors={
-          scheme === "dark"
-            ? ["rgba(11,18,32,0.85)", "rgba(11,18,32,0)"]
-            : ["rgba(248,250,252,0.85)", "rgba(248,250,252,0)"]
-        }
-        style={[styles.statusBarOverlay, { height: insets.top + 16 }]}
-      />
 
       <TrueSheet
         ref={sheetRef}
         name="gyms-sheet"
-        detents={[...sheetDetents]}
-        initialDetentIndex={DETENT_MEDIUM}
+        detents={[...sheet.detents]}
+        initialDetentIndex={DETENT_COLLAPSED}
         initialDetentAnimated
         dimmed={false}
         // Prevent pan-down-to-dismiss. Without this, dragging the sheet below
@@ -399,7 +403,7 @@ export default function GymsScreen() {
         // flex:1 in an absoluteFill container and auto-height resolves
         // to either 0 or the full sheet height).
         header={
-          <GymSearchBar
+          <MapSearchBar
             query={query}
             onChangeText={useGymsStore.getState().setQuery}
             onSubmitSearch={onSubmitSearch}
@@ -410,18 +414,10 @@ export default function GymsScreen() {
         // the header. Without this, the FlatList container has no
         // bounded height.
         scrollable
-        onDidPresent={() => {
-          sheetPresentedRef.current = true;
-        }}
-        onWillDismiss={() => {
-          sheetPresentedRef.current = false;
-        }}
-        onDidDismiss={() => {
-          sheetPresentedRef.current = false;
-        }}
-        onDetentChange={(e) => {
-          currentDetentRef.current = e.nativeEvent.index;
-        }}
+        onDidPresent={sheet.onDidPresent}
+        onWillDismiss={sheet.onWillDismiss}
+        onDidDismiss={sheet.onDidDismiss}
+        onDetentChange={sheet.onDetentChange}
       >
         {/*
           paddingBottom = safe-area bottom. TrueSheet's scrollable layout
@@ -437,7 +433,10 @@ export default function GymsScreen() {
         <View style={[styles.sheetContent, { paddingBottom: insets.bottom }]}>
           <GymList
             gyms={gyms}
+            areas={areas}
+            areaDistances={areaDistances}
             onSelectGym={onSelectGymFromList}
+            onSelectArea={onSelectAreaFromList}
             loading={loading}
             error={error}
             colors={colors}
@@ -487,6 +486,8 @@ export default function GymsScreen() {
           // setSelectedGym(null) from re-triggering a redundant dismiss()
           // because detailSheetPresentedRef.current is already false.
           setDetailGym(null);
+          setDetailArea(null);
+          setSelectedArea(null);
           useGymsStore.getState().setSelectedGym(null);
         }}
       >
@@ -498,13 +499,16 @@ export default function GymsScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            {detailGym && (
+            {detailGym && !detailArea && (
               <GymDetailCard
                 gym={detailGym}
                 onClose={() => detailSheetRef.current?.dismiss().catch(() => {})}
-                colors={colors}
-                primary={primary}
-                primaryBg={primaryBg}
+              />
+            )}
+            {detailArea && (
+              <AreaDetailCard
+                area={detailArea}
+                onClose={() => detailSheetRef.current?.dismiss().catch(() => {})}
               />
             )}
           </ScrollView>
@@ -533,13 +537,6 @@ export default function GymsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   mapWrapper: { flex: 1 },
-  statusBarOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 40,
-  },
   sheetContent: {
     flex: 1,
   },

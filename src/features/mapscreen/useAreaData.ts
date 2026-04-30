@@ -1,0 +1,109 @@
+// src/features/mapscreen/useAreaData.ts
+// Area-mode data: area detail + map pins + lazy wall/route fetching on pin tap.
+// Extracted from app/outdoor/crag-map.tsx. Exposes `loadWallsForPin` so the
+// unified MapScreen can render the same WallGroup sheet content without
+// duplicating the multi-level fetch logic.
+
+import { useCallback, useEffect, useState } from 'react';
+
+import { outdoorApi } from '../outdoor/api';
+import type { Area, MapPin, Wall } from '../outdoor/types';
+
+export interface UseAreaDataResult {
+  area: Area | null;
+  pins: MapPin[];
+  loading: boolean;
+  loadWallsForPin: (pin: MapPin) => Promise<Wall[]>;
+  search: (query: string) => Promise<import('../outdoor/types').OutdoorRoute[]>;
+}
+
+export function useAreaData(areaId: string | undefined): UseAreaDataResult {
+  const [area, setArea] = useState<Area | null>(null);
+  const [pins, setPins] = useState<MapPin[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!areaId) {
+      setArea(null);
+      setPins([]);
+      return;
+    }
+    setLoading(true);
+    Promise.all([outdoorApi.getArea(areaId), outdoorApi.getMapPins(areaId)])
+      .then(([areaData, pinData]) => {
+        if (areaData) setArea(areaData);
+        setPins(pinData ?? []);
+      })
+      .finally(() => setLoading(false));
+  }, [areaId]);
+
+  // Multi-level fetch based on pin kind — identical semantics to crag-map.
+  const loadWallsForPin = useCallback(async (pin: MapPin): Promise<Wall[]> => {
+    // Route-level pin — look up the parent wall from the already-loaded
+    // `pins` state (getMapPins emits parent_id on every route pin) and
+    // reconstruct its Wall object. No extra API call beyond getRoutes.
+    if (pin.level === 'route') {
+      const parentId = pin.parent_id;
+      if (!parentId) return [];
+      const wallPin = pins.find((p) => p.level === 'wall' && p.id === parentId);
+      if (!wallPin) return [];
+      const wallRoutes = await outdoorApi.getRoutes(parentId);
+      return [
+        {
+          id: wallPin.id,
+          sector_id: '',
+          name: wallPin.name,
+          lat: wallPin.lat,
+          lng: wallPin.lng,
+          sort_order: 0,
+          status: 'approved',
+          route_count: wallRoutes.length,
+          routes: wallRoutes,
+        },
+      ];
+    }
+    if (pin.level === 'wall') {
+      const wallRoutes = await outdoorApi.getRoutes(pin.id);
+      return [
+        {
+          id: pin.id,
+          sector_id: '',
+          name: pin.name,
+          lat: pin.lat,
+          lng: pin.lng,
+          sort_order: 0,
+          status: 'approved',
+          route_count: wallRoutes.length,
+          routes: wallRoutes,
+        },
+      ];
+    }
+    if (pin.level === 'sector') {
+      const sectorWalls = await outdoorApi.getWalls(pin.id);
+      return Promise.all(
+        sectorWalls.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
+      );
+    }
+    // crag: expand to all sectors → walls → routes
+    const sectors = await outdoorApi.getSectors(pin.id);
+    const allWalls: Wall[] = [];
+    for (const sec of sectors) {
+      const ws = await outdoorApi.getWalls(sec.id);
+      const wsWithRoutes = await Promise.all(
+        ws.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
+      );
+      allWalls.push(...wsWithRoutes);
+    }
+    return allWalls;
+  }, [pins]);
+
+  const search = useCallback(
+    async (query: string) => {
+      if (!areaId || !query.trim()) return [];
+      return outdoorApi.search(query.trim(), areaId);
+    },
+    [areaId],
+  );
+
+  return { area, pins, loading, loadWallsForPin, search };
+}

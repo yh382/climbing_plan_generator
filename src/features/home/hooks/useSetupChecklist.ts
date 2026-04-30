@@ -11,6 +11,7 @@ import { gymCommunityApi } from "@/features/gyms/api";
 import { api } from "@/lib/apiClient";
 import { registerForPushNotifications } from "@/lib/pushNotifications";
 import { useI18N } from "../../../../lib/i18n";
+import { mapHref } from "@/features/mapscreen/navigation";
 
 const STORAGE_KEY = "setup_climmate_progress";
 const OPEN_PRESESSION_KEY = "setup_auto_open_presession";
@@ -272,7 +273,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
 
   const handleFirstClimb = useCallback(async () => {
     await AsyncStorage.setItem(OPEN_PRESESSION_KEY, "true");
-    router.push("/(tabs)/calendar");
+    router.push("/(drawer)/(tabs)/activity" as any);
   }, [router]);
 
   const handleFirstPost = useCallback(() => {
@@ -295,7 +296,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
       subtitle: tr("身高、体重、臂展", "Height, weight & arm span"),
       completed: !!progress.body_info,
       locked: false,
-      onPress: () => router.push({ pathname: "/(tabs)/profile", params: { initialTab: "stats", expandBody: "true" } }),
+      onPress: () => router.push({ pathname: "/(drawer)/(tabs)/profile", params: { initialTab: "stats", expandBody: "true" } }),
     },
     {
       id: "find_gym",
@@ -303,7 +304,7 @@ export function useSetupChecklist(): UseSetupChecklistReturn {
       subtitle: tr("加入常去岩馆社区", "Join your home gym community"),
       completed: !!progress.find_gym,
       locked: false,
-      onPress: () => router.push("/gyms"),
+      onPress: () => router.push(mapHref()),
     },
     {
       id: "first_climb",

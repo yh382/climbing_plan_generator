@@ -27,6 +27,11 @@ export interface NativeSearchBarProps extends Omit<ViewProps, "onFocus" | "onBlu
   searchFieldBackgroundColor?: string;
   /** Placeholder font point size. Omit to use the system default. */
   placeholderFontSize?: number;
+  /** When true, the search field becomes first responder (raises the
+   *  keyboard + places the cursor inside). Retried up to ~2s to cover
+   *  modal/TrueSheet animation windows. Flipping back to false resigns
+   *  first responder (hides the keyboard). */
+  focusOnMount?: boolean;
 
   /** Fired on every text change */
   onChangeText?: (e: { nativeEvent: { text: string } }) => void;

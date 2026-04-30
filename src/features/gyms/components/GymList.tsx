@@ -1,12 +1,22 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import type { GymPlace } from "../../../../lib/poi/types";
+import type { Area } from "../../outdoor/types";
 import { PAGE_SIZE } from "../constants";
 import { GymListItem } from "./GymListItem";
+import { AreaListItem } from "../../outdoor/components/AreaListItem";
+
+// Merged list item type — gym and area are peers in the sheet list.
+type MixedItem =
+  | { kind: "gym"; key: string; distance_m?: number; gym: GymPlace }
+  | { kind: "area"; key: string; distance_m?: number; area: Area };
 
 interface GymListProps {
   gyms: GymPlace[];
+  areas?: Area[];
+  areaDistances?: Record<string, number>; // area.id → meters (optional; used for sort + display)
   onSelectGym: (gym: GymPlace) => void;
+  onSelectArea?: (area: Area) => void;
   loading: boolean;
   error: string | null;
   colors: {
@@ -21,27 +31,54 @@ interface GymListProps {
 
 export function GymList({
   gyms,
+  areas,
+  areaDistances,
   onSelectGym,
+  onSelectArea,
   loading,
   error,
   colors,
   emptyText,
 }: GymListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const listRef = useRef<FlatList<GymPlace>>(null);
+  const listRef = useRef<FlatList<MixedItem>>(null);
 
-  // Reset pagination when gyms change (new search/fetch)
+  // Build the mixed, distance-sorted list. Items without distance sink to the
+  // bottom (Infinity) so the nearby POIs float naturally to the top.
+  const mixedItems = useMemo<MixedItem[]>(() => {
+    const items: MixedItem[] = [];
+    for (const g of gyms) {
+      items.push({
+        kind: "gym",
+        key: `gym:${g.place_id}`,
+        distance_m: g.distance_m ?? undefined,
+        gym: g,
+      });
+    }
+    for (const a of areas ?? []) {
+      items.push({
+        kind: "area",
+        key: `area:${a.id}`,
+        distance_m: areaDistances?.[a.id],
+        area: a,
+      });
+    }
+    items.sort((x, y) => (x.distance_m ?? Infinity) - (y.distance_m ?? Infinity));
+    return items;
+  }, [gyms, areas, areaDistances]);
+
+  // Reset pagination when the merged item set changes (new search/fetch)
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [gyms]);
+  }, [mixedItems]);
 
-  const displayedGyms = gyms.slice(0, visibleCount);
+  const displayed = mixedItems.slice(0, visibleCount);
 
   const onEndReached = useCallback(() => {
-    if (visibleCount < gyms.length) {
-      setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, gyms.length));
+    if (visibleCount < mixedItems.length) {
+      setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, mixedItems.length));
     }
-  }, [visibleCount, gyms.length]);
+  }, [visibleCount, mixedItems.length]);
 
   const listHeader = useMemo(() => (
     <>
@@ -56,19 +93,31 @@ export function GymList({
 
   return (
     <View style={styles.listContainer}>
-      <FlatList<GymPlace>
+      <FlatList<MixedItem>
         ref={listRef}
-        data={displayedGyms}
-        keyExtractor={(it: GymPlace) => it.place_id}
+        data={displayed}
+        keyExtractor={(it) => it.key}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={listHeader}
-        renderItem={({ item }: { item: GymPlace }) => (
-          <GymListItem
-            gym={item}
-            onPress={() => onSelectGym(item)}
-            colors={colors}
-          />
-        )}
+        renderItem={({ item }) => {
+          if (item.kind === "gym") {
+            return (
+              <GymListItem
+                gym={item.gym}
+                onPress={() => onSelectGym(item.gym)}
+                colors={colors}
+              />
+            );
+          }
+          return (
+            <AreaListItem
+              area={item.area}
+              distanceM={item.distance_m}
+              onPress={() => onSelectArea?.(item.area)}
+              colors={colors}
+            />
+          );
+        }}
         ItemSeparatorComponent={() => (
           <View style={[styles.rowDivider, { backgroundColor: colors.shellBorder }]} />
         )}
@@ -84,10 +133,6 @@ export function GymList({
         bounces={false}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        // Only the 12pt visual breathing room at the bottom of the list.
-        // Safe-area bottom is handled by the parent (sheetContent in
-        // GymsScreen.tsx) so the FlatList container itself shrinks rather
-        // than overflowing into the home-indicator region.
         contentContainerStyle={[styles.listCardContent, { paddingBottom: 12 }]}
       />
     </View>
