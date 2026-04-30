@@ -18,9 +18,12 @@ const PROFILE_TABS = [
   { key: "posts", icon: "grid-outline", iconActive: "grid" },
   { key: "stats", icon: "stats-chart-outline", iconActive: "stats-chart" },
   { key: "badges", icon: "ribbon-outline", iconActive: "ribbon" },
+  { key: "lists", icon: "list-outline", iconActive: "list" },
 ] as const;
 
 const TAB_COUNT = PROFILE_TABS.length;
+const TAB_INDICES = PROFILE_TABS.map((_, i) => i);
+const TAB_DOT_OFFSETS_FACTOR = PROFILE_TABS.map((_, i) => i + 0.5);
 
 export interface ProfileTabBarProps {
   activeTab: string;
@@ -93,8 +96,8 @@ export default function ProfileTabBar({ activeTab, onTabPress, scrollPosition: s
     if (tabWidth === 0) return { opacity: 0 };
     const translateX = interpolate(
       scrollPosition.value,
-      [0, 1, 2],
-      [tabWidth * 0.5 - 2, tabWidth * 1.5 - 2, tabWidth * 2.5 - 2],
+      TAB_INDICES,
+      TAB_DOT_OFFSETS_FACTOR.map((f) => tabWidth * f - 2),
     );
     return { transform: [{ translateX }], opacity: 1 };
   });

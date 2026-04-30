@@ -21,6 +21,8 @@ export default function ProfileLayout() {
       <Stack.Screen name="likes" options={{ title: "Likes", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="mentions" options={{ title: "Mentions", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="saved" options={{ title: "Saved", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="lists" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="lists/[listId]" options={{ headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
     </Stack>
   );
 }

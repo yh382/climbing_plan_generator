@@ -9,6 +9,7 @@ export type PrivacySettingsData = {
   analysis_public: boolean;
   plans_public: boolean;
   badges_public: boolean;
+  lists_public: boolean;
 };
 
 export const profileApi = {
