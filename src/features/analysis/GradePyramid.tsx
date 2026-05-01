@@ -3,6 +3,7 @@ import React, { useMemo, useState, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { GradePyramidNative } from "../../../modules/climmate-charts/src";
 import useLogsStore from "../../store/useLogsStore";
 import { buildFixedGradePyramid } from "../../services/stats";
 import { useThemeColors } from "../../lib/useThemeColors";
@@ -11,24 +12,23 @@ import { useSettings } from "../../contexts/SettingsContext";
 
 type TabType = "boulder" | "rope";
 
-export default function GradePyramid() {
+type GradePyramidComponentProps = {
+  /** Set by AnalysisScreen carousel; flipping false→true re-fires the bar animation. */
+  isActive?: boolean;
+};
+
+export default function GradePyramid({ isActive = true }: GradePyramidComponentProps = {}) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { logs } = useLogsStore();
   const [activeTab, setActiveTab] = useState<TabType>("boulder");
+  const helpRef = useRef<TrueSheet>(null);
 
   const pyramidData = useMemo(() => {
     const type = activeTab === "boulder" ? "boulder" : "lead";
     return buildFixedGradePyramid(logs, type);
   }, [logs, activeTab]);
-
-  const maxCount = useMemo(() => {
-    if (pyramidData.length === 0) return 1;
-    return Math.max(...pyramidData.map((d) => d.count));
-  }, [pyramidData]);
-
-  const helpRef = useRef<TrueSheet>(null);
 
   return (
     <View style={styles.chartCard}>
@@ -58,38 +58,15 @@ export default function GradePyramid() {
       </View>
 
       <ScrollView
-        style={styles.pyramidScroll}
+        style={styles.chartContainer}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.chartBody}>
-          {pyramidData.map((item) => {
-            const widthPct = maxCount > 0 ? Math.max(12, (item.count / maxCount) * 100) : 0;
-            return (
-              <View key={item.grade} style={styles.row}>
-                <Text style={styles.gradeLabel}>{item.grade}</Text>
-                <View style={styles.barTrack}>
-                  {item.count > 0 ? (
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          width: `${widthPct}%`,
-                          backgroundColor: item.color,
-                          opacity: 0.9,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.barCount}>{item.count}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.emptyBar} />
-                  )}
-                </View>
-              </View>
-            );
-          })}
-        </View>
+        <GradePyramidNative
+          data={pyramidData}
+          climbType={activeTab === "boulder" ? "boulder" : "rope"}
+          isActive={isActive}
+        />
       </ScrollView>
 
       <TrueSheet
@@ -200,61 +177,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   toggleTextActive: {
     color: colors.toggleActiveText,
   },
-  pyramidScroll: {
+  chartContainer: {
     flex: 1,
-    paddingTop: 8,
+    minHeight: 240,
   },
-  chartBody: {
-    width: "100%",
-    paddingHorizontal: 10,
-  },
-  emptyContainer: {
-    height: 100,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontStyle: "italic",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-    width: "100%",
-  },
-  gradeLabel: {
-    width: 40,
-    textAlign: "right",
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.chartLabel,
-    marginRight: 8,
-  },
-  barTrack: {
-    flex: 1,
-    alignItems: "flex-start",
-  },
-  bar: {
-    height: 22,
-    borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 24,
-  },
-  barCount: {
-    color: "#FFF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  emptyBar: {
-    height: 22,
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: colors.emptyBarColor,
-  },
-  // TrueSheet help styles
   sheetHeader: {
     paddingHorizontal: 22,
     paddingTop: 26,

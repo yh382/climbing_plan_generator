@@ -63,7 +63,7 @@ const config: ExpoConfig = {
     "expo-location",
     "expo-secure-store",
     "expo-video",
-    ["expo-build-properties", { ios: { useFrameworks: "static" } }],
+    ["expo-build-properties", { ios: { useFrameworks: "static", deploymentTarget: "17.0" } }],
     ["expo-media-library", {
       photosPermission: "ClimMate 需要访问你的相册，以便选择头像和封面照片。",
     }],

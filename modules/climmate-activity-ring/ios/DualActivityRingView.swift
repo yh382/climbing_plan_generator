@@ -51,6 +51,9 @@ struct DualActivityRingSwiftUI: View {
     let thickness: Double
     let gap: Double
 
+    // No animation here — ActivityRingSwiftUI now sweeps from 0 on its own
+    // .onAppear, which propagates to both rings inside this composer.
+
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)

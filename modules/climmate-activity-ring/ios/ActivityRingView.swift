@@ -71,9 +71,12 @@ struct ActivityRingSwiftUI: View {
 
     private static let HEAD_DARKEN = 0.08
     private static let TAIL_LIGHTEN = 0.12
-    private static let GRADIENT_MIN_PROGRESS = 0.15
-    private static let BASE_SEGMENTS = 80
-    private static let MIN_SEGMENTS = 64
+
+    // Circle().trim(to:) is natively Animatable — angle interpolates smoothly
+    // each frame. Earlier impl used N segment Paths which `.animation` collapses
+    // into a "fade segments in" effect (whole ring appears at once) instead of
+    // the canonical Apple Fitness "sweep" feel.
+    @State private var displayedProgress: Double = 0
 
     var body: some View {
         let colorStart = color.darken(Self.HEAD_DARKEN)
@@ -81,66 +84,124 @@ struct ActivityRingSwiftUI: View {
 
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let cx = side / 2
-            let cy = side / 2
             let r  = (side - thickness) / 2
 
             ZStack {
-                // strokeBorder (not stroke) so the bg track's stroke stays
-                // inside the frame — matches the inset radius used by
-                // Path.addArc below. Without this the bg sits 6.5pt past
-                // the colored arc.
                 Circle()
                     .strokeBorder(bgTrackColor, lineWidth: thickness)
 
-                if progress > 0 {
-                    let hasOverlap = progress > 1
-                    if hasOverlap {
-                        let tFirstEnd = 1.0 / progress
-                        let firstSegs = max(Self.MIN_SEGMENTS,
-                            Int(Double(Self.BASE_SEGMENTS) * tFirstEnd * progress))
-                        GradientArc(cx: cx, cy: cy, r: r, thickness: thickness,
-                                    startAngle: 0, endAngle: 2 * .pi - 0.001,
-                                    tStart: 0, tEnd: tFirstEnd,
-                                    colorStart: colorStart, colorEnd: colorEnd,
-                                    segments: firstSegs)
+                // First lap. STATIC AngularGradient covering the full 360°.
+                // Earlier we tried dynamic endAngle to make the head land on
+                // colorEnd, but the lineCap.round at the trim's tip extends a
+                // few degrees past the gradient's end during animation —
+                // SwiftUI's behavior outside the gradient range causes the cap
+                // to render colorStart (dark) at angles past endAngle, giving
+                // a "head turns dark" flash near 12 o'clock as the first lap
+                // closes. Static 360° gradient keeps the cap inside the range
+                // at all times. Trade-off: head shows mid-gradient color
+                // mid-animation rather than always colorEnd, which is also
+                // how Apple Fitness behaves.
+                RingArcShape(progress: displayedProgress, lapStart: 0, thickness: thickness)
+                    .stroke(
+                        AngularGradient(
+                            colors: [colorStart, colorEnd],
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: thickness, lineCap: .round)
+                    )
 
-                        let frac = progress.truncatingRemainder(dividingBy: 1)
-                        let overlapAngle = (frac == 0) ? 2 * .pi : frac * 2 * .pi
-                        TipShadow(cx: cx, cy: cy, r: r, angle: overlapAngle,
-                                  thickness: thickness)
+                // Start cover at 12 o'clock — hides the first lap's lineCap
+                // bleed (gradient extends to colorStart behind the start cap).
+                // Always shown when progress > 0 so the bleed never flashes
+                // during animation. When the overlap arc is present, it sits
+                // ABOVE this cover in the ZStack and covers it with its own
+                // colorEnd-gradient start — no visual conflict.
+                Circle()
+                    .fill(colorStart)
+                    .frame(width: thickness, height: thickness)
+                    .offset(y: -r)
+                    .opacity(progress > 0 ? 1 : 0)
 
-                        let overlapSegs = max(24,
-                            Int(Double(Self.BASE_SEGMENTS) * (1 - tFirstEnd) * progress))
-                        GradientArc(cx: cx, cy: cy, r: r, thickness: thickness,
-                                    startAngle: 0, endAngle: overlapAngle,
-                                    tStart: tFirstEnd, tEnd: 1,
-                                    colorStart: colorStart, colorEnd: colorEnd,
-                                    segments: overlapSegs)
-                    } else if progress < Self.GRADIENT_MIN_PROGRESS {
-                        let totalAngle = progress * 2 * .pi
-                        Path { p in
-                            p.addArc(center: CGPoint(x: cx, y: cy), radius: r,
-                                     startAngle: .radians(-(.pi / 2)),
-                                     endAngle: .radians(totalAngle - .pi / 2),
-                                     clockwise: false)
-                        }
-                        .stroke(color, style: StrokeStyle(lineWidth: thickness,
-                                                          lineCap: .round))
-                    } else {
-                        let totalAngle = progress * 2 * .pi
-                        let segs = max(Self.MIN_SEGMENTS,
-                            Int(Double(Self.BASE_SEGMENTS) * progress))
-                        GradientArc(cx: cx, cy: cy, r: r, thickness: thickness,
-                                    startAngle: 0, endAngle: totalAngle,
-                                    tStart: 0, tEnd: 1,
-                                    colorStart: colorStart, colorEnd: colorEnd,
-                                    segments: segs)
-                    }
-                }
+                // Overlap second lap. Gradient colors continue the first lap's
+                // flow: starts at colorEnd (= first lap's tail color at 12
+                // o'clock) and ends at an even lighter shade for the head.
+                // This avoids a visible color break at the 12 o'clock seam.
+                let overlapVisible = overlapAngle(of: displayedProgress)
+                let colorOverlapHead = colorEnd.lighten(0.10)
+                RingArcShape(progress: displayedProgress, lapStart: 1, thickness: thickness)
+                    .stroke(
+                        AngularGradient(
+                            colors: [colorEnd, colorOverlapHead],
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(-90 + max(90, overlapVisible * 360))
+                        ),
+                        style: StrokeStyle(lineWidth: thickness, lineCap: .round)
+                    )
             }
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.1)) {
+                displayedProgress = progress
+            }
+        }
+        .onChange(of: progress) { newValue in
+            withAnimation(.easeOut(duration: 0.8)) {
+                displayedProgress = newValue
+            }
+        }
+    }
+
+    /// Visible angular extent (in turns, 0..1) of the overlap lap given total
+    /// progress. Used to position the floating head cap.
+    private func overlapAngle(of p: Double) -> Double {
+        guard p > 1 else { return 0 }
+        let frac = p.truncatingRemainder(dividingBy: 1)
+        return frac == 0 ? 1.0 : frac
+    }
+}
+
+// MARK: - RingArcShape
+
+/// One lap of an Apple Fitness-style ring. `progress` is 0..N where each
+/// 1.0 is one full revolution. `lapStart` selects which lap this shape
+/// renders: 0 for the first lap (visible while progress 0..1), 1 for the
+/// overlap (visible while progress 1..2). Both laps share a single
+/// `progress` value so SwiftUI animates them as one continuous head moving
+/// around the ring instead of two parallel sweeps.
+struct RingArcShape: Shape {
+    var progress: Double
+    let lapStart: Double
+    let thickness: Double
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let lapProgress = max(0, min(progress - lapStart, 1))
+        guard lapProgress > 0 else { return Path() }
+
+        let side = min(rect.width, rect.height)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        // Inset by half stroke so the resulting stroked arc stays inside the
+        // frame and lines up with the bg `strokeBorder`.
+        let radius = side / 2 - thickness / 2
+
+        let startAngle = -Double.pi / 2          // 12 o'clock
+        let endAngle = startAngle + lapProgress * 2 * .pi
+        var path = Path()
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .radians(startAngle),
+            endAngle: .radians(endAngle),
+            clockwise: false
+        )
+        return path
     }
 }
 

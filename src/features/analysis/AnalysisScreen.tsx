@@ -86,8 +86,8 @@ export default function AnalysisScreen({ embedded = false }: Props) {
   const csmHelpRef = useRef<TrueSheet>(null);
 
   const chartCards = [
-    { key: "volume", component: <TrainingVolumeChart /> },
-    { key: "pyramid", component: <GradePyramid /> },
+    { key: "volume", render: (active: boolean) => <TrainingVolumeChart isActive={active} /> },
+    { key: "pyramid", render: (active: boolean) => <GradePyramid isActive={active} /> },
   ];
 
   const content = (
@@ -149,12 +149,12 @@ export default function AnalysisScreen({ embedded = false }: Props) {
             setChartPage(page);
           }}
         >
-          {chartCards.map((card) => (
+          {chartCards.map((card, i) => (
             <View
               key={card.key}
               style={{ width: SCREEN_WIDTH, paddingHorizontal: 16, height: CHART_CARD_HEIGHT }}
             >
-              {card.component}
+              {card.render(chartPage === i)}
             </View>
           ))}
         </ScrollView>
