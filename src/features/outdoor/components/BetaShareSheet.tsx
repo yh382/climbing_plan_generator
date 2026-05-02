@@ -36,6 +36,12 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import { compressVideo } from '../../../lib/videoCompression';
+import { compressImage } from '../../../lib/imageCompression';
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from '../../../lib/uploadActivityBridge';
 import {
   uploadSingleFileToR2,
   toFileUri,
@@ -102,8 +108,12 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
     const handleSubmit = useCallback(async () => {
       if (!video || submitting) return;
       setSubmitting(true);
+      const uploadId = startUpload(tr('上传 Beta…', 'Uploading beta…'), 'la');
       try {
-        const compressedUri = await compressVideo(video.uri);
+        updateUpload(uploadId, 0, 'compressing');
+        const compressedUri = await compressVideo(video.uri,
+          (p) => updateUpload(uploadId, p * 0.6, 'compressing'));
+        updateUpload(uploadId, 0.6, 'uploading');
 
         // Prefer cover-picker's chosen frame; fall back to auto-generated.
         let thumbnailUrl: string | undefined;
@@ -124,7 +134,8 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
 
         if (localThumbUri) {
           try {
-            const thumbFileUri = await toFileUri(localThumbUri);
+            const compressedThumb = await compressImage(localThumbUri, 'thumbnail');
+            const thumbFileUri = await toFileUri(compressedThumb);
             thumbnailUrl = await uploadSingleFileToR2(
               thumbFileUri,
               'image/jpeg',
@@ -135,11 +146,13 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
           }
         }
 
+        updateUpload(uploadId, 0.85, 'uploading');
         const mediaUrl = await uploadSingleFileToR2(
           compressedUri,
           'video/mp4',
           BETA_CATEGORY,
         );
+        updateUpload(uploadId, 0.95);
 
         const body = {
           media_url: mediaUrl,
@@ -152,11 +165,13 @@ const BetaShareSheet = forwardRef<BetaShareSheetHandle, Props>(
           await betaApi.createForRoute(routeId, body);
         }
 
+        finishUpload(uploadId, 'success');
         sheetRef.current?.dismiss().catch(() => {});
         onSuccess?.();
       } catch (err: any) {
         const msg =
           err?.detail || err?.message || tr('上传失败，请重试', 'Upload failed');
+        finishUpload(uploadId, 'error', msg);
         Alert.alert(tr('上传失败', 'Upload failed'), msg);
       } finally {
         setSubmitting(false);

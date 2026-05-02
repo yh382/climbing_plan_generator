@@ -2,6 +2,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../../lib/apiClient';
 import { compressVideo } from '../../lib/videoCompression';
+import { compressImage } from '../../lib/imageCompression';
 import type {
   UserPostCreateIn,
   UserPostOut,
@@ -28,7 +29,8 @@ type PresignResponse = { upload_url: string; public_url: string; key: string };
 
 /** Upload a single local image (e.g. video cover thumbnail) to R2, return public URL. */
 export async function uploadThumbnailToR2(localUri: string): Promise<string> {
-  const fileUri = await toFileUri(localUri);
+  const compressed = await compressImage(localUri, 'thumbnail');
+  const fileUri = await toFileUri(compressed);
   const { upload_url, public_url } = await api.post<PresignResponse>(
     '/upload/presign',
     { category: 'posts', content_type: 'image/jpeg' }
@@ -81,7 +83,8 @@ export async function uploadPostMedia(
         const compressed = await compressVideo(item.uri);
         fileUri = compressed;
       } else {
-        fileUri = await toFileUri(item.uri);
+        const compressed = await compressImage(item.uri, 'postMedia');
+        fileUri = await toFileUri(compressed);
       }
 
       const contentType = item.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';

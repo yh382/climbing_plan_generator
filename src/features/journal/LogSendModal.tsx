@@ -19,6 +19,11 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { consumePendingMedia } from "@/features/community/pendingMedia";
 import { toFileUri, uploadLogMedia } from "@/features/journal/api";
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from "@/lib/uploadActivityBridge";
 import type { LogMedia } from "./loglist/types";
 import type { PickedMediaItem } from "@/features/community/types";
 
@@ -67,7 +72,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const [note, setNote] = useState("");
   const [mediaItems, setMediaItems] = useState<LogMedia[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(-1); // -1 = hidden, 0-100 = progress
+  // Upload progress is reported through the global Live Activity (uploadActivityBridge).
 
   // Present/dismiss based on visible prop
   useEffect(() => {
@@ -138,48 +143,61 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     try {
       const finalAttempts = style === "redpoint" ? attempts : 1;
 
-      // Upload local media to R2 before saving (cloud backup)
+      // Upload local media to R2 before saving (cloud backup).
+      // Progress reported through the global Live Activity.
       let finalMedia: LogMedia[] | undefined;
+      let uploadId: string | null = null;
       if (mediaItems.length > 0) {
-        setUploadProgress(0);
+        uploadId = startUpload(t("上传中…", "Uploading log…"), "la");
+        const total = mediaItems.length;
         const uploaded: LogMedia[] = [];
-        for (const m of mediaItems) {
+        let anyError = false;
+        for (let i = 0; i < mediaItems.length; i++) {
+          const m = mediaItems[i];
+          const stepBase = i / total;
+          const stepEnd = (i + 1) / total;
+          const stepSpan = stepEnd - stepBase;
           if (m.uri.startsWith("http")) {
             uploaded.push(m);
+            updateUpload(uploadId, stepEnd);
           } else {
             try {
               if (m.type === "video") {
-                // Upload video (80% of progress)
-                const result = await uploadLogMedia(m.uri, "video/mp4", (p) => setUploadProgress(p * 0.8));
-                // Upload or generate thumbnail (remaining 20%)
+                // Video upload = 80% of step, thumbnail = 20%
+                const result = await uploadLogMedia(m.uri, "video/mp4",
+                  (p) => updateUpload(uploadId!, stepBase + stepSpan * (p / 100) * 0.8));
                 let coverUrl = m.coverUri;
                 if (coverUrl && !coverUrl.startsWith("http")) {
                   try {
-                    const thumbResult = await uploadLogMedia(coverUrl, "image/jpeg", (p) => setUploadProgress(80 + p * 0.2));
+                    const thumbResult = await uploadLogMedia(coverUrl, "image/jpeg",
+                      (p) => updateUpload(uploadId!, stepBase + stepSpan * (0.8 + (p / 100) * 0.2)));
                     coverUrl = thumbResult.public_url;
                   } catch { /* keep local coverUri as fallback */ }
                 } else if (!coverUrl) {
                   try {
                     const VT = await import("expo-video-thumbnails");
                     const { uri: thumbUri } = await VT.getThumbnailAsync(m.uri, { time: 1000, quality: 0.7 });
-                    const thumbResult = await uploadLogMedia(thumbUri, "image/jpeg", (p) => setUploadProgress(80 + p * 0.2));
+                    const thumbResult = await uploadLogMedia(thumbUri, "image/jpeg",
+                      (p) => updateUpload(uploadId!, stepBase + stepSpan * (0.8 + (p / 100) * 0.2)));
                     coverUrl = thumbResult.public_url;
                   } catch { /* no thumbnail available */ }
                 }
                 uploaded.push({ ...m, uri: result.public_url, coverUri: coverUrl });
               } else {
-                // Image upload
-                const result = await uploadLogMedia(m.uri, "image/jpeg", (p) => setUploadProgress(p));
+                const result = await uploadLogMedia(m.uri, "image/jpeg",
+                  (p) => updateUpload(uploadId!, stepBase + stepSpan * (p / 100)));
                 uploaded.push({ ...m, uri: result.public_url });
               }
+              updateUpload(uploadId, stepEnd);
             } catch (err: any) {
               console.warn("[LOG_MEDIA] Upload failed, keeping local URI:", err?.message || err);
               uploaded.push(m); // fallback: save with local URI
+              anyError = true;
             }
           }
         }
         finalMedia = uploaded;
-        setUploadProgress(100);
+        finishUpload(uploadId, anyError ? "error" : "success");
       }
 
       await Promise.resolve(
@@ -187,7 +205,6 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
       );
     } finally {
       setSubmitting(false);
-      setUploadProgress(-1);
     }
   };
 
@@ -316,9 +333,7 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
           {/* Done */}
           <TouchableOpacity activeOpacity={0.9} onPress={handleDone} style={[styles.doneBtn, submitting && { opacity: 0.6 }]} disabled={submitting}>
             <Text style={styles.doneText}>
-              {submitting && uploadProgress >= 0
-                ? `${t("上传中", "Uploading")}${uploadProgress < 100 ? ` ${Math.round(uploadProgress)}%` : "..."}`
-                : t("完成", "Done")}
+              {submitting ? t("发送中…", "Sending…") : t("完成", "Done")}
             </Text>
           </TouchableOpacity>
         </View>

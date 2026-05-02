@@ -1,8 +1,9 @@
 // Background post upload manager.
-// Fires the upload + create-post flow after the user leaves the arrange/create screen,
-// exposing status so CommunityScreen can show a small progress banner.
+// Fires the upload + create-post flow after the user leaves the arrange/create
+// screen. Progress is reported through the global upload bridge (Live Activity
+// + zustand store), so the UI is consistent across all media-upload channels.
 
-import { useSyncExternalStore } from "react";
+import { Alert } from "react-native";
 import {
   uploadThumbnailToR2,
   uploadSingleFileToR2,
@@ -10,43 +11,15 @@ import {
 } from "./api";
 import { api } from "../../lib/apiClient";
 import { compressVideo } from "../../lib/videoCompression";
+import { compressImage } from "../../lib/imageCompression";
 import { useCommunityStore } from "../../store/useCommunityStore";
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from "../../lib/uploadActivityBridge";
 import type { PostDraft } from "./pendingPostDraft";
 import type { PickedMediaItem, UserPostCreateIn } from "./types";
-
-// ── State ──
-
-export type UploadStatus = "idle" | "compressing" | "uploading" | "success" | "error";
-
-export type UploadState = {
-  status: UploadStatus;
-  uploaded: number; // media items uploaded so far
-  total: number; // total media items to upload
-  error?: string;
-};
-
-let _state: UploadState = { status: "idle", uploaded: 0, total: 0 };
-const _listeners = new Set<() => void>();
-
-function setState(patch: Partial<UploadState>) {
-  _state = { ..._state, ...patch };
-  _listeners.forEach((fn) => fn());
-}
-
-function getSnapshot(): UploadState {
-  return _state;
-}
-
-function subscribe(cb: () => void) {
-  _listeners.add(cb);
-  return () => {
-    _listeners.delete(cb);
-  };
-}
-
-export function usePostUploadState(): UploadState {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
 
 // ── Metrics builder (extracted from create.tsx) ──
 
@@ -88,52 +61,53 @@ export async function submitPostInBackground(
   _pendingDraft = draft;
   _pendingMedia = sortedMedia;
 
-  setState({ status: "uploading", uploaded: 0, total: sortedMedia.length, error: undefined });
+  const uploadId = startUpload("Posting…", "la");
 
   try {
     // 1. Upload media one by one (compress videos → auto-thumbnail → upload)
     const localItems = sortedMedia.filter((m) => !m.uri.startsWith("http"));
     const uploadMap = new Map<string, { type: "image" | "video"; url: string }>();
     const autoThumbMap = new Map<string, string>(); // auto-generated thumbnails
+    const totalSteps = Math.max(1, localItems.length);
 
-    if (localItems.length > 0) {
-      setState({ total: localItems.length });
-      for (let i = 0; i < localItems.length; i++) {
-        const item = localItems[i];
+    for (let i = 0; i < localItems.length; i++) {
+      const item = localItems[i];
+      const stepBase = i / totalSteps;
+      const stepEnd = (i + 1) / totalSteps;
 
-        if (item.mediaType === "video") {
-          // Step 1: Compress video (HEVC→H.264)
-          setState({ status: "compressing" });
-          const compressedUri = await compressVideo(item.uri);
+      if (item.mediaType === "video") {
+        // Step 1: Compress video (HEVC→H.264)
+        updateUpload(uploadId, stepBase, "compressing");
+        const compressedUri = await compressVideo(item.uri);
 
-          // Step 2: Auto-generate thumbnail if missing
-          // Uses the COMPRESSED file (H.264) so it works even when
-          // the original HEVC couldn't be decoded for thumbnails.
-          if (!item.coverUri) {
-            try {
-              const VT = await import("expo-video-thumbnails");
-              const { uri: thumbUri } = await VT.getThumbnailAsync(
-                compressedUri,
-                { time: 1000, quality: 0.7 },
-              );
-              autoThumbMap.set(item.id, thumbUri);
-            } catch { /* fallback: no thumbnail */ }
-          }
-
-          // Step 3: Upload compressed video to R2
-          setState({ status: "uploading" });
-          const publicUrl = await uploadSingleFileToR2(compressedUri, "video/mp4");
-          uploadMap.set(item.id, { type: "video", url: publicUrl });
-        } else {
-          // Image: copy ph:// → file:// then upload
-          setState({ status: "uploading" });
-          const fileUri = await toFileUri(item.uri);
-          const publicUrl = await uploadSingleFileToR2(fileUri, "image/jpeg");
-          uploadMap.set(item.id, { type: "image", url: publicUrl });
+        // Step 2: Auto-generate thumbnail if missing
+        // Uses the COMPRESSED file (H.264) so it works even when
+        // the original HEVC couldn't be decoded for thumbnails.
+        if (!item.coverUri) {
+          try {
+            const VT = await import("expo-video-thumbnails");
+            const { uri: thumbUri } = await VT.getThumbnailAsync(
+              compressedUri,
+              { time: 1000, quality: 0.7 },
+            );
+            autoThumbMap.set(item.id, thumbUri);
+          } catch { /* fallback: no thumbnail */ }
         }
 
-        setState({ uploaded: i + 1 });
+        // Step 3: Upload compressed video to R2
+        updateUpload(uploadId, stepBase + (stepEnd - stepBase) * 0.4, "uploading");
+        const publicUrl = await uploadSingleFileToR2(compressedUri, "video/mp4");
+        uploadMap.set(item.id, { type: "video", url: publicUrl });
+      } else {
+        // Image: compress (longest ≤ 2048px, JPEG q=0.9) → ph:// → file:// → upload
+        updateUpload(uploadId, stepBase, "uploading");
+        const compressed = await compressImage(item.uri, "postMedia");
+        const fileUri = await toFileUri(compressed);
+        const publicUrl = await uploadSingleFileToR2(fileUri, "image/jpeg");
+        uploadMap.set(item.id, { type: "image", url: publicUrl });
       }
+
+      updateUpload(uploadId, stepEnd);
     }
 
     // Upload cover thumbnails to R2 (manual picks + auto-generated, parallel)
@@ -195,18 +169,18 @@ export async function submitPostInBackground(
         .catch(() => {});
     }
 
-    setState({ status: "success" });
+    finishUpload(uploadId, "success");
     _pendingDraft = null;
     _pendingMedia = null;
-
-    // Auto-dismiss after 2.5s
-    setTimeout(() => {
-      if (_state.status === "success") {
-        setState({ status: "idle", uploaded: 0, total: 0 });
-      }
-    }, 2500);
   } catch (e: any) {
-    setState({ status: "error", error: e?.message || "Upload failed" });
+    const msg = e?.message || "Upload failed";
+    finishUpload(uploadId, "error", msg);
+    // Surface a retry path. Live Activity shows the error icon but the
+    // detail/retry affordance lives here.
+    Alert.alert("Post Failed", msg, [
+      { text: "Dismiss", style: "cancel" },
+      { text: "Retry", onPress: () => retryUpload() },
+    ]);
   }
 }
 
@@ -214,10 +188,4 @@ export function retryUpload() {
   if (_pendingDraft && _pendingMedia) {
     submitPostInBackground(_pendingDraft, _pendingMedia);
   }
-}
-
-export function dismissUploadBanner() {
-  _pendingDraft = null;
-  _pendingMedia = null;
-  setState({ status: "idle", uploaded: 0, total: 0, error: undefined });
 }

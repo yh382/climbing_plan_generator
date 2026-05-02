@@ -25,6 +25,7 @@ import * as Notifications from "expo-notifications";
 import GorillaSplash from "../src/components/GorillaSplash";
 import FloatingActiveSessionTimer from "../src/features/journal/FloatingActiveSessionTimer";
 import BadgeUnlockToast from "../src/components/ui/BadgeUnlockToast";
+import UploadToastOverlay from "../src/components/UploadToastOverlay";
 
 import { useAuthStore } from "../src/store/useAuthStore";
 import useLogsStore from "../src/store/useLogsStore";
@@ -256,6 +257,7 @@ export default function RootLayout() {
             <View style={{ flex: 1 }}>
               <RootStack />
               <FloatingTimerOverlay />
+              <UploadToastOverlay />
               <BadgeUnlockToast />
             </View>
           </ThemeProvider>

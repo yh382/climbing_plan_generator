@@ -18,14 +18,8 @@ import useLogsStore from "../../store/useLogsStore";
 import useActiveWorkoutStore from "../../store/useActiveWorkoutStore";
 import { useChatStore } from "../../store/useChatStore";
 import GymsTab from "./gyms/GymsTab";
-import UploadProgressToast from "@/components/ui/UploadProgressToast";
 import ScrollToTopFab from "./components/ScrollToTopFab";
 import { setBlockVideoTaps } from "@/components/shared/MediaCarousel";
-import {
-  usePostUploadState,
-  retryUpload,
-  dismissUploadBanner,
-} from "./postUploadManager";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -44,20 +38,9 @@ export default function CommunityScreen() {
   const currentUserId = useUserStore((s) => s.user?.id);
   const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
 
-  // Upload progress tracking
-  const uploadState = usePostUploadState();
-  const uploadProgress = uploadState.total > 0 ? Math.min(95, (uploadState.uploaded / uploadState.total) * 100) : 0;
-  const showUploadToast = uploadState.status === "compressing" || uploadState.status === "uploading" || uploadState.status === "success";
-
-  // Show Alert on upload error
-  useEffect(() => {
-    if (uploadState.status === "error") {
-      Alert.alert("Post Failed", uploadState.error || "Upload failed", [
-        { text: "Dismiss", onPress: dismissUploadBanner },
-        { text: "Retry", onPress: retryUpload },
-      ]);
-    }
-  }, [uploadState.status]);
+  // Upload progress UI is now driven by the global Live Activity (see
+  // postUploadManager → uploadActivityBridge). Errors surface their own Alert
+  // from postUploadManager; nothing for this screen to track locally.
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -412,11 +395,6 @@ export default function CommunityScreen() {
         commentCount={commentPostCount}
       />
 
-      <UploadProgressToast
-        visible={showUploadToast}
-        progress={uploadState.status === "success" ? 100 : uploadProgress}
-        onDismiss={dismissUploadBanner}
-      />
     </>
   );
 }

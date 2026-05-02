@@ -50,6 +50,12 @@ import {
   toFileUri,
 } from '../../../src/features/community/api';
 import { compressVideo } from '../../../src/lib/videoCompression';
+import { compressImage } from '../../../src/lib/imageCompression';
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from '../../../src/lib/uploadActivityBridge';
 import type { PickedMediaItem } from '../../../src/features/community/types';
 import BetaShareSheet, {
   type BetaShareSheetHandle,
@@ -211,8 +217,12 @@ export default function GymRouteDetailPage() {
       //    uses. Send sheet stays in "Submitting…" state until this resolves.
       let betaUploaded = false;
       if (pendingBetaVideo) {
+        const uploadId = startUpload(tr('上传 Beta…', 'Uploading beta…'), 'la');
         try {
-          const compressedUri = await compressVideo(pendingBetaVideo.uri);
+          updateUpload(uploadId, 0, 'compressing');
+          const compressedUri = await compressVideo(pendingBetaVideo.uri,
+            (p) => updateUpload(uploadId, p * 0.6, 'compressing'));
+          updateUpload(uploadId, 0.6, 'uploading');
 
           let thumbnailUrl: string | undefined;
           const localThumbUri =
@@ -232,7 +242,8 @@ export default function GymRouteDetailPage() {
 
           if (localThumbUri) {
             try {
-              const thumbFileUri = await toFileUri(localThumbUri);
+              const compressedThumb = await compressImage(localThumbUri, 'thumbnail');
+              const thumbFileUri = await toFileUri(compressedThumb);
               thumbnailUrl = await uploadSingleFileToR2(
                 thumbFileUri,
                 'image/jpeg',
@@ -243,21 +254,25 @@ export default function GymRouteDetailPage() {
             }
           }
 
+          updateUpload(uploadId, 0.85, 'uploading');
           const mediaUrl = await uploadSingleFileToR2(
             compressedUri,
             'video/mp4',
             'route-beta',
           );
+          updateUpload(uploadId, 0.95);
 
           await gymsCatalogApi.createBeta(route.id, {
             media_url: mediaUrl,
             thumbnail_url: thumbnailUrl,
             description: draft.comment?.trim() || null,
           });
+          finishUpload(uploadId, 'success');
           betaUploaded = true;
         } catch (err: any) {
           const msg =
             err?.detail || err?.message || tr('Beta 上传失败', 'Beta upload failed');
+          finishUpload(uploadId, 'error', msg);
           Alert.alert(tr('Beta 上传失败', 'Beta upload failed'), msg);
         } finally {
           setPendingBetaVideo(null);

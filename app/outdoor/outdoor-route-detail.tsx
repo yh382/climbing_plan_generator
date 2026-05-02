@@ -37,6 +37,12 @@ import {
   toFileUri,
 } from '../../src/features/community/api';
 import { compressVideo } from '../../src/lib/videoCompression';
+import { compressImage } from '../../src/lib/imageCompression';
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from '../../src/lib/uploadActivityBridge';
 import { betaApi } from '../../src/features/outdoor/betaApi';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -191,8 +197,12 @@ export default function OutdoorRouteDetailPage() {
     //    The comment doubles as the beta description — one field, two uses.
     let betaUploaded = false;
     if (pendingBetaVideo) {
+      const uploadId = startUpload(tr('上传 Beta…', 'Uploading beta…'), 'la');
       try {
-        const compressedUri = await compressVideo(pendingBetaVideo.uri);
+        updateUpload(uploadId, 0, 'compressing');
+        const compressedUri = await compressVideo(pendingBetaVideo.uri,
+          (p) => updateUpload(uploadId, p * 0.6, 'compressing'));
+        updateUpload(uploadId, 0.6, 'uploading');
 
         let thumbnailUrl: string | undefined;
         // Prefer the cover frame the user picked in cover-picker; fall back
@@ -214,7 +224,8 @@ export default function OutdoorRouteDetailPage() {
 
         if (localThumbUri) {
           try {
-            const thumbFileUri = await toFileUri(localThumbUri);
+            const compressedThumb = await compressImage(localThumbUri, 'thumbnail');
+            const thumbFileUri = await toFileUri(compressedThumb);
             thumbnailUrl = await uploadSingleFileToR2(
               thumbFileUri,
               'image/jpeg',
@@ -225,11 +236,13 @@ export default function OutdoorRouteDetailPage() {
           }
         }
 
+        updateUpload(uploadId, 0.85, 'uploading');
         const mediaUrl = await uploadSingleFileToR2(
           compressedUri,
           'video/mp4',
           'route-beta',
         );
+        updateUpload(uploadId, 0.95);
 
         await betaApi.createForRoute(id, {
           media_url: mediaUrl,
@@ -237,6 +250,7 @@ export default function OutdoorRouteDetailPage() {
           description: draft.comment?.trim() || null,
         });
 
+        finishUpload(uploadId, 'success');
         betaUploaded = true;
       } catch (err: any) {
         // Surface upload failures but don't block the log — send is
@@ -244,6 +258,7 @@ export default function OutdoorRouteDetailPage() {
         // next send-sheet open starts fresh instead of showing a stale
         // "attached" row from a failed upload.
         const msg = err?.detail || err?.message || tr('Beta 上传失败', 'Beta upload failed');
+        finishUpload(uploadId, 'error', msg);
         Alert.alert(tr('Beta 上传失败', 'Beta upload failed'), msg);
       } finally {
         setPendingBetaVideo(null);

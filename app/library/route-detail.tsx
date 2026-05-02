@@ -7,15 +7,13 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
-  Modal,
   Pressable,
   FlatList,
   TouchableOpacity,
 } from "react-native";
 import { Image } from "expo-image";
-import { VideoView, useVideoPlayer } from "expo-video";
-import * as ScreenOrientation from "expo-screen-orientation";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
+import { presentImageViewer } from "../../modules/climmate-image-viewer/src";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,8 +23,12 @@ import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { getColorForGrade } from "../../lib/gradeColors";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
-import UploadProgressToast from "../../src/components/ui/UploadProgressToast";
 import { toFileUri, uploadLogMediaBatch } from "../../src/features/journal/api";
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from "../../src/lib/uploadActivityBridge";
 import { enqueueLogEvent } from "../../src/features/journal/sync/logsOutbox";
 import { syncWidgetFromStore } from "@/lib/widgetBridge";
 import useLogsStore from "../../src/store/useLogsStore";
@@ -56,30 +58,6 @@ function ensureMedia(item: LocalDayLogItem): LogMedia[] {
   return arr;
 }
 
-function VideoPlayerModal({ uri, onClose, topInset }: { uri: string; onClose: () => void; topInset: number }) {
-  const player = useVideoPlayer({ uri }, (p) => { p.play(); });
-
-  useEffect(() => {
-    ScreenOrientation.unlockAsync();
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    };
-  }, []);
-
-  return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <VideoView player={player} style={{ flex: 1 }} nativeControls contentFit="contain" />
-      <TouchableOpacity
-        style={{ position: "absolute", top: topInset + 8, left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}
-        onPress={onClose}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="close" size={22} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 export default function RouteDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -95,10 +73,7 @@ export default function RouteDetailScreen() {
   const [item, setItem] = useState<LocalDayLogItem | null>(null);
   const itemRef = useRef<LocalDayLogItem | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
-  const [playingVideoUri, setPlayingVideoUri] = useState<string | null>(null);
-  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
 
   const climbType = (type === "toprope" || type === "lead") ? type : "boulder";
 
@@ -196,7 +171,7 @@ export default function RouteDetailScreen() {
 
           // Upload to R2 (media files + cover thumbnails)
           setUploading(true);
-          setUploadProgress(0);
+          const uploadId = startUpload("Saving log media…", "la");
 
           // Build upload list: main media files
           const uploadItems = toAdd.map((m) => ({
@@ -212,10 +187,17 @@ export default function RouteDetailScreen() {
             }
           }
 
-          const results = await uploadLogMediaBatch(
-            uploadItems,
-            (p) => setUploadProgress(p),
-          );
+          let results: Awaited<ReturnType<typeof uploadLogMediaBatch>>;
+          try {
+            results = await uploadLogMediaBatch(
+              uploadItems,
+              (p) => updateUpload(uploadId, p / 100),
+            );
+            finishUpload(uploadId, "success");
+          } catch (err: any) {
+            finishUpload(uploadId, "error", err?.message);
+            throw err;
+          }
 
           // Replace local URIs with R2 URLs
           if (results.length > 0) {
@@ -405,15 +387,20 @@ export default function RouteDetailScreen() {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
                   setActiveMediaIndex(idx);
                 }}
-                renderItem={({ item: m }) => {
+                renderItem={({ item: m, index }) => {
                   const coverUri = m.type === "video" ? (m.coverUri || m.uri) : m.uri;
                   return (
                     <Pressable
                       style={{ width: SCREEN_W, height: "100%" }}
-                      onPress={() => {
-                        if (m.type === "video") setPlayingVideoUri(m.uri);
-                        else setPreviewImageUri(m.uri);
-                      }}
+                      onPress={() =>
+                        presentImageViewer({
+                          media: media.map((x) => ({
+                            url: x.uri,
+                            type: x.type,
+                          })),
+                          startIndex: index,
+                        })
+                      }
                     >
                       {coverUri ? (
                         <Image source={{ uri: coverUri }} style={s.mediaImage} contentFit="cover" />
@@ -514,36 +501,6 @@ export default function RouteDetailScreen() {
 
       </ScrollView>
 
-      <UploadProgressToast
-        visible={uploading}
-        progress={uploadProgress}
-        onDismiss={() => setUploading(false)}
-      />
-
-      {/* Video player modal */}
-      <Modal visible={!!playingVideoUri} animationType="fade" transparent onRequestClose={() => setPlayingVideoUri(null)}>
-        {playingVideoUri ? (
-          <VideoPlayerModal uri={playingVideoUri} onClose={() => setPlayingVideoUri(null)} topInset={insets.top} />
-        ) : null}
-      </Modal>
-
-      {/* Image preview modal */}
-      <Modal visible={!!previewImageUri} animationType="fade" transparent onRequestClose={() => setPreviewImageUri(null)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}>
-          <TouchableOpacity
-            style={{ position: "absolute", top: 60, right: 18, width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}
-            onPress={() => setPreviewImageUri(null)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="close" size={22} color="#fff" />
-          </TouchableOpacity>
-          <View style={{ width: "92%", height: "55%", borderRadius: 18, overflow: "hidden", backgroundColor: "#000" }}>
-            {previewImageUri ? (
-              <Image source={{ uri: previewImageUri }} style={{ width: "100%", height: "100%" }} contentFit="contain" />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
       </View>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button

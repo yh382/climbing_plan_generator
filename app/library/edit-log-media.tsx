@@ -22,7 +22,11 @@ import {
 } from "@/features/journal/loglist/storage";
 import { uploadLogMediaBatch, toFileUri } from "@/features/journal/api";
 import { api } from "@/lib/apiClient";
-import UploadProgressToast from "@/components/ui/UploadProgressToast";
+import {
+  startUpload,
+  updateUpload,
+  finishUpload,
+} from "@/lib/uploadActivityBridge";
 import type { LocalDayLogItem, LogMedia } from "@/features/journal/loglist/types";
 
 const LOG_MAX_MEDIA = 1;
@@ -59,7 +63,6 @@ export default function EditLogMediaScreen() {
   const [item, setItem] = useState<LocalDayLogItem | null>(null);
   const [mediaItems, setMediaItems] = useState<LogMedia[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Load item on mount
   useEffect(() => {
@@ -131,7 +134,7 @@ export default function EditLogMediaScreen() {
 
     if (toUpload.length > 0) {
       setUploading(true);
-      setUploadProgress(0);
+      const uploadId = startUpload("Saving log media…", "la");
       try {
         // Build upload list: main media files
         const uploadItems = toUpload.map((m) => ({
@@ -149,8 +152,9 @@ export default function EditLogMediaScreen() {
 
         const results = await uploadLogMediaBatch(
           uploadItems,
-          (p) => setUploadProgress(p)
+          (p) => updateUpload(uploadId, p / 100)
         );
+        finishUpload(uploadId, "success");
 
         // Map cover upload results
         let coverResultIdx = 0;
@@ -175,8 +179,9 @@ export default function EditLogMediaScreen() {
           }
           return m;
         });
-      } catch (e) {
+      } catch (e: any) {
         if (__DEV__) console.warn("Upload failed:", e);
+        finishUpload(uploadId, "error", e?.message);
         Alert.alert("Upload Error", "Some media failed to upload. Please try again.");
         setUploading(false);
         return;
@@ -262,12 +267,6 @@ export default function EditLogMediaScreen() {
             </TouchableOpacity>
           ) : null
         }
-      />
-
-      <UploadProgressToast
-        visible={uploading}
-        progress={uploadProgress}
-        onDismiss={() => setUploading(false)}
       />
     </View>
   );

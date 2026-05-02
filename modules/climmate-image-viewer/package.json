@@ -1,0 +1,6 @@
+{
+  "name": "climmate-image-viewer",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "private": true
+}

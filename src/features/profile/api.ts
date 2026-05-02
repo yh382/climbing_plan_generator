@@ -2,6 +2,11 @@
 
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../../lib/apiClient";
+import { compressImage } from "../../lib/imageCompression";
+import {
+  startUpload,
+  finishUpload,
+} from "../../lib/uploadActivityBridge";
 
 export type PrivacySettingsData = {
   posts_public: boolean;
@@ -44,26 +49,43 @@ export async function uploadImageToR2(
   localUri: string,
   category: "avatars" | "covers"
 ): Promise<string> {
-  // 0. Convert ph:// to file:// (uploadAsync doesn't support ph://)
-  const fileUri = await toFileUri(localUri);
-
-  // 1. Get presigned PUT URL from backend
-  const { upload_url, public_url } = await api.post<PresignResponse>(
-    "/upload/presign",
-    { category, content_type: "image/jpeg" }
+  // Surface 'silent' — avatar/cover are small enough (< 100KB after
+  // compression, ~500ms upload) that flashing a Live Activity would be jankier
+  // than no UI. Failures are surfaced via the caller's Alert (EditProfileView
+  // catches the throw). The store entry is kept anyway so there's a single
+  // record of every upload across the app.
+  const uploadId = startUpload(
+    category === "avatars" ? "Updating avatar" : "Updating cover",
+    "silent",
   );
 
-  // 2. Upload directly to R2
-  const result = await FileSystem.uploadAsync(upload_url, fileUri, {
-    httpMethod: "PUT",
-    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: { "Content-Type": "image/jpeg" },
-  });
+  try {
+    // 0. Compress (avatar 512px / cover 1920px) + convert ph:// to file://
+    const variant = category === "avatars" ? "avatar" : "cover";
+    const compressed = await compressImage(localUri, variant);
+    const fileUri = await toFileUri(compressed);
 
-  if (result.status < 200 || result.status >= 300) {
-    throw new Error(`Upload failed: ${result.status}`);
+    // 1. Get presigned PUT URL from backend
+    const { upload_url, public_url } = await api.post<PresignResponse>(
+      "/upload/presign",
+      { category, content_type: "image/jpeg" }
+    );
+
+    // 2. Upload directly to R2
+    const result = await FileSystem.uploadAsync(upload_url, fileUri, {
+      httpMethod: "PUT",
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: { "Content-Type": "image/jpeg" },
+    });
+
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`Upload failed: ${result.status}`);
+    }
+
+    finishUpload(uploadId, "success");
+    return public_url;
+  } catch (err: any) {
+    finishUpload(uploadId, "error", err?.message);
+    throw err;
   }
-
-  // 3. Return public HTTPS URL
-  return public_url;
 }

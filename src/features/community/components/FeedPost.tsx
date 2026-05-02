@@ -20,7 +20,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { FeedPost as FeedPostType, PostAttachment } from "../../../types/community";
 import MediaCarousel from "../../../components/shared/MediaCarousel";
-import ImageViewer from "../../../components/shared/ImageViewer";
+import { presentImageViewer } from "../../../../modules/climmate-image-viewer/src";
 import { PostAttachmentCard } from "../../../components/shared/PostAttachmentCard";
 
 function buildAttachmentProps(att: PostAttachment) {
@@ -139,12 +139,9 @@ function FeedPost({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const [viewerVisible, setViewerVisible] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState(0);
-
   const openViewer = (index: number) => {
-    setViewerIndex(index);
-    setViewerVisible(true);
+    if (!post.media || post.media.length === 0) return;
+    presentImageViewer({ media: post.media, startIndex: index });
   };
 
   return (
@@ -284,15 +281,6 @@ function FeedPost({
         </TouchableOpacity>
       </View>
 
-      {/* Full-screen media viewer modal */}
-      {post.media && post.media.length > 0 && (
-        <ImageViewer
-          media={post.media}
-          initialIndex={viewerIndex}
-          visible={viewerVisible}
-          onClose={() => setViewerVisible(false)}
-        />
-      )}
     </View>
   );
 }

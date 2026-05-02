@@ -3,10 +3,10 @@
 // wall section showing the holds. Same lightbox + tap-to-zoom pattern,
 // taller aspect ratio so vertical compositions don't crop.
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ImageViewer from '../../../components/shared/ImageViewer';
+import { presentImageViewer } from '../../../../modules/climmate-image-viewer/src';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
@@ -17,7 +17,6 @@ type Props = {
 };
 
 export function WallCloseUpCard({ wallCloseUpUrl, routeName }: Props) {
-  const [viewerOpen, setViewerOpen] = useState(false);
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -30,7 +29,12 @@ export function WallCloseUpCard({ wallCloseUpUrl, routeName }: Props) {
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={() => setViewerOpen(true)} style={styles.imageWrapper}>
+      <Pressable
+        onPress={() =>
+          presentImageViewer({ media: [{ url: wallCloseUpUrl, type: 'image' }] })
+        }
+        style={styles.imageWrapper}
+      >
         <Image
           source={{ uri: wallCloseUpUrl }}
           style={styles.image}
@@ -45,11 +49,6 @@ export function WallCloseUpCard({ wallCloseUpUrl, routeName }: Props) {
           <Ionicons name="expand-outline" size={14} color="#fff" />
         </View>
       </Pressable>
-      <ImageViewer
-        visible={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        media={[{ url: wallCloseUpUrl, type: 'image' }]}
-      />
     </View>
   );
 }

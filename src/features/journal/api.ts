@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../../lib/apiClient";
 import { compressVideo } from "../../lib/videoCompression";
+import { compressImage } from "../../lib/imageCompression";
 
 type UploadProgressCallback = (progress: number) => void;
 
@@ -39,7 +40,9 @@ export async function uploadLogMedia(
     // After compression, override content type to video/mp4
     contentType = "video/mp4";
   } else {
-    fileUri = await toFileUri(uri);
+    // Compress image: longest side ≤ 2048px, JPEG quality 0.9
+    const compressed = await compressImage(uri, "logMedia");
+    fileUri = await toFileUri(compressed);
   }
 
   // 1. Get presigned URL
