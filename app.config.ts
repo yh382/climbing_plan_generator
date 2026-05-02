@@ -72,7 +72,7 @@ const config: ExpoConfig = {
       color: "#22C55E",
     }],
     "expo-apple-authentication",
-    "@react-native-community/datetimepicker",
+    ["expo-image-picker", { photosPermission: false }],
     "expo-image",
     "expo-sharing",
     "expo-web-browser",

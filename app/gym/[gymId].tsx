@@ -30,6 +30,8 @@ import {
 } from '../../modules/glass-effect-union/src';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import { TopFadeMaskView } from '../../src/components/shared/TopFadeMaskView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 
@@ -103,6 +105,7 @@ export default function GymMapScreen() {
   const topBarStyle = useAnimatedStyle(() => ({
     opacity: topBarOpacity.value,
   }));
+
 
   /** Tapping a route dot on the floor plan scopes the sheet list to
    *  that route's wall instead of opening the detail page. The detail
@@ -232,12 +235,14 @@ export default function GymMapScreen() {
         </Animated.View>
       </View>
 
-      {/* Bottom peek sheet. Header is supplied via TrueSheet's
-          dedicated `header` prop (matches outdoor MapScreenMapbox
-          exactly) — TrueSheet pins it to the top of the sheet
-          content, sizes the inner ScrollView to fill the rest, and
-          the iOS native sheet does the standard scroll↔drag bridge
-          for ScrollViews discovered via `scrollable`. */}
+      {/* Bottom peek sheet. iOS 26 system edge effects don't compose
+          with MaskedView's CALayer mask — the system attaches its
+          fade rendering as auxiliary layers on the scroll view that
+          get clipped/conflicted by the mask. So both edges are handled
+          by MaskedView alpha gradients (RN-controlled, predictable):
+          - TOP: 80px alpha 0→1 ramp (Apple Maps style soft fade)
+          - BOTTOM: 60px alpha 1→0 ramp (mirror)
+          No `header` / `footer` props needed — pure RN solution. */}
       <TrueSheet
         name="gym-routes-peek-sheet"
         detents={[...SHEET_DETENTS]}
@@ -249,82 +254,83 @@ export default function GymMapScreen() {
         grabber
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         onDetentChange={onDetentChange}
-        header={
-          <View style={styles.peekHeader}>
-            <View style={{ width: 44, height: 44 }}>
-              <HeaderButton
-                icon="person.2"
-                variant="glass"
-                size={44}
-                iconSize={19}
-                iconWeight="light"
-                onPress={() => router.push('/gym-community' as any)}
-              />
-            </View>
-            <View style={{ flex: 1 }} />
-            <View style={{ width: 44, height: 44 }}>
-              <HeaderButton
-                icon="line.3.horizontal"
-                variant="glass"
-                size={44}
-                iconSize={19}
-                iconWeight="light"
-                onPress={() => menuSheetRef.current?.present()}
-              />
-            </View>
-            <View
-              style={styles.peekHeaderTitleAbsolute}
-              pointerEvents="box-none"
-            >
-              <View style={styles.peekHeaderTitleRow}>
-                {selectedSectionId ? (
-                  <TouchableOpacity
-                    onPress={handleClearWall}
-                    hitSlop={10}
-                    activeOpacity={0.6}
-                    style={styles.peekHeaderBack}
-                  >
-                    <Ionicons
-                      name="chevron-back"
-                      size={18}
-                      color={colors.textPrimary}
-                    />
-                  </TouchableOpacity>
-                ) : null}
+      >
+        <TopFadeMaskView topFadeRatio={0.25}>
+          <ScrollView
+            contentContainerStyle={styles.peekScrollBody}
+            showsVerticalScrollIndicator={false}
+          >
+            <GymRoutesSegment
+              gymId={gymId}
+              wallSections={wallSections}
+              pinSectionId={selectedSectionId}
+              onSelectRoute={handleOpenRouteDetail}
+              hideSectionHeaders={true}
+            />
+          </ScrollView>
+        </TopFadeMaskView>
+
+        {/* Floating title + buttons overlay — sibling of MaskedView at
+            level 1, absolutely positioned on top. Title is masked from
+            the alpha gradient (separate from ScrollView) so it stays
+            fully visible. */}
+        <View style={styles.peekHeaderOverlay} pointerEvents="box-none">
+          <View style={{ width: 44, height: 44 }}>
+            <HeaderButton
+              icon="person.2"
+              variant="glass"
+              size={44}
+              iconSize={19}
+              iconWeight="light"
+              onPress={() => router.push('/gym-community' as any)}
+            />
+          </View>
+          <View style={{ flex: 1 }} />
+          <View style={{ width: 44, height: 44 }}>
+            <HeaderButton
+              icon="line.3.horizontal"
+              variant="glass"
+              size={44}
+              iconSize={19}
+              iconWeight="light"
+              onPress={() => menuSheetRef.current?.present()}
+            />
+          </View>
+          <View
+            style={styles.peekHeaderTitleAbsolute}
+            pointerEvents="box-none"
+          >
+            <View style={styles.peekHeaderTitleRow}>
+              {selectedSectionId ? (
                 <TouchableOpacity
-                  onPress={() => menuSheetRef.current?.present()}
+                  onPress={handleClearWall}
+                  hitSlop={10}
                   activeOpacity={0.6}
-                  hitSlop={8}
-                  style={styles.peekHeaderTitleHit}
+                  style={styles.peekHeaderBack}
                 >
-                  <Text style={styles.peekHeaderTitle} numberOfLines={1}>
-                    {(selectedSectionId
-                      ? wallSections.find((w) => w.id === selectedSectionId)
-                          ?.name
-                      : gym?.name) ?? tr('岩馆', 'Gym')}
-                  </Text>
+                  <Ionicons
+                    name="chevron-back"
+                    size={18}
+                    color={colors.textPrimary}
+                  />
                 </TouchableOpacity>
-              </View>
+              ) : null}
+              <TouchableOpacity
+                onPress={() => menuSheetRef.current?.present()}
+                activeOpacity={0.6}
+                hitSlop={8}
+                style={styles.peekHeaderTitleHit}
+              >
+                <Text style={styles.peekHeaderTitle} numberOfLines={1}>
+                  {(selectedSectionId
+                    ? wallSections.find((w) => w.id === selectedSectionId)
+                        ?.name
+                    : gym?.name) ?? tr('岩馆', 'Gym')}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-        }
-      >
-        <ScrollView
-          contentContainerStyle={styles.peekScrollBody}
-          showsVerticalScrollIndicator={false}
-        >
-          <GymRoutesSegment
-            gymId={gymId}
-            wallSections={wallSections}
-            pinSectionId={selectedSectionId}
-            onSelectRoute={handleOpenRouteDetail}
-            // Always flat list — the wall name is on every route card
-            // breadcrumb, and the sheet's big title carries the
-            // currently-selected wall. Section sub-headers were
-            // adding visual noise without new information.
-            hideSectionHeaders={true}
-          />
-        </ScrollView>
+        </View>
       </TrueSheet>
 
       <GymMenuSheet
@@ -365,22 +371,29 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 12,
       gap: 8,
     },
+    peekContentRoot: {
+      flex: 1,
+    },
     peekScrollBody: {
+      // Match overlay header height (76) so initial content sits below
+      // the floating overlay. Content still scrolls UNDER the overlay
+      // — the iOS 26 system softStyle scrollEdgeEffect creates the
+      // gradient fade at scroll top.
+      paddingTop: 76,
       paddingBottom: 32,
     },
-    peekHeader: {
+    peekHeaderOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      // Apple HIG sheet-header spec: 16pt inset on all four sides for
-      // 44pt icon buttons. Outdoor reaches the same total by stacking
-      // 8pt sheetBody padding + 8pt headerRow padding inside its
-      // ScrollView. Our header lives in TrueSheet's dedicated `header`
-      // prop slot which has no wrapping ScrollView, so we apply the
-      // full 16pt directly here.
       paddingHorizontal: 16,
       paddingTop: 16,
       paddingBottom: 16,
       gap: 10,
+      zIndex: 10,
     },
     peekHeaderTitleAbsolute: {
       position: 'absolute',

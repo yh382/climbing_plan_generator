@@ -1,5 +1,6 @@
-// Module-level bridge to pass selected media items
-// from device-media-picker.tsx back to create.tsx via router.back()
+// Module-level bridge to pass selected media items between screens
+// (e.g. CommunityScreen "+" PHPicker → /community/create initial mode,
+// or arrange → create batch finalization).
 
 import type { PickedMediaItem } from './types';
 

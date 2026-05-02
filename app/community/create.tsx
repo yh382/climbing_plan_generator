@@ -27,6 +27,7 @@ import { setPostDraft } from "../../src/features/community/pendingPostDraft";
 import { consumeCoverUpdate } from "../../src/features/community/pendingCoverUpdate";
 import { uploadPostMedia, uploadThumbnailToR2 } from "../../src/features/community/api";
 import { submitPostInBackground } from "../../src/features/community/postUploadManager";
+import { pickMediaFromLibrary } from "../../src/lib/mediaPicker";
 
 const AUDIENCE_OPTIONS = [
   { value: 'public' as const, label: 'Public', icon: 'globe-outline' as const },
@@ -210,9 +211,17 @@ export default function CreatePostScreen() {
     }, [navigateToNextCoverPicker])
   );
 
-  const handleAddMedia = () => {
+  const handleAddMedia = async () => {
     if (mediaList.length >= MAX_MEDIA) return;
-    router.push('/community/device-media-picker');
+    const items = await pickMediaFromLibrary({
+      maxSelect: MAX_MEDIA - mediaList.length,
+    });
+    if (items.length === 0) return;
+    setMediaList(prev => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const unique = items.filter(m => !existingIds.has(m.id));
+      return [...prev, ...unique];
+    });
   };
 
   const handleRemoveMedia = (index: number) => {

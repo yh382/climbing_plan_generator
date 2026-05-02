@@ -28,6 +28,7 @@ import { useRouter } from 'expo-router';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
+import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import { useUserStore } from '../../../store/useUserStore';
 import { NativeSegmentedControl } from '../../../components/ui/NativeSegmentedControl';
 import RoutesLibrarySheet, { type RoutesLibrarySheetHandle } from './RoutesLibrarySheet';
@@ -120,9 +121,11 @@ const AreaMenuSheet = forwardRef<AreaMenuSheetHandle, AreaMenuSheetProps>((props
       detents={[0.9]}
       dimmed
       dismissible
+      scrollable
       grabber
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
     >
+      <TopFadeMaskView topFadeRatio={0.08}>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {/* 1. Area header card — full-bleed cover image (no overlay) + text
             block underneath. Tap the card to see the full area detail
@@ -245,6 +248,7 @@ const AreaMenuSheet = forwardRef<AreaMenuSheetHandle, AreaMenuSheetProps>((props
           </View>
         ) : null}
       </ScrollView>
+      </TopFadeMaskView>
     </TrueSheet>
 
     {/* Stacked sheet — opens on top of AreaMenuSheet when the user taps

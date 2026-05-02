@@ -22,7 +22,7 @@ import { format, parseISO } from "date-fns";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { getColorForGrade } from "../../lib/gradeColors";
-import { consumePendingMedia } from "../../src/features/community/pendingMedia";
+import { pickMediaFromLibrary } from "../../src/lib/mediaPicker";
 import { toFileUri, uploadLogMediaBatch } from "../../src/features/journal/api";
 import {
   startUpload,
@@ -122,129 +122,115 @@ export default function RouteDetailScreen() {
     return { sends, attemptsTotal, boltLabel };
   }, [item]);
 
-  const handleAddMedia = useCallback(() => {
+  const handleAddMedia = useCallback(async () => {
     if (media.length >= LOG_MAX_MEDIA) {
       Alert.alert("Limit Reached", `Each log can have up to ${LOG_MAX_MEDIA} media items.`);
       return;
     }
     const remaining = LOG_MAX_MEDIA - media.length;
-    router.push({ pathname: "/community/device-media-picker", params: { maxSelect: String(remaining), defaultAlbum: "Videos" } });
-  }, [media.length, router]);
+    const pending = await pickMediaFromLibrary({
+      maxSelect: remaining,
+      mediaType: "videos",
+    });
+    if (pending.length === 0) return;
 
-  // Consume media from device-media-picker when returning, then upload to R2
-  // NOTE: uses itemRef (not item) so the callback doesn't re-create when item changes,
-  // which would set cancelled=true and prevent the R2 URL save.
-  useFocusEffect(
-    useCallback(() => {
-      const pending = consumePendingMedia();
-      const currentItem = itemRef.current;
-      if (!pending || pending.length === 0 || !currentItem) return;
+    const currentItem = itemRef.current;
+    if (!currentItem) return;
+    const existing = ensureMedia(currentItem);
+    const usableRemaining = LOG_MAX_MEDIA - existing.length;
+    if (usableRemaining <= 0) return;
 
-      const existing = ensureMedia(currentItem);
-      const remaining = LOG_MAX_MEDIA - existing.length;
-      if (remaining <= 0) return;
+    // Convert ph:// URIs to file:// before storing
+    const toAdd: LogMedia[] = await Promise.all(
+      pending.slice(0, usableRemaining).map(async (p) => ({
+        id: p.id,
+        type: (p.mediaType === "video" ? "video" : "image") as "video" | "image",
+        uri: await toFileUri(p.uri),
+        coverUri: p.coverUri || undefined,
+      }))
+    );
+    try {
+      // Save local URIs first
+      const updater = (old: LocalDayLogItem) => ({
+        ...old,
+        media: [...ensureMedia(old), ...toAdd],
+      });
+      const nextList = sessionKey
+        ? await updateSessionItem(sessionKey, climbType, currentItem.id, updater)
+        : await updateDayItem(date, climbType, currentItem.id, updater);
+      if (nextList) {
+        const updated = nextList.find((it) => it.id === itemId) ?? null;
+        setItem(updated);
+      }
 
-      let cancelled = false;
-      (async () => {
-        // Convert ph:// URIs to file:// before storing
-        const toAdd: LogMedia[] = await Promise.all(
-          pending.slice(0, remaining).map(async (p) => ({
-            id: p.id,
-            type: (p.mediaType === "video" ? "video" : "image") as "video" | "image",
-            uri: await toFileUri(p.uri),
-            coverUri: p.coverUri || undefined,
-          }))
-        );
-        try {
-          // Save local URIs first
-          const updater = (old: LocalDayLogItem) => ({
-            ...old,
-            media: [...ensureMedia(old), ...toAdd],
-          });
-          const nextList = sessionKey
-            ? await updateSessionItem(sessionKey, climbType, currentItem.id, updater)
-            : await updateDayItem(date, climbType, currentItem.id, updater);
-          if (!cancelled && nextList) {
-            const updated = nextList.find((it) => it.id === itemId) ?? null;
-            setItem(updated);
-          }
+      // Upload to R2 (media files + cover thumbnails)
+      setUploading(true);
+      const uploadId = startUpload("Saving log media…", "la");
 
-          // Upload to R2 (media files + cover thumbnails)
-          setUploading(true);
-          const uploadId = startUpload("Saving log media…", "la");
-
-          // Build upload list: main media files
-          const uploadItems = toAdd.map((m) => ({
-            uri: m.uri,
-            contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
-          }));
-          // Append cover thumbnails that need uploading
-          const coverIndices: number[] = [];
-          for (const m of toAdd) {
-            if (m.coverUri && m.coverUri.startsWith("file://")) {
-              coverIndices.push(uploadItems.length);
-              uploadItems.push({ uri: m.coverUri, contentType: "image/jpeg" });
-            }
-          }
-
-          let results: Awaited<ReturnType<typeof uploadLogMediaBatch>>;
-          try {
-            results = await uploadLogMediaBatch(
-              uploadItems,
-              (p) => updateUpload(uploadId, p / 100),
-            );
-            finishUpload(uploadId, "success");
-          } catch (err: any) {
-            finishUpload(uploadId, "error", err?.message);
-            throw err;
-          }
-
-          // Replace local URIs with R2 URLs
-          if (results.length > 0) {
-            // Map cover upload results back to toAdd items
-            let coverResultIdx = 0;
-            const coverUrls: Record<string, string> = {};
-            for (let i = 0; i < toAdd.length; i++) {
-              if (toAdd[i].coverUri && toAdd[i].coverUri!.startsWith("file://") && coverIndices[coverResultIdx] !== undefined) {
-                const ri = coverIndices[coverResultIdx];
-                if (results[ri]) coverUrls[toAdd[i].id] = results[ri].public_url;
-                coverResultIdx++;
-              }
-            }
-
-            const urlUpdater = (old: LocalDayLogItem) => {
-              const oldMedia = ensureMedia(old);
-              const newMedia = oldMedia.map((m) => {
-                const idx = toAdd.findIndex((a) => a.id === m.id);
-                if (idx >= 0 && results[idx]) {
-                  return {
-                    ...m,
-                    uri: results[idx].public_url,
-                    coverUri: coverUrls[m.id] || m.coverUri,
-                  };
-                }
-                return m;
-              });
-              return { ...old, media: newMedia };
-            };
-            // Always save R2 URLs to storage (even if screen navigated away)
-            const finalList = sessionKey
-              ? await updateSessionItem(sessionKey, climbType, currentItem.id, urlUpdater)
-              : await updateDayItem(date, climbType, currentItem.id, urlUpdater);
-            if (!cancelled && finalList) {
-              const updated = finalList.find((it) => it.id === itemId) ?? null;
-              setItem(updated);
-            }
-          }
-        } catch (e) {
-          if (__DEV__) console.warn("Failed to save/upload media:", e);
-        } finally {
-          setUploading(false);
+      const uploadItems = toAdd.map((m) => ({
+        uri: m.uri,
+        contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
+      }));
+      const coverIndices: number[] = [];
+      for (const m of toAdd) {
+        if (m.coverUri && m.coverUri.startsWith("file://")) {
+          coverIndices.push(uploadItems.length);
+          uploadItems.push({ uri: m.coverUri, contentType: "image/jpeg" });
         }
-      })();
-      return () => { cancelled = true; };
-    }, [sessionKey, climbType, date, itemId])
-  );
+      }
+
+      let results: Awaited<ReturnType<typeof uploadLogMediaBatch>>;
+      try {
+        results = await uploadLogMediaBatch(
+          uploadItems,
+          (p) => updateUpload(uploadId, p / 100),
+        );
+        finishUpload(uploadId, "success");
+      } catch (err: any) {
+        finishUpload(uploadId, "error", err?.message);
+        throw err;
+      }
+
+      if (results.length > 0) {
+        let coverResultIdx = 0;
+        const coverUrls: Record<string, string> = {};
+        for (let i = 0; i < toAdd.length; i++) {
+          if (toAdd[i].coverUri && toAdd[i].coverUri!.startsWith("file://") && coverIndices[coverResultIdx] !== undefined) {
+            const ri = coverIndices[coverResultIdx];
+            if (results[ri]) coverUrls[toAdd[i].id] = results[ri].public_url;
+            coverResultIdx++;
+          }
+        }
+
+        const urlUpdater = (old: LocalDayLogItem) => {
+          const oldMedia = ensureMedia(old);
+          const newMedia = oldMedia.map((m) => {
+            const idx = toAdd.findIndex((a) => a.id === m.id);
+            if (idx >= 0 && results[idx]) {
+              return {
+                ...m,
+                uri: results[idx].public_url,
+                coverUri: coverUrls[m.id] || m.coverUri,
+              };
+            }
+            return m;
+          });
+          return { ...old, media: newMedia };
+        };
+        const finalList = sessionKey
+          ? await updateSessionItem(sessionKey, climbType, currentItem.id, urlUpdater)
+          : await updateDayItem(date, climbType, currentItem.id, urlUpdater);
+        if (finalList) {
+          const updated = finalList.find((it) => it.id === itemId) ?? null;
+          setItem(updated);
+        }
+      }
+    } catch (e) {
+      if (__DEV__) console.warn("Failed to save/upload media:", e);
+    } finally {
+      setUploading(false);
+    }
+  }, [media.length, sessionKey, climbType, date, itemId]);
 
   const handleDeleteLog = useCallback(() => {
     Alert.alert("Delete Log", "Are you sure you want to delete this log?", [

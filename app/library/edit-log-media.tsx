@@ -9,11 +9,10 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { HeaderButton } from "@/components/ui/HeaderButton";
-import { consumePendingMedia } from "@/features/community/pendingMedia";
+import { pickMediaFromLibrary } from "@/lib/mediaPicker";
 import {
   readDayList,
   readSessionList,
@@ -87,39 +86,32 @@ export default function EditLogMediaScreen() {
     };
   }, [date, itemId, climbType, sessionKey]);
 
-  // Consume pending media from device picker (images only — videos go through cover-picker → route-detail)
-  useFocusEffect(
-    useCallback(() => {
-      const pending = consumePendingMedia();
-      if (pending && pending.length > 0) {
-        // Convert ph:// → file:// before storing (preserve coverUri)
-        (async () => {
-          const converted = await Promise.all(
-            pending.map(async (p) => ({
-              id: p.id,
-              type: (p.mediaType === "video" ? "video" : "image") as
-                | "video"
-                | "image",
-              uri: await toFileUri(p.uri),
-              coverUri: p.coverUri || undefined,
-            }))
-          );
-          setMediaItems((prev) =>
-            [...prev, ...converted].slice(0, LOG_MAX_MEDIA)
-          );
-        })();
-      }
-    }, [])
-  );
-
-  const handleAddMore = useCallback(() => {
+  const handleAddMore = useCallback(async () => {
     if (mediaItems.length >= LOG_MAX_MEDIA) {
       Alert.alert("Limit", `Max ${LOG_MAX_MEDIA} media per log`);
       return;
     }
     const remaining = LOG_MAX_MEDIA - mediaItems.length;
-    router.push({ pathname: "/community/device-media-picker", params: { maxSelect: String(remaining), defaultAlbum: "Videos", source: "edit-log-media" } });
-  }, [mediaItems.length, router]);
+    const items = await pickMediaFromLibrary({
+      maxSelect: remaining,
+      mediaType: "videos",
+    });
+    if (items.length === 0) return;
+    // Convert ph:// → file:// before storing
+    const converted = await Promise.all(
+      items.map(async (p) => ({
+        id: p.id,
+        type: (p.mediaType === "video" ? "video" : "image") as
+          | "video"
+          | "image",
+        uri: await toFileUri(p.uri),
+        coverUri: p.coverUri || undefined,
+      }))
+    );
+    setMediaItems((prev) =>
+      [...prev, ...converted].slice(0, LOG_MAX_MEDIA)
+    );
+  }, [mediaItems.length]);
 
   const handleRemove = useCallback((mediaId: string) => {
     setMediaItems((prev) => prev.filter((m) => m.id !== mediaId));

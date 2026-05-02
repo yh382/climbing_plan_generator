@@ -21,6 +21,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import { useThemeColors } from '../../../lib/useThemeColors';
+import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import type { Gym, WallSection } from '../../gymsCatalog/types';
 
 export type GymInfoContext = 'main' | 'menu';
@@ -105,9 +106,11 @@ const GymInfoSheet = forwardRef<GymInfoSheetHandle, Props>(
         detents={[...detents]}
         dimmed
         dismissible
+        scrollable
         grabber
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       >
+        <TopFadeMaskView topFadeRatio={0.08}>
         <ScrollView
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
@@ -195,6 +198,7 @@ const GymInfoSheet = forwardRef<GymInfoSheetHandle, Props>(
             </Section>
           ) : null}
         </ScrollView>
+        </TopFadeMaskView>
       </TrueSheet>
     );
   },

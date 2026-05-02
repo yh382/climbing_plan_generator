@@ -30,7 +30,6 @@ import {
   Stack,
   useRouter,
   useLocalSearchParams,
-  useFocusEffect,
 } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -41,10 +40,7 @@ import { theme } from '../../../src/lib/theme';
 import GradeSuggestionCard, {
   type SendLog,
 } from '../../../src/components/shared/GradeSuggestionCard';
-import {
-  consumePendingMedia,
-  setPendingMedia,
-} from '../../../src/features/community/pendingMedia';
+import { pickMediaFromLibrary } from '../../../src/lib/mediaPicker';
 import {
   uploadSingleFileToR2,
   toFileUri,
@@ -110,11 +106,42 @@ export default function GymRouteDetailPage() {
   const [sendSheetOpen, setSendSheetOpen] = useState(false);
   const [pendingBetaVideo, setPendingBetaVideo] =
     useState<PickedMediaItem | null>(null);
-  // 'send'  → media picker returned for the send-sheet attached-beta flow
-  // 'direct'→ media picker returned for the bare camera-button flow
-  // null    → no in-flight picker round-trip
-  const betaFlowRef = useRef<'send' | 'direct' | null>(null);
   const betaShareSheetRef = useRef<BetaShareSheetHandle | null>(null);
+
+  // Picks a single video via system PHPicker, enforces the 90s cap, then
+  // dispatches to either 'send' (re-open OutdoorSendSheet w/ beta) or
+  // 'direct' (present BetaShareSheet standalone).
+  const pickAndDispatchBeta = useCallback(
+    async (flow: 'send' | 'direct') => {
+      if (!route) return;
+      const items = await pickMediaFromLibrary({
+        maxSelect: 1,
+        mediaType: 'videos',
+      });
+      const videoItem = items.find((m) => m.mediaType === 'video') ?? null;
+      if (!videoItem) return;
+      if (videoItem.duration && videoItem.duration > 90) {
+        Alert.alert(
+          tr('视频过长', 'Video too long'),
+          tr(
+            'Beta 视频请保持在 90 秒以内',
+            'Keep beta videos under 90 seconds.',
+          ),
+        );
+        return;
+      }
+      setSendSheetOpen(false);
+      if (flow === 'direct') {
+        requestAnimationFrame(() => {
+          betaShareSheetRef.current?.present(videoItem);
+        });
+      } else {
+        setPendingBetaVideo(videoItem);
+        requestAnimationFrame(() => setSendSheetOpen(true));
+      }
+    },
+    [route, tr],
+  );
 
   useEffect(() => {
     if (!routeId) return;
@@ -177,18 +204,10 @@ export default function GymRouteDetailPage() {
     setSendSheetOpen(true);
   }, [route]);
 
-  // OutdoorSendSheet's "Share Beta" row → push to picker with flow='send'
-  // so the focus effect re-opens the send sheet with the chosen video
-  // attached (vs flow='direct' which opens BetaShareSheet standalone).
-  const handleShareBetaFromSendSheet = useCallback(() => {
-    if (!route) return;
-    setSendSheetOpen(false);
-    setPendingMedia(null);
-    betaFlowRef.current = 'send';
-    router.push(
-      '/community/device-media-picker?maxSelect=1&source=beta' as any,
-    );
-  }, [route, router]);
+  const handleShareBetaFromSendSheet = useCallback(
+    () => pickAndDispatchBeta('send'),
+    [pickAndDispatchBeta],
+  );
 
   const handleRemoveBeta = useCallback(() => {
     setPendingBetaVideo(null);
@@ -317,50 +336,10 @@ export default function GymRouteDetailPage() {
     );
   }, [tr]);
 
-  // Camera button → bare share-beta flow (no rating). flow='direct' so the
-  // focus effect routes the picked video to BetaShareSheet rather than
-  // re-opening the send sheet. Setting the ref before navigation is the
-  // only reliable way to differentiate flows because the picker route is
-  // shared with the send-sheet "Share Beta" affordance.
   const handleShareBeta = useCallback(() => {
     if (!route || route.status === 'archived') return;
-    setPendingMedia(null);
-    betaFlowRef.current = 'direct';
-    router.push(
-      '/community/device-media-picker?maxSelect=1&source=beta' as any,
-    );
-  }, [route, router]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const pending = consumePendingMedia();
-      const flow = betaFlowRef.current;
-      betaFlowRef.current = null;
-      if (!pending || pending.length === 0) return;
-      const videoItem = pending.find((m) => m.mediaType === 'video') ?? null;
-      if (!videoItem) return;
-      // Hard-cap at 90s before opening the sheet — same limit the sheet
-      // enforces, but failing fast keeps users from sitting through the
-      // sheet animation just to be told their video is too long.
-      if (videoItem.duration && videoItem.duration > 90) {
-        Alert.alert(
-          tr('视频过长', 'Video too long'),
-          tr('Beta 视频请保持在 90 秒以内', 'Keep beta videos under 90 seconds.'),
-        );
-        return;
-      }
-      if (flow === 'direct') {
-        requestAnimationFrame(() => {
-          betaShareSheetRef.current?.present(videoItem);
-        });
-      } else {
-        // Default to the send-integrated flow: stash the video and
-        // re-open the send sheet with the attached-row visible.
-        setPendingBetaVideo(videoItem);
-        requestAnimationFrame(() => setSendSheetOpen(true));
-      }
-    }, [tr]),
-  );
+    pickAndDispatchBeta('direct');
+  }, [route, pickAndDispatchBeta]);
 
   if (loading) {
     return (

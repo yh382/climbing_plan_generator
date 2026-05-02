@@ -12,12 +12,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { useRouter } from "expo-router";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { consumePendingMedia } from "@/features/community/pendingMedia";
+import { pickMediaFromLibrary } from "@/lib/mediaPicker";
 import { toFileUri, uploadLogMedia } from "@/features/journal/api";
 import {
   startUpload,
@@ -61,7 +60,6 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const t = useMemo(() => tr ?? ((_zh: string, en: string) => en), [tr]);
-  const router = useRouter();
   const sheetRef = useRef<TrueSheet>(null);
   const isPresented = useRef(false);
 
@@ -93,24 +91,9 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     }
   }, [visible]);
 
-  // Consume pending media when screen regains focus (back from picker)
+  // Re-present sheet on focus if it should be visible.
   useFocusEffect(
     useCallback(() => {
-      const items = consumePendingMedia();
-      if (items && items.length > 0) {
-        // Convert ph:// → file:// before storing
-        (async () => {
-          const converted = await Promise.all(
-            items.map(async (item) => ({
-              ...item,
-              uri: await toFileUri(item.uri),
-            }))
-          );
-          setMediaItems((prev) =>
-            [...prev, ...converted.map(toLogMedia)].slice(0, LOG_MAX_MEDIA)
-          );
-        })();
-      }
       if (visible && !isPresented.current) {
         setTimeout(() => {
           sheetRef.current?.present();
@@ -133,8 +116,20 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
     setFeel(order[(idx + dir + order.length) % order.length]);
   };
 
-  const handleAddMedia = () => {
-    router.push("/community/device-media-picker" as any);
+  const handleAddMedia = async () => {
+    if (mediaItems.length >= LOG_MAX_MEDIA) return;
+    const remaining = LOG_MAX_MEDIA - mediaItems.length;
+    const items = await pickMediaFromLibrary({ maxSelect: remaining });
+    if (items.length === 0) return;
+    const converted = await Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        uri: await toFileUri(item.uri),
+      })),
+    );
+    setMediaItems((prev) =>
+      [...prev, ...converted.map(toLogMedia)].slice(0, LOG_MAX_MEDIA),
+    );
   };
 
   const handleDone = async () => {

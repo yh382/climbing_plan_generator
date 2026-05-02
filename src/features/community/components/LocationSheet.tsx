@@ -3,16 +3,17 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   TextInput,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { theme } from '../../../lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
 import { api } from '@/lib/apiClient';
+import { TopFadeMaskView } from '@/components/shared/TopFadeMaskView';
 
 type GymItem = {
   id: string;
@@ -205,19 +206,16 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
     <TrueSheet
       ref={sheetRef}
       detents={[0.6, 0.9]}
-
+      scrollable
       backgroundColor={colors.sheetBackground}
       grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       dimmed
       dimmedDetentIndex={0}
       onDidDismiss={handleDismiss}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Add Location</Text>
-      </View>
-
+      <TopFadeMaskView topFadeRatio={0.15}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 16 }}
+        contentContainerStyle={{ paddingTop: 56, paddingBottom: 16 }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.searchWrap}>
@@ -258,19 +256,27 @@ export default function LocationSheet({ visible, onClose, onSelect }: LocationSh
           ))
         )}
       </ScrollView>
+      </TopFadeMaskView>
+
+      <View style={styles.titleOverlay} pointerEvents="none">
+        <Text style={styles.titleText}>Add Location</Text>
+      </View>
     </TrueSheet>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  header: {
+  titleOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 22,
     paddingTop: 26,
     paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.cardBorder,
+    alignItems: 'center',
   },
-  headerTitle: {
+  titleText: {
     fontSize: 15,
     fontWeight: '600',
     fontFamily: theme.fonts.bold,

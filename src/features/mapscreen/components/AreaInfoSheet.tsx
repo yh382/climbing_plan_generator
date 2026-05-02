@@ -43,6 +43,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { theme } from '../../../lib/theme';
+import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import { outdoorApi } from '../../outdoor/api';
 import { useAreaFavoriteToggle } from '../../outdoor/hooks';
 import type { Accommodation, Area, Transport } from '../../outdoor/types';
@@ -331,6 +332,7 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
         footer={footer}
         onDidPresent={onPresent}
       >
+        <TopFadeMaskView topFadeRatio={0.08}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.body}
@@ -435,6 +437,7 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
           ) : null}
 
         </ScrollView>
+        </TopFadeMaskView>
 
       </TrueSheet>
     );

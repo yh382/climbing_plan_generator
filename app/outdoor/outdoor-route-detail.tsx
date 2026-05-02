@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
@@ -27,10 +27,7 @@ import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet
 import BetaShareSheet, {
   type BetaShareSheetHandle,
 } from '../../src/features/outdoor/components/BetaShareSheet';
-import {
-  consumePendingMedia,
-  setPendingMedia,
-} from '../../src/features/community/pendingMedia';
+import { pickMediaFromLibrary } from '../../src/lib/mediaPicker';
 import type { PickedMediaItem } from '../../src/features/community/types';
 import {
   uploadSingleFileToR2,
@@ -163,19 +160,48 @@ export default function OutdoorRouteDetailPage() {
     );
   }, [tr]);
 
-  // Beta video stash — populated by the useFocusEffect consumer below
-  // when we return from the device-media-picker. Declared here (before
-  // onSendDone) so onSendDone's closure sees it.
+  // Beta video stash. Declared here (before onSendDone) so its closure
+  // sees the latest value when the user submits the send-sheet.
   const [pendingBetaVideo, setPendingBetaVideo] =
     useState<PickedMediaItem | null>(null);
 
-  // Tracks which flow launched the media picker so the focus effect
-  // routes the returned video to the right landing surface:
-  //   'send'   → re-open OutdoorSendSheet with beta attached
-  //   'direct' → open BetaShareSheet (standalone upload)
-  // The ref is cleared as soon as the focus effect consumes it.
-  const betaFlowRef = useRef<'send' | 'direct' | null>(null);
   const betaShareSheetRef = useRef<BetaShareSheetHandle | null>(null);
+
+  // Picks a single video via system PHPicker, enforces the 90s cap, then
+  // dispatches to either the send-integrated flow ('send' → re-open
+  // OutdoorSendSheet with beta attached) or the standalone share flow
+  // ('direct' → present BetaShareSheet).
+  const pickAndDispatchBeta = useCallback(
+    async (flow: 'send' | 'direct') => {
+      if (!route) return;
+      const items = await pickMediaFromLibrary({
+        maxSelect: 1,
+        mediaType: 'videos',
+      });
+      const videoItem = items.find((m) => m.mediaType === 'video') ?? null;
+      if (!videoItem) return;
+      if (videoItem.duration && videoItem.duration > 90) {
+        Alert.alert(
+          tr('视频过长', 'Video too long'),
+          tr(
+            'Beta 视频请保持在 90 秒以内',
+            'Keep beta videos under 90 seconds.',
+          ),
+        );
+        return;
+      }
+      setSendSheetOpen(false);
+      if (flow === 'direct') {
+        requestAnimationFrame(() => {
+          betaShareSheetRef.current?.present(videoItem);
+        });
+      } else {
+        setPendingBetaVideo(videoItem);
+        requestAnimationFrame(() => setSendSheetOpen(true));
+      }
+    },
+    [route, tr],
+  );
 
   const onSendDone = useCallback(async (draft: OutdoorSendDraft) => {
     if (!id) return;
@@ -275,64 +301,19 @@ export default function OutdoorRouteDetailPage() {
     );
   }, [id, tr, pendingBetaVideo]);
 
-  const handleShareBeta = useCallback(() => {
-    if (!route) return;
-    setSendSheetOpen(false);
-    // Clear global pending media so we don't accidentally consume a
-    // stale pick from another flow. `pendingBetaVideo` stays until the
-    // new one overwrites it — if the user cancels the picker, the
-    // previously attached beta is preserved.
-    setPendingMedia(null);
-    betaFlowRef.current = 'send';
-    router.push(
-      '/community/device-media-picker?maxSelect=1&source=beta' as any,
-    );
-  }, [route, router]);
+  const handleShareBeta = useCallback(
+    () => pickAndDispatchBeta('send'),
+    [pickAndDispatchBeta],
+  );
 
-  const handleDirectShareBeta = useCallback(() => {
-    if (!route) return;
-    setPendingMedia(null);
-    betaFlowRef.current = 'direct';
-    router.push(
-      '/community/device-media-picker?maxSelect=1&source=beta' as any,
-    );
-  }, [route, router]);
+  const handleDirectShareBeta = useCallback(
+    () => pickAndDispatchBeta('direct'),
+    [pickAndDispatchBeta],
+  );
 
   const handleRemoveBeta = useCallback(() => {
     setPendingBetaVideo(null);
   }, []);
-
-  // Returning from the picker → stash the picked video and either re-open
-  // the send sheet (integrated flow) or present BetaShareSheet (direct
-  // camera-button flow). Enforce the 90s cap here so the user doesn't
-  // wait for a long upload that would be rejected.
-  useFocusEffect(
-    useCallback(() => {
-      const pending = consumePendingMedia();
-      const flow = betaFlowRef.current;
-      betaFlowRef.current = null;
-      if (!pending || pending.length === 0) return;
-      const videoItem = pending.find((m) => m.mediaType === 'video') ?? null;
-      if (!videoItem) return;
-      if (videoItem.duration && videoItem.duration > 90) {
-        Alert.alert(
-          tr('视频过长', 'Video too long'),
-          tr('Beta 视频请保持在 90 秒以内', 'Keep beta videos under 90 seconds.'),
-        );
-        return;
-      }
-      if (flow === 'direct') {
-        requestAnimationFrame(() => {
-          betaShareSheetRef.current?.present(videoItem);
-        });
-      } else {
-        // Default to the send-integrated flow for any other entry
-        // (including stale picks where flow wasn't set).
-        setPendingBetaVideo(videoItem);
-        requestAnimationFrame(() => setSendSheetOpen(true));
-      }
-    }, [tr]),
-  );
 
   if (loading) {
     return (

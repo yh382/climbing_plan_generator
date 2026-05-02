@@ -20,6 +20,8 @@ import { useChatStore } from "../../store/useChatStore";
 import GymsTab from "./gyms/GymsTab";
 import ScrollToTopFab from "./components/ScrollToTopFab";
 import { setBlockVideoTaps } from "@/components/shared/MediaCarousel";
+import { pickMediaFromLibrary } from "@/lib/mediaPicker";
+import { setPendingMedia } from "./pendingMedia";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -307,7 +309,12 @@ export default function CommunityScreen() {
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon="plus"
-          onPress={() => router.push("/community/device-media-picker?mode=initial")}
+          onPress={async () => {
+            const items = await pickMediaFromLibrary({ maxSelect: 10 });
+            if (items.length === 0) return;
+            setPendingMedia(items);
+            router.push("/community/create" as any);
+          }}
         />
         <Stack.Toolbar.Button
           separateBackground

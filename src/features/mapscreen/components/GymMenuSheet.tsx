@@ -24,6 +24,7 @@ import { useRouter } from 'expo-router';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import { useThemeColors } from '../../../lib/useThemeColors';
+import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import { useUserStore } from '../../../store/useUserStore';
 import GymInfoSheet, {
   type GymInfoSheetHandle,
@@ -103,9 +104,11 @@ const GymMenuSheet = forwardRef<GymMenuSheetHandle, Props>((props, ref) => {
         detents={[0.9]}
         dimmed
         dismissible
+        scrollable
         grabber
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
       >
+        <TopFadeMaskView topFadeRatio={0.08}>
         <ScrollView
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
@@ -221,6 +224,7 @@ const GymMenuSheet = forwardRef<GymMenuSheetHandle, Props>((props, ref) => {
             </View>
           ) : null}
         </ScrollView>
+        </TopFadeMaskView>
       </TrueSheet>
 
       {/* Stacked sheets */}

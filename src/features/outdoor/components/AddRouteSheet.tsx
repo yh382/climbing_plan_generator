@@ -5,12 +5,11 @@
 //   sub-segment (when Rope): Sport / Trad / Multi-pitch
 //   name (text)  | grade (chip scroller, V-scale or YDS per top seg)
 //   coords (use-map-center OR tap-on-map-to-pin)
-//   photos (reuses /community/device-media-picker route)
+//   photos (system PHPicker via expo-image-picker)
 //
-// Photo picker flow: the picker is a full-screen route, not a component.
-// We dismiss this sheet, push the picker, and re-present via
-// useFocusEffect after router.back() + consumePendingMedia() drains the
-// bridge (same pattern as LogSendModal).
+// Photo picker flow: dismiss this sheet, await pickMediaFromLibrary, then
+// re-present (PHPicker is a system modal that would otherwise stack on
+// top of TrueSheet's modal layer).
 //
 // Pin-pick flow: we dismiss this sheet and let the host map screen take
 // over (crosshair overlay + onPress handler). Host calls ref.setCoords()
@@ -30,7 +29,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
-import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
 import { useThemeColors } from '../../../lib/useThemeColors';
@@ -39,7 +37,7 @@ import { theme } from '../../../lib/theme';
 import { NativeSegmentedControl } from '../../../components/ui/NativeSegmentedControl';
 import { V_SCALE_GRADES, YDS_GRADES } from '../../../lib/gradeSystem';
 import { uploadPostMedia } from '../../community/api';
-import { consumePendingMedia } from '../../community/pendingMedia';
+import { pickMediaFromLibrary } from '../../../lib/mediaPicker';
 import { outdoorApi } from '../api';
 
 type RopeStyle = 'sport' | 'trad' | 'multi-pitch';
@@ -71,14 +69,8 @@ interface AddRouteSheetProps {
 const AddRouteSheet = forwardRef<AddRouteSheetHandle, AddRouteSheetProps>((props, ref) => {
   const colors = useThemeColors();
   const { tr } = useSettings();
-  const router = useRouter();
   const sheetRef = useRef<TrueSheet>(null);
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  // Set to true when we programmatically dismiss the sheet before
-  // pushing the device-media-picker; useFocusEffect re-presents on
-  // return and clears this flag.
-  const pendingRepresentRef = useRef(false);
 
   // Top segment: 0 = Rope, 1 = Boulder
   const [topIdx, setTopIdx] = useState(0);
@@ -111,56 +103,36 @@ const AddRouteSheet = forwardRef<AddRouteSheetHandle, AddRouteSheetProps>((props
     setCoords: (c) => setCoords(c),
   }));
 
-  // Back from /community/device-media-picker: consume the media bridge,
-  // upload photos to R2 under `outdoor_routes/`, re-present the sheet.
-  useFocusEffect(
-    useCallback(() => {
-      const items = consumePendingMedia();
-      if (items && items.length > 0) {
-        const photos = items.filter((it) => it.mediaType === 'image');
-        if (photos.length > 0) {
-          setUploading(true);
-          uploadPostMedia(photos, 'outdoor_routes')
-            .then((uploaded) => {
-              setPhotoUrls((prev) => [...prev, ...uploaded.map((u) => u.url)]);
-            })
-            .catch((e) => {
-              Alert.alert(
-                tr('上传失败', 'Upload failed'),
-                String(e?.message ?? e),
-              );
-            })
-            .finally(() => {
-              setUploading(false);
-            });
-        }
-      }
-      // Re-present only if we left via our own picker push — NOT if the
-      // user dismissed the sheet by swiping down (onDidDismiss clears
-      // the flag).
-      if (pendingRepresentRef.current) {
-        pendingRepresentRef.current = false;
-        setTimeout(() => sheetRef.current?.present().catch(() => {}), 50);
-      }
-    }, [tr]),
-  );
-
-  const handlePickPhotos = () => {
+  const handlePickPhotos = async () => {
     const remaining = MAX_PHOTOS - photoUrls.length;
     if (remaining <= 0) {
       Alert.alert(tr('照片数量已达上限', 'Photo limit reached'));
       return;
     }
-    pendingRepresentRef.current = true;
-    sheetRef.current?.dismiss().catch(() => {});
-    router.push({
-      pathname: '/community/device-media-picker' as any,
-      params: {
-        mode: 'initial',
-        maxSelect: String(remaining),
-        source: 'add-route',
-      },
-    });
+    // Dismiss the sheet so PHPicker doesn't stack on top of TrueSheet's
+    // modal layer (re-present after pick completes / cancels).
+    await sheetRef.current?.dismiss().catch(() => {});
+    let items: Awaited<ReturnType<typeof pickMediaFromLibrary>> = [];
+    try {
+      items = await pickMediaFromLibrary({
+        maxSelect: remaining,
+        mediaType: 'images',
+      });
+    } finally {
+      setTimeout(() => sheetRef.current?.present().catch(() => {}), 50);
+    }
+    if (items.length === 0) return;
+    const photos = items.filter((it) => it.mediaType === 'image');
+    if (photos.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded = await uploadPostMedia(photos, 'outdoor_routes');
+      setPhotoUrls((prev) => [...prev, ...uploaded.map((u) => u.url)]);
+    } catch (e: any) {
+      Alert.alert(tr('上传失败', 'Upload failed'), String(e?.message ?? e));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const [locLoading, setLocLoading] = useState(false);

@@ -36,6 +36,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/useThemeColors';
 import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
+import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
 
 import { useGymsStore } from '../../store/useGymsStore';
 import AreaMenuSheet, { type AreaMenuSheetHandle } from './components/AreaMenuSheet';
@@ -1228,113 +1229,23 @@ export default function MapScreenMapbox({
             />
           </View>
         ) : (
+          <>
+          <TopFadeMaskView topFadeRatio={0.15}>
           <ScrollView
             ref={sheetScrollRef}
-            contentContainerStyle={[cragStyles(colors).sheetBody, { paddingBottom: insets.bottom + 20 }]}
+            contentContainerStyle={[
+              cragStyles(colors).sheetBody,
+              {
+                paddingTop:
+                  mode.kind === 'area' && !searchExpanded ? 76 : 4,
+                paddingBottom: insets.bottom + 20,
+              },
+            ]}
             showsVerticalScrollIndicator={false}
           >
-            {/* Sheet header row — single row, constant across detents.
-                Layout: [search] [area name › opens info] [community] [avatar].
-                Lives at the TOP of the scroll body (not pinned header) so
-                TrueSheet's scroll-to-sheet drag linking still works. */}
-            {mode.kind === 'area' && !searchExpanded ? (
-              <View style={cragStyles(colors).headerRow}>
-                {/* Left: fused [search | community] pill — iOS 26 liquid
-                    glass with auto-merging via glassEffectUnion. Mirrors
-                    MapTopBar pattern. The previous comment warned about
-                    SwiftUI hosting-view re-measurement during TrueSheet
-                    fast-collapse causing vertical misalignment; we work
-                    around it by wrapping <Host> in a fixed-size <View>
-                    (88×44) so RN layout bounds stay pinned regardless
-                    of what SwiftUI reports internally. Spike verified
-                    on {DATE_TBD} — drag sheet fast, observe no jitter. */}
-                <View style={{ width: 88, height: 44 }}>
-                  <Host matchContents>
-                    <GlassEffectContainer spacing={0}>
-                      <GlassUnionGroup>
-                        <HStack spacing={0}>
-                          <Button
-                            systemImage={'magnifyingglass' as any}
-                            label=""
-                            onPress={openAreaSearch}
-                            modifiers={[
-                              buttonStyle('plain'),
-                              labelStyle('iconOnly'),
-                              font({ size: 18, weight: 'light' }),
-                              frame({ width: 44, height: 44, alignment: 'center' }),
-                              glassEffect({
-                                glass: { variant: 'regular', interactive: true },
-                                shape: 'capsule',
-                              }),
-                              glassEffectUnion('sheet-left-pill'),
-                            ] as any}
-                          />
-                          <Button
-                            systemImage={'person.2' as any}
-                            label=""
-                            onPress={navigateToCommunity}
-                            modifiers={[
-                              buttonStyle('plain'),
-                              labelStyle('iconOnly'),
-                              font({ size: 18, weight: 'light' }),
-                              frame({ width: 44, height: 44, alignment: 'center' }),
-                              glassEffect({
-                                glass: { variant: 'regular', interactive: true },
-                                shape: 'capsule',
-                              }),
-                              glassEffectUnion('sheet-left-pill'),
-                            ] as any}
-                          />
-                        </HStack>
-                      </GlassUnionGroup>
-                    </GlassEffectContainer>
-                  </Host>
-                </View>
-
-                {/* Spacer so the avatar gets pushed to the right. Title
-                    sits absolute-centered on top so it aligns to the
-                    sheet's horizontal midline regardless of the
-                    pill/avatar widths. */}
-                <View style={{ flex: 1 }} />
-
-                {/* Right: hamburger button — iOS 26 liquid glass circle.
-                    Opens sheet for Area Tools / User Tools. Wrapped in
-                    fixed-size 44×44 <View> to pin RN layout bounds
-                    (see left-pill comment above for the rationale). */}
-                <View style={{ width: 44, height: 44 }}>
-                  <HeaderButton
-                    icon="line.3.horizontal"
-                    variant="glass"
-                    size={44}
-                    onPress={() => areaMenuSheetRef.current?.present()}
-                  />
-                </View>
-
-                {/* Title — absolutely positioned over the row so it
-                    centers against the headerRow's content bounds
-                    (which are symmetrically inset from the sheet edges),
-                    i.e. the sheet's horizontal midline. pointerEvents
-                    box-none lets the pill + avatar below still receive
-                    taps; the TouchableOpacity itself is the only hit
-                    target inside the absolute layer. */}
-                <View style={cragStyles(colors).headerTitleAbsolute} pointerEvents="box-none">
-                  <TouchableOpacity
-                    onPress={openAreaInfo}
-                    activeOpacity={0.6}
-                    hitSlop={8}
-                    style={cragStyles(colors).headerTitleHit}
-                  >
-                    <Text style={cragStyles(colors).headerAreaName} numberOfLines={1}>
-                      {areaData.area?.name ?? mode.areaName ?? tr('攀岩区', 'Area')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : null}
-
             {/* Scoped sub-title row: shown only when a pin/search has set
                 sheetTitle, OR for list-mode showing the list length. Area
-                name itself has moved up into the sheet header. */}
+                name itself has moved up into the pinned header overlay. */}
             {mode.kind === 'area' && sheetTitle ? (
               <View style={cragStyles(colors).titleRow}>
                 <Text style={cragStyles(colors).sheetTitleText} numberOfLines={1}>
@@ -1408,6 +1319,83 @@ export default function MapScreenMapbox({
               </Text>
             )}
           </ScrollView>
+          </TopFadeMaskView>
+
+          {/* Pinned area header overlay — sits on top of TopFadeMaskView
+              so the alpha gradient (set ratio 0.15) fades scroll content
+              behind it. Buttons + title remain fully visible (sibling,
+              not masked). Mirrors gym/[gymId].tsx pattern. */}
+          {mode.kind === 'area' && !searchExpanded ? (
+            <View style={cragStyles(colors).pinnedHeaderOverlay} pointerEvents="box-none">
+              <View style={{ width: 88, height: 44 }}>
+                <Host matchContents>
+                  <GlassEffectContainer spacing={0}>
+                    <GlassUnionGroup>
+                      <HStack spacing={0}>
+                        <Button
+                          systemImage={'magnifyingglass' as any}
+                          label=""
+                          onPress={openAreaSearch}
+                          modifiers={[
+                            buttonStyle('plain'),
+                            labelStyle('iconOnly'),
+                            font({ size: 18, weight: 'light' }),
+                            frame({ width: 44, height: 44, alignment: 'center' }),
+                            glassEffect({
+                              glass: { variant: 'regular', interactive: true },
+                              shape: 'capsule',
+                            }),
+                            glassEffectUnion('sheet-left-pill'),
+                          ] as any}
+                        />
+                        <Button
+                          systemImage={'person.2' as any}
+                          label=""
+                          onPress={navigateToCommunity}
+                          modifiers={[
+                            buttonStyle('plain'),
+                            labelStyle('iconOnly'),
+                            font({ size: 18, weight: 'light' }),
+                            frame({ width: 44, height: 44, alignment: 'center' }),
+                            glassEffect({
+                              glass: { variant: 'regular', interactive: true },
+                              shape: 'capsule',
+                            }),
+                            glassEffectUnion('sheet-left-pill'),
+                          ] as any}
+                        />
+                      </HStack>
+                    </GlassUnionGroup>
+                  </GlassEffectContainer>
+                </Host>
+              </View>
+
+              <View style={{ flex: 1 }} />
+
+              <View style={{ width: 44, height: 44 }}>
+                <HeaderButton
+                  icon="line.3.horizontal"
+                  variant="glass"
+                  size={44}
+                  onPress={() => areaMenuSheetRef.current?.present()}
+                />
+              </View>
+
+              <View style={cragStyles(colors).headerTitleAbsolute} pointerEvents="box-none">
+                <TouchableOpacity
+                  onPress={openAreaInfo}
+                  activeOpacity={0.6}
+                  hitSlop={8}
+                  style={cragStyles(colors).headerTitleHit}
+                >
+                  <Text style={cragStyles(colors).headerAreaName} numberOfLines={1}>
+                    {areaData.area?.name ?? mode.areaName ?? tr('攀岩区', 'Area')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+          </>
         )}
       </TrueSheet>
 
@@ -1618,6 +1606,24 @@ const cragStyles = (c: ReturnType<typeof useThemeColors>) =>
       paddingTop: 12,
       paddingBottom: 16,
       gap: 10,
+    },
+    pinnedHeaderOverlay: {
+      // Absolute-positioned pinned header sitting on top of the
+      // TopFadeMaskView. Sheet edges have 16pt symmetric inset (full
+      // value here since the absolute overlay isn't nested in
+      // sheetBody's 8pt horizontal padding). Same buttons + title
+      // structure as the old in-scroll header, just floating.
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 16,
+      gap: 10,
+      zIndex: 10,
     },
     // Title absolutely positioned across the headerRow. Because the
     // headerRow's horizontal padding is symmetric (8 + 8 sheetBody =
