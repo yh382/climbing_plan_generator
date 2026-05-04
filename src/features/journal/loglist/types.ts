@@ -34,5 +34,11 @@ export type LocalDayLogItem = {
   coverUri?: string;
   imageUri?: string;
 
+  // INDOOR_A: catalog-route binding. Mutually exclusive — populated when the
+  // log was created from outdoor/gym route detail Send. Drives Journal's
+  // onPress routing back to the correct detail page.
+  outdoor_route_id?: string | null;
+  gym_route_id?: string | null;
+
   createdAt: number;
 };

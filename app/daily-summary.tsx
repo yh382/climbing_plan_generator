@@ -134,6 +134,22 @@ export default function DailySummaryScreen() {
                 item={item}
                 readOnly={!isSelf}
                 onPress={() => {
+                  // INDOOR_A: catalog-bound logs jump to their detail page;
+                  // free-form logs keep the legacy /library/route-detail path.
+                  if (item.outdoor_route_id) {
+                    router.push({
+                      pathname: "/outdoor/outdoor-route-detail",
+                      params: { id: item.outdoor_route_id },
+                    });
+                    return;
+                  }
+                  if (item.gym_route_id) {
+                    router.push({
+                      pathname: "/gym/route/[routeId]",
+                      params: { routeId: item.gym_route_id },
+                    });
+                    return;
+                  }
                   router.push({
                     pathname: "/library/route-detail",
                     params: { date, itemId: item.id, type: item.type },
@@ -160,6 +176,20 @@ export default function DailySummaryScreen() {
               item={item}
               readOnly={!isSelf}
               onPress={() => {
+                if (item.outdoor_route_id) {
+                  router.push({
+                    pathname: "/outdoor/outdoor-route-detail",
+                    params: { id: item.outdoor_route_id },
+                  });
+                  return;
+                }
+                if (item.gym_route_id) {
+                  router.push({
+                    pathname: "/gym/route/[routeId]",
+                    params: { routeId: item.gym_route_id },
+                  });
+                  return;
+                }
                 router.push({
                   pathname: "/library/route-detail",
                   params: { date, itemId: item.id, type: item.type },

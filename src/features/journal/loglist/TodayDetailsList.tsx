@@ -214,6 +214,22 @@ function TodayDetailsList({
           note={(notesMap[it.name] || it.note || "").trim() || undefined}
           tr={tr}
           onPress={() => {
+            // INDOOR_A: catalog-bound logs jump back to their detail page,
+            // free-form logs keep the legacy /library/route-detail flow.
+            if (it.outdoor_route_id) {
+              router.push({
+                pathname: "/outdoor/outdoor-route-detail",
+                params: { id: it.outdoor_route_id },
+              });
+              return;
+            }
+            if (it.gym_route_id) {
+              router.push({
+                pathname: "/gym/route/[routeId]",
+                params: { routeId: it.gym_route_id },
+              });
+              return;
+            }
             router.push({
               pathname: "/library/route-detail",
               params: {

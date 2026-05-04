@@ -218,6 +218,8 @@ function backendLogToLocal(log: any): LocalDayLogItem {
       uri: m.url || m.uri,           // backend uses `url`; fallback `uri` for legacy rows
       coverUri: m.thumbUrl || m.coverUri,
     })),
+    outdoor_route_id: log.outdoor_route_id ?? null,
+    gym_route_id: log.gym_route_id ?? null,
     createdAt: new Date(log.created_at).getTime(),
   };
 }

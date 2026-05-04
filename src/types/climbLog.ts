@@ -17,6 +17,8 @@ export interface ClimbLog {
   styleTags: string[] | null;
   attempts: number;
   gymId: string | null;
+  outdoorRouteId: string | null;
+  gymRouteId: string | null;
   routeName: string | null;
   note: string | null;
   media: MediaItem[] | null;

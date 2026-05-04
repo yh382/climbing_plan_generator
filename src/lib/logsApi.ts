@@ -40,6 +40,10 @@ export type CreateLogPayload = {
   send_count: number;
   note?: string | null;
   media?: Array<{ type: "image" | "video"; url: string; thumbUrl?: string }>;
+  // INDOOR_A: optional catalog-route binding. Mutually exclusive — backend
+  // schema validator rejects logs that set both.
+  outdoor_route_id?: string | null;
+  gym_route_id?: string | null;
 };
 
 // Convert frontend payload → backend ClimbLogCreateIn
@@ -73,6 +77,8 @@ function toBackendPayload(p: CreateLogPayload) {
       url: m.url || m.uri,             // frontend LogMedia uses `uri`; normalise to backend `url`
       thumbUrl: m.thumbUrl || m.coverUri,
     })) || null,
+    outdoor_route_id: p.outdoor_route_id || null,
+    gym_route_id: p.gym_route_id || null,
   };
 }
 

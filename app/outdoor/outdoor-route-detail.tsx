@@ -41,6 +41,7 @@ import {
   finishUpload,
 } from '../../src/lib/uploadActivityBridge';
 import { betaApi } from '../../src/features/outdoor/betaApi';
+import { enqueueRouteSendLog } from '../../src/features/journal/sync/enqueueRouteSendLog';
 
 const SCREEN_W = Dimensions.get('window').width;
 const PHOTO_H = SCREEN_W * 0.82;
@@ -204,10 +205,23 @@ export default function OutdoorRouteDetailPage() {
   );
 
   const onSendDone = useCallback(async (draft: OutdoorSendDraft) => {
-    if (!id) return;
+    if (!id || !route) return;
 
-    // 1. Log the send (comment + stars → rating).
-    // TODO: enqueueLogEvent({ type: "send", route_id: id, ...draft, client_id: ... })
+    // 1. ClimbLog FIRST (local + outbox). Rating can be lost; the user's send
+    //    record cannot. enqueue is fire-and-forget — outbox will retry.
+    try {
+      await enqueueRouteSendLog({
+        routeKind: 'outdoor',
+        routeId: route.id,
+        routeName: route.name,
+        routeStyle: route.style,
+        draft,
+      });
+    } catch (e) {
+      console.warn('[outdoor send] enqueue log failed:', e);
+    }
+
+    // 2. Rating (best-effort).
     try {
       await outdoorApi.rateRoute(id, { stars: draft.stars, comment: draft.comment || undefined });
       // Refresh the route so aggregate stars/rating_count reflect the new rating.
@@ -299,7 +313,7 @@ export default function OutdoorRouteDetailPage() {
         ? tr(`${summary}\nBeta 已上传`, `${summary}\nBeta uploaded`)
         : summary,
     );
-  }, [id, tr, pendingBetaVideo]);
+  }, [id, route, tr, pendingBetaVideo]);
 
   const handleShareBeta = useCallback(
     () => pickAndDispatchBeta('send'),

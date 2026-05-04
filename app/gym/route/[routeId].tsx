@@ -61,6 +61,7 @@ import OutdoorSendSheet, {
 } from '../../../src/features/outdoor/sendSheet/OutdoorSendSheet';
 import { RouteDescriptionCard } from '../../../src/features/outdoor/components/RouteDescriptionCard';
 import { gymsCatalogApi } from '../../../src/features/gymsCatalog/api';
+import { enqueueRouteSendLog } from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
 import { WallCloseUpCard } from '../../../src/features/gymsCatalog/components/WallCloseUpCard';
 import type {
@@ -217,7 +218,21 @@ export default function GymRouteDetailPage() {
     async (draft: OutdoorSendDraft) => {
       if (!route) return;
 
-      // 1. Record the rating. Comment doubles as the beta description if
+      // 1. ClimbLog FIRST (local + outbox). The user's send record is
+      //    durable; rating below is best-effort.
+      try {
+        await enqueueRouteSendLog({
+          routeKind: 'gym',
+          routeId: route.id,
+          routeName: route.name ?? '',
+          routeStyle: route.style,
+          draft,
+        });
+      } catch (e) {
+        console.warn('[gym send] enqueue log failed:', e);
+      }
+
+      // 2. Record the rating. Comment doubles as the beta description if
       //    a beta video is attached — same one-field-two-uses pattern as
       //    outdoor.
       try {
