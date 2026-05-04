@@ -61,7 +61,10 @@ import OutdoorSendSheet, {
 } from '../../../src/features/outdoor/sendSheet/OutdoorSendSheet';
 import { RouteDescriptionCard } from '../../../src/features/outdoor/components/RouteDescriptionCard';
 import { gymsCatalogApi } from '../../../src/features/gymsCatalog/api';
-import { enqueueRouteSendLog } from '../../../src/features/journal/sync/enqueueRouteSendLog';
+import {
+  enqueueRouteSendLog,
+  flushLogsOutboxNow,
+} from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
 import { WallCloseUpCard } from '../../../src/features/gymsCatalog/components/WallCloseUpCard';
 import type {
@@ -166,11 +169,9 @@ export default function GymRouteDetailPage() {
     };
   }, [routeId]);
 
-  // GradeSuggestionCard expects send logs (excludes attempts). Indoor
-  // ascents don't carry suggested_grade or feel (no FE sheet captures
-  // those for gym yet), so the histogram collapses to "everyone climbed
-  // this at the original grade" — which is the correct mock display
-  // until the gym send sheet ships.
+  // GradeSuggestionCard expects send logs (excludes attempts). INDOOR_A:
+  // histogram + feel were stripped from the card (mock-y display), only
+  // user_id + username are needed for the climber-count footer.
   const sendLogs: SendLog[] = useMemo(
     () =>
       (ascents ?? [])
@@ -178,8 +179,6 @@ export default function GymRouteDetailPage() {
         .map((a) => ({
           user_id: a.user_id,
           username: a.username ?? '',
-          suggested_grade_text: undefined,
-          feel: undefined,
         })),
     [ascents],
   );
@@ -228,6 +227,13 @@ export default function GymRouteDetailPage() {
           routeStyle: route.style,
           draft,
         });
+        await flushLogsOutboxNow();
+        try {
+          const fresh = await gymsCatalogApi.getAscents(route.id);
+          setAscents(fresh ?? []);
+        } catch {
+          // Non-fatal — Climbers list will refresh on next mount.
+        }
       } catch (e) {
         console.warn('[gym send] enqueue log failed:', e);
       }
@@ -576,7 +582,6 @@ export default function GymRouteDetailPage() {
               {tr('攀登数据', 'Climber Data')}
             </Text>
             <GradeSuggestionCard
-              originalGrade={route.grade_text}
               logs={sendLogs}
               avgStars={route.stars ?? null}
               onPress={() =>

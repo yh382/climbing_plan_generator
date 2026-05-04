@@ -41,7 +41,10 @@ import {
   finishUpload,
 } from '../../src/lib/uploadActivityBridge';
 import { betaApi } from '../../src/features/outdoor/betaApi';
-import { enqueueRouteSendLog } from '../../src/features/journal/sync/enqueueRouteSendLog';
+import {
+  enqueueRouteSendLog,
+  flushLogsOutboxNow,
+} from '../../src/features/journal/sync/enqueueRouteSendLog';
 
 const SCREEN_W = Dimensions.get('window').width;
 const PHOTO_H = SCREEN_W * 0.82;
@@ -115,17 +118,16 @@ export default function OutdoorRouteDetailPage() {
     return (route.photos ?? []).map((p) => ({ url: p.url, caption: p.caption }));
   }, [route]);
 
-  // Aggregate send logs for GradeSuggestionCard — histogram + majority feel.
-  // avgStars comes from `route.stars` (backend aggregate) as the single source
-  // of truth, so per-log stars aren't merged here.
+  // Climber rows for GradeSuggestionCard. avgStars comes from `route.stars`
+  // (backend aggregate) as the single source of truth — per-log stars aren't
+  // merged here. INDOOR_A: histogram + feel were stripped from the card; only
+  // user_id + username are needed for the climber-count footer.
   const sendLogs: SendLog[] = useMemo(() => {
     return ascents
       .filter((a) => a.result !== 'attempt')
       .map((a) => ({
         user_id: a.user_id,
         username: a.username,
-        suggested_grade_text: undefined,
-        feel: undefined,
       }) as SendLog);
   }, [ascents]);
 
@@ -217,6 +219,16 @@ export default function OutdoorRouteDetailPage() {
         routeStyle: route.style,
         draft,
       });
+      // Push to backend immediately so the Climbers list updates within
+      // the same interaction instead of waiting for the next Journal-tab
+      // focus to flush. Silent on failure — the queued event retries.
+      await flushLogsOutboxNow();
+      try {
+        const fresh = await outdoorApi.getAscents(id);
+        setAscents(fresh ?? []);
+      } catch {
+        // Non-fatal — Climbers list will refresh on next mount.
+      }
     } catch (e) {
       console.warn('[outdoor send] enqueue log failed:', e);
     }
@@ -506,7 +518,6 @@ export default function OutdoorRouteDetailPage() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{tr('攀登数据', 'Climber Data')}</Text>
             <GradeSuggestionCard
-              originalGrade={route.grade_text}
               logs={sendLogs}
               avgStars={route.stars ?? null}
               onPress={() =>

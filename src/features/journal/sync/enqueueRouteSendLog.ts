@@ -7,7 +7,9 @@
 import type { LocalDayLogItem, LogMedia } from "../loglist/types";
 import type { OutdoorSendDraft } from "../../outdoor/sendSheet/OutdoorSendSheet";
 import { readDayList, writeDayList } from "../loglist/storage";
-import { enqueueLogEvent } from "./logsOutbox";
+import { enqueueLogEvent, flushLogsOutbox } from "./logsOutbox";
+import { readAllServerIds, setServerId } from "./serverIdMap";
+import { useAuthStore } from "../../../store/useAuthStore";
 
 export type RouteKind = "outdoor" | "gym";
 
@@ -86,4 +88,31 @@ export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> 
       gym_route_id: input.routeKind === "gym" ? input.routeId : null,
     },
   });
+}
+
+/**
+ * Local-only logs outbox flush — no session work, no full sync, no cooldown.
+ * Caller awaits this right after `enqueueRouteSendLog` so the user's send
+ * appears on the route detail's Climbers list within the same interaction
+ * instead of waiting for the next Journal-tab focus.
+ *
+ * Returns silently when offline / not signed in — the queued event will
+ * flush at the next opportunity (Journal focus, sync, app reopen).
+ */
+export async function flushLogsOutboxNow(): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  if (!token) return;
+  try {
+    const idMap = await readAllServerIds();
+    await flushLogsOutbox({
+      token,
+      resolveServerId: (localId) => idMap[localId] ?? null,
+      saveServerId: async (localId, serverId) => {
+        await setServerId(localId, serverId);
+        idMap[localId] = serverId;
+      },
+    });
+  } catch (e) {
+    if (__DEV__) console.warn("[flushLogsOutboxNow] failed:", e);
+  }
 }
