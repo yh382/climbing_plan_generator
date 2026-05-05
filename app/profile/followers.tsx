@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 import { communityApi } from "../../src/features/community/api";
 import { api } from "../../src/lib/apiClient";
@@ -180,6 +181,7 @@ export default function FollowersScreen() {
           <Text style={styles.emptyText}>No followers yet</Text>
         </View>
       ) : (
+        <ScrollEdgeFallback>
         <FlatList
           data={users}
           keyExtractor={(item) => item.user_id}
@@ -187,6 +189,7 @@ export default function FollowersScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           contentInsetAdjustmentBehavior="automatic"
         />
+        </ScrollEdgeFallback>
       )}
     </View>
   );

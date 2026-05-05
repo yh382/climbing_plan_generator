@@ -25,6 +25,7 @@ import { handleAwardedBadges } from "../../src/store/useBadgeUnlockStore";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { WeekSelector } from "../../src/features/plans/components/WeekSelector";
 import { ExercisePickerModal } from "../../src/features/plans/components/ExercisePickerModal";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import type { PlanV3, PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
 import type { ActionSummary } from "../../src/features/home/exercises/model/types";
 
@@ -362,6 +363,7 @@ export default function PlanBuilderScreen() {
         />
       </Stack.Toolbar>
 
+      <ScrollEdgeFallback>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Plan Meta — collapsible */}
         <View style={styles.metaSection}>
@@ -494,6 +496,7 @@ export default function PlanBuilderScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Exercise Picker Modal */}
       <ExercisePickerModal

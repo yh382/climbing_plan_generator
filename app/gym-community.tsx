@@ -7,6 +7,7 @@ import GymDropdownPill from "../src/features/community/components/GymDropdownPil
 import { useGymFavoriteToggle } from "../src/features/gyms/hooks";
 import { gymCommunityApi, GymStats } from "../src/features/gyms/api";
 import { useThemeColors } from "../src/lib/useThemeColors";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 export default function GymCommunityPage() {
   const { gymId, gymName } = useLocalSearchParams<{
@@ -65,16 +66,18 @@ export default function GymCommunityPage() {
         />
       </Stack.Toolbar>
 
-      <FlatList
-        style={{ flex: 1, backgroundColor: colors.background }}
-        data={[]}
-        keyExtractor={() => "gym-community-empty"}
-        renderItem={() => null}
-        ListFooterComponent={content}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      />
+      <ScrollEdgeFallback>
+        <FlatList
+          style={{ flex: 1, backgroundColor: colors.background }}
+          data={[]}
+          keyExtractor={() => "gym-community-empty"}
+          renderItem={() => null}
+          ListFooterComponent={content}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        />
+      </ScrollEdgeFallback>
     </View>
   );
 }

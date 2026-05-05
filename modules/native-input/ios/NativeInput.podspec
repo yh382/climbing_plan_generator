@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.homepage       = 'https://github.com/user/native-input'
   s.license        = 'MIT'
   s.author         = 'ClimMate'
-  s.platform       = :ios, '15.1'
+  s.platform       = :ios, '17.0'
   s.source         = { git: '' }
   s.swift_version  = '5.0'
   s.static_framework = true

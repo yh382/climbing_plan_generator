@@ -37,6 +37,7 @@ import type { Badge, BadgeSectionKey, BadgeTier } from "../../../src/features/pr
 import { usePublicProfile, PublicBadge } from "../../../src/features/community/hooks";
 import { communityApi } from "../../../src/features/community/api";
 import { chatApi } from "../../../src/features/chat/api";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 function publicBadgeToBadge(b: PublicBadge): Badge {
   return {
@@ -302,6 +303,7 @@ export default function PublicProfileScreen() {
 
   return (
     <View style={dynStyles.screenRoot}>
+      <ScrollEdgeFallback>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -421,6 +423,7 @@ export default function PublicProfileScreen() {
           </View>
         </PagerView>
       </Animated.ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Native toolbar menu (context menu from button position) */}
       <Stack.Toolbar placement="right">

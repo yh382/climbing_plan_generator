@@ -25,6 +25,7 @@ import { useI18N } from "../../../lib/i18n";
 import { useSettings } from "../../contexts/SettingsContext";
 import useLogsStore, { type LogType } from "../../store/useLogsStore";
 import { gymCommunityApi } from "../gyms/api";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 export default function SessionsSegment() {
   const router = useRouter();
@@ -121,6 +122,7 @@ export default function SessionsSegment() {
   const activeFilterLabel = filterOptions.find(o => o.key === timeFilter)?.label ?? "";
 
   return (
+    <ScrollEdgeFallback>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
@@ -204,6 +206,7 @@ export default function SessionsSegment() {
         }}
       />
     </ScrollView>
+    </ScrollEdgeFallback>
   );
 }
 

@@ -16,6 +16,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../../src/components/ui/HeaderButton";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useThemeColors } from "../../../src/lib/useThemeColors";
 import { theme } from "../../../src/lib/theme";
 import { useSettings } from "../../../src/contexts/SettingsContext";
@@ -160,6 +161,7 @@ export default function ListDetailPage() {
         ) : null}
       </Stack.Toolbar>
 
+      <ScrollEdgeFallback>
       <FlatList
         data={detail.items}
         keyExtractor={(item) => item.id}
@@ -224,6 +226,7 @@ export default function ListDetailPage() {
           );
         }}
       />
+      </ScrollEdgeFallback>
 
       <CreateListSheet
         visible={editVisible}

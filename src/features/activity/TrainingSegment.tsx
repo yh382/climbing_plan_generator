@@ -18,6 +18,7 @@ import FavoriteExercisesGrid from "./FavoriteExercisesGrid";
 import MonthCalendar from "./MonthCalendar";
 import ActivitySegmentBar from "./ActivitySegmentBar";
 import ActivitySubtitle from "./ActivitySubtitle";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 export default function TrainingSegment() {
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function TrainingSegment() {
   }, [activePlanData]);
 
   return (
+    <ScrollEdgeFallback>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
@@ -107,6 +109,7 @@ export default function TrainingSegment() {
       <MyPlansGrid />
       <FavoriteExercisesGrid />
     </ScrollView>
+    </ScrollEdgeFallback>
   );
 }
 

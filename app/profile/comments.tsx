@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { communityApi } from "../../src/features/community/api";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useSettings } from "src/contexts/SettingsContext";
 import type { ThemeColors } from "../../src/lib/theme";
 
@@ -86,6 +87,7 @@ export default function MyComments() {
           <Text style={styles.emptyText}>{tr("暂无评论", "No comments yet")}</Text>
         </View>
       ) : (
+        <ScrollEdgeFallback>
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
@@ -93,6 +95,7 @@ export default function MyComments() {
           contentContainerStyle={{ padding: 16 }}
           contentInsetAdjustmentBehavior="automatic"
         />
+        </ScrollEdgeFallback>
       )}
     </View>
   );

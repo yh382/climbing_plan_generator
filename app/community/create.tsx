@@ -28,6 +28,7 @@ import { consumeCoverUpdate } from "../../src/features/community/pendingCoverUpd
 import { uploadPostMedia, uploadThumbnailToR2 } from "../../src/features/community/api";
 import { submitPostInBackground } from "../../src/features/community/postUploadManager";
 import { pickMediaFromLibrary } from "../../src/lib/mediaPicker";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 const AUDIENCE_OPTIONS = [
   { value: 'public' as const, label: 'Public', icon: 'globe-outline' as const },
@@ -363,6 +364,7 @@ export default function CreatePostScreen() {
   return (
     <View style={styles.screen}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollEdgeFallback>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
@@ -474,6 +476,7 @@ export default function CreatePostScreen() {
             </View>
           )}
         </ScrollView>
+        </ScrollEdgeFallback>
 
         {/* Bottom Toolbar — bare icons + pill */}
         <View style={[styles.toolbar, { paddingBottom: insets.bottom || 12 }]}>

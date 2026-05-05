@@ -5,10 +5,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   /** Ratio of total height for the top alpha fade zone (0..1).
-   *  Default 0.25. Past this point, mask is solid (full content
-   *  visibility). Tune so the fade zone covers any pinned title
-   *  overlay above. For sheets WITHOUT a title overlay, a smaller
-   *  value (~0.08-0.12) gives a subtle Apple-Maps-style soft edge. */
+   *  Default 0.15 (covers ~40-60pt pinned title overlay at typical
+   *  sheet detent heights). Past this point, mask is solid (full
+   *  content visibility). For sheets WITHOUT a title overlay, a
+   *  smaller value (~0.08) gives a subtle Apple-Maps-style soft edge. */
   topFadeRatio?: number;
   style?: ViewStyle;
   children: React.ReactNode;
@@ -44,7 +44,7 @@ interface Props {
  * TrueSheetContentView.mm:182-194).
  */
 export function TopFadeMaskView({
-  topFadeRatio = 0.25,
+  topFadeRatio = 0.15,
   style,
   children,
 }: Props) {

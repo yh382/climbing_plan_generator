@@ -10,6 +10,7 @@ import { NativeSegmentedControl } from "@/components/ui";
 import { theme } from "@/lib/theme";
 import ConversationsList from "@/features/inbox/ConversationsList";
 import ActivityFeed from "@/features/inbox/ActivityFeed";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 type Section = "conversations" | "activity";
 
@@ -62,10 +63,14 @@ export default function InboxScreen() {
     [styles, options, section],
   );
 
-  return section === "conversations" ? (
-    <ConversationsList listHeader={listHeader} />
-  ) : (
-    <ActivityFeed listHeader={listHeader} />
+  return (
+    <ScrollEdgeFallback>
+      {section === "conversations" ? (
+        <ConversationsList listHeader={listHeader} />
+      ) : (
+        <ActivityFeed listHeader={listHeader} />
+      )}
+    </ScrollEdgeFallback>
   );
 }
 

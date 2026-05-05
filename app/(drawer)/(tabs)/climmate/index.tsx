@@ -18,6 +18,7 @@ import ConversationListSheet from "@/features/coachChat/components/ConversationL
 import TaskBar from "@/features/coachChat/components/TaskBar";
 import MessageBubble from "@/features/coachChat/components/MessageBubble";
 import ThinkingBubble from "@/features/coachChat/components/ThinkingBubble";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 const MODE_STARTER_PROMPTS: Record<Exclude<CoachMode, "none">, { zh: string; en: string }> = {
   plan: { zh: "帮我制定一个训练计划", en: "Help me create a training plan" },
@@ -241,32 +242,34 @@ export default function ClimmateScreen() {
       </Stack.Toolbar>
 
       {/* Messages ScrollView — always rendered */}
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingBottom: bottomBarHeight,
-          paddingTop: 6,
-        }}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-        keyboardDismissMode="on-drag"
-        onContentSizeChange={handleContentSizeChange}
-        onScrollBeginDrag={dismissKeyboard}
-        onTouchStart={(e) => {
-          touchStartRef.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-        }}
-        onTouchEnd={(e) => {
-          const dx = Math.abs(e.nativeEvent.pageX - touchStartRef.current.x);
-          const dy = Math.abs(e.nativeEvent.pageY - touchStartRef.current.y);
-          if (dx < 10 && dy < 10 && keyboardVisible) dismissKeyboard();
-        }}
-      >
-        {realMessages.map((m) => (
-          <MessageBubble key={m.id} msg={m} />
-        ))}
-        {showThinking && <ThinkingBubble />}
-      </ScrollView>
+      <ScrollEdgeFallback>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingBottom: bottomBarHeight,
+            paddingTop: 6,
+          }}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          onContentSizeChange={handleContentSizeChange}
+          onScrollBeginDrag={dismissKeyboard}
+          onTouchStart={(e) => {
+            touchStartRef.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+          }}
+          onTouchEnd={(e) => {
+            const dx = Math.abs(e.nativeEvent.pageX - touchStartRef.current.x);
+            const dy = Math.abs(e.nativeEvent.pageY - touchStartRef.current.y);
+            if (dx < 10 && dy < 10 && keyboardVisible) dismissKeyboard();
+          }}
+        >
+          {realMessages.map((m) => (
+            <MessageBubble key={m.id} msg={m} />
+          ))}
+          {showThinking && <ThinkingBubble />}
+        </ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Greeting — absolutely positioned with explicit height */}
       {showGreeting && !showThinking && !inputFocused && (

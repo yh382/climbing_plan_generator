@@ -8,6 +8,7 @@ import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions"
 import { useSettings } from "@/contexts/SettingsContext";
 import { useThemeColors } from "@/lib/useThemeColors";
 import RankTab from "@/features/community/rank/RankTab";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 export default function RankScreen() {
   const { tr } = useSettings();
@@ -46,16 +47,18 @@ export default function RankScreen() {
   }, [navigation, colors, tr, router]);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentInsetAdjustmentBehavior="automatic"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      <RankTab
-        discipline={discipline}
-        onPressUser={(userId) => router.push(`/community/u/${userId}`)}
-      />
-    </ScrollView>
+    <ScrollEdgeFallback>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <RankTab
+          discipline={discipline}
+          onPressUser={(userId) => router.push(`/community/u/${userId}`)}
+        />
+      </ScrollView>
+    </ScrollEdgeFallback>
   );
 }

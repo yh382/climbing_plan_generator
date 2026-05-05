@@ -34,6 +34,7 @@ import type { ThemeColors } from "@/lib/theme";
 import type { Badge, BadgeSectionKey, BadgeTier } from "@/features/profile/components/badgessection/types";
 import { useSettings } from "src/contexts/SettingsContext";
 import { useUserStore } from "@/store/useUserStore";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 // ── Constants ──
 
@@ -442,6 +443,7 @@ export default function AllBadgesPage() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollEdgeFallback>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: PADDING, paddingBottom: 60 }}
@@ -499,6 +501,7 @@ export default function AllBadgesPage() {
           );
         })}
       </ScrollView>
+      </ScrollEdgeFallback>
 
       <BadgeDetailModal
         badge={selectedBadge}

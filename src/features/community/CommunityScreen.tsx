@@ -11,6 +11,7 @@ import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import FeedPost from "./components/FeedPost";
 import { NativeSegmentedControl } from "@/components/ui";
 import CommentSheet from "./components/CommentSheet";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 // SmartBottomSheet removed — replaced by inline popover
 import { useCommunityStore } from "../../store/useCommunityStore";
 import { useUserStore } from "../../store/useUserStore";
@@ -347,7 +348,11 @@ export default function CommunityScreen() {
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
 
-      {/* Feed FlatList (mode === "gyms" 时隐藏) */}
+      {/* Feed FlatList (mode === "gyms" 时隐藏) — COMPAT spike: wrap with
+          ScrollEdgeFallback so EXPO_PUBLIC_FORCE_FALLBACK=1 forces the
+          MaskedView path on iOS 26 simulator to verify visual + RefreshControl
+          interaction. Remove wrapper after audit if not adopted. */}
+      <ScrollEdgeFallback>
       <FlatList
         ref={feedListRef}
         style={[
@@ -368,6 +373,7 @@ export default function CommunityScreen() {
         onViewableItemsChanged={onViewableItemsChangedRef}
         viewabilityConfig={feedViewabilityConfig}
       />
+      </ScrollEdgeFallback>
 
       {/* Scroll-to-top FAB — only while browsing the Post feed.
           Elevated when the global active-session / workout pill is visible

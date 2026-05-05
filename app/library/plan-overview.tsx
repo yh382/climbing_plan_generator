@@ -14,6 +14,7 @@ import { usePlanDetail } from "../../src/features/plans/hooks";
 import { plansApi } from "../../src/features/plans/api";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { TRAINING_TYPE_GRADIENTS } from "../../src/components/plancard/PlanCard.gradients";
 import type { TrainingType } from "../../src/components/plancard/PlanCard.types";
 import type { PlanV3Session, PlanV3SessionItem } from "../../src/types/plan";
@@ -196,6 +197,7 @@ export default function PlanOverviewScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
+      <ScrollEdgeFallback>
       <Animated.ScrollView onScroll={scrollHandler} scrollEventThrottle={16} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero Image */}
         <Animated.View style={[heroParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
@@ -337,6 +339,7 @@ export default function PlanOverviewScreen() {
           )}
         </View>
       </Animated.ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Bottom action */}
       {showAddButton && (

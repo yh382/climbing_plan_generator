@@ -22,6 +22,7 @@ import { calculateKPIs } from "../../../../src/services/stats";
 
 import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../../src/components/shared/ProfileTabBar";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 const TABS = ["posts", "stats", "badges", "lists"] as const;
 
@@ -309,6 +310,7 @@ export default function ProfileScreen() {
   // --------------------- render ---------------------
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollEdgeFallback>
       <Animated.ScrollView
         ref={scrollRef}
         onScroll={scrollHandler}
@@ -374,6 +376,7 @@ export default function ProfileScreen() {
           </View>
         </PagerView>
       </Animated.ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Native toolbar: settings + share menu */}
       <Stack.Toolbar placement="right">

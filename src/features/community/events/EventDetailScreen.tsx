@@ -31,6 +31,7 @@ import EventDetailsModal from "./EventDetailsModal";
 import { useEventDetailData } from "./data/useEventDetailData";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 // === Constants (Align with Challenge) ===
 const COVER_H = 280;
@@ -199,6 +200,7 @@ export default function EventDetailScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      <ScrollEdgeFallback>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -363,6 +365,7 @@ export default function EventDetailScreen() {
           </View>
         )}
       </Animated.ScrollView>
+      </ScrollEdgeFallback>
 
       <EventDetailsModal
         visible={detailsOpen}

@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.author         = 'ClimMate'
   s.homepage       = 'https://github.com/example'
   s.source         = { git: '' }
-  s.platform       = :ios, '15.1'
+  s.platform       = :ios, '17.0'
   s.swift_version  = '5.9'
   # UploadAttributes.swift is glob-included so it compiles into the main app
   # target and stays in sync with the widget extension's copy via

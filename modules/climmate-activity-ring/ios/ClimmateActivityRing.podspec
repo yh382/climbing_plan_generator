@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license        = 'MIT'
   s.author         = 'ClimMate'
   s.source         = { git: '' }
-  s.platform       = :ios, '15.1'
+  s.platform       = :ios, '17.0'
   s.swift_version  = '5.0'
   s.source_files   = '**/*.swift'
   s.dependency 'ExpoModulesCore'

@@ -30,6 +30,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { useThemeColors } from "src/lib/useThemeColors";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { theme } from "src/lib/theme";
 import { useCropGesture } from "src/features/profile/hooks/useCropGesture";
@@ -478,6 +479,7 @@ export default function LibraryScreen() {
             </TouchableOpacity>
           </View>
         ) : (
+          <ScrollEdgeFallback>
           <Animated.FlatList
             ref={gridRef as any}
             data={assets}
@@ -493,6 +495,7 @@ export default function LibraryScreen() {
             scrollEventThrottle={16}
             contentInsetAdjustmentBehavior="automatic"
           />
+          </ScrollEdgeFallback>
         )}
       </View>
 

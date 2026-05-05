@@ -25,6 +25,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
 import type { FeedPost as FeedPostType } from "@/types/community";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 export default function UserPostsScreen() {
   const { userId, initialPostId } = useLocalSearchParams<{
@@ -249,26 +250,28 @@ export default function UserPostsScreen() {
 
   return (
     <>
-      <FlatList
-        ref={listRef}
-        style={{ flex: 1, backgroundColor: colors.background }}
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentInsetAdjustmentBehavior="automatic"
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 110 }}
-        initialScrollIndex={initialIndex}
-        onScrollToIndexFailed={onScrollToIndexFailed}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={styles.emptyText}>No posts yet</Text>
-          </View>
-        }
-      />
+      <ScrollEdgeFallback>
+        <FlatList
+          ref={listRef}
+          style={{ flex: 1, backgroundColor: colors.background }}
+          data={posts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 110 }}
+          initialScrollIndex={initialIndex}
+          onScrollToIndexFailed={onScrollToIndexFailed}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>No posts yet</Text>
+            </View>
+          }
+        />
+      </ScrollEdgeFallback>
       <CommentSheet
         visible={!!commentPostId}
         onClose={() => {

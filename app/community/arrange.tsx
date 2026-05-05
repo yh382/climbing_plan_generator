@@ -38,6 +38,7 @@ import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMNS = 3;
@@ -321,30 +322,32 @@ export default function ArrangeScreen() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hint */}
-        <View style={styles.hintRow}>
-          <Text style={styles.hintText}>Long press and drag to reorder</Text>
-          <Text style={styles.hintCount}>{items.length} items</Text>
-        </View>
-        <View style={[styles.gridContainer, { height: gridHeight }]}>
-          {items.map((item, index) => (
-            <SortableItem
-              key={item.id}
-              item={item}
-              index={index}
-              positions={positions}
-              itemCount={items.length}
-              onDragEnd={handleDragEnd}
-              styles={styles}
-            />
-          ))}
-        </View>
-      </ScrollView>
+      <ScrollEdgeFallback>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hint */}
+          <View style={styles.hintRow}>
+            <Text style={styles.hintText}>Long press and drag to reorder</Text>
+            <Text style={styles.hintCount}>{items.length} items</Text>
+          </View>
+          <View style={[styles.gridContainer, { height: gridHeight }]}>
+            {items.map((item, index) => (
+              <SortableItem
+                key={item.id}
+                item={item}
+                index={index}
+                positions={positions}
+                itemCount={items.length}
+                onDragEnd={handleDragEnd}
+                styles={styles}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </ScrollEdgeFallback>
     </GestureHandlerRootView>
   );
 }

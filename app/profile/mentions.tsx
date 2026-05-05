@@ -6,6 +6,7 @@ import { communityApi } from "../../src/features/community/api";
 import type { MentionOut } from "../../src/features/community/types";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useSettings } from "src/contexts/SettingsContext";
 import type { ThemeColors } from "../../src/lib/theme";
 
@@ -52,6 +53,7 @@ export default function Mentions() {
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.textSecondary} />
       ) : (
+        <ScrollEdgeFallback>
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
@@ -81,6 +83,7 @@ export default function Mentions() {
             <Text style={styles.emptyText}>{tr("暂无提及", "No mentions yet")}</Text>
           )}
         </ScrollView>
+        </ScrollEdgeFallback>
       )}
     </View>
   );

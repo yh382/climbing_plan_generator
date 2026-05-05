@@ -21,6 +21,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { searchApi, type SearchUserResult, type RecommendedUser } from "@/features/search/api";
 import UserRecommendCard from "@/features/search/UserRecommendCard";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import type { ChallengeOut } from "@/features/community/challenges/types";
 import type { EventOut } from "@/features/community/events/types";
 
@@ -158,6 +159,7 @@ export default function UniversalSearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollEdgeFallback>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
@@ -423,6 +425,7 @@ export default function UniversalSearchScreen() {
           </View>
         )}
       </ScrollView>
+      </ScrollEdgeFallback>
     </View>
   );
 }

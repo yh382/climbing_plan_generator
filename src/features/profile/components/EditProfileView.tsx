@@ -25,6 +25,7 @@ import LocationPickerSheet from "./LocationPickerSheet";
 import HomeGymPickerSheet from "./HomeGymPickerSheet";
 import AvatarPickerSheet from "./AvatarPickerSheet";
 import { consumePendingImage } from "src/features/profile/imagePickerBridge";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 type UserMe = {
   id: string;
@@ -310,6 +311,7 @@ export default function EditProfileView() {
 
   return (
     <View style={styles.container}>
+      <ScrollEdgeFallback>
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -396,6 +398,7 @@ export default function EditProfileView() {
           />
         </View>
       </ScrollView>
+      </ScrollEdgeFallback>
 
       <LocationPickerSheet
         visible={locationPickerOpen}
