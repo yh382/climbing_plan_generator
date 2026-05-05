@@ -9,7 +9,6 @@ import type {
 } from './types';
 import {
   MOCK_AREAS, MOCK_CRAGS, MOCK_SECTORS, MOCK_WALLS, MOCK_ROUTES,
-  MOCK_ASCENTS, MOCK_RATINGS,
 } from './mockData';
 
 const USE_MOCK = __DEV__;
@@ -89,12 +88,10 @@ export const outdoorApi = {
   },
 
   getAscents: async (routeId: string): Promise<RouteAscent[]> => {
-    if (USE_MOCK) return MOCK_ASCENTS;
     return api.get<RouteAscent[]>(`/outdoor/routes/${routeId}/ascents`);
   },
 
   getRatings: async (routeId: string): Promise<RouteRating[]> => {
-    if (USE_MOCK) return MOCK_RATINGS;
     return api.get<RouteRating[]>(`/outdoor/routes/${routeId}/ratings`);
   },
 
