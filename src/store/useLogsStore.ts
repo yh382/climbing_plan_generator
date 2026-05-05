@@ -442,12 +442,22 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
             }
           }
 
-          // Group logs by date|type for day lists
+          // Group logs by date|type for day lists.
+          // B2 follow-up: derive the date from log.created_at in user's LOCAL
+          // timezone, NOT from backend's `log.date` column. Older log rows on
+          // the backend were stored with a UTC date (pre-fix clients used UTC
+          // ISO slicing), so trusting log.date would re-poison local dayList
+          // immediately after the one-shot migration cleaned it up. The
+          // local-derived date matches backendLogToLocal's item.date, so the
+          // dayList key and item.date stay consistent.
           const logsByDateType = new Map<string, { date: string; type: LogType; logs: any[] }>();
           for (const log of visibleLogs) {
-            const key = `${log.date}|${log.wall_type}`;
+            const localDate = log.created_at
+              ? localDateStringFromMs(new Date(log.created_at).getTime())
+              : log.date;
+            const key = `${localDate}|${log.wall_type}`;
             if (!logsByDateType.has(key)) {
-              logsByDateType.set(key, { date: log.date, type: log.wall_type, logs: [] });
+              logsByDateType.set(key, { date: localDate, type: log.wall_type, logs: [] });
             }
             logsByDateType.get(key)!.logs.push(log);
           }

@@ -241,7 +241,10 @@ const DAY_LIST_PREFIX = "journal_day_list_";
 
 /** ---------- Migration: "yds" → "lead" ---------- */
 const MIGRATION_KEY = "migration_yds_to_rope_v1";
-const MIGRATION_LOCAL_DATE_KEY = "migration_daylist_local_date_v1";
+// v2: bumped so users on v1 (which raced syncFromBackend's UTC-date
+// grouping and got re-poisoned) re-run the migration after the
+// syncFromBackend grouping fix lands.
+const MIGRATION_LOCAL_DATE_KEY = "migration_daylist_local_date_v2";
 
 async function migrateYdsToRopeTypes() {
   const allKeys = await AsyncStorage.getAllKeys();
