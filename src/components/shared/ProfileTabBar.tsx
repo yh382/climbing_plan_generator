@@ -5,11 +5,10 @@ import { View, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-nat
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
-  useAnimatedProps,
   useSharedValue,
   withTiming,
   interpolate,
-  interpolateColor,
+  Extrapolation,
   SharedValue,
 } from "react-native-reanimated";
 import { theme } from "@/lib/theme";
@@ -32,8 +31,6 @@ export interface ProfileTabBarProps {
   scrollPosition?: SharedValue<number>;
 }
 
-const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
-
 function TabIcon({
   tab,
   index,
@@ -49,14 +46,24 @@ function TabIcon({
   inactiveColor: string;
   onPress: () => void;
 }) {
-  // vector-icons Ionicons 内部是 Text wrapper —— animated `style.color` 不传给
-  // underlying Text 的 color prop。改用 useAnimatedProps 直传 prop，是
-  // reanimated 推荐的非 style props (color/fill 等) 动画方案。
-  const animatedProps = useAnimatedProps(() => ({
-    color: interpolateColor(
+  // vector-icons Ionicons 内部是 Text wrapper：animated style.color 和
+  // animatedProps={color} 都不能 reach into 内部 Text 的 color。所以叠两层
+  // 同样的 icon（active 黑 + inactive 灰），用 opacity 平滑切换 —— opacity
+  // 是纯 style 属性 reanimated 100% 工作。
+  const activeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
       scrollPosition.value,
       [index - 1, index, index + 1],
-      [inactiveColor, activeColor, inactiveColor],
+      [0, 1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+  const inactiveStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollPosition.value,
+      [index - 1, index, index + 1],
+      [1, 0, 1],
+      Extrapolation.CLAMP,
     ),
   }));
 
@@ -66,12 +73,16 @@ function TabIcon({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <AnimatedIonicons
-        // @ts-ignore — icon union type
-        name={tab.iconActive}
-        size={22}
-        animatedProps={animatedProps}
-      />
+      <View style={styles_static.iconStack}>
+        <Animated.View style={[styles_static.iconAbsolute, inactiveStyle]}>
+          {/* @ts-ignore — icon union type */}
+          <Ionicons name={tab.iconActive} size={22} color={inactiveColor} />
+        </Animated.View>
+        <Animated.View style={[styles_static.iconAbsolute, activeStyle]}>
+          {/* @ts-ignore — icon union type */}
+          <Ionicons name={tab.iconActive} size={22} color={activeColor} />
+        </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -127,6 +138,8 @@ export default function ProfileTabBar({ activeTab, onTabPress, scrollPosition: s
 
 const styles_static = StyleSheet.create({
   tabItem: { flex: 1, alignItems: "center", justifyContent: "center" },
+  iconStack: { width: 22, height: 22 },
+  iconAbsolute: { position: "absolute", top: 0, left: 0 },
 });
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
