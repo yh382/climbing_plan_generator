@@ -36,6 +36,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HeaderButton } from '../../../src/components/ui/HeaderButton';
 import { useThemeColors } from '../../../src/lib/useThemeColors';
 import { useSettings } from '../../../src/contexts/SettingsContext';
+import { useUserStore } from '../../../src/store/useUserStore';
 import { theme } from '../../../src/lib/theme';
 import GradeSuggestionCard, {
   type SendLog,
@@ -106,6 +107,15 @@ export default function GymRouteDetailPage() {
 
   const [route, setRoute] = useState<GymRoute | null>(null);
   const [ascents, setAscents] = useState<GymRouteAscent[]>([]);
+  const currentUserId = useUserStore((s) => s.user?.id);
+  // B2 #2: greyed Send button when current user already has a non-attempt
+  // ascent on this route. Re-evaluates whenever ascents refetch.
+  const userHasSent = useMemo(
+    () =>
+      !!currentUserId &&
+      ascents.some((a) => a.user_id === currentUserId && a.result !== 'attempt'),
+    [currentUserId, ascents],
+  );
   const [loading, setLoading] = useState(true);
   const [localAttempts, setLocalAttempts] = useState(0);
   const [sendSheetOpen, setSendSheetOpen] = useState(false);
@@ -526,27 +536,30 @@ export default function GymRouteDetailPage() {
               style={[
                 styles.primaryBtn,
                 {
-                  backgroundColor: isArchived
-                    ? colors.backgroundSecondary
-                    : colors.accent,
+                  backgroundColor:
+                    isArchived || userHasSent
+                      ? isArchived
+                        ? colors.backgroundSecondary
+                        : colors.pillBackground
+                      : colors.accent,
                 },
               ]}
-              onPress={handleSend}
-              disabled={isArchived}
+              onPress={isArchived || userHasSent ? undefined : handleSend}
+              disabled={isArchived || userHasSent}
               activeOpacity={0.85}
             >
               <Ionicons
-                name="checkmark-circle-outline"
+                name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
                 size={18}
-                color={isArchived ? colors.textTertiary : '#FFFFFF'}
+                color={isArchived || userHasSent ? colors.textTertiary : '#FFFFFF'}
               />
               <Text
                 style={[
                   styles.primaryBtnText,
-                  isArchived && { color: colors.textTertiary },
+                  (isArchived || userHasSent) && { color: colors.textTertiary },
                 ]}
               >
-                {tr('完成', 'Send')}
+                {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

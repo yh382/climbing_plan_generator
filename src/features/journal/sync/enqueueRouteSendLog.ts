@@ -214,12 +214,32 @@ export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<
  * appears on the route detail's Climbers list within the same interaction
  * instead of waiting for the next Journal-tab focus.
  *
- * Returns silently when offline / not signed in — the queued event will
- * flush at the next opportunity (Journal focus, sync, app reopen).
+ * B2 first-send fix: when an auto-startSession just fired, the POST /sessions
+ * promise may still be in flight at flush time → logsOutbox sees `_sessionKey`
+ * but no resolved serverId and **defers the create event back to queue**,
+ * leaving the Climbers list stale until the next sync. We block here on
+ * `awaitSessionServerId()` (with a 3s safety cap) so flush always runs after
+ * the server id is available. Subsequent sends in the same session skip the
+ * wait because activeSession.serverId is already set.
  */
 export async function flushLogsOutboxNow(): Promise<void> {
   const token = useAuthStore.getState().accessToken;
   if (!token) return;
+
+  // Wait for the session POST to land (or hit the cap) so the outbox can
+  // resolve session_id on the very first flush.
+  const active = useLogsStore.getState().activeSession;
+  if (active && !active.serverId) {
+    try {
+      await Promise.race([
+        useLogsStore.getState().awaitSessionServerId(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]);
+    } catch (e) {
+      if (__DEV__) console.warn("[flushLogsOutboxNow] awaitSessionServerId failed:", e);
+    }
+  }
+
   try {
     const idMap = await readAllServerIds();
     await flushLogsOutbox({

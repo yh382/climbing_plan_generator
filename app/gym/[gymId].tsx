@@ -49,6 +49,7 @@ import {
 import GymMenuSheet, {
   type GymMenuSheetHandle,
 } from '../../src/features/mapscreen/components/GymMenuSheet';
+import MapSessionPill from '../../src/features/journal/MapSessionPill';
 
 // Mock-only floor plan asset. The screen layer wires this into
 // GymFloorPlanView when USE_MOCK is set so the bundled PNG is used
@@ -131,6 +132,10 @@ export default function GymMapScreen() {
 
   return (
     <View style={styles.root}>
+      {/* B2 #1: top-center "session active" pill — visible whenever a
+          climbing session is running while user explores the floor plan. */}
+      <MapSessionPill />
+
       {/* Floor plan ~60% of screen */}
       <View style={styles.floorPlanWrap}>
         {loading && !gym ? (
@@ -255,7 +260,7 @@ export default function GymMapScreen() {
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         onDetentChange={onDetentChange}
       >
-        <TopFadeMaskView topFadeRatio={0.25}>
+        <TopFadeMaskView topFadeRatio={0.15}>
           <ScrollView
             contentContainerStyle={styles.peekScrollBody}
             showsVerticalScrollIndicator={false}

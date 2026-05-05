@@ -37,6 +37,7 @@ import { useThemeColors } from '../../lib/useThemeColors';
 import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
 import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
+import MapSessionPill from '../journal/MapSessionPill';
 
 import { useGymsStore } from '../../store/useGymsStore';
 import AreaMenuSheet, { type AreaMenuSheetHandle } from './components/AreaMenuSheet';
@@ -958,6 +959,10 @@ export default function MapScreenMapbox({
     <View style={styles.root}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} translucent />
       <Stack.Screen options={{ headerShown: false }} />
+
+      {/* B2 #1: top-center "session active" pill — visible on all map modes
+          when a climbing session is running. Tap → daily-summary (end). */}
+      <MapSessionPill />
 
       {/* Persistent MapView — stays mounted across modes. Pin layers are
           conditional on mode to avoid overlap between gyms pins and the

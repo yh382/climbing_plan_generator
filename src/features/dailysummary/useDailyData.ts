@@ -256,6 +256,17 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
   const [dayItems, setDayItems] = useState<LocalDayLogItem[]>([]);
   const [sessionItemsByKey, setSessionItemsByKey] = useState<Record<string, LocalDayLogItem[]>>({});
 
+  // B2 #5+#3: tick every second while an active+unpaused session exists so
+  // the time-on-wall ring updates live. Skipped when paused (frozen value)
+  // or when no active session (no work to do — no re-render storm).
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    if (!activeSession || activeSession.pausedAt) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [enabled, activeSession]);
+
   const daySessions = useMemo(() => {
     if (!enabled) return [];
     return (sessions || [])
@@ -285,7 +296,9 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
     };
   }, [enabled, date, daySessions]);
 
-  return useMemo(() => {
+  // Heavy aggregate: only re-runs when the underlying data set changes,
+  // NOT every tick. Tick re-renders only adjust the live overlay below.
+  const base = useMemo(() => {
     if (!enabled) return emptyDailyData();
     const today = ISO_DATE_TODAY();
     const active =
@@ -305,6 +318,28 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
       meta: null,
     });
   }, [enabled, date, daySessions, sessionItemsByKey, dayItems, activeSession]);
+
+  // B2 #5+#3: fold in the active session's elapsed minutes so the time
+  // ring ticks live + reflects end-session immediately (no stale view
+  // until syncFromBackend pulls the new SessionEntry). Paused → freeze
+  // at activeDurationMinutes; active → wall-clock since startTime.
+  // Cheap shallow merge — does NOT rebuild the Maps inside aggregate().
+  return useMemo(() => {
+    if (!enabled) return base;
+    const today = ISO_DATE_TODAY();
+    if (date !== today || !activeSession) return base;
+
+    const liveMin = activeSession.pausedAt
+      ? activeSession.activeDurationMinutes
+      : Math.max(0, Math.floor((Date.now() - activeSession.startTime) / 60000));
+    const newTimeOnWallMin = base.kpis.timeOnWallMin + liveMin;
+    return {
+      ...base,
+      kpis: { ...base.kpis, timeOnWallMin: newTimeOnWallMin },
+      timeOnWallPct: Math.round((newTimeOnWallMin / TIME_ON_WALL_GOAL_MIN) * 100),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, date, base, activeSession, tick]);
 }
 
 // ─── Remote (other-user) branch ────────────────────────────────────

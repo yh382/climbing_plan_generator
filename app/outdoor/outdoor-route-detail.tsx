@@ -16,12 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
 import { useThemeColors } from '../../src/lib/useThemeColors';
 import { useSettings } from '../../src/contexts/SettingsContext';
+import { useUserStore } from '../../src/store/useUserStore';
 import { theme } from '../../src/lib/theme';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
-import { ScrollEdgeFallback } from '../../src/components/shared/ScrollEdgeFallback';
+import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
@@ -81,6 +82,15 @@ export default function OutdoorRouteDetailPage() {
   const [route, setRoute] = useState<OutdoorRoute | null>(null);
   const [ascents, setAscents] = useState<RouteAscent[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentUserId = useUserStore((s) => s.user?.id);
+  // B2 #2: greyed Send button when current user already has a non-attempt
+  // ascent on this route. Re-evaluates whenever ascents refetch.
+  const userHasSent = useMemo(
+    () =>
+      !!currentUserId &&
+      ascents.some((a) => a.user_id === currentUserId && a.result !== 'attempt'),
+    [currentUserId, ascents],
+  );
 
   // Local attempt counter (optimistic UI — backend sync is fire-and-forget)
   const [localAttempts, setLocalAttempts] = useState(0);
@@ -495,12 +505,31 @@ export default function OutdoorRouteDetailPage() {
           {/* Two-button row: Send (primary) + Attempt (secondary, counter) */}
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
-              onPress={handleSend}
+              style={[
+                styles.primaryBtn,
+                {
+                  backgroundColor: userHasSent
+                    ? colors.pillBackground
+                    : colors.accent,
+                },
+              ]}
+              onPress={userHasSent ? undefined : handleSend}
+              disabled={userHasSent}
               activeOpacity={0.85}
             >
-              <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.primaryBtnText}>{tr('完成', 'Send')}</Text>
+              <Ionicons
+                name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                size={18}
+                color={userHasSent ? colors.textTertiary : '#FFFFFF'}
+              />
+              <Text
+                style={[
+                  styles.primaryBtnText,
+                  userHasSent && { color: colors.textTertiary },
+                ]}
+              >
+                {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { backgroundColor: colors.pillBackground }]}
