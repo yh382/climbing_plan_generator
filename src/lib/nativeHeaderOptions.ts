@@ -6,15 +6,20 @@ import { Platform } from 'react-native';
 import { theme } from './theme';
 import type { useThemeColors } from './useThemeColors';
 
-/** True on iOS 26+ (Liquid Glass nav bar makes transparent + scrollEdgeEffects
- *  beautiful), false on iOS<26 / Android — there transparent header leaves
- *  buttons floating on raw scroll content with no backdrop, so icons get
- *  unreadable when content scrolls past. Falling back to opaque chrome on
- *  those targets is the COMPAT-friendly default.
+/** `true` on iOS 26+ (Liquid Glass floating-header look — content scrolls
+ *  through transparent chrome), `undefined` elsewhere so iOS 17/18 falls
+ *  back to the native translucent NavigationBar default (auto blur material
+ *  + scrollEdgeAppearance: transparent at top, opaque after scrolling past
+ *  large title). Setting `false` explicitly on iOS<26 forces the standard
+ *  appearance everywhere and traps the large title inside a tall opaque
+ *  chrome — looks worse than the system default.
  *
- *  Use as: `headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }`. */
-export const HEADER_TRANSPARENT =
-  Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
+ *  Use as: `headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }`.
+ *  When undefined, the prop is silently ignored — exactly what we want. */
+export const HEADER_TRANSPARENT: true | undefined =
+  Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26
+    ? true
+    : undefined;
 
 /** Base header (system default translucent bar with back+title) */
 export const NATIVE_HEADER_BASE = {} as const;

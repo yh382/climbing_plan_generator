@@ -1,6 +1,5 @@
 import React from 'react';
-import { Platform, type ViewStyle } from 'react-native';
-import { TopFadeMaskView } from './TopFadeMaskView';
+import { type ViewStyle } from 'react-native';
 
 interface Props {
   topFadeRatio?: number;
@@ -9,23 +8,21 @@ interface Props {
 }
 
 /**
- * iOS≥26 transparent header + `scrollEdgeEffects:'soft'` 已在系统层提供顶部
- * alpha fade。iOS<26 上 `scrollEdgeEffects` 是 graceful no-op，没有 fade →
- * 用 TopFadeMaskView 手动接近视觉。
+ * **DEPRECATED — passthrough wrapper, kept for call-site compatibility.**
  *
- * 使用：包在 ScrollView/FlatList 外层。如里层是 RefreshControl 列表，请在
- * Phase 4 audit 时实测：MaskedView 会把指示器 alpha mask 成透明，可能不可见。
+ * Original intent (COMPAT Phase 3): manually fade content below transparent
+ * header on iOS<26 since `scrollEdgeEffects:'soft'` is a no-op there.
  *
- * topFadeRatio 不传则透传 TopFadeMaskView default (0.15)。
+ * Real-device test on iOS 18 (2026-05-05) showed the manual MaskedView fade
+ * is **redundant** when `headerTransparent` is undefined on iOS<26: the
+ * native UINavigationBar already provides translucent material + scrollEdge
+ * transparency that handles the fade gracefully. Stacking a MaskedView on
+ * top creates a double-fade that darkens content (light pages get a visible
+ * white band, dark pages get a gray band).
+ *
+ * Component now passes children through on every platform / version. Left
+ * in place to avoid editing 45+ call sites; remove on next big sweep.
  */
-export function ScrollEdgeFallback({ topFadeRatio, style, children }: Props) {
-  const iosVersion = parseInt(String(Platform.Version), 10);
-  if (Platform.OS === 'ios' && iosVersion >= 26) {
-    return <>{children}</>;
-  }
-  return (
-    <TopFadeMaskView topFadeRatio={topFadeRatio} style={style}>
-      {children}
-    </TopFadeMaskView>
-  );
+export function ScrollEdgeFallback({ children }: Props) {
+  return <>{children}</>;
 }
