@@ -24,6 +24,7 @@ import { useDailyData } from "../src/features/dailysummary/useDailyData";
 import { localDateString } from "../src/lib/localDate";
 import DailyDashboardCarousel from "../src/features/dailysummary/DailyDashboardCarousel";
 import DailyDateNavBar from "../src/features/dailysummary/DailyDateNavBar";
+import ActiveSessionCard from "../src/features/dailysummary/ActiveSessionCard";
 import SessionGroupHeader from "../src/features/dailysummary/SessionGroupHeader";
 import useSettingsStore from "../src/store/useSettingsStore";
 import { useUserStore } from "../src/store/useUserStore";
@@ -113,14 +114,16 @@ export default function DailySummaryScreen() {
       </View>
       <DailyDashboardCarousel data={data} />
 
-      {/* B2 #3: active session is now folded into data.sessions as an
-          in-progress group at the bottom — its SessionGroupHeader renders
-          with `inProgress` styling. The standalone ActiveSessionCard was
-          redundant + caused items to leak into "quick logs". */}
+      {/* B2 #3: active session is folded into data.sessions as an in-progress
+          group with `inProgress`-styled header. ActiveSessionCard (timer +
+          END SESSION button) is rendered inside that group between the
+          header and the items, replacing the previous top-of-page card so
+          users still have a tappable end-session affordance. */}
 
       {data.sessions.map((group, idx) => {
         // The virtual in-progress entry uses id "active_<startMs>" — see
-        // useLocalDailyData. Detect it to flip header styling.
+        // useLocalDailyData. Detect it to flip header styling + render the
+        // active card inline.
         const isInProgress = group.session.id.startsWith("active_");
         return (
         <View key={group.session.id}>
@@ -131,6 +134,13 @@ export default function DailySummaryScreen() {
             duration={group.session.duration}
             inProgress={isInProgress}
           />
+          {isInProgress && isSelf && data.activeSession && (
+            <ActiveSessionCard
+              startTime={data.activeSession.startTime}
+              gymName={data.activeSession.gymName}
+              discipline={data.activeSession.discipline}
+            />
+          )}
           {group.items.length > 0 ? (
             group.items.map((item) => (
               <ClimbItemCard
