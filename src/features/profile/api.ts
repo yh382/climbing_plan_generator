@@ -15,6 +15,7 @@ export type PrivacySettingsData = {
   plans_public: boolean;
   badges_public: boolean;
   lists_public: boolean;
+  logs_public: boolean;
 };
 
 export const profileApi = {

@@ -11,6 +11,7 @@ const FIELD_MAP: Record<string, string> = {
   plans: "plans_public",
   badges: "badges_public",
   lists: "lists_public",
+  logs: "logs_public",
 };
 
 type VisibilitySettings = {
@@ -20,6 +21,7 @@ type VisibilitySettings = {
   plans: boolean;
   badges: boolean;
   lists: boolean;
+  logs: boolean;
 };
 
 export default function PrivacySettings() {
@@ -29,7 +31,7 @@ export default function PrivacySettings() {
 
   const [loading, setLoading] = useState(true);
   const [visibility, setVisibility] = useState<VisibilitySettings>({
-    posts: true, body: false, analysis: true, plans: true, badges: true, lists: true,
+    posts: true, body: false, analysis: true, plans: true, badges: true, lists: true, logs: true,
   });
 
   useLayoutEffect(() => {
@@ -45,6 +47,7 @@ export default function PrivacySettings() {
         plans: data.plans_public,
         badges: data.badges_public,
         lists: data.lists_public ?? true,
+        logs: data.logs_public ?? true,
       });
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -75,6 +78,7 @@ export default function PrivacySettings() {
           <Toggle isOn={visibility.plans} onIsOnChange={() => handleToggle("plans")} label={tr("训练计划", "My Plans")} />
           <Toggle isOn={visibility.badges} onIsOnChange={() => handleToggle("badges")} label={tr("徽章", "My Badges")} />
           <Toggle isOn={visibility.lists} onIsOnChange={() => handleToggle("lists")} label={tr("我的清单", "My Lists")} />
+          <Toggle isOn={visibility.logs} onIsOnChange={() => handleToggle("logs")} label={tr("我的攀登记录", "Climb Logs")} />
         </Section>
       </Form>
     </Host>

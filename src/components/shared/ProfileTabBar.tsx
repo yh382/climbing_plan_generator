@@ -5,6 +5,7 @@ import { View, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-nat
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
+  useAnimatedProps,
   useSharedValue,
   withTiming,
   interpolate,
@@ -48,14 +49,16 @@ function TabIcon({
   inactiveColor: string;
   onPress: () => void;
 }) {
-  const animatedColor = useAnimatedStyle(() => {
-    const color = interpolateColor(
+  // vector-icons Ionicons 内部是 Text wrapper —— animated `style.color` 不传给
+  // underlying Text 的 color prop。改用 useAnimatedProps 直传 prop，是
+  // reanimated 推荐的非 style props (color/fill 等) 动画方案。
+  const animatedProps = useAnimatedProps(() => ({
+    color: interpolateColor(
       scrollPosition.value,
       [index - 1, index, index + 1],
       [inactiveColor, activeColor, inactiveColor],
-    );
-    return { color };
-  });
+    ),
+  }));
 
   return (
     <TouchableOpacity
@@ -67,7 +70,7 @@ function TabIcon({
         // @ts-ignore — icon union type
         name={tab.iconActive}
         size={22}
-        style={animatedColor}
+        animatedProps={animatedProps}
       />
     </TouchableOpacity>
   );

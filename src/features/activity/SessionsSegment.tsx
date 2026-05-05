@@ -9,7 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { subDays, parseISO, format } from "date-fns";
+import { subDays, parseISO, format, startOfMonth, subMonths } from "date-fns";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../../lib/useThemeColors";
@@ -85,10 +85,10 @@ export default function SessionsSegment() {
     const now = new Date();
     switch (timeFilter) {
       case "week": return subDays(now, 7);
-      case "month": return subDays(now, 30);
-      case "last_month": return subDays(now, 60);
-      case "3_months": return subDays(now, 90);
-      case "6_months": return subDays(now, 180);
+      case "month": return startOfMonth(now);
+      case "last_month": return startOfMonth(subMonths(now, 1));
+      case "3_months": return startOfMonth(subMonths(now, 3));
+      case "6_months": return startOfMonth(subMonths(now, 6));
     }
   }, [timeFilter]);
 
