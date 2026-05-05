@@ -9,7 +9,7 @@ import { pickerStyle, tag, frame, buttonStyle, background, shapes, font, foregro
 import { useSettings } from "src/contexts/SettingsContext";
 import { useAuthStore } from "src/store/useAuthStore";
 import { useThemeColors } from "src/lib/useThemeColors";
-import { NATIVE_HEADER_LARGE } from "../../src/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
 
 // 类型定义
 type UnitSystem = "imperial" | "metric";
@@ -58,10 +58,11 @@ export default function Settings() {
   useLayoutEffect(() => {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
+      ...withHeaderTheme(colors),
       headerShown: true,
       title: tr("设置", "Settings"),
     });
-  }, [navigation, tr]);
+  }, [navigation, tr, colors]);
 
   if (!ready) return null;
 

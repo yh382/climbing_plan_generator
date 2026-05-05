@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
-import { NATIVE_HEADER_LARGE } from "../../src/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 
@@ -43,6 +43,7 @@ export default function ChallengesScreen() {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
+      ...withHeaderTheme(colors),
       title: "Challenges",
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={() => router.back()} />

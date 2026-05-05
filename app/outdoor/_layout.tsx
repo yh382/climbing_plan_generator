@@ -2,10 +2,12 @@
 // Stack navigator for outdoor climbing pages
 
 import { Stack } from 'expo-router';
-import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from '@/lib/nativeHeaderOptions';
+import { useThemeColors } from "@/lib/useThemeColors";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT, withHeaderTheme } from '@/lib/nativeHeaderOptions';
 
 export default function OutdoorLayout() {
-  return (
+  
+  const colors = useThemeColors();return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen
         name="crag-map"
@@ -24,6 +26,7 @@ export default function OutdoorLayout() {
         name="crag-community"
         options={{
           ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
           headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' },
         }}
@@ -39,6 +42,7 @@ export default function OutdoorLayout() {
         name="route-climbers"
         options={{
           ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
           headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' },
         }}

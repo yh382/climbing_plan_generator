@@ -3,21 +3,24 @@
 // The same AnalysisScreen is reused inside Activity tab's Analysis segment.
 
 import React from "react";
+import { useThemeColors } from "@/lib/useThemeColors";
 import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { HeaderButton } from "../src/components/ui/HeaderButton";
-import { NATIVE_HEADER_LARGE } from "../src/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "../src/lib/nativeHeaderOptions";
 import { useSettings } from "../src/contexts/SettingsContext";
 import AnalysisScreen from "../src/features/analysis/AnalysisScreen";
 
 export default function AnalysisRoute() {
-  const navigation = useNavigation();
+  
+  const colors = useThemeColors();const navigation = useNavigation();
   const router = useRouter();
   const { tr } = useSettings();
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
+      ...withHeaderTheme(colors),
       headerShown: true,
       title: tr("分析", "Analysis"),
       headerLeft: () => (

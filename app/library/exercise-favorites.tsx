@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, FlatList } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 
 import ExerciseLibraryCard from "@/components/shared/ExerciseLibraryCard";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -183,6 +183,7 @@ export default function ExerciseFavoritesScreen() {
     <>
       <Stack.Screen options={{
         ...NATIVE_HEADER_LARGE,
+        ...withHeaderTheme(colors),
         title: titleText,
       }} />
       <FlatList

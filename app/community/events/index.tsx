@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { eventApi } from "@/features/community/events/api";
@@ -44,6 +44,7 @@ export default function EventsScreen() {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
+      ...withHeaderTheme(colors),
       title: "Events",
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={() => router.back()} />

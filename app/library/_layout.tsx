@@ -1,8 +1,10 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 
 export default function LibraryLayout() {
-  return (
+  
+  const colors = useThemeColors();return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen name="generator" />
       <Stack.Screen name="my-plans" />
@@ -10,6 +12,7 @@ export default function LibraryLayout() {
         name="exercise-categories"
         options={{
           ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
           headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' },
         }}
@@ -20,6 +23,7 @@ export default function LibraryLayout() {
         name="exercises"
         options={{
           ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
           headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' },
         }}

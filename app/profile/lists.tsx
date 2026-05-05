@@ -3,6 +3,7 @@
 // Profile tab and this page stay in sync.
 
 import { useLayoutEffect } from "react";
+import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
@@ -23,6 +24,7 @@ export default function MyListsPage() {
     navigation.setOptions({
       title: isSelf ? tr("我的清单", "My Lists") : tr("清单", "Lists"),
       headerLargeTitle: true,
+      ...withHeaderTheme(colors),
       headerLargeTitleShadowVisible: false,
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
     });

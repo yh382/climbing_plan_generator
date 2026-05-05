@@ -3,6 +3,7 @@
 // Reuses gym community patterns with area_id as data source
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { View, Text, ScrollView, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';

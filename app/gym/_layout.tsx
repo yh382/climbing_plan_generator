@@ -3,10 +3,12 @@
 // pages get a transparent native header so back/toolbar render natively.
 
 import { Stack } from 'expo-router';
-import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from '@/lib/nativeHeaderOptions';
+import { useThemeColors } from "@/lib/useThemeColors";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT, withHeaderTheme } from '@/lib/nativeHeaderOptions';
 
 export default function GymLayout() {
-  return (
+  
+  const colors = useThemeColors();return (
     <Stack screenOptions={{ ...NATIVE_HEADER_BASE }}>
       <Stack.Screen
         name="[gymId]"
@@ -31,6 +33,7 @@ export default function GymLayout() {
         name="route-climbers"
         options={{
           ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
           headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' },
         }}

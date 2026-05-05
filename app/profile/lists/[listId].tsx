@@ -2,6 +2,7 @@
 // and swipe-delete items. Viewer sees read-only.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import {
   View,
   Text,
@@ -111,6 +112,7 @@ export default function ListDetailPage() {
     navigation.setOptions({
       title: detail?.name ?? tr("清单", "List"),
       headerLargeTitle: true,
+      ...withHeaderTheme(colors),
       headerLargeTitleShadowVisible: false,
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
     });
