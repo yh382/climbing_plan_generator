@@ -8,6 +8,7 @@ import {
   FlatList, TouchableOpacity, Pressable, ActivityIndicator,
   Alert, Share,
 } from 'react-native';
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -426,7 +427,7 @@ export default function OutdoorRouteDetailPage() {
           // title would be redundant. Leave empty so the transparent
           // header reads as pure chrome (just the back chevron + toolbar).
           headerTitle: '',
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           // Plain icon — iOS 26 automatically wraps transparent-header nav
           // items in its own liquid-glass pill. Using variant='glass'
           // here stacks our own pill inside Apple's → visible "pill inside

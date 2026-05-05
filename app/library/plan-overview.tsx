@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 import { usePlanDetail } from "../../src/features/plans/hooks";
 import { plansApi } from "../../src/features/plans/api";
@@ -72,7 +73,7 @@ export default function PlanOverviewScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       headerTitle: "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
       scrollEdgeEffects: { top: 'soft' },

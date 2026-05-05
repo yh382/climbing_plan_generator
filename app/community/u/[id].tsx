@@ -11,6 +11,7 @@ import {
   FlatList,
   useWindowDimensions,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -261,7 +262,7 @@ export default function PublicProfileScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       title: "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
     });

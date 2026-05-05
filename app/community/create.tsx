@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, Alert, Modal,
   Pressable, Dimensions,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
@@ -327,7 +328,7 @@ export default function CreatePostScreen() {
 
     navigation.setOptions({
       title: isEditMode ? 'Edit Post' : 'New Post',
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerLeft: () => (
         <Host matchContents>

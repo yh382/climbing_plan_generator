@@ -11,6 +11,7 @@ import {
   FlatList,
   TouchableOpacity,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from "expo-image";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { presentImageViewer } from "../../modules/climmate-image-viewer/src";
@@ -356,7 +357,7 @@ export default function RouteDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Route Detail", headerTransparent: true, scrollEdgeEffects: { top: "soft" }, headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} /> }} />
+      <Stack.Screen options={{ title: "Route Detail", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: "soft" }, headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} /> }} />
       <View style={s.container}>
       <ScrollEdgeFallback>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>

@@ -12,6 +12,7 @@ import {
   Alert,
   ViewToken,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import useLogsStore from "@/store/useLogsStore";
@@ -47,7 +48,7 @@ export default function UserPostsScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: "Posts",
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={() => router.back()} />

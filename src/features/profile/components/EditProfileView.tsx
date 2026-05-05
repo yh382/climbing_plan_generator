@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from "expo-image";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
@@ -248,7 +249,7 @@ export default function EditProfileView() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerLeft: () => (
         <Host matchContents>

@@ -24,6 +24,7 @@ import {
   Share,
   FlatList,
 } from 'react-native';
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import {
@@ -436,7 +437,7 @@ export default function GymRouteDetailPage() {
       <Stack.Screen
         options={{
           headerTitle: '',
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           headerLeft: () => (
             <HeaderButton
               icon="chevron.backward"

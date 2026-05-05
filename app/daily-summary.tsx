@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { format, addDays, subDays, parseISO } from "date-fns";
 
-import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../src/lib/useThemeColors";
 import { useSettings } from "../src/contexts/SettingsContext";
@@ -72,7 +72,7 @@ export default function DailySummaryScreen() {
       ...NATIVE_HEADER_LARGE,
       ...withHeaderTheme(colors),
       headerShown: true,
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       title: tr("总结", "Summary"),
       headerLeft: () => (

@@ -21,7 +21,7 @@ import * as Haptics from "expo-haptics";
 
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
-import { NATIVE_HEADER_BASE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_BASE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -174,7 +174,7 @@ export default function ShareCardScreen() {
         options={{
           ...NATIVE_HEADER_BASE,
           title: "Share Card",
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: "soft" },
           headerLeft: () => (
             <HeaderButton icon="chevron.backward" onPress={() => router.back()} />

@@ -11,6 +11,12 @@ import { setOnAuthExpired } from "@/lib/authEvents";
 import { useAuthStore } from "@/store/useAuthStore";
 
 const isIOS = Platform.OS === "ios";
+// iOS<26: NativeTabs default goes transparent when content scrolls to the
+// tab bar edge — looks washed out / unreadable on iOS 17. Force opaque
+// (system blur material stays on, just not transparent). iOS 26 keeps
+// its native floating-pill behavior unchanged.
+const iosVersion = isIOS ? parseInt(String(Platform.Version), 10) : 0;
+const tabBarNeedsOpaque = isIOS && iosVersion < 26;
 
 export default function TabsLayout() {
   const { user, fetchMe } = useUserStore();
@@ -34,7 +40,11 @@ export default function TabsLayout() {
   }, [logout, router]);
 
   return (
-    <NativeTabs tintColor="#306E6F" minimizeBehavior="never">
+    <NativeTabs
+      tintColor="#306E6F"
+      minimizeBehavior="never"
+      disableTransparentOnScrollEdge={tabBarNeedsOpaque}
+    >
       {/* 1. Home */}
       <NativeTabs.Trigger name="index" contentStyle={{ backgroundColor: "transparent" }}>
         {isIOS ? (

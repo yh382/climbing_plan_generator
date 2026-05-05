@@ -8,7 +8,7 @@ import React, { useLayoutEffect } from "react";
 import { Alert } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
-import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useThemeColors } from "../../../../src/lib/useThemeColors";
 import { useSettings } from "../../../../src/contexts/SettingsContext";
 
@@ -35,7 +35,7 @@ export default function ActivityScreen() {
       ...NATIVE_HEADER_LARGE,
       ...withHeaderTheme(colors),
       headerShown: true,
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       title: tr("活动", "Activity"),
       headerLeft: undefined,

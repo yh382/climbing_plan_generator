@@ -11,6 +11,7 @@ import {
   Platform,
   Keyboard,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -57,7 +58,7 @@ export default function UniversalSearchScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       title: "",
       headerLeft: () => (

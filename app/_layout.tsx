@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { AppState, View, StyleSheet, useColorScheme, Platform } from "react-native";
 import { Stack, SplashScreen, useRouter, useSegments } from "expo-router";
 import { ThemeProvider, DarkTheme, DefaultTheme } from "@react-navigation/native";
-import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "../src/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from "../src/lib/nativeHeaderOptions";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -89,7 +89,7 @@ function RootStack() {
         options={{
           headerShown: true,
           ...NATIVE_HEADER_BASE,
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: "soft" },
         }}
       />

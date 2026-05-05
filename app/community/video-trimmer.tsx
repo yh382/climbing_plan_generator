@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -289,7 +290,7 @@ export default function VideoTrimmerScreen() {
       <Stack.Screen
         options={{
           title: "",
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           gestureEnabled: true,
           fullScreenGestureEnabled: true,
           headerLeft: () => (

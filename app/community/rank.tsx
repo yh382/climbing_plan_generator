@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
 import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
-import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, withHeaderTheme, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useThemeColors } from "@/lib/useThemeColors";
 import RankTab from "@/features/community/rank/RankTab";
@@ -26,7 +26,7 @@ export default function RankScreen() {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
       ...withHeaderTheme(colors),
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       title: tr("排行榜", "Rank"),
       headerLeft: () => (

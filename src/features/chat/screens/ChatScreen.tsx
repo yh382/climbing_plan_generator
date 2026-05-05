@@ -13,6 +13,7 @@ import ChatBubble from "../components/ChatBubble";
 import ChatDateSeparator from "../components/ChatDateSeparator";
 import ChatInput from "../components/ChatInput";
 import type { ChatMessageOut } from "../types";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 type ChatListItem =
   | { type: "date"; key: string; iso: string }
@@ -71,7 +72,7 @@ export default function ChatScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: headerTitle,
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerLeft: () => (
         <Host matchContents>

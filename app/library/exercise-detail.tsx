@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -153,7 +154,7 @@ export default function ExerciseDetailScreen() {
   // Native transparent header with scroll edge effect
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       headerTitle: "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
       scrollEdgeEffects: { top: "soft" },

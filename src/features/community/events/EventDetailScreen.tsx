@@ -10,6 +10,7 @@ import {
   ViewStyle,
   Pressable,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -160,7 +161,7 @@ export default function EventDetailScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       headerTitle: "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
       headerRight: () => <HeaderButton icon="square.and.arrow.up" onPress={() => {}} />,

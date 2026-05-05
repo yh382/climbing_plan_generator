@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 /**
  * Nested Stack for /inbox, following the same pattern as (tabs)/index/_layout.
@@ -13,7 +13,7 @@ export default function InboxLayout() {
         name="index"
         options={{
           ...NATIVE_HEADER_LARGE,
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: "soft" },
         }}
       />

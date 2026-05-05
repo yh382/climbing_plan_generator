@@ -2,8 +2,19 @@
 // Shared native iOS header configuration for Expo Router Stack screens
 // Uses system default translucent nav bar — iOS 26 Liquid Glass applies automatically
 
+import { Platform } from 'react-native';
 import { theme } from './theme';
 import type { useThemeColors } from './useThemeColors';
+
+/** True on iOS 26+ (Liquid Glass nav bar makes transparent + scrollEdgeEffects
+ *  beautiful), false on iOS<26 / Android — there transparent header leaves
+ *  buttons floating on raw scroll content with no backdrop, so icons get
+ *  unreadable when content scrolls past. Falling back to opaque chrome on
+ *  those targets is the COMPAT-friendly default.
+ *
+ *  Use as: `headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }`. */
+export const HEADER_TRANSPARENT =
+  Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
 
 /** Base header (system default translucent bar with back+title) */
 export const NATIVE_HEADER_BASE = {} as const;

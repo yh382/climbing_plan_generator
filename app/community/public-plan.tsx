@@ -9,6 +9,7 @@ import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 import { usePlanDetail } from "../../src/features/plans/hooks";
 import { plansApi } from "../../src/features/plans/api";
@@ -70,7 +71,7 @@ export default function PublicPlanScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       headerBlurEffect: "systemChromeMaterial",
       title: plan?.title ?? "",
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,

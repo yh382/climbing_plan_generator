@@ -12,6 +12,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -210,7 +211,7 @@ export default function CoverPickerScreen() {
       <Stack.Screen
         options={{
           title: "",
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           headerLeft: () => (
             <HeaderButton
               icon="chevron.backward"

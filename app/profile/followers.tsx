@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,7 +43,7 @@ export default function FollowersScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: "Followers",
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={() => router.back()} />

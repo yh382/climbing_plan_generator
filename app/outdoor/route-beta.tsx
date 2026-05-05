@@ -16,6 +16,7 @@ import {
   FlatList,
   ScrollView,
 } from 'react-native';
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { useThemeColors } from '../../src/lib/useThemeColors';
@@ -133,7 +134,7 @@ export default function RouteBetaPage() {
             typeof routeName === 'string' && routeName.length > 0
               ? routeName
               : tr('Beta', 'Beta'),
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: 'soft' } as any,
           // Don't inherit the previous screen's title next to the back
           // chevron — keeps the nav bar clean (the page title IS the

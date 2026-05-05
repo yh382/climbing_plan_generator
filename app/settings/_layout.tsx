@@ -1,5 +1,5 @@
 import { Stack, useRouter } from "expo-router";
-import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 export default function SettingsSubLayout() {
   const router = useRouter();
@@ -13,9 +13,9 @@ export default function SettingsSubLayout() {
           headerShown: true,
         }}
       />
-      <Stack.Screen name="notifications" options={{ title: "Notifications", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
-      <Stack.Screen name="privacy" options={{ title: "Privacy", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
-      <Stack.Screen name="help" options={{ title: "Help", headerTransparent: true, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="notifications" options={{ title: "Notifications", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="privacy" options={{ title: "Privacy", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="help" options={{ title: "Help", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
     </Stack>
   );
 }

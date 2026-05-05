@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_BASE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_BASE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 export default function ClimmateLayout() {
   return (
@@ -9,7 +9,7 @@ export default function ClimmateLayout() {
         options={{
           ...NATIVE_HEADER_BASE,
           headerLargeTitle: false,
-          headerTransparent: true,
+          headerTransparent: HEADER_TRANSPARENT,
           scrollEdgeEffects: { top: "soft" },
         }}
       />

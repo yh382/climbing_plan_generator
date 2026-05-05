@@ -8,6 +8,7 @@ import React, {
   useLayoutEffect,
   useRef,
 } from "react";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import {
   View,
   Text,
@@ -299,7 +300,7 @@ export default function ArrangeScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: "Arrange",
-      headerTransparent: true,
+      headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       headerRight: () => (
         <Pressable

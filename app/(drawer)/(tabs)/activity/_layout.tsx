@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { NATIVE_HEADER_LARGE } from "@/lib/nativeHeaderOptions";
+import { NATIVE_HEADER_LARGE, HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { DrawerSceneWrapper } from "@/components/drawer/DrawerSceneWrapper";
 
 export default function ActivityLayout() {
@@ -10,7 +10,7 @@ export default function ActivityLayout() {
           name="index"
           options={{
             ...NATIVE_HEADER_LARGE,
-            headerTransparent: true,
+            headerTransparent: HEADER_TRANSPARENT,
             scrollEdgeEffects: { top: "soft" },
           }}
         />

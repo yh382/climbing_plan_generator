@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, FlatList } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 
 import GymCommunityTabs from "../src/features/community/gyms/GymCommunityTabs";
 import GymDropdownPill from "../src/features/community/components/GymDropdownPill";
@@ -54,7 +55,7 @@ export default function GymCommunityPage() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen options={{
         title: "",
-        headerTransparent: true,
+        headerTransparent: HEADER_TRANSPARENT,
         headerBackButtonDisplayMode: "minimal",
         scrollEdgeEffects: { top: "soft" },
       }} />
