@@ -34,8 +34,19 @@ export const NATIVE_HEADER_LARGE = {
 /** Theme-aware header text colors + brand DM Sans font. iOS renders the
  *  large title and its collapsed inline title from these styles, so setting
  *  fontFamily here applies app-wide (Home / Activity / Daily Summary / any
- *  Stack screen using withHeaderTheme). */
+ *  Stack screen using withHeaderTheme).
+ *
+ *  iOS<26: also sets `headerLargeStyle.backgroundColor` and
+ *  `headerStyle.backgroundColor` to `colors.background` so the
+ *  scrollEdgeAppearance (transparent by default for large titles) gets a
+ *  solid backdrop matching the screen — without this, scrolled content
+ *  bleeds up through the transparent chrome into the status bar zone. iOS
+ *  26 keeps these undefined to preserve the floating Liquid Glass look. */
 export function withHeaderTheme(colors: ReturnType<typeof useThemeColors>) {
+  const isIOS = Platform.OS === 'ios';
+  const iosVersion = isIOS ? parseInt(String(Platform.Version), 10) : 0;
+  const needsOpaqueBackdrop = isIOS && iosVersion < 26;
+
   return {
     headerTintColor: colors.textPrimary,
     headerTitleStyle: {
@@ -46,5 +57,11 @@ export function withHeaderTheme(colors: ReturnType<typeof useThemeColors>) {
       color: colors.textPrimary,
       fontFamily: theme.fonts.black,
     },
+    ...(needsOpaqueBackdrop
+      ? {
+          headerStyle: { backgroundColor: colors.background },
+          headerLargeStyle: { backgroundColor: colors.background },
+        }
+      : null),
   };
 }
