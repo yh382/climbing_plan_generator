@@ -17,9 +17,9 @@ export default function SettingsSubLayout() {
           headerShown: true,
         }}
       />
-      <Stack.Screen name="notifications" options={{ title: "Notifications", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }, ...themed }} />
-      <Stack.Screen name="privacy" options={{ title: "Privacy", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }, ...themed }} />
-      <Stack.Screen name="help" options={{ title: "Help", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' }, ...themed }} />
+      <Stack.Screen name="notifications" options={{ ...NATIVE_HEADER_LARGE, ...themed, title: "Notifications", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="privacy" options={{ ...NATIVE_HEADER_LARGE, ...themed, title: "Privacy", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="help" options={{ ...NATIVE_HEADER_LARGE, ...themed, title: "Help", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
     </Stack>
   );
 }
