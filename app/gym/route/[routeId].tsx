@@ -79,8 +79,10 @@ const PHOTO_H = SCREEN_W * 0.82;
 
 // B2 #2: greyed Send button background when current user already sent this
 // route. Mid-grey so the white text + checkmark icon stay readable in both
-// light and dark modes (theme-agnostic by design — disabled state).
+// light and dark modes (theme-agnostic by design — disabled state). The
+// checkmark itself stays green to celebrate completion.
 const SENDED_BG = '#6B7280';
+const SENDED_TICK = '#34D399'; // emerald-400 — readable on both light & dark grey
 
 // Same grade pickers OutdoorSendSheet uses for outdoor routes — indoor
 // boulder is V-scale, indoor rope is YDS in our schema. font/french
@@ -555,7 +557,13 @@ export default function GymRouteDetailPage() {
               <Ionicons
                 name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
                 size={18}
-                color={isArchived ? colors.textTertiary : '#FFFFFF'}
+                color={
+                  isArchived
+                    ? colors.textTertiary
+                    : userHasSent
+                      ? SENDED_TICK
+                      : '#FFFFFF'
+                }
               />
               <Text
                 style={[
