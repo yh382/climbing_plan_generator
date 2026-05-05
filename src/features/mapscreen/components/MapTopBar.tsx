@@ -9,8 +9,9 @@
 //       buttons stacked inside the same glass union (iOS 26 toolbar feel).
 
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, View, StyleSheet, Pressable } from "react-native";
+import { Animated, Platform, View, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
 import { Host, Button, VStack, GlassEffectContainer, Menu } from "@expo/ui/swift-ui";
 import {
   buttonStyle,
@@ -58,6 +59,37 @@ interface MapTopBarProps {
 }
 
 const BTN_SIZE = 44;
+
+// iOS<26 lacks SwiftUI's `glassEffect` (Liquid Glass landed in iOS 26),
+// so the buttons render as bare icons floating on the map. Apple Maps on
+// iOS 18 uses UIBlurEffect.systemMaterial — we mimic that with expo-blur.
+// On iOS≥26 the SwiftUI Host's own glassEffect modifier draws the
+// material; we just render a transparent passthrough so the two layers
+// don't double up.
+const isIOS = Platform.OS === "ios";
+const iosVersion = isIOS ? parseInt(String(Platform.Version), 10) : 0;
+const NEEDS_BLUR_FALLBACK = isIOS && iosVersion < 26;
+
+function GlassBackdrop({
+  children,
+  borderRadius,
+  style,
+}: {
+  children: React.ReactNode;
+  borderRadius: number;
+  style?: any;
+}) {
+  if (!NEEDS_BLUR_FALLBACK) return <>{children}</>;
+  return (
+    <BlurView
+      intensity={70}
+      tint="systemMaterial"
+      style={[{ borderRadius, overflow: "hidden" }, style]}
+    >
+      {children}
+    </BlurView>
+  );
+}
 
 const GLASS_CIRCLE = glassEffect({
   glass: { variant: "regular", interactive: true },
@@ -131,14 +163,16 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
         {/* Left button */}
         <View style={styles.sideWrap}>
           {leftButton && leftButton.visible !== false && (
-            <Host matchContents>
-              <Button
-                systemImage={leftButton.icon as any}
-                label=""
-                onPress={leftButton.onPress ?? (() => {})}
-                modifiers={LEFT_BTN as any}
-              />
-            </Host>
+            <GlassBackdrop borderRadius={BTN_SIZE / 2}>
+              <Host matchContents>
+                <Button
+                  systemImage={leftButton.icon as any}
+                  label=""
+                  onPress={leftButton.onPress ?? (() => {})}
+                  modifiers={LEFT_BTN as any}
+                />
+              </Host>
+            </GlassBackdrop>
           )}
         </View>
 
@@ -148,6 +182,7 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
         {/* Right vertical pill */}
         <View style={styles.sideWrap}>
           {visibleRight.length > 0 && (
+            <GlassBackdrop borderRadius={BTN_SIZE / 2}>
             <Host matchContents>
               <GlassEffectContainer spacing={20}>
                 <GlassUnionGroup>
@@ -230,6 +265,7 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
                 </GlassUnionGroup>
               </GlassEffectContainer>
             </Host>
+            </GlassBackdrop>
           )}
         </View>
       </Animated.View>
