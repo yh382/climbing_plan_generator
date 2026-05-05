@@ -12,8 +12,10 @@ import useLogsStore from "../../store/useLogsStore";
 
 type Props = {
   startTime: number;
+  /** Crag-level name for outdoor, gym name for indoor. Shown as small
+   *  footer text — empty string is OK (footer hides). discipline is
+   *  intentionally not displayed here (often mixed mid-session). */
   gymName: string;
-  discipline: "boulder" | "toprope" | "lead";
 };
 
 function formatElapsed(ms: number): string {
@@ -26,7 +28,7 @@ function formatElapsed(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-export default function ActiveSessionCard({ startTime, gymName, discipline }: Props) {
+export default function ActiveSessionCard({ startTime, gymName }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -59,12 +61,6 @@ export default function ActiveSessionCard({ startTime, gymName, discipline }: Pr
     );
   };
 
-  const disciplineLabel = discipline === "boulder"
-    ? tr("抱石", "Boulder")
-    : discipline === "toprope"
-      ? tr("顶绳", "Top Rope")
-      : tr("先锋", "Lead");
-
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -72,12 +68,13 @@ export default function ActiveSessionCard({ startTime, gymName, discipline }: Pr
         <Text style={styles.badge}>{tr("进行中", "ACTIVE")}</Text>
       </View>
       <Text style={styles.timer}>{formatElapsed(elapsed)}</Text>
-      <Text style={styles.meta}>
-        {gymName} · {disciplineLabel}
-      </Text>
       <TouchableOpacity style={styles.endBtn} onPress={handleEnd} activeOpacity={0.85}>
         <Text style={styles.endBtnText}>{tr("结束 Session", "END SESSION")}</Text>
       </TouchableOpacity>
+      {/* Small footer: crag/gym name only — no discipline. Mid-session
+          discipline is often mixed (TR warmup → lead project) and can
+          mislead more than help. */}
+      {gymName ? <Text style={styles.footer}>{gymName}</Text> : null}
     </View>
   );
 }
@@ -115,11 +112,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       color: "#FFFFFF",
       letterSpacing: 1,
     },
-    meta: {
-      marginTop: 4,
-      fontSize: 13,
-      fontFamily: theme.fonts.medium,
-      color: "#C7C7CC",
+    footer: {
+      marginTop: 12,
+      fontSize: 11,
+      fontFamily: theme.fonts.regular,
+      color: "#8E8E93",
+      letterSpacing: 0.2,
     },
     endBtn: {
       marginTop: 16,

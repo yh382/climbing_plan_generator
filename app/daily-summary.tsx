@@ -138,7 +138,6 @@ export default function DailySummaryScreen() {
             <ActiveSessionCard
               startTime={data.activeSession.startTime}
               gymName={data.activeSession.gymName}
-              discipline={data.activeSession.discipline}
             />
           )}
           {group.items.length > 0 ? (

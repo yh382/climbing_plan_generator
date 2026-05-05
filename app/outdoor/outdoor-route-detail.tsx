@@ -166,7 +166,15 @@ export default function OutdoorRouteDetailPage() {
         routeName: route.name,
         routeStyle: route.style,
         routeGrade: route.grade_text,
-        sessionGymName: route.wall_name || route.sector_name || 'Outdoor',
+        // Prefer crag → sector → wall → 'Outdoor'. Crag is the right grain
+        // for "where am I climbing today" — a day in Little Cottonwood
+        // can span South Face / North Face but stays one crag.
+        sessionGymName:
+          route.crag_name ||
+          route.area_name ||
+          route.sector_name ||
+          route.wall_name ||
+          'Outdoor',
         sessionLocationType: 'outdoor',
       });
       await flushLogsOutboxNow();
@@ -255,7 +263,12 @@ export default function OutdoorRouteDetailPage() {
         routeName: route.name,
         routeStyle: route.style,
         draft,
-        sessionGymName: route.wall_name || route.sector_name || 'Outdoor',
+        sessionGymName:
+          route.crag_name ||
+          route.area_name ||
+          route.sector_name ||
+          route.wall_name ||
+          'Outdoor',
         sessionLocationType: 'outdoor',
       });
       // Push to backend immediately so the Climbers list updates within

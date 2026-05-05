@@ -148,9 +148,15 @@ export type OutdoorRoute = {
   rating_count: number;
   send_count: number;
   attempt_count: number;
-  // Display context (populated by API or joined in frontend)
-  sector_name?: string;
+  // Display context (populated by API or joined in frontend).
+  // B2 follow-up: BE now returns the full ancestry chain so the catalog
+  // Send path can pick crag_name as the session label (matches the user's
+  // mental model — "today I climbed in Little Cottonwood", not "today I
+  // climbed on North Face").
   wall_name?: string;
+  sector_name?: string;
+  crag_name?: string;
+  area_name?: string;
   wall_topo_url?: string;
 };
 

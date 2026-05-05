@@ -59,6 +59,11 @@ export type GymRoute = {
   description: string | null;
   created_at: string;
   updated_at: string;
+  // B2 follow-up: parent gym ancestry, populated by GET /routes/{id}.
+  // Used by catalog Send to label the auto-started session with the
+  // actual gym name instead of the literal "Gym" fallback.
+  gym_id?: string | null;
+  gym_name?: string | null;
 };
 
 export type GymRouteListParams = {

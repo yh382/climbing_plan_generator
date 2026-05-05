@@ -224,9 +224,11 @@ export default function GymRouteDetailPage() {
         routeName: route.name ?? '',
         routeStyle: route.style,
         routeGrade: route.grade_text,
-        // Gym name isn't loaded with the GymRoute response — fallback string
-        // is the session label until we fetch wall_section → gym separately.
-        sessionGymName: 'Gym',
+        // B2 follow-up: GET /routes/{id} now joins gym → gym_name; fall
+        // back to literal 'Gym' only if the route was loaded by a stale
+        // client that doesn't include the field.
+        sessionGymName: route.gym_name || 'Gym',
+        sessionGymId: route.gym_id ?? null,
         sessionLocationType: 'gym',
       });
       await flushLogsOutboxNow();
@@ -262,7 +264,8 @@ export default function GymRouteDetailPage() {
           routeName: route.name ?? '',
           routeStyle: route.style,
           draft,
-          sessionGymName: 'Gym',
+          sessionGymName: route.gym_name || 'Gym',
+          sessionGymId: route.gym_id ?? null,
           sessionLocationType: 'gym',
         });
         await flushLogsOutboxNow();
