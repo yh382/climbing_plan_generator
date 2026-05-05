@@ -378,13 +378,17 @@ export default function ProfileScreen() {
       </Animated.ScrollView>
       </ScrollEdgeFallback>
 
-      {/* Native toolbar: settings + share menu */}
+      {/* Native toolbar: settings + share menu.
+          tintColor=black overrides system blue tint — Profile has a cover
+          image background so black SF Symbols read clearly without the
+          accent-blue distraction (per user feedback 2026-05-05). */}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="gearshape"
+          tintColor="#000000"
           onPress={() => router.push("/settings")}
         />
-        <Stack.Toolbar.Menu icon="square.and.arrow.up">
+        <Stack.Toolbar.Menu icon="square.and.arrow.up" tintColor="#000000">
           <Stack.Toolbar.MenuAction
             icon="link"
             onPress={async () => {
