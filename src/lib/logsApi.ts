@@ -30,11 +30,16 @@ async function authedFetch(path: string, token: string, init?: RequestInit) {
 export type CreateLogPayload = {
   client_id?: string | null; // client-generated UUID for sync dedup
   session_id?: string | null;
+  // B2: local session key used by logsOutbox to resolve session_id at flush
+  // time — covers the race where the catalog log is enqueued before the
+  // POST /sessions response returns its server id.
+  _sessionKey?: string | null;
   date: string; // YYYY-MM-DD
   log_type: "boulder" | "toprope" | "lead";
   grade_text: string;
   route_name?: string | null;
-  style: "redpoint" | "flash" | "onsight";
+  // B2: "attempt" for catalog Attempt button (no Send sheet, no grade picker).
+  style: "redpoint" | "flash" | "onsight" | "attempt";
   feel?: "soft" | "solid" | "hard" | null;
   attempts_total: number;
   send_count: number;
@@ -57,6 +62,7 @@ function toBackendPayload(p: CreateLogPayload) {
     redpoint: "send",
     flash: "flash",
     onsight: "onsight",
+    attempt: "attempt",
   };
   const result = STYLE_TO_RESULT[p.style] || "send";
 

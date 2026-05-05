@@ -63,6 +63,7 @@ import { RouteDescriptionCard } from '../../../src/features/outdoor/components/R
 import { gymsCatalogApi } from '../../../src/features/gymsCatalog/api';
 import {
   enqueueRouteSendLog,
+  enqueueRouteAttemptLog,
   flushLogsOutboxNow,
 } from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
@@ -192,11 +193,29 @@ export default function GymRouteDetailPage() {
     );
   }, [router, route, tr]);
 
-  const handleAttempt = useCallback(() => {
+  const handleAttempt = useCallback(async () => {
     if (!route || route.status === 'archived') return;
     setLocalAttempts((n) => n + 1);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // Future: enqueue a ClimbLog with gym_route_id once log↔route wiring lands.
+
+    try {
+      // B2: Attempt now persists to backend; auto-startSession fires inside
+      // enqueueRouteAttemptLog when no active session exists.
+      await enqueueRouteAttemptLog({
+        routeKind: 'gym',
+        routeId: route.id,
+        routeName: route.name ?? '',
+        routeStyle: route.style,
+        routeGrade: route.grade_text,
+        // Gym name isn't loaded with the GymRoute response — fallback string
+        // is the session label until we fetch wall_section → gym separately.
+        sessionGymName: 'Gym',
+        sessionLocationType: 'gym',
+      });
+      await flushLogsOutboxNow();
+    } catch (e) {
+      if (__DEV__) console.warn('[gym attempt] enqueue failed:', e);
+    }
   }, [route]);
 
   const handleSend = useCallback(() => {
@@ -226,6 +245,8 @@ export default function GymRouteDetailPage() {
           routeName: route.name ?? '',
           routeStyle: route.style,
           draft,
+          sessionGymName: 'Gym',
+          sessionLocationType: 'gym',
         });
         await flushLogsOutboxNow();
         try {

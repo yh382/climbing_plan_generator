@@ -31,12 +31,16 @@ export function startLiveActivity(params: {
     });
 }
 
-/** Update Live Activity whenever a log is recorded. */
+/** Update Live Activity whenever a log is recorded.
+ *
+ * B2: `paused` field drives the LA's gray-timer + "Paused" chip rendering.
+ * Defaults to false so existing call sites that omit it stay active-styled. */
 export function updateLiveActivity(params: {
   routeCount: number;
   sendCount: number;
   bestGrade: string;
   attempts: number;
+  paused?: boolean;
 }) {
   if (Platform.OS !== "ios") return;
   if (!ClimmateLiveActivity) return;
@@ -47,6 +51,7 @@ export function updateLiveActivity(params: {
     params.sendCount,
     params.bestGrade,
     params.attempts,
+    params.paused ?? false,
   ).catch((e) => {
     if (__DEV__) console.warn("[liveActivity] update failed:", e);
   });

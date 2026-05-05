@@ -35,7 +35,7 @@ import {
   clearBackupSnapshot,
 } from "../features/journal/sync/localBackup";
 import { syncWidgetFromStore } from "../lib/widgetBridge";
-import { startLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
+import { startLiveActivity, updateLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
 import { recalcIntensityForDate } from "../services/stats/intensityCalculator";
 
 // In-flight POST /sessions promise — endSession awaits this to avoid race condition
@@ -88,15 +88,28 @@ type LogsState = {
   logs: LogEntry[];
 
   sessions: SessionEntry[];
-  activeSession: { startTime: number; gymName: string; discipline: LogType; serverId: string | null } | null;
+  activeSession: {
+    startTime: number;
+    gymName: string;
+    discipline: LogType;
+    serverId: string | null;
+    // B2: pause-state fields. pausedAt=null means active.
+    pausedAt: number | null;
+    lastActivityAt: number;            // ms timestamp; updated on every catalog log + resume
+    activeDurationMinutes: number;     // local estimate; backend is authoritative on /pause + /end
+  } | null;
 
   upsertCount: (p: { date: string; type: LogType; grade: string; delta: number }) => void;
   remove: (id: string) => void;
   resetDay: (date: string, type?: LogType) => void;
 
-  startSession: (gymName: string, discipline: LogType, gymId?: string | null) => void;
+  startSession: (gymName: string, discipline: LogType, gymId?: string | null, locationType?: "gym" | "outdoor") => void;
   endSession: () => Promise<SessionEntry | null>;
   discardActiveSession: () => Promise<void>;
+  // B2: pause / resume / touch — auto-driven by inactivity check + catalog logs.
+  pauseSession: () => Promise<void>;
+  resumeSession: () => Promise<void>;
+  touchActivity: () => void;
   deleteSession: (sessionKey: string) => Promise<string[]>;
   toggleSessionPublic: (sessionKey: string) => Promise<void>;
 
@@ -688,12 +701,20 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         }
       },
 
-      startSession: (gymName, discipline, gymId) => {
+      startSession: (gymName, discipline, gymId, locationType = "gym") => {
         const startTime = Date.now();
         const sessionKey = String(startTime);
         const localDate = keyOf(new Date(startTime)); // YYYY-MM-DD in user's local timezone
         set({
-          activeSession: { startTime, gymName, discipline, serverId: null },
+          activeSession: {
+            startTime,
+            gymName,
+            discipline,
+            serverId: null,
+            pausedAt: null,
+            lastActivityAt: startTime,
+            activeDurationMinutes: 0,
+          },
         });
 
         // Start Live Activity (灵动岛/锁屏)
@@ -711,7 +732,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         // 异步创建后端 session — promise 保存到模块变量, endSession 可 await
         const sessionPayload = {
           gym_name: gymName,
-          location_type: "gym" as const,
+          location_type: locationType,
           date: localDate,
           start_time: new Date(startTime).toISOString(),
           ...(gymId ? { gym_id: gymId } : {}),
@@ -920,6 +941,99 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           clearBackupSnapshot().catch(() => {});
           syncWidgetFromStore();
           return fallbackSession;
+        }
+      },
+
+      // B2: bump lastActivityAt — call from every catalog log + addLog so
+      // the foreground inactivity check has a fresh timestamp. Pure local;
+      // backend's last_activity_at is set on every authoritative event.
+      touchActivity: () => {
+        const { activeSession } = get();
+        if (!activeSession) return;
+        set({ activeSession: { ...activeSession, lastActivityAt: Date.now() } });
+      },
+
+      // B2: pause an active session. Backend POST is fire-and-forget (idempotent
+      // on the server side). LA is updated immediately so the user sees gray
+      // timer + "Paused" chip before the network call returns.
+      pauseSession: async () => {
+        const { activeSession } = get();
+        if (!activeSession) return;
+        if (activeSession.pausedAt) return; // already paused
+
+        const now = Date.now();
+        const lastSegmentMin = Math.max(
+          0,
+          Math.floor((now - activeSession.lastActivityAt) / 60000),
+        );
+        const nextActiveMin = activeSession.activeDurationMinutes + lastSegmentMin;
+
+        set({
+          activeSession: {
+            ...activeSession,
+            pausedAt: now,
+            activeDurationMinutes: nextActiveMin,
+          },
+        });
+
+        // LA pause render — bypasses any throttle so user sees the change immediately.
+        updateLiveActivity({
+          routeCount: 0,
+          sendCount: 0,
+          bestGrade: "",
+          attempts: 0,
+          paused: true,
+        });
+
+        // Backend pause — idempotent on server; failure is non-fatal because
+        // the FE estimate is enough to render the paused UI. Next online sync
+        // (foreground check) will re-attempt via direct call, not outbox.
+        const serverId =
+          activeSession.serverId ??
+          (await getSessionServerId(String(activeSession.startTime)).catch(() => null));
+        if (serverId) {
+          try {
+            await api.post(`/sessions/${serverId}/pause`, {});
+          } catch (e) {
+            if (__DEV__) console.warn("[pauseSession] backend pause failed:", e);
+          }
+        }
+      },
+
+      // B2: resume a paused session. Silent (no toast / Alert per UX decision).
+      // Called from inactivityCheck on app resume + auto from
+      // enqueueRouteSendLog/AttemptLog when user logs while paused.
+      resumeSession: async () => {
+        const { activeSession } = get();
+        if (!activeSession) return;
+        if (!activeSession.pausedAt) return; // already active
+
+        const now = Date.now();
+        set({
+          activeSession: {
+            ...activeSession,
+            pausedAt: null,
+            lastActivityAt: now,
+          },
+        });
+
+        updateLiveActivity({
+          routeCount: 0,
+          sendCount: 0,
+          bestGrade: "",
+          attempts: 0,
+          paused: false,
+        });
+
+        const serverId =
+          activeSession.serverId ??
+          (await getSessionServerId(String(activeSession.startTime)).catch(() => null));
+        if (serverId) {
+          try {
+            await api.post(`/sessions/${serverId}/resume`, {});
+          } catch (e) {
+            if (__DEV__) console.warn("[resumeSession] backend resume failed:", e);
+          }
         }
       },
 

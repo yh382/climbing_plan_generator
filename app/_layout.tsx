@@ -1,7 +1,7 @@
 // app/_layout.tsx
 import "react-native-gesture-handler";
 import React, { useEffect, useState, useCallback } from "react";
-import { View, StyleSheet, useColorScheme, Platform } from "react-native";
+import { AppState, View, StyleSheet, useColorScheme, Platform } from "react-native";
 import { Stack, SplashScreen, useRouter, useSegments } from "expo-router";
 import { ThemeProvider, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE } from "../src/lib/nativeHeaderOptions";
@@ -35,6 +35,7 @@ import { registerForPushNotifications } from "../src/lib/pushNotifications";
 import { handlePushTap, handleColdStartPushTap } from "../src/lib/pushTapHandler";
 import { syncWidgetFromStore } from "@/lib/widgetBridge";
 import { endAllLiveActivities } from "../src/lib/liveActivityBridge";
+import { checkInactivityOnFocus } from "../src/features/journal/sync/inactivityCheck";
 
 // Set up notification handler (must be outside component)
 Notifications.setNotificationHandler({
@@ -233,6 +234,20 @@ export default function RootLayout() {
   // regardless of current screen.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(handlePushTap);
+    return () => sub.remove();
+  }, []);
+
+  // B2: 60-min inactivity → auto-pause; cross-day → auto-end. Only fires when
+  // the app comes to foreground (RN can't run reliable background timers).
+  // Backend midnight cron is the safety net for users who never reopen.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        checkInactivityOnFocus().catch((e) => {
+          if (__DEV__) console.warn("[inactivityCheck]", e);
+        });
+      }
+    });
     return () => sub.remove();
   }, []);
 

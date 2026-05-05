@@ -40,6 +40,14 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
 
   useEffect(() => {
     if (!activeSession) return;
+
+    // B2: when paused, freeze the timer at activeDurationMinutes (no per-second
+    // ticks). Resume restarts the live tick from the original startTime.
+    if (activeSession.pausedAt) {
+      setElapsedMs(activeSession.activeDurationMinutes * 60 * 1000);
+      return;
+    }
+
     const update = () => setElapsedMs(Date.now() - activeSession.startTime);
     update();
     let id: ReturnType<typeof setInterval> | undefined = setInterval(update, 1000);
@@ -62,6 +70,8 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
 
   const hasLog = !!activeSession;
   const hasWorkout = showWorkout;
+  // B2: paused gates dot color + pill bg + label tint.
+  const isPaused = !!activeSession?.pausedAt;
 
   if (!hasLog && !hasWorkout) return null;
 
@@ -88,9 +98,16 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
   if (variant === "inline") {
     if (!hasLog) return null;
     return (
-      <TouchableOpacity style={[styles.inlineContainer, style]} onPress={handleLogPress} activeOpacity={0.8}>
-        <View style={styles.liveDot} />
-        <Text style={styles.inlineText}>{`${pad2(logTime.h)}:${pad2(logTime.m)}:${pad2(logTime.s)}`}</Text>
+      <TouchableOpacity
+        style={[styles.inlineContainer, isPaused && styles.inlineContainerPaused, style]}
+        onPress={handleLogPress}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.liveDot, isPaused && styles.liveDotPaused]} />
+        <Text style={[styles.inlineText, isPaused && styles.inlineTextPaused]}>
+          {`${pad2(logTime.h)}:${pad2(logTime.m)}:${pad2(logTime.s)}`}
+        </Text>
+        {isPaused && <Text style={styles.pausedLabel}>Paused</Text>}
         <Ionicons name="chevron-forward" size={14} color="#FFF" style={{ opacity: 0.6, marginLeft: 4 }} />
       </TouchableOpacity>
     );
@@ -116,11 +133,15 @@ export default function ActiveSessionFloat({ style, variant = "floating" }: Prop
 
       {/* Log pill */}
       {hasLog ? (
-        <TouchableOpacity style={styles.pill} onPress={handleLogPress} activeOpacity={0.9}>
-          <View style={styles.liveDot} />
+        <TouchableOpacity
+          style={[styles.pill, isPaused && styles.pillPaused]}
+          onPress={handleLogPress}
+          activeOpacity={0.9}
+        >
+          <View style={[styles.liveDot, isPaused && styles.liveDotPaused]} />
           <View style={styles.twoLineCol}>
-            <Text style={styles.timeTop}>{logTopText}</Text>
-            <Text style={styles.timeBottom}>{logBottomText}</Text>
+            <Text style={[styles.timeTop, isPaused && styles.timeDimmed]}>{logTopText}</Text>
+            <Text style={[styles.timeBottom, isPaused && styles.timeDimmed]}>{logBottomText}</Text>
           </View>
         </TouchableOpacity>
       ) : null}
@@ -201,5 +222,30 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: "#EF4444",
+  },
+
+  // ── B2: paused-state overrides ────────────────────────────────
+  inlineContainerPaused: {
+    backgroundColor: "#374151",  // slate-700: less alarming than the live #0B1220
+    shadowColor: "transparent",
+  },
+  inlineTextPaused: {
+    color: "#D1D5DB",
+  },
+  pillPaused: {
+    backgroundColor: "#374151",
+    shadowOpacity: 0.05,
+  },
+  liveDotPaused: {
+    backgroundColor: "#FBBF24",  // amber-400: matches LA's yellow dot
+  },
+  timeDimmed: {
+    color: "#D1D5DB",
+  },
+  pausedLabel: {
+    color: "#FBBF24",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: 4,
   },
 });

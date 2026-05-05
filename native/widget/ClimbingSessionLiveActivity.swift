@@ -44,11 +44,10 @@ struct ClimbingSessionLiveActivity: Widget {
           .font(.system(size: 12))
           .foregroundColor(accent)
       } compactTrailing: {
-        // Green dot — "session active" indicator. Keeps the pill as narrow
-        // as possible (like Apple Music). Detailed stats are available via
-        // long-press (Expanded DI) or the Lock Screen banner.
+        // B2: dot color flips to yellow when paused (gray dot would read as
+        // "ended"; yellow is the universal "warning / paused" cue).
         Circle()
-          .fill(Color.green)
+          .fill(context.state.paused ? Color.yellow : Color.green)
           .frame(width: 8, height: 8)
       } minimal: {
         // Multi-LA scenario — just identity, no data
@@ -76,15 +75,37 @@ struct ClimbingSessionLiveActivity: Widget {
 
   /// Render a live h:mm:ss timer that always shows hours.
   /// Used in surfaces with ample space (Expanded DI bottom, Lock Screen).
+  ///
+  /// B2: when paused, switches to a static "—:—:—" placeholder rendered in
+  /// gray. SwiftUI's `Text(timerInterval:)` cannot be paused mid-flight
+  /// without ending the activity, so we substitute static text instead.
   @ViewBuilder
-  private func fixedTimer(start: Date, size: CGFloat, weight: Font.Weight) -> some View {
-    Text(timerInterval: start...Date.distantFuture,
-         pauseTime: nil,
-         countsDown: false,
-         showsHours: true)
-      .font(.system(size: size, weight: weight))
-      .monospacedDigit()
-      .foregroundColor(accent)
+  private func fixedTimer(start: Date, size: CGFloat, weight: Font.Weight, paused: Bool = false) -> some View {
+    if paused {
+      Text("—:—:—")
+        .font(.system(size: size, weight: weight))
+        .monospacedDigit()
+        .foregroundColor(.gray)
+    } else {
+      Text(timerInterval: start...Date.distantFuture,
+           pauseTime: nil,
+           countsDown: false,
+           showsHours: true)
+        .font(.system(size: size, weight: weight))
+        .monospacedDigit()
+        .foregroundColor(accent)
+    }
+  }
+
+  /// Small "Paused" chip rendered next to the timer when state.paused == true.
+  @ViewBuilder
+  private func pausedChip() -> some View {
+    Text("Paused")
+      .font(.system(size: 11, weight: .semibold))
+      .foregroundColor(.white)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 3)
+      .background(Capsule().fill(Color.yellow.opacity(0.85)))
   }
 
   /// Display a grade with a fallback dash for empty/initial state.
@@ -114,10 +135,13 @@ struct ClimbingSessionLiveActivity: Widget {
       // Row 2: live timer (left) + circular End button (right)
       HStack {
         HStack(spacing: 6) {
-          Image(systemName: "timer")
+          Image(systemName: state.paused ? "pause.circle.fill" : "timer")
             .font(.system(size: 18, weight: .semibold))
-            .foregroundColor(accent)
-          fixedTimer(start: start, size: 26, weight: .bold)
+            .foregroundColor(state.paused ? .yellow : accent)
+          fixedTimer(start: start, size: 26, weight: .bold, paused: state.paused)
+          if state.paused {
+            pausedChip()
+          }
         }
         Spacer()
         // Circular End button — opens app via deep link, shows confirmation
@@ -193,8 +217,11 @@ struct ClimbingSessionLiveActivity: Widget {
     let start = Self.startDate(state.startTime)
 
     HStack {
-      // Live timer on the left (h:mm:ss fixed)
-      fixedTimer(start: start, size: 18, weight: .semibold)
+      // Live timer on the left (h:mm:ss fixed) — paused → gray placeholder.
+      fixedTimer(start: start, size: 18, weight: .semibold, paused: state.paused)
+      if state.paused {
+        pausedChip()
+      }
       Spacer()
       // routes · sends on the right
       Text("\(state.routeCount) routes · \(state.sendCount) sends")

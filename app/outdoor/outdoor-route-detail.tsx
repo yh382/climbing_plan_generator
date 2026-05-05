@@ -21,6 +21,7 @@ import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
+import { ScrollEdgeFallback } from '../../src/components/shared/ScrollEdgeFallback';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
@@ -43,6 +44,7 @@ import {
 import { betaApi } from '../../src/features/outdoor/betaApi';
 import {
   enqueueRouteSendLog,
+  enqueueRouteAttemptLog,
   flushLogsOutboxNow,
 } from '../../src/features/journal/sync/enqueueRouteSendLog';
 
@@ -131,12 +133,30 @@ export default function OutdoorRouteDetailPage() {
       }) as SendLog);
   }, [ascents]);
 
-  // Attempt: +1 locally, fire backend event (stubbed for now), haptic
-  const handleAttempt = useCallback(() => {
+  // Attempt: +1 locally, persist to backend (B2 first-time wiring), haptic.
+  // The auto-startSession path inside enqueueRouteAttemptLog opens an outdoor
+  // session if none is active — hence "tap Attempt" alone now starts a session.
+  const handleAttempt = useCallback(async () => {
     setLocalAttempts((n) => n + 1);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // TODO: enqueueLogEvent({ type: "attempt", route_id: id, client_id: ... })
-  }, []);
+
+    if (!route) return;
+
+    try {
+      await enqueueRouteAttemptLog({
+        routeKind: 'outdoor',
+        routeId: route.id,
+        routeName: route.name,
+        routeStyle: route.style,
+        routeGrade: route.grade_text,
+        sessionGymName: route.wall_name || route.sector_name || 'Outdoor',
+        sessionLocationType: 'outdoor',
+      });
+      await flushLogsOutboxNow();
+    } catch (e) {
+      if (__DEV__) console.warn('[outdoor attempt] enqueue failed:', e);
+    }
+  }, [route]);
 
   const handleSend = useCallback(() => setSendSheetOpen(true), []);
 
@@ -218,6 +238,8 @@ export default function OutdoorRouteDetailPage() {
         routeName: route.name,
         routeStyle: route.style,
         draft,
+        sessionGymName: route.wall_name || route.sector_name || 'Outdoor',
+        sessionLocationType: 'outdoor',
       });
       // Push to backend immediately so the Climbers list updates within
       // the same interaction instead of waiting for the next Journal-tab
@@ -407,6 +429,7 @@ export default function OutdoorRouteDetailPage() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
+      <ScrollEdgeFallback>
       <ScrollView
         style={styles.container}
         contentInsetAdjustmentBehavior="never"
@@ -527,6 +550,7 @@ export default function OutdoorRouteDetailPage() {
           </View>
         </View>
       </ScrollView>
+      </ScrollEdgeFallback>
 
       {/* Send sheet (Item 10) */}
       <OutdoorSendSheet

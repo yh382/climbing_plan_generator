@@ -40,19 +40,29 @@ public class ClimmateLiveActivityModule: Module {
       }
     }
 
-    AsyncFunction("update") { (routeCount: Int, sendCount: Int, bestGrade: String, attempts: Int) -> Void in
+    // B2: `paused` arg drives the paused render path in
+    // ClimbingSessionLiveActivity.swift — JS calls update with paused=true
+    // immediately when pauseSession() is invoked, paused=false on resume.
+    // Pass-through stat args (routeCount/sendCount/etc) — when JS only wants
+    // to flip paused (e.g. pauseSession's stub call), it sends 0/"" and we
+    // preserve the existing values from oldState so the UI doesn't blank out.
+    AsyncFunction("update") { (routeCount: Int, sendCount: Int, bestGrade: String, attempts: Int, paused: Bool) -> Void in
       guard #available(iOS 16.2, *) else { return }
 
       for activity in Activity<ClimbingSessionAttributes>.activities {
         let oldState = activity.content.state
+        // If caller passed all-zeros + empty grade, treat as a "paused-only"
+        // update and keep existing stats. Otherwise overwrite with new stats.
+        let isStatsOnlyToggle = (routeCount == 0 && sendCount == 0 && bestGrade.isEmpty && attempts == 0)
         let newState = ClimbingSessionAttributes.ContentState(
           gymName: oldState.gymName,
           discipline: oldState.discipline,
           startTime: oldState.startTime,
-          routeCount: routeCount,
-          sendCount: sendCount,
-          bestGrade: bestGrade,
-          attempts: attempts
+          routeCount: isStatsOnlyToggle ? oldState.routeCount : routeCount,
+          sendCount: isStatsOnlyToggle ? oldState.sendCount : sendCount,
+          bestGrade: isStatsOnlyToggle ? oldState.bestGrade : bestGrade,
+          attempts: isStatsOnlyToggle ? oldState.attempts : attempts,
+          paused: paused
         )
         await activity.update(.init(state: newState, staleDate: Date().addingTimeInterval(8 * 3600)))
       }
@@ -70,7 +80,8 @@ public class ClimmateLiveActivityModule: Module {
           routeCount: routeCount,
           sendCount: sendCount,
           bestGrade: bestGrade,
-          attempts: attempts
+          attempts: attempts,
+          paused: false
         )
         await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .immediate)
       }
