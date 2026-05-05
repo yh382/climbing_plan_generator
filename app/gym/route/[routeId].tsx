@@ -77,6 +77,11 @@ import type {
 const SCREEN_W = Dimensions.get('window').width;
 const PHOTO_H = SCREEN_W * 0.82;
 
+// B2 #2: greyed Send button background when current user already sent this
+// route. Mid-grey so the white text + checkmark icon stay readable in both
+// light and dark modes (theme-agnostic by design — disabled state).
+const SENDED_BG = '#6B7280';
+
 // Same grade pickers OutdoorSendSheet uses for outdoor routes — indoor
 // boulder is V-scale, indoor rope is YDS in our schema. font/french
 // systems exist on backend but are rare for indoor; fall back by family.
@@ -536,11 +541,10 @@ export default function GymRouteDetailPage() {
               style={[
                 styles.primaryBtn,
                 {
-                  backgroundColor:
-                    isArchived || userHasSent
-                      ? isArchived
-                        ? colors.backgroundSecondary
-                        : colors.pillBackground
+                  backgroundColor: isArchived
+                    ? colors.backgroundSecondary
+                    : userHasSent
+                      ? SENDED_BG
                       : colors.accent,
                 },
               ]}
@@ -551,12 +555,12 @@ export default function GymRouteDetailPage() {
               <Ionicons
                 name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
                 size={18}
-                color={isArchived || userHasSent ? colors.textTertiary : '#FFFFFF'}
+                color={isArchived ? colors.textTertiary : '#FFFFFF'}
               />
               <Text
                 style={[
                   styles.primaryBtnText,
-                  (isArchived || userHasSent) && { color: colors.textTertiary },
+                  isArchived && { color: colors.textTertiary },
                 ]}
               >
                 {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}

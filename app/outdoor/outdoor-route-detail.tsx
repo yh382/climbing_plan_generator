@@ -52,6 +52,12 @@ import {
 const SCREEN_W = Dimensions.get('window').width;
 const PHOTO_H = SCREEN_W * 0.82;
 
+// B2 #2: greyed Send button background when current user already sent this
+// route. Mid-grey so the white text + checkmark icon stay readable in both
+// light and dark modes (theme-agnostic by design — disabled state, not
+// brand-colored).
+const SENDED_BG = '#6B7280';
+
 // Grade option list — used by OutdoorSendSheet's suggest-a-grade stepper.
 const YDS_GRADES = [
   '5.5', '5.6', '5.7', '5.8', '5.9',
@@ -508,9 +514,7 @@ export default function OutdoorRouteDetailPage() {
               style={[
                 styles.primaryBtn,
                 {
-                  backgroundColor: userHasSent
-                    ? colors.pillBackground
-                    : colors.accent,
+                  backgroundColor: userHasSent ? SENDED_BG : colors.accent,
                 },
               ]}
               onPress={userHasSent ? undefined : handleSend}
@@ -520,14 +524,9 @@ export default function OutdoorRouteDetailPage() {
               <Ionicons
                 name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
                 size={18}
-                color={userHasSent ? colors.textTertiary : '#FFFFFF'}
+                color="#FFFFFF"
               />
-              <Text
-                style={[
-                  styles.primaryBtnText,
-                  userHasSent && { color: colors.textTertiary },
-                ]}
-              >
+              <Text style={styles.primaryBtnText}>
                 {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}
               </Text>
             </TouchableOpacity>
