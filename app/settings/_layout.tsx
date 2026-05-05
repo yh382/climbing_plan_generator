@@ -14,6 +14,12 @@ export default function SettingsSubLayout() {
         options={{
           ...NATIVE_HEADER_LARGE,
           ...themed,
+          // Settings index uses SwiftUI <Host><Form> for the iOS-native
+          // grouped list look. Form's UIScrollView lives inside the Host
+          // so RN NativeStack can't `findScrollView` it → large-title
+          // collapse-on-scroll doesn't fire. Settle for always-inline
+          // title (matches Apple Settings sub-pages anyway).
+          headerLargeTitle: false,
           headerShown: true,
         }}
       />

@@ -59,6 +59,10 @@ export default function Settings() {
     navigation.setOptions({
       ...NATIVE_HEADER_LARGE,
       ...withHeaderTheme(colors),
+      // Force inline title — Form's scroll view is hidden from
+      // NativeStack so the large-title collapse can't fire. See
+      // settings/_layout.tsx for full rationale.
+      headerLargeTitle: false,
       headerShown: true,
       title: tr("设置", "Settings"),
     });
