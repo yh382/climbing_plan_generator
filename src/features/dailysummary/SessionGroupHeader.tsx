@@ -14,9 +14,17 @@ type Props = {
   startTime: string; // ISO
   endTime: string;   // ISO
   duration: string;  // "2h 30m"
+  /** B2 #3: when true, render as "in progress" instead of a fixed end time. */
+  inProgress?: boolean;
 };
 
-export default function SessionGroupHeader({ index, startTime, endTime, duration }: Props) {
+export default function SessionGroupHeader({
+  index,
+  startTime,
+  endTime,
+  duration,
+  inProgress = false,
+}: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -24,12 +32,14 @@ export default function SessionGroupHeader({ index, startTime, endTime, duration
   const start = new Date(startTime);
   const end = new Date(endTime);
 
+  const label = inProgress
+    ? `${tr(`第 ${index} 次`, `Session ${index}`)} · ${format(start, "HH:mm")} · ${tr("进行中", "in progress")}`
+    : `${tr(`第 ${index} 次`, `Session ${index}`)} · ${format(start, "HH:mm")}-${format(end, "HH:mm")} · ${duration}`;
+
   return (
     <View style={styles.wrap}>
       <View style={styles.rule} />
-      <Text style={styles.text}>
-        {tr(`第 ${index} 次`, `Session ${index}`)} · {format(start, "HH:mm")}-{format(end, "HH:mm")} · {duration}
-      </Text>
+      <Text style={[styles.text, inProgress && styles.textInProgress]}>{label}</Text>
       <View style={styles.rule} />
     </View>
   );
@@ -51,5 +61,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.medium,
       color: colors.textSecondary,
       letterSpacing: 0.3,
+    },
+    textInProgress: {
+      color: colors.accent,
+      fontFamily: theme.fonts.bold,
     },
   });

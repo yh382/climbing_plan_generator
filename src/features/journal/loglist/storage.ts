@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LocalDayLogItem } from "./types";
+import { localDateStringFromMs } from "../../../lib/localDate";
 
 type StorageType = "boulder" | "toprope" | "lead";
 
@@ -145,8 +146,102 @@ export async function readNotesByRoutes(routeNames: string[]): Promise<Record<st
   return out;
 }
 
+/** ---------- Migration: dayList UTC → LOCAL date bucketing (B2 follow-up) ----------
+ *
+ * Pre-B2-fix the catalog Send/Attempt path bucketed dayList items by UTC
+ * date (`new Date().toISOString().slice(0,10)`). For users west of UTC
+ * (e.g. UTC-6 MT), local evening was already next-UTC-day, so items
+ * logged in the evening landed in tomorrow's bucket. This migration
+ * scans every `journal_day_list_<date>_<type>` key and re-buckets each
+ * item by its `createdAt` LOCAL date. Idempotent (move only when bucket
+ * key ≠ derived local date). */
+async function migrateDayListUtcToLocal() {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const dayKeys = allKeys.filter((k) => k.startsWith(DAY_LIST_PREFIX));
+  if (dayKeys.length === 0) return;
+
+  // type: "boulder" | "toprope" | "lead" → list of items to add to that
+  // type's `<correctDate>` bucket. Keyed by `${date}_${type}`.
+  const additions = new Map<string, LocalDayLogItem[]>();
+  // Items to keep in their current bucket (already correct OR no createdAt).
+  const survivors = new Map<string, LocalDayLogItem[]>();
+
+  for (const key of dayKeys) {
+    const trail = key.slice(DAY_LIST_PREFIX.length); // YYYY-MM-DD_<type>
+    const m = trail.match(/^(\d{4}-\d{2}-\d{2})_(boulder|toprope|lead)$/);
+    if (!m) continue;
+    const [, bucketDate, type] = m;
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) continue;
+    let items: LocalDayLogItem[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      continue;
+    }
+
+    for (const it of items) {
+      const correctDate =
+        typeof it.createdAt === "number"
+          ? localDateStringFromMs(it.createdAt)
+          : bucketDate; // legacy items without createdAt — leave in place
+
+      const targetKey = `${correctDate}_${type}`;
+      const map = correctDate === bucketDate ? survivors : additions;
+      if (!map.has(targetKey)) map.set(targetKey, []);
+      // De-dup by id within the target bucket.
+      const list = map.get(targetKey)!;
+      if (!list.some((x) => x.id === it.id)) {
+        // Update item.date too so future readers see consistent value.
+        list.push({ ...it, date: correctDate });
+      }
+    }
+  }
+
+  // Write survivors back to their original buckets (overwrite to drop misplaced).
+  // Then merge additions into target buckets (preserve any survivors that
+  // belong there + dedup by id).
+  const allTargets = new Set<string>([...survivors.keys(), ...additions.keys()]);
+  for (const targetKey of allTargets) {
+    const surviving = survivors.get(targetKey) ?? [];
+    const incoming = additions.get(targetKey) ?? [];
+    const seen = new Set<string>();
+    const merged: LocalDayLogItem[] = [];
+    for (const list of [surviving, incoming]) {
+      for (const it of list) {
+        if (!it.id || seen.has(it.id)) continue;
+        seen.add(it.id);
+        merged.push(it);
+      }
+    }
+    const m2 = targetKey.match(/^(\d{4}-\d{2}-\d{2})_(boulder|toprope|lead)$/);
+    if (!m2) continue;
+    const [, date, type] = m2;
+    await AsyncStorage.setItem(
+      DAY_LIST_KEY(date, type as StorageType),
+      JSON.stringify(merged),
+    );
+  }
+
+  // Wipe any source bucket that no longer has any survivors AND wasn't
+  // re-targeted as a destination (e.g. a stale empty bucket left behind).
+  // We accomplish this implicitly above by overwriting only allTargets.
+  // For source keys absent from allTargets (because all items moved away
+  // and nothing landed back), explicitly clear them.
+  for (const key of dayKeys) {
+    const trail = key.slice(DAY_LIST_PREFIX.length);
+    if (!allTargets.has(trail)) {
+      await AsyncStorage.setItem(key, JSON.stringify([]));
+    }
+  }
+}
+
+const DAY_LIST_PREFIX = "journal_day_list_";
+
 /** ---------- Migration: "yds" → "lead" ---------- */
 const MIGRATION_KEY = "migration_yds_to_rope_v1";
+const MIGRATION_LOCAL_DATE_KEY = "migration_daylist_local_date_v1";
 
 async function migrateYdsToRopeTypes() {
   const allKeys = await AsyncStorage.getAllKeys();
@@ -178,6 +273,14 @@ export async function runMigrationsIfNeeded() {
     if (!done) {
       await migrateYdsToRopeTypes();
       await AsyncStorage.setItem(MIGRATION_KEY, "1");
+    }
+
+    const localDateMigrationDone = await AsyncStorage.getItem(
+      MIGRATION_LOCAL_DATE_KEY,
+    );
+    if (!localDateMigrationDone) {
+      await migrateDayListUtcToLocal();
+      await AsyncStorage.setItem(MIGRATION_LOCAL_DATE_KEY, "1");
     }
   } catch {
     // best-effort

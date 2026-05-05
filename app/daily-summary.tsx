@@ -21,20 +21,21 @@ import { HeaderButton } from "../src/components/ui/HeaderButton";
 import { Avatar } from "../src/components/ui/Avatar";
 
 import { useDailyData } from "../src/features/dailysummary/useDailyData";
+import { localDateString } from "../src/lib/localDate";
 import DailyDashboardCarousel from "../src/features/dailysummary/DailyDashboardCarousel";
 import DailyDateNavBar from "../src/features/dailysummary/DailyDateNavBar";
-import ActiveSessionCard from "../src/features/dailysummary/ActiveSessionCard";
 import SessionGroupHeader from "../src/features/dailysummary/SessionGroupHeader";
 import useSettingsStore from "../src/store/useSettingsStore";
 import { useUserStore } from "../src/store/useUserStore";
 import ClimbItemCard from "../src/components/shared/ClimbItemCard";
+import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 function resolveDateParam(raw: string | string[] | undefined): string {
   const v = Array.isArray(raw) ? raw[0] : raw;
-  if (!v || v === "today") return new Date().toISOString().slice(0, 10);
+  if (!v || v === "today") return localDateString();
   // Expect YYYY-MM-DD; fall back to today on invalid input.
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 function resolveStringParam(raw: string | string[] | undefined): string | undefined {
@@ -86,6 +87,7 @@ export default function DailySummaryScreen() {
     !!data.activeSession || data.sessions.length > 0 || data.quickLogs.length > 0;
 
   return (
+    <ScrollEdgeFallback>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
@@ -111,21 +113,23 @@ export default function DailySummaryScreen() {
       </View>
       <DailyDashboardCarousel data={data} />
 
-      {isSelf && data.activeSession && (
-        <ActiveSessionCard
-          startTime={data.activeSession.startTime}
-          gymName={data.activeSession.gymName}
-          discipline={data.activeSession.discipline}
-        />
-      )}
+      {/* B2 #3: active session is now folded into data.sessions as an
+          in-progress group at the bottom — its SessionGroupHeader renders
+          with `inProgress` styling. The standalone ActiveSessionCard was
+          redundant + caused items to leak into "quick logs". */}
 
-      {data.sessions.map((group, idx) => (
+      {data.sessions.map((group, idx) => {
+        // The virtual in-progress entry uses id "active_<startMs>" — see
+        // useLocalDailyData. Detect it to flip header styling.
+        const isInProgress = group.session.id.startsWith("active_");
+        return (
         <View key={group.session.id}>
           <SessionGroupHeader
             index={idx + 1}
             startTime={group.session.startTime}
             endTime={group.session.endTime}
             duration={group.session.duration}
+            inProgress={isInProgress}
           />
           {group.items.length > 0 ? (
             group.items.map((item) => (
@@ -161,7 +165,8 @@ export default function DailySummaryScreen() {
             <Text style={styles.placeholder}>{tr("本次 session 暂无记录", "No climbs in this session")}</Text>
           )}
         </View>
-      ))}
+      );
+      })}
 
       {data.quickLogs.length > 0 && (
         <View>
@@ -226,6 +231,7 @@ export default function DailySummaryScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
+    </ScrollEdgeFallback>
   );
 }
 

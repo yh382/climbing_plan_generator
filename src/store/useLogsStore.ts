@@ -36,6 +36,7 @@ import {
 } from "../features/journal/sync/localBackup";
 import { syncWidgetFromStore } from "../lib/widgetBridge";
 import { startLiveActivity, updateLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
+import { localDateString, localDateStringFromMs } from "../lib/localDate";
 import { recalcIntensityForDate } from "../services/stats/intensityCalculator";
 
 // In-flight POST /sessions promise — endSession awaits this to avoid race condition
@@ -127,8 +128,9 @@ type LogsState = {
   getHashByDate: (date: string, type?: LogType) => string;
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// Single source of truth for local-date bucketing. Was a private keyOf;
+// promoted to lib/localDate so enqueueRouteSendLog + daily-summary share it.
+const keyOf = (d: Date) => localDateString(d);
 
 function hashSegments(list: GradeCount[]): string {
   if (!list?.length) return "0";
@@ -213,9 +215,18 @@ const RESULT_TO_STYLE: Record<string, string> = {
 };
 
 function backendLogToLocal(log: any): LocalDayLogItem {
+  // B2 follow-up: backend log.date may be UTC (older clients used UTC ISO
+  // slicing for date) — re-derive the bucketing date from created_at in
+  // user's LOCAL timezone so a session and its logs always share the same
+  // local day. No-op when log.date already matches the local-derived date.
+  const created = log.created_at ? new Date(log.created_at) : null;
+  const localDate = created
+    ? localDateStringFromMs(created.getTime())
+    : log.date;
+
   return {
     id: log.client_id || String(log.id),
-    date: log.date,
+    date: localDate,
     type: log.wall_type as any,
     grade: log.grade_text,
     name: log.route_name || log.grade_text,

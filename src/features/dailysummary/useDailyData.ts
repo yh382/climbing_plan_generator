@@ -20,6 +20,7 @@ import type { LocalDayLogItem } from "../journal/loglist/types";
 import type { SendStyle, Feel } from "../journal/loglist/types";
 import { computeDailyIntensity } from "../../services/stats/intensityCalculator";
 import { api } from "../../lib/apiClient";
+import { localDateString } from "../../lib/localDate";
 
 export type SessionGroup = {
   session: SessionEntry;
@@ -66,7 +67,9 @@ export type DailyData = {
 };
 
 const TIME_ON_WALL_GOAL_MIN = 120; // 2h
-const ISO_DATE_TODAY = () => new Date().toISOString().slice(0, 10);
+// User's perception of "today" is local. UTC ISO slicing breaks for users
+// west of UTC (afternoon = next UTC day) → see B2 follow-up bug.
+const ISO_DATE_TODAY = () => localDateString();
 
 function parseDurationToMin(dur: string): number {
   let total = 0;
@@ -267,12 +270,42 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
     return () => clearInterval(id);
   }, [enabled, activeSession]);
 
+  // B2 #3: when an active session exists for `date`, build a virtual
+  // SessionEntry so it appears as a Session group (in progress) instead of
+  // its items leaking into "quick logs". Same shape as completed sessions.
+  const today = enabled ? ISO_DATE_TODAY() : "";
+  const showActiveAsGroup = enabled && date === today && !!activeSession;
+  const activeSessionEntry = useMemo<SessionEntry | null>(() => {
+    if (!showActiveAsGroup || !activeSession) return null;
+    const startMs = activeSession.startTime;
+    const startIso = new Date(startMs).toISOString();
+    return {
+      id: `active_${startMs}`,
+      date,
+      startTime: startIso,
+      // endTime/duration are placeholders — SessionGroupHeader switches to
+      // "in progress" rendering when inProgress=true.
+      endTime: startIso,
+      duration: "",
+      gymName: activeSession.gymName,
+      discipline: activeSession.discipline,
+      sessionKey: String(startMs),
+      sends: 0,
+      best: "",
+      attempts: 0,
+      serverId: activeSession.serverId,
+      isPublic: false,
+      synced: !!activeSession.serverId,
+    };
+  }, [showActiveAsGroup, activeSession, date]);
+
   const daySessions = useMemo(() => {
     if (!enabled) return [];
-    return (sessions || [])
+    const completed = (sessions || [])
       .filter((s) => s.date === date)
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }, [enabled, sessions, date]);
+    return activeSessionEntry ? [...completed, activeSessionEntry] : completed;
+  }, [enabled, sessions, date, activeSessionEntry]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -294,7 +327,10 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
     return () => {
       cancelled = true;
     };
-  }, [enabled, date, daySessions]);
+    // tick is included so the active session's items refetch every second
+    // (catches catalog Send writes between ticks). Cheap — readSessionList
+    // is just an AsyncStorage key fetch per type.
+  }, [enabled, date, daySessions, tick]);
 
   // Heavy aggregate: only re-runs when the underlying data set changes,
   // NOT every tick. Tick re-renders only adjust the live overlay below.

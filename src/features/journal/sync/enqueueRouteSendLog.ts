@@ -9,11 +9,12 @@
 
 import type { LocalDayLogItem, LogMedia } from "../loglist/types";
 import type { OutdoorSendDraft } from "../../outdoor/sendSheet/OutdoorSendSheet";
-import { readDayList, writeDayList } from "../loglist/storage";
+import { readDayList, writeDayList, readSessionList, writeSessionList } from "../loglist/storage";
 import { enqueueLogEvent, flushLogsOutbox } from "./logsOutbox";
 import { readAllServerIds, setServerId } from "./serverIdMap";
 import { useAuthStore } from "../../../store/useAuthStore";
 import useLogsStore, { type LogType } from "../../../store/useLogsStore";
+import { localDateString } from "../../../lib/localDate";
 
 export type RouteKind = "outdoor" | "gym";
 
@@ -96,7 +97,7 @@ async function ensureActiveSessionForRoute(
 }
 
 export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = localDateString(); // YYYY-MM-DD in user's LOCAL timezone
   const wallType = mapStyleToWallType(input.routeKind, input.routeStyle);
   const itemId = newId();
 
@@ -126,6 +127,14 @@ export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> 
 
   const existing = await readDayList(today, wallType);
   await writeDayList(today, wallType, [item, ...existing]);
+
+  // B2 #3: also write to sessionList so daily-summary's in-progress group
+  // can claim the item (and not leak it to "quick logs" mid-session).
+  // Symmetric with manual TodayDetailsList path.
+  if (sessionKey) {
+    const existingSession = await readSessionList(sessionKey, wallType);
+    await writeSessionList(sessionKey, wallType, [item, ...existingSession]);
+  }
 
   await enqueueLogEvent({
     type: "create",
@@ -157,7 +166,7 @@ export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> 
  * no feel; sendCount=0 + attemptsTotal=1 in the local list.
  */
 export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString(); // YYYY-MM-DD in user's LOCAL timezone
   const wallType = mapStyleToWallType(input.routeKind, input.routeStyle);
   const itemId = newId();
 
@@ -184,6 +193,12 @@ export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<
 
   const existing = await readDayList(today, wallType);
   await writeDayList(today, wallType, [item, ...existing]);
+
+  // B2 #3: also write to sessionList (same rationale as enqueueRouteSendLog).
+  if (sessionKey) {
+    const existingSession = await readSessionList(sessionKey, wallType);
+    await writeSessionList(sessionKey, wallType, [item, ...existingSession]);
+  }
 
   await enqueueLogEvent({
     type: "create",
