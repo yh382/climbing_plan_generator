@@ -13,7 +13,7 @@ import ActivityKit
 // Each surface is space-budgeted differently:
 //   - Minimal DI:    icon only (1-glyph identity marker)
 //   - Compact DI:    icon leading + auto-format timer trailing
-//   - Expanded DI:   discipline icon/label + best grade + (timer + routes·sends)
+//   - Expanded DI:   discipline icon + best grade + (timer + routes·sends)
 //   - Lock Screen:   meta row + big timer + 2x2 stats grid + End Session button
 //
 // Timer rendering uses SwiftUI's native `Text(timerInterval:...)` so it
@@ -126,8 +126,11 @@ struct ClimbingSessionLiveActivity: Widget {
     let start = Self.startDate(state.startTime)
 
     VStack(alignment: .leading, spacing: 10) {
-      // Row 1: meta — gym name · discipline
-      Text("\(state.gymName) · \(state.discipline)")
+      // Row 1: meta — gym name only. B2-FU4 (2026-05-05): dropped discipline
+      // suffix to match the daily-summary ActiveSessionCard which intentionally
+      // omits boulder/lead (mid-session is often mixed: TR warmup → lead project,
+      // showing one is misleading).
+      Text(state.gymName)
         .font(.system(size: 13, weight: .medium))
         .foregroundColor(secondaryText)
         .lineLimit(1)
@@ -187,13 +190,12 @@ struct ClimbingSessionLiveActivity: Widget {
 
   @ViewBuilder
   private func expandedLeading(context: ActivityViewContext<ClimbingSessionAttributes>) -> some View {
+    // B2-FU4 (2026-05-05): icon only — discipline label removed to match
+    // ActiveSessionCard. Icon stays as the app identity marker.
     VStack(alignment: .leading, spacing: 4) {
       Image(systemName: "figure.climbing")
         .font(.system(size: 18, weight: .semibold))
         .foregroundColor(accent)
-      Text(context.state.discipline)
-        .font(.system(size: 11))
-        .foregroundColor(secondaryText)
     }
     .padding(.leading, 8)
   }

@@ -23,8 +23,12 @@ class CalendarDayRingView: ExpoView {
 
     // Caller-provided colors (all hex)
     @objc var outerBaseColor: String = "#A08060"        { didSet { updateView() } }
+    // B2-FU2 (2026-05-05): deprecated. Small ring now mirrors ActivityRingSwiftUI
+    // which uses a single accent color + darken/lighten gradient. JS prop kept
+    // for caller compatibility; remove next window after callers stop passing it.
     @objc var outerCompletedColor: String = "#8B6914"   { didSet { updateView() } }
     @objc var innerBaseColor: String = "#306E6F"        { didSet { updateView() } }
+    // B2-FU2 (2026-05-05): deprecated. See outerCompletedColor.
     @objc var innerCompletedColor: String = "#265858"   { didSet { updateView() } }
     @objc var ringTrackColor: String = "#E5E7EB"        { didSet { updateView() } }
     @objc var selectedBg: String = "#306E6F"            { didSet { updateView() } }
@@ -119,14 +123,14 @@ struct CalendarDayRingSwiftUI: View {
                 }
                 ZStack {
                     if hasDuration {
-                        StackedRing(raw: durationRaw,
-                                    base: outerBase, completed: outerCompleted,
+                        StackedRing(progress: durationRaw,
+                                    color: outerBase,
                                     track: ringTrack,
                                     size: Self.SIZE, thickness: Self.THICKNESS)
                     }
                     if hasSends {
-                        StackedRing(raw: sendRaw,
-                                    base: innerBase, completed: innerCompleted,
+                        StackedRing(progress: sendRaw,
+                                    color: innerBase,
                                     track: ringTrack,
                                     size: Self.SIZE - (Self.THICKNESS + Self.GAP) * 2,
                                     thickness: Self.THICKNESS)
@@ -187,42 +191,110 @@ struct CalendarDayRingSwiftUI: View {
     }
 }
 
-/// Apple Fitness-style stacked progress ring: when raw > 1, half-opacity
-/// underlying ring shows the previous loop while the foreground ring resets
-/// to the remainder, with completed-color when ratio reaches 1. Mirrors the
-/// RN strokeOpacity={0.3} stacked behavior in CalendarDayRing.tsx.
+/// Apple Fitness-style ring identical to `ActivityRingSwiftUI` (the daily
+/// summary big ring) — see [`ActivityRingView.swift`] L81-L155 for the
+/// canonical body. Differences are size/thickness only and a shorter
+/// `.onChange` duration tuned for B2-FU's 1s live tick (0.8s in big ring →
+/// 0.35s here so the animation finishes before the next tick).
+///
+/// B2-FU2 (2026-05-05): replaced the prior `base.opacity(0.3) + single trim`
+/// shortcut. Caller no longer passes a separate "completed" color — the
+/// gradient + lap-1 overlap express both progress and overshoot via a single
+/// accent color.
 struct StackedRing: View {
-    let raw: Double
-    let base: Color
-    let completed: Color
+    let progress: Double            // 0..N (overshoot OK)
+    let color: Color                // accent (gradient endpoints derived)
     let track: Color
     let size: CGFloat
     let thickness: CGFloat
 
+    private static let HEAD_DARKEN = 0.08
+    private static let TAIL_LIGHTEN = 0.12
+
+    @State private var displayedProgress: Double = 0
+
     var body: some View {
-        let fullLoops = Int(floor(raw))
-        let remainder = raw - Double(fullLoops)
-        let stacked = fullLoops > 0
-        let ratio: Double = stacked
-            ? (remainder == 0 && raw > 0 ? 1 : remainder)
-            : min(raw, 1)
-        let strokeColor = ratio >= 1 ? completed : base
+        let colorStart = color.darken(Self.HEAD_DARKEN)
+        let colorEnd   = color.lighten(Self.TAIL_LIGHTEN)
+        let r = (size - thickness) / 2
 
         ZStack {
-            // strokeBorder + inset(by:) keep the stroke inside the frame so
-            // both rings sit at the same path radius. Without this, the
-            // stroke extends `thickness/2` outside the frame and adjacent
-            // rings (calendar's nested inner) overlap.
+            // Track / first lap base
             Circle()
-                .strokeBorder(stacked ? base.opacity(0.3) : track,
-                              lineWidth: thickness)
+                .strokeBorder(track, lineWidth: thickness)
+
+            // First lap. STATIC AngularGradient covering the full 360° — see
+            // big-ring rationale: dynamic endAngle causes the lineCap.round
+            // tip to render `colorStart` (dark) at angles past endAngle as
+            // the first lap closes, giving a "head turns dark" flash near 12
+            // o'clock. Static 360° keeps the cap inside the gradient range.
+            RingArcShape(progress: displayedProgress, lapStart: 0,
+                         thickness: Double(thickness))
+                .stroke(
+                    AngularGradient(
+                        colors: [colorStart, colorEnd],
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(270)
+                    ),
+                    style: StrokeStyle(lineWidth: thickness, lineCap: .round)
+                )
+
+            // Start cover at 12 o'clock — hides the first lap's lineCap
+            // bleed (gradient extends to colorStart behind the start cap).
+            // Always shown when progress > 0 so the bleed never flashes
+            // during animation. When the overlap arc is present, it sits
+            // ABOVE this cover in the ZStack and covers it with its own
+            // colorEnd-gradient start — no visual conflict.
             Circle()
-                .inset(by: thickness / 2)
-                .trim(from: 0, to: ratio)
-                .stroke(strokeColor,
-                        style: StrokeStyle(lineWidth: thickness, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+                .fill(colorStart)
+                .frame(width: thickness, height: thickness)
+                .offset(y: -r)
+                .opacity(progress > 0 ? 1 : 0)
+
+            // Overlap second lap. Gradient continues the first lap's flow:
+            // starts at colorEnd (= first lap's tail at 12 o'clock) and ends
+            // at an even lighter shade for the head — avoids a visible color
+            // break at the seam.
+            let overlapVisible = StackedRing.overlapAngle(of: displayedProgress)
+            let colorOverlapHead = colorEnd.lighten(0.10)
+            RingArcShape(progress: displayedProgress, lapStart: 1,
+                         thickness: Double(thickness))
+                .stroke(
+                    AngularGradient(
+                        colors: [colorEnd, colorOverlapHead],
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(-90 + max(90, overlapVisible * 360))
+                    ),
+                    style: StrokeStyle(lineWidth: thickness, lineCap: .round)
+                )
         }
         .frame(width: size, height: size)
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.1)) {
+                displayedProgress = progress
+            }
+        }
+        .onChange(of: progress) { newValue in
+            // 0.35s vs big-ring 0.8s: month cell receives a setState every
+            // second from B2-FU's live tick. With 0.8s ease-out the next
+            // tick arrives before the prior animation settles, producing a
+            // visible "hitch" as `displayedProgress` is re-targeted mid-
+            // tween. 0.35s leaves ~0.65s of stillness per second so each
+            // tick reads as a clean discrete advance.
+            withAnimation(.easeOut(duration: 0.35)) {
+                displayedProgress = newValue
+            }
+        }
+    }
+
+    /// Visible angular extent (in turns, 0..1) of the overlap lap given total
+    /// progress — duplicated from `ActivityRingSwiftUI` to keep `StackedRing`
+    /// self-contained within this file.
+    private static func overlapAngle(of p: Double) -> Double {
+        guard p > 1 else { return 0 }
+        let frac = p.truncatingRemainder(dividingBy: 1)
+        return frac == 0 ? 1.0 : frac
     }
 }
