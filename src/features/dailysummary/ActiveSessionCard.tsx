@@ -3,8 +3,8 @@
 // is in progress. Includes a live 1-second timer and an END SESSION button
 // that calls useLogsStore.endSession().
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActionSheetIOS, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../../lib/useThemeColors";
 import { useSettings } from "../../contexts/SettingsContext";
@@ -33,6 +33,7 @@ export default function ActiveSessionCard({ startTime, gymName }: Props) {
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const endSession = useLogsStore((s) => s.endSession);
+  const discardActiveSession = useLogsStore((s) => s.discardActiveSession);
   const [elapsed, setElapsed] = useState(() => Date.now() - startTime);
 
   useEffect(() => {
@@ -40,26 +41,54 @@ export default function ActiveSessionCard({ startTime, gymName }: Props) {
     return () => clearInterval(id);
   }, [startTime]);
 
-  const handleEnd = () => {
-    Alert.alert(
-      tr("结束 Session？", "End Session?"),
-      tr("确认要结束当前的攀岩 session 吗？", "Are you sure you want to end this climbing session?"),
-      [
-        { text: tr("取消", "Cancel"), style: "cancel" },
+  // B2-FU: 3-option sheet aligned with journal.tsx free-form path so the
+  // End / Discard UX is identical regardless of which surface initiated the
+  // teardown (LA tap → end-session.tsx, journal pill, daily-summary card).
+  const performEndAndSave = useCallback(async () => {
+    try {
+      await endSession();
+    } catch (e) {
+      console.warn("[ActiveSessionCard] endSession failed:", e);
+    }
+  }, [endSession]);
+
+  const performDiscard = useCallback(async () => {
+    try {
+      await discardActiveSession();
+    } catch (e) {
+      console.warn("[ActiveSessionCard] discardActiveSession failed:", e);
+    }
+  }, [discardActiveSession]);
+
+  const handleEnd = useCallback(() => {
+    const endLabel = tr("结束并保存", "End & Save");
+    const discardLabel = tr("丢弃本次训练", "Discard Session");
+    const cancelLabel = tr("取消", "Cancel");
+    const title = tr("结束训练?", "End Session?");
+    const message = tr("选择保存或丢弃本次训练。", "Save or discard this session?");
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: tr("结束", "End"),
-          style: "default",
-          onPress: async () => {
-            try {
-              await endSession();
-            } catch (e) {
-              console.warn("[ActiveSessionCard] endSession failed:", e);
-            }
-          },
+          title,
+          message,
+          options: [endLabel, discardLabel, cancelLabel],
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
         },
-      ]
-    );
-  };
+        (buttonIndex) => {
+          if (buttonIndex === 0) performEndAndSave();
+          else if (buttonIndex === 1) performDiscard();
+        },
+      );
+    } else {
+      Alert.alert(title, message, [
+        { text: cancelLabel, style: "cancel" },
+        { text: discardLabel, style: "destructive", onPress: performDiscard },
+        { text: endLabel, onPress: performEndAndSave },
+      ]);
+    }
+  }, [tr, performEndAndSave, performDiscard]);
 
   return (
     <View style={styles.card}>

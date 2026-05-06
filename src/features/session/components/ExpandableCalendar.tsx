@@ -29,6 +29,10 @@ import {
 import { usePlanStore, toDateString } from "../../../store/usePlanStore";
 import useLogsStore from "../../../store/useLogsStore";
 import { CalendarDayRing } from "../../../../modules/climmate-activity-ring/src";
+import { foldActiveSessionMinutes } from "../../dailysummary/foldActiveSession";
+import { TIME_ON_WALL_GOAL_MIN } from "../../dailysummary/useDailyData";
+import { computeSessionStats } from "../../../services/sessionStats";
+import { localDateString } from "../../../lib/localDate";
 
 if (
   Platform.OS === "android" &&
@@ -73,6 +77,42 @@ export default function ExpandableCalendar({
 
   const { monthMap, buildMonthMap } = usePlanStore();
   const sessions = useLogsStore((s) => s.sessions);
+  // B2-FU: subscribe to active session so today's cell can fold in live
+  // duration + catalog sends without waiting for endSession.
+  const activeSession = useLogsStore((s) => s.activeSession);
+
+  // 1s tick — only when an active+unpaused session exists. Drives the today
+  // cell's duration ring + refetches active sessionList for live send count.
+  // Same pattern as useDailyData (see features/dailysummary/useDailyData).
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!activeSession || activeSession.pausedAt) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [activeSession]);
+
+  // Live send count for today from the active session's storage buckets
+  // (boulder + lead). Refetched on tick and on session start/pause/resume.
+  const [activeSends, setActiveSends] = useState(0);
+  useEffect(() => {
+    if (!activeSession) {
+      setActiveSends(0);
+      return;
+    }
+    let cancelled = false;
+    const sessionKey = String(activeSession.startTime);
+    (async () => {
+      const [boulder, lead] = await Promise.all([
+        computeSessionStats(sessionKey, "boulder"),
+        computeSessionStats(sessionKey, "lead"),
+      ]);
+      if (cancelled) return;
+      setActiveSends(boulder.sends + lead.sends);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession, tick]);
 
   // ── Color palette for CalendarDayRing native view (Window AU). The native
   // module is intentionally theme-unaware: it just renders whichever colors
@@ -97,7 +137,9 @@ export default function ExpandableCalendar({
     } as const;
   }, [colors]);
 
-  // Build dayStats: both duration and sends from sessions (same date, no timezone split)
+  // Build dayStats: completed sessions + (today only) folded active-session
+  // duration + live catalog sends. B2-FU: data source now matches daily-summary's
+  // big ring so the two never drift while a session is in progress.
   const dayStats = useMemo(() => {
     const map: Record<string, { durationMin: number; sends: number }> = {};
     for (const s of sessions) {
@@ -106,8 +148,23 @@ export default function ExpandableCalendar({
       prev.sends += s.sends || 0;
       map[s.date] = prev;
     }
+    // Fold active session into today's bucket. `liveMin` is computed from
+    // Date.now() each render — the 1s tick above triggers re-renders so
+    // the duration ring advances live; activeSends covers catalog sends.
+    if (activeSession) {
+      const today = localDateString();
+      const { liveMin, isToday } = foldActiveSessionMinutes(activeSession, today, today);
+      if (isToday) {
+        const prev = map[today] || { durationMin: 0, sends: 0 };
+        map[today] = {
+          durationMin: prev.durationMin + liveMin,
+          sends: prev.sends + activeSends,
+        };
+      }
+    }
     return map;
-  }, [sessions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, activeSession, activeSends, tick]);
 
   useEffect(() => {
     if (expanded) {
@@ -229,6 +286,7 @@ export default function ExpandableCalendar({
                 <CalendarDayRing
                   dayLabel={format(date, "d")}
                   durationMin={stats?.durationMin ?? 0}
+                  durationGoal={TIME_ON_WALL_GOAL_MIN}
                   sendCount={stats?.sends ?? 0}
                   planProgress={planProgress}
                   isSelected={activeDate != null && activeDate === dateStr}

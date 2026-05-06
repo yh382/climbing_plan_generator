@@ -6,6 +6,7 @@ import LogItemCard from "./LogItemCard";
 import { LocalDayLogItem } from "./types";
 import { readNotesByRoutes, readSessionList, writeSessionList } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
+import { computeSessionStats } from "../../../services/sessionStats";
 
 type Props = {
   /** Stable id for the current session (recommended: String(activeSession.startTime)) */
@@ -65,45 +66,27 @@ function TodayDetailsList({
     onCountChange?.(items.length);
   }, [items, onCountChange]);
 
-  // Live Activity stats
+  // Live Activity stats — delegate to shared aggregator (services/sessionStats)
+  // so journal.tsx, catalog enqueue, and any future caller compute identically.
+  // We re-fetch on every items change instead of recomputing in-process so
+  // logic drift with computeSessionStats is impossible.
   useEffect(() => {
     if (!onStatsChange) return;
-    const sends = items.reduce((s, it) => {
-      if (typeof (it as any)?.sendCount === "number") return s + (it as any).sendCount;
-      const style = (it as any)?.style;
-      if (style === "redpoint" || style === "flash" || style === "onsight") return s + 1;
-      return s;
-    }, 0);
-
-    // attempts = sum of attemptsTotal across all items (depth/effort metric).
-    // Each item represents one route; attemptsTotal counts how many times the
-    // user tried that route (incl. repeat actions). Defaults to 1 if missing.
-    const attempts = items.reduce(
-      (sum, it) => sum + ((it as any)?.attemptsTotal ?? (it as any)?.attempts ?? 1),
-      0,
-    );
-
-    const grades = items
-      .map((it) => String(it?.grade || "").trim())
-      .filter((g) => g.length > 0);
-
-    let best = "";
-    if (logType === "boulder") {
-      best = grades
-        .filter((g) => /^V\d+/i.test(g))
-        .sort((a, b) => {
-          const va = parseInt(a.replace(/^V/i, ""), 10);
-          const vb = parseInt(b.replace(/^V/i, ""), 10);
-          return vb - va;
-        })[0] || "";
-    } else {
-      best = grades
-        .filter((g) => /^5\./.test(g))
-        .sort((a, b) => b.localeCompare(a))[0] || "";
-    }
-
-    onStatsChange({ sends, best, routeCount: items.length, attempts });
-  }, [items, onStatsChange, logType]);
+    let cancelled = false;
+    (async () => {
+      const stats = await computeSessionStats(sessionKey, logType);
+      if (cancelled) return;
+      onStatsChange({
+        sends: stats.sends,
+        best: stats.best,
+        routeCount: stats.routeCount,
+        attempts: stats.attempts,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items, onStatsChange, logType, sessionKey]);
 
   const load = useCallback(async () => {
     const raw = await readSessionList(sessionKey, logType);

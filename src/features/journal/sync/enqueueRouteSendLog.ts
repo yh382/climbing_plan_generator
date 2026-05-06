@@ -15,6 +15,8 @@ import { readAllServerIds, setServerId } from "./serverIdMap";
 import { useAuthStore } from "../../../store/useAuthStore";
 import useLogsStore, { type LogType } from "../../../store/useLogsStore";
 import { localDateString } from "../../../lib/localDate";
+import { computeSessionStats } from "../../../services/sessionStats";
+import { pushLiveActivityStatsThrottled } from "../../../lib/liveActivityThrottle";
 
 export type RouteKind = "outdoor" | "gym";
 
@@ -96,6 +98,29 @@ async function ensureActiveSessionForRoute(
   return active ? active.startTime : null;
 }
 
+/**
+ * B2-FU: after a catalog log lands in sessionList, recompute the active
+ * session's stats and push to Live Activity (throttled). No-op when there's
+ * no active session (sessionKey null) — LA shouldn't be running anyway.
+ */
+async function pushSessionStatsToLiveActivity(
+  sessionKey: string | null,
+  wallType: WallType,
+): Promise<void> {
+  if (!sessionKey) return;
+  try {
+    const stats = await computeSessionStats(sessionKey, wallType);
+    pushLiveActivityStatsThrottled({
+      routeCount: stats.routeCount,
+      sendCount: stats.sends,
+      bestGrade: stats.best,
+      attempts: stats.attempts,
+    });
+  } catch (e) {
+    if (__DEV__) console.warn("[pushSessionStatsToLiveActivity] failed:", e);
+  }
+}
+
 export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> {
   const today = localDateString(); // YYYY-MM-DD in user's LOCAL timezone
   const wallType = mapStyleToWallType(input.routeKind, input.routeStyle);
@@ -157,6 +182,10 @@ export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> 
       gym_route_id: input.routeKind === "gym" ? input.routeId : null,
     },
   });
+
+  // B2-FU: catalog log path bypasses TodayDetailsList — push stats to LA
+  // here so Dynamic Island reflects the new send/attempt within ≤500ms.
+  await pushSessionStatsToLiveActivity(sessionKey, wallType);
 }
 
 /**
@@ -221,6 +250,9 @@ export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<
       gym_route_id: input.routeKind === "gym" ? input.routeId : null,
     },
   });
+
+  // B2-FU: same rationale as enqueueRouteSendLog.
+  await pushSessionStatsToLiveActivity(sessionKey, wallType);
 }
 
 /**

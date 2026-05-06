@@ -21,6 +21,7 @@ import type { SendStyle, Feel } from "../journal/loglist/types";
 import { computeDailyIntensity } from "../../services/stats/intensityCalculator";
 import { api } from "../../lib/apiClient";
 import { localDateString } from "../../lib/localDate";
+import { foldActiveSessionMinutes } from "./foldActiveSession";
 
 export type SessionGroup = {
   session: SessionEntry;
@@ -66,7 +67,9 @@ export type DailyData = {
   meta: DailyMeta | null;
 };
 
-const TIME_ON_WALL_GOAL_MIN = 120; // 2h
+// Exported so other surfaces (e.g. ExpandableCalendar's day-cell ring) can
+// align their fill goal with daily-summary's big ring — see B2-FU.
+export const TIME_ON_WALL_GOAL_MIN = 120; // 2h
 // User's perception of "today" is local. UTC ISO slicing breaks for users
 // west of UTC (afternoon = next UTC day) → see B2 follow-up bug.
 const ISO_DATE_TODAY = () => localDateString();
@@ -357,17 +360,12 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
 
   // B2 #5+#3: fold in the active session's elapsed minutes so the time
   // ring ticks live + reflects end-session immediately (no stale view
-  // until syncFromBackend pulls the new SessionEntry). Paused → freeze
-  // at activeDurationMinutes; active → wall-clock since startTime.
-  // Cheap shallow merge — does NOT rebuild the Maps inside aggregate().
+  // until syncFromBackend pulls the new SessionEntry). Helper now shared
+  // with ExpandableCalendar (B2-FU) — see features/dailysummary/foldActiveSession.
   return useMemo(() => {
     if (!enabled) return base;
-    const today = ISO_DATE_TODAY();
-    if (date !== today || !activeSession) return base;
-
-    const liveMin = activeSession.pausedAt
-      ? activeSession.activeDurationMinutes
-      : Math.max(0, Math.floor((Date.now() - activeSession.startTime) / 60000));
+    const { liveMin, isToday } = foldActiveSessionMinutes(activeSession, date, ISO_DATE_TODAY());
+    if (!isToday || !activeSession) return base;
     const newTimeOnWallMin = base.kpis.timeOnWallMin + liveMin;
     return {
       ...base,
