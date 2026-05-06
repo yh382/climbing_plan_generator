@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import LogItemCard from "./LogItemCard";
+import ClimbItemCard from "../../../components/shared/ClimbItemCard";
 import { LocalDayLogItem } from "./types";
 import { readNotesByRoutes, readSessionList, writeSessionList } from "./storage";
 import { enqueueLogEvent } from "../sync/logsOutbox";
@@ -190,9 +190,11 @@ function TodayDetailsList({
   return (
     <View style={{ gap: 10 }}>
       {list.map((it, idx) => (
-        <LogItemCard
+        <ClimbItemCard
           key={`${it.id ?? "it"}_${idx}`}
           item={it}
+          variant="single"
+          showFeel
           labelOf={labelOf}
           note={(notesMap[it.name] || it.note || "").trim() || undefined}
           tr={tr}

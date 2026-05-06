@@ -139,16 +139,18 @@ export default function OutdoorRouteDetailPage() {
   }, [route]);
 
   // Climber rows for GradeSuggestionCard. avgStars comes from `route.stars`
-  // (backend aggregate) as the single source of truth — per-log stars aren't
-  // merged here. INDOOR_A: histogram + feel were stripped from the card; only
-  // user_id + username are needed for the climber-count footer.
+  // (backend aggregate) as the single source of truth — per-log stars
+  // aren't merged here. Window D1_D2_E2 — `grade_text` + `feel` echoed
+  // back by /ascents power the histogram + majority-feel pill.
   const sendLogs: SendLog[] = useMemo(() => {
     return ascents
       .filter((a) => a.result !== 'attempt')
       .map((a) => ({
         user_id: a.user_id,
         username: a.username,
-      }) as SendLog);
+        grade_text: a.grade_text ?? null,
+        feel: (a.feel ?? null) as SendLog['feel'],
+      }));
   }, [ascents]);
 
   // Attempt: +1 locally, persist to backend (B2 first-time wiring), haptic.

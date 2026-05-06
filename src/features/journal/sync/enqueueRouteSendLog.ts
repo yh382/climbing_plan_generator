@@ -209,7 +209,7 @@ export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<
     grade: input.routeGrade,
     name: input.routeName,
     // Local rendering treats "attempt" as the redpoint family minus sendCount;
-    // LogItemCard already handles sendCount=0 → "attempted" badge variant.
+    // ClimbItemCard 'single' variant handles sendCount=0 → "attempted" badge.
     style: "redpoint",
     feel: "solid",
     sendCount: 0,

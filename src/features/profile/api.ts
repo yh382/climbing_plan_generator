@@ -24,6 +24,30 @@ export const profileApi = {
     api.patch<PrivacySettingsData>("/profiles/me/privacy", data),
 };
 
+import type { AscentsFilter, UserAscentsResponse } from "./types";
+
+/** GET /users/{userId}/ascents — historical aggregated ascents for the
+ *  user, filtered by privacy + visibility on the backend. */
+export function getUserAscents(
+  userId: string,
+  params: AscentsFilter = {},
+): Promise<UserAscentsResponse> {
+  const qs = new URLSearchParams();
+  if (params.location_type && params.location_type !== "all") {
+    qs.set("location_type", params.location_type);
+  }
+  if (params.wall_type && params.wall_type !== "all") {
+    qs.set("wall_type", params.wall_type);
+  }
+  if (params.since) qs.set("since", params.since);
+  if (params.cursor) qs.set("cursor", params.cursor);
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return api.get<UserAscentsResponse>(
+    `/users/${userId}/ascents${query ? `?${query}` : ""}`,
+  );
+}
+
 type PresignResponse = {
   upload_url: string;
   public_url: string;

@@ -95,6 +95,10 @@ export type GymRouteAscent = {
   username: string | null;
   result: 'send' | 'flash' | 'onsight' | 'attempt';
   grade_text: string | null;
+  /** Window D1_D2_E2 — echoed by /gym/routes/{id}/ascents so
+   *  GradeSuggestionCard can plot a histogram + majority-feel pill. */
+  feel?: 'soft' | 'solid' | 'hard' | null;
+  style_tags?: string[] | null;
   attempts: number | null;
   date: string;
   note: string | null;

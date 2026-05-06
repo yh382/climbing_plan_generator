@@ -178,6 +178,14 @@ export type RouteAscent = {
   username: string;
   avatar_url?: string;
   result: string; // send / flash / onsight / attempt
+  /** Grader's text grade (e.g. "5.11b" / "V5"). Window D1_D2_E2 — echoed
+   *  by /outdoor/routes/{id}/ascents so GradeSuggestionCard can plot a
+   *  per-grade histogram without a second round-trip. */
+  grade_text?: string | null;
+  /** Per-log subjective feel ('soft' | 'solid' | 'hard'). Window
+   *  D1_D2_E2 — same purpose as grade_text. */
+  feel?: 'soft' | 'solid' | 'hard' | null;
+  style_tags?: string[] | null;
   attempts: number;
   date: string;
   note?: string;

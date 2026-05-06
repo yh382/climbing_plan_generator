@@ -1,12 +1,12 @@
 // src/components/shared/GradeSuggestionCard.tsx
 // Climber summary card. Shared between outdoor + gym route detail.
 //
-// Shows ONLY data we actually have from /ascents: avg stars (server-side
-// aggregate) + climber count + first climber name. Histogram + majority-feel
-// were stripped (INDOOR_A device test, 2026-05-03) — the /ascents endpoint
-// doesn't return suggested_grade or feel per-log, so those displays were
-// always rendering placeholder values that looked like real aggregates.
-// Resurrect them only after the endpoint adds those fields.
+// Window D1_D2_E2 — restored histogram of `grade_text` + majority-feel
+// pill after the backend `/ascents` endpoints started echoing `feel`
+// alongside the existing `grade_text`. Displayed only when there is
+// enough signal to be meaningful (≥1 distinct grade, ≥5 logs for the
+// feel pill) — otherwise the card collapses back to the avg-stars +
+// climber-count footer.
 
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
@@ -15,10 +15,16 @@ import { useThemeColors } from '../../lib/useThemeColors';
 import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
 
+export type SendLogFeel = 'soft' | 'solid' | 'hard';
+
 export type SendLog = {
   user_id: string;
   username: string;
   stars?: number;
+  /** Per-log graded text — populates the histogram bins. */
+  grade_text?: string | null;
+  /** Per-log subjective feel — populates the majority-feel pill. */
+  feel?: SendLogFeel | null;
 };
 
 interface GradeSuggestionCardProps {
@@ -27,6 +33,55 @@ interface GradeSuggestionCardProps {
   avgStars?: number | null;
   /** Whole-card tap handler. If omitted, card is not pressable. */
   onPress?: () => void;
+}
+
+const MIN_LOGS_FOR_FEEL_PILL = 5;
+const MAX_HISTOGRAM_BARS = 5;
+
+type HistogramRow = { grade: string; count: number; pct: number };
+
+function buildHistogram(logs: SendLog[]): HistogramRow[] {
+  const counts = new Map<string, number>();
+  for (const l of logs) {
+    const g = (l.grade_text ?? '').trim();
+    if (!g) continue;
+    counts.set(g, (counts.get(g) ?? 0) + 1);
+  }
+  if (counts.size === 0) return [];
+  const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+  const rows = Array.from(counts.entries()).map(([grade, count]) => ({
+    grade,
+    count,
+    pct: count / total,
+  }));
+  // Top-N by frequency, ties broken alphabetically for stability.
+  rows.sort((a, b) => (b.count - a.count) || a.grade.localeCompare(b.grade));
+  return rows.slice(0, MAX_HISTOGRAM_BARS);
+}
+
+function pickMajorityFeel(logs: SendLog[]): SendLogFeel | null {
+  const counts: Record<SendLogFeel, number> = { soft: 0, solid: 0, hard: 0 };
+  let total = 0;
+  for (const l of logs) {
+    const f = l.feel;
+    if (f === 'soft' || f === 'solid' || f === 'hard') {
+      counts[f] += 1;
+      total += 1;
+    }
+  }
+  if (total < MIN_LOGS_FOR_FEEL_PILL) return null;
+  let winner: SendLogFeel = 'solid';
+  let max = -1;
+  (['soft', 'solid', 'hard'] as SendLogFeel[]).forEach((k) => {
+    if (counts[k] > max) {
+      winner = k;
+      max = counts[k];
+    }
+  });
+  // Surface the pill only when the winning feel is actually skewed —
+  // otherwise "solid" is the trivial default and adds noise.
+  if (winner === 'solid' && max < total * 0.5) return null;
+  return winner;
 }
 
 export default function GradeSuggestionCard({
@@ -44,6 +99,9 @@ export default function GradeSuggestionCard({
     if (rated.length === 0) return null;
     return rated.reduce((s, l) => s + (l.stars ?? 0), 0) / rated.length;
   }, [logs, avgStarsProp]);
+
+  const histogram = useMemo(() => buildHistogram(logs), [logs]);
+  const majorityFeel = useMemo(() => pickMajorityFeel(logs), [logs]);
 
   const climberCount = logs.length;
   const firstClimber = logs[0]?.username;
@@ -69,14 +127,52 @@ export default function GradeSuggestionCard({
       }
     : { style: styles.card };
 
+  const feelLabel: Record<SendLogFeel, string> = {
+    soft: tr('偏软', 'Soft'),
+    solid: tr('准确', 'Solid'),
+    hard: tr('偏硬', 'Hard'),
+  };
+
   return (
     <Container {...containerProps}>
-      {avgStars != null && (
-        <View style={styles.topRow}>
-          <Text style={styles.avgStars}>{avgStars.toFixed(1)}</Text>
-          <Ionicons name="star" size={16} color="#FFD60A" style={{ marginLeft: 4 }} />
+      <View style={styles.headerRow}>
+        {avgStars != null && (
+          <View style={styles.starGroup}>
+            <Text style={styles.avgStars}>{avgStars.toFixed(1)}</Text>
+            <Ionicons name="star" size={16} color="#FFD60A" style={{ marginLeft: 4 }} />
+          </View>
+        )}
+        {majorityFeel && (
+          <View style={[styles.feelPill, { backgroundColor: colors.pillBackground }]}>
+            <Text style={[styles.feelPillText, { color: colors.pillText }]}>
+              {feelLabel[majorityFeel].toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {histogram.length > 0 && (
+        <View style={styles.histogram}>
+          {histogram.map((row) => (
+            <View key={row.grade} style={styles.histRow}>
+              <Text style={styles.histGrade}>{row.grade}</Text>
+              <View style={styles.histTrack}>
+                <View
+                  style={[
+                    styles.histFill,
+                    {
+                      width: `${Math.max(8, row.pct * 100)}%`,
+                      backgroundColor: colors.accent,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.histCount}>{row.count}</Text>
+            </View>
+          ))}
         </View>
       )}
+
       {firstClimber && (
         <View style={styles.climbersRow}>
           <Text style={styles.climbersText}>
@@ -114,15 +210,63 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       textAlign: 'center',
       paddingVertical: 8,
     },
-    topRow: {
+    headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: 10,
+    },
+    starGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     avgStars: {
       fontFamily: theme.fonts.black,
       fontSize: 22,
       color: c.textPrimary,
+    },
+    feelPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+    },
+    feelPillText: {
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 0.8,
+    },
+    histogram: {
+      gap: 6,
+      marginBottom: 12,
+    },
+    histRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    histGrade: {
+      fontFamily: 'DMMono_500Medium',
+      fontSize: 12,
+      color: c.textSecondary,
+      width: 36,
+    },
+    histTrack: {
+      flex: 1,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.backgroundSecondary,
+      overflow: 'hidden',
+    },
+    histFill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    histCount: {
+      fontFamily: theme.fonts.medium,
+      fontSize: 12,
+      color: c.textTertiary,
+      width: 20,
+      textAlign: 'right',
     },
     climbersRow: {
       flexDirection: 'row',

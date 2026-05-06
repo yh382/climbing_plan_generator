@@ -188,9 +188,9 @@ export default function GymRouteDetailPage() {
     };
   }, [routeId]);
 
-  // GradeSuggestionCard expects send logs (excludes attempts). INDOOR_A:
-  // histogram + feel were stripped from the card (mock-y display), only
-  // user_id + username are needed for the climber-count footer.
+  // GradeSuggestionCard expects send logs (excludes attempts). Window
+  // D1_D2_E2 — `grade_text` + `feel` echoed back by /ascents power the
+  // histogram + majority-feel pill restored to the card.
   const sendLogs: SendLog[] = useMemo(
     () =>
       (ascents ?? [])
@@ -198,6 +198,8 @@ export default function GymRouteDetailPage() {
         .map((a) => ({
           user_id: a.user_id,
           username: a.username ?? '',
+          grade_text: a.grade_text ?? null,
+          feel: (a.feel ?? null) as SendLog['feel'],
         })),
     [ascents],
   );
