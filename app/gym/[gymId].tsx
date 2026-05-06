@@ -80,7 +80,19 @@ export default function GymMapScreen() {
   );
   const menuSheetRef = useRef<GymMenuSheetHandle>(null);
   // B1 — peek-sheet ref + dismiss / re-present mirrors MapScreenMapbox.
+  // Tracks whether the sheet is currently presented natively, so
+  // useFocusEffect doesn't fire a redundant present() on an
+  // already-visible sheet (which iOS sometimes reacts to by leaving the
+  // sheet hidden + the floating top bar invisible — observed when
+  // returning from /gym/route/[routeId] after a successful Send).
   const peekSheetRef = useRef<TrueSheet | null>(null);
+  const sheetPresentedRef = useRef<boolean>(false);
+  const onSheetDidPresent = useCallback(() => {
+    sheetPresentedRef.current = true;
+  }, []);
+  const onSheetDidDismiss = useCallback(() => {
+    sheetPresentedRef.current = false;
+  }, []);
   const dismissPeekSheet = useCallback(() => {
     peekSheetRef.current?.dismiss().catch(() => {});
   }, []);
@@ -88,14 +100,6 @@ export default function GymMapScreen() {
   // glass-union as a 3rd member; null when count<=0 (pill stays
   // 2-button).
   const todaySendsBtn = useTodaySendsButton(dismissPeekSheet);
-  useFocusEffect(
-    useCallback(() => {
-      const id = requestAnimationFrame(() => {
-        peekSheetRef.current?.present(1).catch(() => {});
-      });
-      return () => cancelAnimationFrame(id);
-    }, []),
-  );
 
   // Bumped to imperatively reset the floor plan zoom + pan back to the
   // default state when the user taps the back-chevron next to the wall
@@ -128,6 +132,31 @@ export default function GymMapScreen() {
   const topBarStyle = useAnimatedStyle(() => ({
     opacity: topBarOpacity.value,
   }));
+
+  // On focus regain — happens both on first mount and when popping back
+  // from a pushed screen (e.g. /gym/route/[routeId] after a Send).
+  // Defensive resets:
+  //   1. Force currentDetent → 1 so the top bar isn't stuck at the
+  //      faded-out value if the sheet was at DETENT_LARGE before the
+  //      push.
+  //   2. Snap topBarOpacity → 1 (no animation) so a stuck shared value
+  //      from before the push doesn't leave the buttons invisible.
+  //   3. Re-present the sheet ONLY if it's currently dismissed.
+  //      Calling present() on an already-presented sheet has been seen
+  //      to leave it hidden — `dismissible={false}` keeps it presented
+  //      across pushes, so the iOS auto-restore handles visibility.
+  useFocusEffect(
+    useCallback(() => {
+      setCurrentDetent(1);
+      topBarOpacity.value = 1;
+      const id = requestAnimationFrame(() => {
+        if (!sheetPresentedRef.current) {
+          peekSheetRef.current?.present(1).catch(() => {});
+        }
+      });
+      return () => cancelAnimationFrame(id);
+    }, [topBarOpacity]),
+  );
 
 
   /** Tapping a route dot on the floor plan scopes the sheet list to
@@ -296,6 +325,8 @@ export default function GymMapScreen() {
         grabber
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         onDetentChange={onDetentChange}
+        onDidPresent={onSheetDidPresent}
+        onDidDismiss={onSheetDidDismiss}
       >
         <TopFadeMaskView topFadeRatio={0.15}>
           <ScrollView
