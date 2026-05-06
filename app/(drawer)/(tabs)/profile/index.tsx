@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { View, StyleSheet, Share, useWindowDimensions } from "react-native";
+import { View, StyleSheet, Share, useWindowDimensions, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +25,13 @@ import ProfileTabBar from "../../../../src/components/shared/ProfileTabBar";
 import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 
 const TABS = ["posts", "stats", "badges", "lists"] as const;
+
+// COMPAT 用白图标对抗 cover 图（iOS 17/18 没有 Liquid Glass 容器）；iOS 26
+// SF Symbol 落在 Liquid Glass capsule 里，黑图标对比更柔和。
+const TOOLBAR_ICON_COLOR =
+  Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26
+    ? "#000000"
+    : "#FFFFFF";
 
 type Units = "imperial" | "metric";
 type FollowCounts = { followers: number; following: number };
@@ -379,16 +386,17 @@ export default function ProfileScreen() {
       </ScrollEdgeFallback>
 
       {/* Native toolbar: settings + share menu.
-          tintColor=white overrides system blue tint — Profile has a cover
-          image background; white SF Symbols read consistently across both
-          light & dark cover photos and both system theme modes. */}
+          iOS 26 Liquid Glass renders these inside a translucent capsule;
+          black SF Symbols read better against the glass than white.
+          iOS<26 keeps the COMPAT-era white tint for legibility against the
+          full-bleed cover image background. */}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="gearshape"
-          tintColor="#FFFFFF"
+          tintColor={TOOLBAR_ICON_COLOR}
           onPress={() => router.push("/settings")}
         />
-        <Stack.Toolbar.Menu icon="square.and.arrow.up" tintColor="#FFFFFF">
+        <Stack.Toolbar.Menu icon="square.and.arrow.up" tintColor={TOOLBAR_ICON_COLOR}>
           <Stack.Toolbar.MenuAction
             icon="link"
             onPress={async () => {
