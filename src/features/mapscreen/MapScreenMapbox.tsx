@@ -38,7 +38,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
 import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
 import MapSessionPill from '../journal/MapSessionPill';
-import TodaySendsButton from '../dailysummary/TodaySendsButton';
+import { useTodaySendsButton } from '../dailysummary/useTodaySendsButton';
 
 import { useGymsStore } from '../../store/useGymsStore';
 import AreaMenuSheet, { type AreaMenuSheetHandle } from './components/AreaMenuSheet';
@@ -902,6 +902,10 @@ export default function MapScreenMapbox({
     sheet.sheetRef.current?.dismiss().catch(() => {});
   }, [sheet]);
 
+  // B1_FU_SWIFTUI — TodaySendsButton 走 SwiftUI Host 路径，作为 right
+  // pill 第 4 个 child fuse 进同一 glassEffectUnion。null when count<=0。
+  const todaySendsBtn = useTodaySendsButton(dismissPrimarySheet);
+
   // B1 — re-present the primary sheet when the screen regains focus
   // (e.g. after popping /daily-summary back). useMapSheetState's auto-
   // present only fires once on mount; without this, dismissed sheets
@@ -923,9 +927,11 @@ export default function MapScreenMapbox({
         icon: 'chevron.left',
         onPress: mode.kind === 'gyms' ? () => router.back() : onBackToGyms,
       }}
-      rightButtons={mapViewControlButtons}
+      rightButtons={[
+        ...mapViewControlButtons,
+        ...(todaySendsBtn ? [todaySendsBtn] : []),
+      ]}
       hidden={anySheetFull || pinPickMode}
-      belowRight={<TodaySendsButton onPressBefore={dismissPrimarySheet} />}
     />
   );
 

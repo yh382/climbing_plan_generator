@@ -28,6 +28,10 @@ import {
   GlassUnionGroup,
   glassEffectUnion,
 } from '../../modules/glass-effect-union/src';
+import {
+  rightPillCountButtonModifiers,
+  rightPillCountLabel,
+} from '../../src/features/mapscreen/components/MapTopBar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -50,7 +54,7 @@ import GymMenuSheet, {
   type GymMenuSheetHandle,
 } from '../../src/features/mapscreen/components/GymMenuSheet';
 import MapSessionPill from '../../src/features/journal/MapSessionPill';
-import TodaySendsButton from '../../src/features/dailysummary/TodaySendsButton';
+import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 
 // Mock-only floor plan asset. The screen layer wires this into
 // GymFloorPlanView when USE_MOCK is set so the bundled PNG is used
@@ -80,6 +84,10 @@ export default function GymMapScreen() {
   const dismissPeekSheet = useCallback(() => {
     peekSheetRef.current?.dismiss().catch(() => {});
   }, []);
+  // B1_FU_SWIFTUI — count badge fuses into the right-pill SwiftUI
+  // glass-union as a 3rd member; null when count<=0 (pill stays
+  // 2-button).
+  const todaySendsBtn = useTodaySendsButton(dismissPeekSheet);
   useFocusEffect(
     useCallback(() => {
       const id = requestAnimationFrame(() => {
@@ -246,27 +254,24 @@ export default function GymMapScreen() {
                         ] as any
                       }
                     />
+                    {/* B1_FU_SWIFTUI — today's-sends count fuses into
+                        the same glass-union as a 3rd member when count
+                        > 0; pill auto-morphs 2↔3. Living inside the
+                        SwiftUI subtree avoids the prior RN-sibling
+                        @Namespace conflict. */}
+                    {todaySendsBtn?.count != null ? (
+                      <Button
+                        label={rightPillCountLabel(todaySendsBtn.count)}
+                        onPress={todaySendsBtn.onPress ?? (() => {})}
+                        modifiers={
+                          rightPillCountButtonModifiers('gym-floor-right-pill') as any
+                        }
+                      />
+                    ) : null}
                   </VStack>
                 </GlassUnionGroup>
               </GlassEffectContainer>
             </Host>
-          </View>
-          {/* B1 — TodaySendsButton must NOT live inside the right
-              cluster View next to the SwiftUI Host above (a RN sibling
-              there breaks the SwiftUI @Namespace registration for the
-              fused glass-union pill — verified via binary bisect; see
-              MapTopBar.belowRight comment). Instead render it as an
-              absolute overlay anchored below where the share/bookmark
-              pill ends: paddingTop (insets.top + 8) + 2×44pt pill
-              height + 8gap. */}
-          <View
-            style={[
-              styles.todaySendsAnchor,
-              { top: insets.top + 8 + 44 * 2 + 8 },
-            ]}
-            pointerEvents="box-none"
-          >
-            <TodaySendsButton onPressBefore={dismissPeekSheet} />
           </View>
         </Animated.View>
       </View>
@@ -407,12 +412,6 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       alignItems: 'flex-start',
       paddingHorizontal: 12,
       gap: 8,
-    },
-    todaySendsAnchor: {
-      position: 'absolute',
-      right: 12,
-      width: 44,
-      alignItems: 'center',
     },
     peekContentRoot: {
       flex: 1,

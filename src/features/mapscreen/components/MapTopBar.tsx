@@ -19,6 +19,9 @@ import {
   frame,
   font,
   glassEffect,
+  foregroundStyle,
+  monospacedDigit,
+  contentTransition,
 } from "@expo/ui/swift-ui/modifiers";
 import {
   GlassUnionGroup,
@@ -32,7 +35,9 @@ export interface MapTopBarMenuItem {
 }
 
 export interface MapTopBarButton {
-  icon: string; // SF Symbol name
+  /** SF Symbol name. Required unless `count` is set (count buttons render
+   *  a numeric text label instead of an icon). */
+  icon?: string;
   /** Plain-button tap handler. Ignored if menuItems or morphMenuItems are set. */
   onPress?: () => void;
   /** SwiftUI Menu dropdown (tap opens a popover). */
@@ -41,6 +46,13 @@ export interface MapTopBarButton {
    *  trigger. Items share the same glass union so the pill reads as one
    *  continuous liquid-glass capsule. */
   morphMenuItems?: MapTopBarMenuItem[];
+  /** Numeric badge button — renders the count as the button label inside
+   *  the same glass-union pill (no SF Symbol). Used by today's-sends
+   *  counter so the 4-button capsule fuses cleanly across runtimes
+   *  instead of mounting a sibling RN component (which silently breaks
+   *  the SwiftUI @Namespace registration). Visual highlight (light-green
+   *  disk + black digit) is fixed inside `rightPillCountButtonModifiers`. */
+  count?: number;
   /** Render condition — if false, button is hidden. */
   visible?: boolean;
   key?: string;
@@ -56,8 +68,6 @@ interface MapTopBarProps {
   /** When true, fade the top bar out of view (e.g. when the parent sheet
    *  expands to a detent that would overlap with the bar). */
   hidden?: boolean;
-  /** Extra node rendered in the right column below the fused right pill. */
-  belowRight?: React.ReactNode;
 }
 
 const BTN_SIZE = 44;
@@ -114,6 +124,50 @@ function rightButtonModifiers(unionId: string) {
   ] as const;
 }
 
+/** Light-teal tint for the count-badge glass material. Picked to (a)
+ *  read clearly against black digits (~10:1 contrast) and (b) pop
+ *  visually among the surrounding plain-glass pill members so the
+ *  today's-sends count is the obvious focal point — while still being
+ *  a `regular` glass member that participates in `glassEffectUnion`
+ *  morph (`clear` variant disqualifies the button from the fusion;
+ *  `regular` + tint keeps it inside the pill as a tinted-glass disc).
+ *  Hex literal because this is a visual-spec color for one component,
+ *  not a theme-driven token. */
+const COUNT_BADGE_TINT = "#A8D5D6";
+
+/** Modifier chain for a count-badge button that fuses into a right-pill
+ *  glass union (e.g. today's-sends counter). Visual: black digit on a
+ *  light-teal `regular`-glass capsule that fuses with siblings via the
+ *  shared `glassEffectUnion(unionId)` namespace.
+ *
+ *  Exported so screens that build their own GlassUnionGroup VStack
+ *  outside MapTopBar (currently app/gym/[gymId].tsx) share the same
+ *  chain. */
+export function rightPillCountButtonModifiers(unionId: string) {
+  return [
+    buttonStyle("plain"),
+    font({ size: 17, weight: "semibold" }),
+    monospacedDigit(),
+    foregroundStyle("#000000"),
+    frame({ width: BTN_SIZE, height: BTN_SIZE, alignment: "center" }),
+    glassEffect({
+      glass: {
+        variant: "regular",
+        interactive: true,
+        tint: COUNT_BADGE_TINT,
+      },
+      shape: "capsule",
+    }),
+    glassEffectUnion(unionId),
+    contentTransition("numericText"),
+  ] as const;
+}
+
+/** Display string for a count badge (clamped to "99+"). */
+export function rightPillCountLabel(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
 const LEFT_BTN = [
   buttonStyle("plain"),
   labelStyle("iconOnly"),
@@ -122,7 +176,7 @@ const LEFT_BTN = [
   GLASS_CIRCLE,
 ] as const;
 
-export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidden, belowRight }: MapTopBarProps) {
+export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidden }: MapTopBarProps) {
   const insets = useSafeAreaInsets();
   const RIGHT_BTN = rightButtonModifiers(unionId);
   const visibleRight = rightButtons.filter((b) => b.visible !== false);
@@ -237,7 +291,7 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
                           <Menu
                             key={key}
                             label=""
-                            systemImage={btn.icon}
+                            systemImage={btn.icon as any}
                             modifiers={RIGHT_BTN as any}
                           >
                             {btn.menuItems.map((m, j) => (
@@ -249,6 +303,23 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
                               />
                             ))}
                           </Menu>,
+                        ];
+                      }
+
+                      // Numeric badge — renders count as the button label
+                      // inside the same glass union. Lives next to icon
+                      // buttons so SwiftUI fuses all members into one
+                      // continuous liquid-glass capsule (vs the prior
+                      // RN-sibling overlay which broke the @Namespace
+                      // registration; binary-bisected in B1).
+                      if (typeof btn.count === "number") {
+                        return [
+                          <Button
+                            key={key}
+                            label={rightPillCountLabel(btn.count)}
+                            onPress={btn.onPress ?? (() => {})}
+                            modifiers={rightPillCountButtonModifiers(unionId) as any}
+                          />,
                         ];
                       }
 
@@ -271,27 +342,6 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
           )}
         </View>
 
-        {/* B1 — `belowRight` is rendered as an ABSOLUTE overlay, NOT as a
-            sibling inside the right `sideWrap` View. Reason: any RN View
-            placed as a sibling to the SwiftUI Host that hosts the
-            glass-union'd right pill silently breaks the SwiftUI
-            @Namespace registration for `glassEffectUnion`, which causes
-            the fused capsule to fall apart into 3 disconnected buttons
-            (verified by binary-bisecting B1 regression). Lifting it
-            outside sideWrap preserves the union; absolute positioning
-            (top = visibleRight.length * BTN_SIZE + 8) keeps it visually
-            below the right pill regardless of how many buttons render. */}
-        {belowRight ? (
-          <View
-            style={[
-              styles.belowRightAbsolute,
-              { top: visibleRight.length * BTN_SIZE + 8 },
-            ]}
-            pointerEvents="box-none"
-          >
-            {belowRight}
-          </View>
-        ) : null}
       </Animated.View>
     </>
   );
@@ -324,13 +374,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     top: 0,
     zIndex: 49,
-  },
-  // Absolute-positioned outside sideWrap so it isn't an RN sibling to
-  // the SwiftUI Host (see B1 binary-bisect comment in render).
-  belowRightAbsolute: {
-    position: "absolute",
-    right: 0,
-    width: BTN_SIZE,
-    alignItems: "center",
   },
 });

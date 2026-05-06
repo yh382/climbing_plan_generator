@@ -33,7 +33,7 @@ import { isCN } from '../../src/lib/region';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import { outdoorListsApi } from '../../src/features/outdoor/listsApi';
 import type { Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
-import TodaySendsButton from '../../src/features/dailysummary/TodaySendsButton';
+import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 import MapPinCluster from '../../src/features/outdoor/components/MapPinCluster';
 import WallGroup from '../../src/features/outdoor/components/WallGroup';
 import RouteListCard from '../../src/features/outdoor/components/RouteListCard';
@@ -454,6 +454,9 @@ export default function CragMapPage() {
   const dismissCragSheet = useCallback(() => {
     sheet.sheetRef.current?.dismiss().catch(() => {});
   }, [sheet]);
+  // B1_FU_SWIFTUI — 走 MapTopBar 的 count kind，融进 right pill
+  // glassEffectUnion；null when count<=0。
+  const todaySendsBtn = useTodaySendsButton(dismissCragSheet);
   useFocusEffect(
     useCallback(() => {
       const id = requestAnimationFrame(() => {
@@ -645,17 +648,15 @@ export default function CragMapPage() {
       <MapTopBar
         unionId="crag-map-pill"
         leftButton={{ icon: 'chevron.left', onPress: () => router.back() }}
-        rightButtons={
-          mode === 'list'
+        rightButtons={[
+          ...(mode === 'list'
             ? []
-            : [
-                { icon: 'location', onPress: recenterOnUser },
-              ]
-        }
+            : [{ icon: 'location', onPress: recenterOnUser }]),
+          ...(todaySendsBtn ? [todaySendsBtn] : []),
+        ]}
         // Fix 5: fade the floating toolbar out when the sheet is at its
         // large detent — otherwise it would overlap the sheet header.
         hidden={topBarHidden}
-        belowRight={<TodaySendsButton onPressBefore={dismissCragSheet} />}
       />
 
       {/* TrueSheet with shared sheet state */}
