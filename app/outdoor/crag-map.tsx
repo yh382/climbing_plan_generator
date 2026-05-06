@@ -2,6 +2,14 @@
 // Layer 2: Crag Map — map + multi-level zoom pins + TrueSheet with routes.
 // Uses the shared MapTopBar / MapSearchBar / useMapSheetState primitives so
 // visual + interaction behavior is identical to gyms-map.
+//
+// ⚠️ CN-ONLY (Amap): Overseas users are redirected to `/map` →
+//   `src/features/mapscreen/MapScreenMapbox.tsx` (the unified Mapbox
+//   screen) on mount. Any feature work touching outdoor map UX MUST land
+//   in MapScreenMapbox FIRST; this file is kept in lock-step as the CN
+//   counterpart only because Amap has no adapter for the unified screen
+//   yet. Don't iterate here without mirroring the change there, or CN
+//   and overseas users will diverge.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,7 +22,7 @@ import MapboxGL from '@rnmapbox/maps';
 import type { MapState } from '@rnmapbox/maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -25,6 +33,7 @@ import { isCN } from '../../src/lib/region';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import { outdoorListsApi } from '../../src/features/outdoor/listsApi';
 import type { Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
+import TodaySendsButton from '../../src/features/dailysummary/TodaySendsButton';
 import MapPinCluster from '../../src/features/outdoor/components/MapPinCluster';
 import WallGroup from '../../src/features/outdoor/components/WallGroup';
 import RouteListCard from '../../src/features/outdoor/components/RouteListCard';
@@ -439,6 +448,21 @@ export default function CragMapPage() {
     });
   }, [router, areaId, area]);
 
+  const topBarHidden = sheet.currentDetentIndex === DETENT_LARGE || pinPickMode;
+  // B1 — dismiss + re-present mirrors MapScreenMapbox; see that file for
+  // the iOS modal-sheet rationale. CN-only file kept in lock-step.
+  const dismissCragSheet = useCallback(() => {
+    sheet.sheetRef.current?.dismiss().catch(() => {});
+  }, [sheet]);
+  useFocusEffect(
+    useCallback(() => {
+      const id = requestAnimationFrame(() => {
+        sheet.sheetRef.current?.present(DETENT_MEDIUM).catch(() => {});
+      });
+      return () => cancelAnimationFrame(id);
+    }, [sheet]),
+  );
+
   // CN top-bar is deliberately minimal — Amap SDK (not integrated here)
   // would differ enough from Mapbox's style/3D toggles that shipping them
   // for CN is low-ROI. The one control that maps cleanly: recenter on the
@@ -630,7 +654,8 @@ export default function CragMapPage() {
         }
         // Fix 5: fade the floating toolbar out when the sheet is at its
         // large detent — otherwise it would overlap the sheet header.
-        hidden={sheet.currentDetentIndex === DETENT_LARGE || pinPickMode}
+        hidden={topBarHidden}
+        belowRight={<TodaySendsButton onPressBefore={dismissCragSheet} />}
       />
 
       {/* TrueSheet with shared sheet state */}

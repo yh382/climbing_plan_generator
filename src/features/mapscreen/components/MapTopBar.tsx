@@ -56,6 +56,8 @@ interface MapTopBarProps {
   /** When true, fade the top bar out of view (e.g. when the parent sheet
    *  expands to a detent that would overlap with the bar). */
   hidden?: boolean;
+  /** Extra node rendered in the right column below the fused right pill. */
+  belowRight?: React.ReactNode;
 }
 
 const BTN_SIZE = 44;
@@ -120,7 +122,7 @@ const LEFT_BTN = [
   GLASS_CIRCLE,
 ] as const;
 
-export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidden }: MapTopBarProps) {
+export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidden, belowRight }: MapTopBarProps) {
   const insets = useSafeAreaInsets();
   const RIGHT_BTN = rightButtonModifiers(unionId);
   const visibleRight = rightButtons.filter((b) => b.visible !== false);
@@ -268,6 +270,28 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
             </GlassBackdrop>
           )}
         </View>
+
+        {/* B1 — `belowRight` is rendered as an ABSOLUTE overlay, NOT as a
+            sibling inside the right `sideWrap` View. Reason: any RN View
+            placed as a sibling to the SwiftUI Host that hosts the
+            glass-union'd right pill silently breaks the SwiftUI
+            @Namespace registration for `glassEffectUnion`, which causes
+            the fused capsule to fall apart into 3 disconnected buttons
+            (verified by binary-bisecting B1 regression). Lifting it
+            outside sideWrap preserves the union; absolute positioning
+            (top = visibleRight.length * BTN_SIZE + 8) keeps it visually
+            below the right pill regardless of how many buttons render. */}
+        {belowRight ? (
+          <View
+            style={[
+              styles.belowRightAbsolute,
+              { top: visibleRight.length * BTN_SIZE + 8 },
+            ]}
+            pointerEvents="box-none"
+          >
+            {belowRight}
+          </View>
+        ) : null}
       </Animated.View>
     </>
   );
@@ -300,5 +324,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     top: 0,
     zIndex: 49,
+  },
+  // Absolute-positioned outside sideWrap so it isn't an RN sibling to
+  // the SwiftUI Host (see B1 binary-bisect comment in render).
+  belowRightAbsolute: {
+    position: "absolute",
+    right: 0,
+    width: BTN_SIZE,
+    alignItems: "center",
   },
 });

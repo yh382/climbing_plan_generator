@@ -258,17 +258,13 @@ export default function Journal() {
       })(); // 不 await
     }
 
-    // 立即导航
+    // 立即导航 — DAILY_GROUP 之后所有 session-end 路径都落到 daily-summary;
+    // /library/log-detail 仍存在但只是 thin redirect。
     if (newSession) {
       router.replace({
-        pathname: "/library/log-detail",
-        params: {
-          date: newSession.date,
-          origin: "end_log",
-          gymName: newSession.gymName ?? activeSession?.gymName ?? "",
-          sessionKey: newSession.sessionKey,
-        },
-      });
+        pathname: "/daily-summary",
+        params: { date: newSession.date },
+      } as any);
     }
   }, [endSession, activeSession, todayKey, router]);
 

@@ -29,7 +29,7 @@ import type { MapState } from '@rnmapbox/maps';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -38,6 +38,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
 import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
 import MapSessionPill from '../journal/MapSessionPill';
+import TodaySendsButton from '../dailysummary/TodaySendsButton';
 
 import { useGymsStore } from '../../store/useGymsStore';
 import AreaMenuSheet, { type AreaMenuSheetHandle } from './components/AreaMenuSheet';
@@ -891,6 +892,30 @@ export default function MapScreenMapbox({
   // Area/list mode used to host community + 3-dot menu; those migrated to
   // the sheet header (community) and profile sheet (add route / reports /
   // offline / share).
+  // B1 — dismiss the persistent primary sheet before TodaySendsButton
+  // pushes /daily-summary. iOS UISheetPresentationController is presented
+  // modally on this screen's view controller; pushing a new screen via
+  // the navigation stack happens UNDER the sheet, so the new screen would
+  // appear masked unless the sheet is dismissed first. Fire-and-forget so
+  // dismiss animation runs in parallel with the push transition.
+  const dismissPrimarySheet = useCallback(() => {
+    sheet.sheetRef.current?.dismiss().catch(() => {});
+  }, [sheet]);
+
+  // B1 — re-present the primary sheet when the screen regains focus
+  // (e.g. after popping /daily-summary back). useMapSheetState's auto-
+  // present only fires once on mount; without this, dismissed sheets
+  // stay gone. Idempotent — TrueSheet.present() no-ops if already
+  // presented, so this also safely covers nav paths that didn't dismiss.
+  useFocusEffect(
+    useCallback(() => {
+      const id = requestAnimationFrame(() => {
+        sheet.sheetRef.current?.present(DETENT_MEDIUM).catch(() => {});
+      });
+      return () => cancelAnimationFrame(id);
+    }, [sheet]),
+  );
+
   const topBar = (
     <MapTopBar
       unionId="map-pill"
@@ -900,6 +925,7 @@ export default function MapScreenMapbox({
       }}
       rightButtons={mapViewControlButtons}
       hidden={anySheetFull || pinPickMode}
+      belowRight={<TodaySendsButton onPressBefore={dismissPrimarySheet} />}
     />
   );
 
