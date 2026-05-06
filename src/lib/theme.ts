@@ -33,6 +33,8 @@ export const theme = {
     emptyBarColor: '#E5E7EB',
     borderTertiary: '#E5E7EB',
     trail: '#A08060',
+    // Window DAILY_GROUP — "Attempted" badge tint (no send yet on a route).
+    attempt: '#D97706',
   },
   typography: {
     hero: { fontSize: 33, fontWeight: '900' as const, letterSpacing: -1.5 },

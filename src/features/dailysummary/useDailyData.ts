@@ -16,9 +16,14 @@ import { useEffect, useMemo, useState } from "react";
 import useLogsStore, { type SessionEntry } from "../../store/useLogsStore";
 import { useUserStore } from "../../store/useUserStore";
 import { readDayList, readSessionList } from "../journal/loglist/storage";
-import type { LocalDayLogItem } from "../journal/loglist/types";
+import type {
+  AggregatedClimbItem,
+  AggregatedStyle,
+  LocalDayLogItem,
+} from "../journal/loglist/types";
 import type { SendStyle, Feel } from "../journal/loglist/types";
 import { computeDailyIntensity } from "../../services/stats/intensityCalculator";
+import { aggregateByRoute } from "../../lib/aggregateClimbItems";
 import { api } from "../../lib/apiClient";
 import { localDateString } from "../../lib/localDate";
 import { foldActiveSessionMinutes } from "./foldActiveSession";
@@ -26,6 +31,9 @@ import { foldActiveSessionMinutes } from "./foldActiveSession";
 export type SessionGroup = {
   session: SessionEntry;
   items: LocalDayLogItem[];
+  /** Window DAILY_GROUP — per-route aggregation of `items`. UI prefers this
+   *  to avoid duplicate "Redpoint · 1x" cards from multi-attempt logs. */
+  aggregatedItems: AggregatedClimbItem[];
   durationMin: number;
 };
 
@@ -53,6 +61,8 @@ export type DailyData = {
   activeSession: ActiveSessionInfo | null;
   sessions: SessionGroup[];
   quickLogs: LocalDayLogItem[];
+  /** Window DAILY_GROUP — per-route aggregation of `quickLogs`. */
+  aggregatedQuickLogs: AggregatedClimbItem[];
   kpis: DailyKpis;
   /** Per-grade aggregation for current day; fed directly to GradePyramid */
   gradePyramid: Array<{ grade: string; sends: number; attempts: number }>;
@@ -170,12 +180,14 @@ function aggregate(input: {
     sessionGroups.push({
       session: s,
       items: group,
+      aggregatedItems: aggregateByRoute(group),
       durationMin: parseDurationToMin(s.duration),
     });
   }
 
   // Quick logs = day-list items that aren't claimed by any session group.
   const quickLogs = dayItems.filter((it) => !usedItemIds.has(it.id));
+  const aggregatedQuickLogs = aggregateByRoute(quickLogs);
 
   // All items (for KPIs / grade pyramid): union of session groups + quick logs,
   // de-duplicated by id so a single log can't be double-counted.
@@ -233,6 +245,7 @@ function aggregate(input: {
     activeSession,
     sessions: sessionGroups,
     quickLogs,
+    aggregatedQuickLogs,
     kpis,
     gradePyramid,
     topsRatePct,
@@ -247,6 +260,7 @@ function emptyDailyData(meta: DailyMeta | null = null): DailyData {
     activeSession: null,
     sessions: [],
     quickLogs: [],
+    aggregatedQuickLogs: [],
     kpis: { sends: 0, attempts: 0, bestGrade: "—", timeOnWallMin: 0, quickLogCount: 0 },
     gradePyramid: [],
     topsRatePct: 0,
@@ -391,9 +405,31 @@ type PublicLogItem = {
   style_tags: string[] | null;
   attempts: number;
   route_name: string | null;
+  outdoor_route_id?: string | null;
+  gym_route_id?: string | null;
   note: string | null;
   media: any[] | null;
   visibility: string;
+  created_at: string;
+};
+
+/** Window DAILY_GROUP — backend-aggregated per-route fold. Optional so older
+ *  backend versions degrade gracefully (FE recomputes from raw logs). */
+type PublicAggregatedItem = {
+  route_key: string;
+  name: string;
+  grade: string;
+  wall_type: string;
+  attempts_total: number;
+  send_count: number;
+  style: AggregatedStyle;
+  feel: string | null;
+  note: string | null;
+  media: any[] | null;
+  outdoor_route_id: string | null;
+  gym_route_id: string | null;
+  latest_id: string;
+  raw_ids: string[];
   created_at: string;
 };
 
@@ -406,6 +442,7 @@ type PublicSessionItem = {
   visibility: string;
   summary: any | null;
   logs: PublicLogItem[];
+  aggregated?: PublicAggregatedItem[];
 };
 
 type PublicDailyResponse = {
@@ -415,6 +452,7 @@ type PublicDailyResponse = {
   date: string;
   sessions: PublicSessionItem[];
   quick_logs: PublicLogItem[];
+  aggregated_quick_logs?: PublicAggregatedItem[];
 };
 
 const SEND_RESULTS = new Set(["send", "flash", "onsight"]);
@@ -444,6 +482,31 @@ function mapLog(remote: PublicLogItem): LocalDayLogItem {
     attempts: remote.attempts,
     note: remote.note ?? undefined,
     media: undefined,
+    outdoor_route_id: remote.outdoor_route_id ?? null,
+    gym_route_id: remote.gym_route_id ?? null,
+    createdAt: new Date(remote.created_at).getTime(),
+  };
+}
+
+function mapAggregated(remote: PublicAggregatedItem): AggregatedClimbItem {
+  const wallType = remote.wall_type;
+  return {
+    routeKey: remote.route_key,
+    name: remote.name,
+    grade: remote.grade,
+    type: (wallType === "toprope" || wallType === "lead"
+      ? wallType
+      : "boulder") as LocalDayLogItem["type"],
+    attemptsTotal: remote.attempts_total,
+    sendCount: remote.send_count,
+    style: remote.style,
+    feel: (remote.feel ?? "solid") as Feel,
+    note: remote.note ?? undefined,
+    media: undefined,
+    outdoor_route_id: remote.outdoor_route_id,
+    gym_route_id: remote.gym_route_id,
+    latestId: remote.latest_id,
+    rawIds: remote.raw_ids,
     createdAt: new Date(remote.created_at).getTime(),
   };
 }
@@ -491,12 +554,20 @@ function transformResponse(res: PublicDailyResponse): {
   daySessions: SessionEntry[];
   sessionItemsByKey: Record<string, LocalDayLogItem[]>;
   dayItems: LocalDayLogItem[];
+  /** Backend-aggregated per-session arrays. Empty record when the backend
+   *  doesn't return the field — caller falls back to FE recomputation. */
+  aggregatedBySessionId: Record<string, AggregatedClimbItem[]>;
+  aggregatedQuickLogs: AggregatedClimbItem[] | null;
   meta: DailyMeta;
 } {
   const daySessions = res.sessions.map((s) => mapSession(s, res.date));
   const sessionItemsByKey: Record<string, LocalDayLogItem[]> = {};
+  const aggregatedBySessionId: Record<string, AggregatedClimbItem[]> = {};
   for (const s of res.sessions) {
     sessionItemsByKey[s.id] = s.logs.map(mapLog);
+    if (s.aggregated) {
+      aggregatedBySessionId[s.id] = s.aggregated.map(mapAggregated);
+    }
   }
   // dayItems = all logs (session + quick) for the day. Aggregator will
   // partition into sessions vs quick by usedItemIds; passing the full bag
@@ -507,6 +578,10 @@ function transformResponse(res: PublicDailyResponse): {
     daySessions,
     sessionItemsByKey,
     dayItems,
+    aggregatedBySessionId,
+    aggregatedQuickLogs: res.aggregated_quick_logs
+      ? res.aggregated_quick_logs.map(mapAggregated)
+      : null,
     meta: { userId: res.user_id, username: res.username, avatarUrl: res.avatar_url },
   };
 }
@@ -530,18 +605,34 @@ function useRemoteDailyData(
           `/users/${userId}/daily/${date}`,
         );
         if (cancelled) return;
-        const { daySessions, sessionItemsByKey, dayItems, meta } =
-          transformResponse(res);
-        setData(
-          aggregate({
-            date,
-            daySessions,
-            sessionItemsByKey,
-            dayItems,
-            activeSession: null,
-            meta,
-          }),
-        );
+        const {
+          daySessions,
+          sessionItemsByKey,
+          dayItems,
+          aggregatedBySessionId,
+          aggregatedQuickLogs,
+          meta,
+        } = transformResponse(res);
+        const base = aggregate({
+          date,
+          daySessions,
+          sessionItemsByKey,
+          dayItems,
+          activeSession: null,
+          meta,
+        });
+        // Prefer backend-aggregated arrays when present; otherwise the FE
+        // computed equivalents from `aggregate()` above are kept as-is.
+        const sessions = base.sessions.map((g) => {
+          const fromBackend = aggregatedBySessionId[g.session.id];
+          return fromBackend ? { ...g, aggregatedItems: fromBackend } : g;
+        });
+        setData({
+          ...base,
+          sessions,
+          aggregatedQuickLogs:
+            aggregatedQuickLogs ?? base.aggregatedQuickLogs,
+        });
       } catch (err) {
         if (cancelled) return;
         console.error("[useRemoteDailyData]", err);

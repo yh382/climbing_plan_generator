@@ -140,32 +140,33 @@ export default function DailySummaryScreen() {
               gymName={data.activeSession.gymName}
             />
           )}
-          {group.items.length > 0 ? (
-            group.items.map((item) => (
+          {group.aggregatedItems.length > 0 ? (
+            group.aggregatedItems.map((agg) => (
               <ClimbItemCard
-                key={item.id}
-                item={item}
+                key={agg.routeKey}
+                item={agg}
                 readOnly={!isSelf}
                 onPress={() => {
                   // INDOOR_A: catalog-bound logs jump to their detail page;
-                  // free-form logs keep the legacy /library/route-detail path.
-                  if (item.outdoor_route_id) {
+                  // free-form logs keep the legacy /library/route-detail
+                  // path, using `latestId` as the row id.
+                  if (agg.outdoor_route_id) {
                     router.push({
                       pathname: "/outdoor/outdoor-route-detail",
-                      params: { id: item.outdoor_route_id },
+                      params: { id: agg.outdoor_route_id },
                     });
                     return;
                   }
-                  if (item.gym_route_id) {
+                  if (agg.gym_route_id) {
                     router.push({
                       pathname: "/gym/route/[routeId]",
-                      params: { routeId: item.gym_route_id },
+                      params: { routeId: agg.gym_route_id },
                     });
                     return;
                   }
                   router.push({
                     pathname: "/library/route-detail",
-                    params: { date, itemId: item.id, type: item.type },
+                    params: { date, itemId: agg.latestId, type: agg.type },
                   });
                 }}
               />
@@ -177,36 +178,36 @@ export default function DailySummaryScreen() {
       );
       })}
 
-      {data.quickLogs.length > 0 && (
+      {data.aggregatedQuickLogs.length > 0 && (
         <View>
           <View style={styles.quickLogsHeader}>
             <View style={styles.rule} />
             <Text style={styles.quickLogsLabel}>{tr("快速记录", "Quick Logs")}</Text>
             <View style={styles.rule} />
           </View>
-          {data.quickLogs.map((item) => (
+          {data.aggregatedQuickLogs.map((agg) => (
             <ClimbItemCard
-              key={item.id}
-              item={item}
+              key={agg.routeKey}
+              item={agg}
               readOnly={!isSelf}
               onPress={() => {
-                if (item.outdoor_route_id) {
+                if (agg.outdoor_route_id) {
                   router.push({
                     pathname: "/outdoor/outdoor-route-detail",
-                    params: { id: item.outdoor_route_id },
+                    params: { id: agg.outdoor_route_id },
                   });
                   return;
                 }
-                if (item.gym_route_id) {
+                if (agg.gym_route_id) {
                   router.push({
                     pathname: "/gym/route/[routeId]",
-                    params: { routeId: item.gym_route_id },
+                    params: { routeId: agg.gym_route_id },
                   });
                   return;
                 }
                 router.push({
                   pathname: "/library/route-detail",
-                  params: { date, itemId: item.id, type: item.type },
+                  params: { date, itemId: agg.latestId, type: agg.type },
                 });
               }}
             />

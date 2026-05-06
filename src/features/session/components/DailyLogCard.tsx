@@ -1,4 +1,9 @@
 // src/features/session/components/DailyLogCard.tsx
+//
+// @deprecated Window DAILY_GROUP — superseded by `DailyGroupCard` (per-date
+// folding of multi-session days). Kept temporarily until dead-code-detector
+// confirms zero callers; remove in the next janitor pass.
+
 import { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +20,7 @@ interface Props {
   onPress: () => void;
 }
 
+/** @deprecated Use DailyGroupCard. */
 export default function DailyLogCard({ dateLabel, duration, attempts, sends, maxGrade, onPress }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);

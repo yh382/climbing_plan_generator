@@ -37,4 +37,5 @@ export const darkColors: ThemeColors = {
   emptyBarColor: '#38383A',
   borderTertiary: '#38383A',
   trail: '#C9A78A',
+  attempt: '#FFB95C',
 };

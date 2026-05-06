@@ -9,14 +9,15 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { subDays, parseISO, format, startOfMonth, subMonths } from "date-fns";
+import { subDays, format, startOfMonth, subMonths } from "date-fns";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../../lib/useThemeColors";
 import MonthCalendar from "./MonthCalendar";
 import ActivitySegmentBar from "./ActivitySegmentBar";
 import ActivitySubtitle from "./ActivitySubtitle";
-import DailyLogCard from "../session/components/DailyLogCard";
+import DailyGroupCard from "../dailysummary/DailyGroupCard";
+import { useDailyGroupSummaries } from "../dailysummary/useDailyGroupSummaries";
 import PreSessionModal from "../session/components/PreSessionModal";
 import ActiveSessionFloat from "../journal/ActiveSessionFloat";
 import StartLogPrompt, { showQuickLogComingSoonAlert } from "../journal/StartLogPrompt";
@@ -33,7 +34,7 @@ export default function SessionsSegment() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { sessions, startSession, activeSession, syncFromBackend, isSyncing } = useLogsStore();
+  const { startSession, activeSession, syncFromBackend, isSyncing } = useLogsStore();
   const { tr } = useSettings();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -93,23 +94,7 @@ export default function SessionsSegment() {
     }
   }, [timeFilter]);
 
-  const historyList = useMemo(() => {
-    if (!sessions || sessions.length === 0) return [];
-    return sessions
-      .filter((s: any) => new Date(s.date) >= filterDate)
-      .sort((a: any, b: any) => b.startTime.localeCompare(a.startTime))
-      .map((s: any) => ({
-        id: s.id,
-        dateLabel: format(parseISO(s.date), "EEE · M.dd"),
-        rawDate: s.date,
-        duration: s.duration,
-        attempts: typeof s.attempts === "number" ? s.attempts : 0,
-        sends: typeof s.sends === "number" ? s.sends : 0,
-        max: s.best || "—",
-        sessionKey: s.sessionKey || "",
-        discipline: s.discipline || "boulder",
-      }));
-  }, [sessions, filterDate]);
+  const dayGroups = useDailyGroupSummaries({ from: filterDate });
 
   const filterOptions: { key: TimeFilter; label: string }[] = [
     { key: "week", label: isZH ? "本周" : "This Week" },
@@ -168,18 +153,14 @@ export default function SessionsSegment() {
         </View>
       )}
 
-      {historyList.length > 0 ? (
+      {dayGroups.length > 0 ? (
         <View style={{ gap: 0 }}>
-          {historyList.map((log) => (
-            <DailyLogCard
-              key={log.id}
-              dateLabel={log.dateLabel}
-              duration={log.duration}
-              attempts={log.attempts}
-              sends={log.sends}
-              maxGrade={log.max}
+          {dayGroups.map((grp) => (
+            <DailyGroupCard
+              key={grp.date}
+              summary={grp}
               onPress={() => {
-                router.push({ pathname: "/daily-summary", params: { date: log.rawDate } } as any);
+                router.push({ pathname: "/daily-summary", params: { date: grp.date } } as any);
               }}
             />
           ))}

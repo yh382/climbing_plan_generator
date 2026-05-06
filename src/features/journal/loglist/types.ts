@@ -1,6 +1,13 @@
 export type SendStyle = "redpoint" | "onsight" | "flash";
 export type Feel = "soft" | "solid" | "hard";
 
+/** Style sentinel used by AggregatedClimbItem when a route has only attempts
+ *  and no sends — UI renders an "Attempted" variant. Never appears on raw
+ *  LocalDayLogItem (whose `style` is set even for attempt rows). */
+export type AggregatedStyle = SendStyle | "attempt";
+
+export type LogType = "boulder" | "toprope" | "lead";
+
 export type LogMedia = {
   id: string;
   type: "image" | "video";
@@ -11,7 +18,7 @@ export type LogMedia = {
 export type LocalDayLogItem = {
   id: string;
   date: string; // YYYY-MM-DD
-  type: "boulder" | "toprope" | "lead";
+  type: LogType;
   grade: string;
   name: string;
 
@@ -40,5 +47,34 @@ export type LocalDayLogItem = {
   outdoor_route_id?: string | null;
   gym_route_id?: string | null;
 
+  createdAt: number;
+};
+
+/** Per-route aggregation of `LocalDayLogItem[]` — multiple attempts and
+ *  sends on the same route collapse into one row. Produced by
+ *  `aggregateByRoute` and rendered by ClimbItemCard's aggregated path.
+ *
+ *  Both FE (`src/lib/aggregateClimbItems.ts`) and BE
+ *  (`services/aggregate_climbs.py`) implement the same algorithm; this
+ *  type matches the BE Pydantic schema `AggregatedClimbItem`. */
+export type AggregatedClimbItem = {
+  routeKey: string;
+  name: string;
+  grade: string;
+  type: LogType;
+  attemptsTotal: number;
+  sendCount: number;
+  /** "attempt" only when sendCount === 0; otherwise the best send style. */
+  style: AggregatedStyle;
+  feel: Feel;
+  note?: string;
+  media?: LogMedia[];
+  outdoor_route_id?: string | null;
+  gym_route_id?: string | null;
+  /** Latest underlying log's id — used to navigate back to a single log. */
+  latestId: string;
+  /** All raw LocalDayLogItem ids that were folded into this row. */
+  rawIds: string[];
+  /** Latest underlying log's createdAt (ms). Used for ordering. */
   createdAt: number;
 };
