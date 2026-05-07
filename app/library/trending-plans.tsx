@@ -4,7 +4,6 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator }
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { TRAINING_INTENTS, TrainingIntent } from "../../src/components/plancard";
 
 import { TrainingPlanCard } from "../../src/components/plancard";
@@ -74,7 +73,6 @@ export default function TrendingPlansScreen() {
           <ActivityIndicator size="large" color={colors.textPrimary} />
         </View>
       ) : (
-        <ScrollEdgeFallback>
         <FlatList
           data={data}
           keyExtractor={(p) => p.id}
@@ -109,7 +107,6 @@ export default function TrendingPlansScreen() {
             </View>
           }
         />
-        </ScrollEdgeFallback>
       )}
     </View>
   );

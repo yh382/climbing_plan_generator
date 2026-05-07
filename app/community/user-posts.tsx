@@ -26,8 +26,6 @@ import { useUserStore } from "@/store/useUserStore";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
 import type { FeedPost as FeedPostType } from "@/types/community";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 export default function UserPostsScreen() {
   const { userId, initialPostId } = useLocalSearchParams<{
     userId: string;
@@ -251,7 +249,6 @@ export default function UserPostsScreen() {
 
   return (
     <>
-      <ScrollEdgeFallback>
         <FlatList
           ref={listRef}
           style={{ flex: 1, backgroundColor: colors.background }}
@@ -272,7 +269,6 @@ export default function UserPostsScreen() {
             </View>
           }
         />
-      </ScrollEdgeFallback>
       <CommentSheet
         visible={!!commentPostId}
         onClose={() => {

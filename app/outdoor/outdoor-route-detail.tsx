@@ -23,7 +23,6 @@ import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
-import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
@@ -462,7 +461,6 @@ export default function OutdoorRouteDetailPage() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
-      <ScrollEdgeFallback>
       <ScrollView
         style={styles.container}
         contentInsetAdjustmentBehavior="never"
@@ -595,8 +593,6 @@ export default function OutdoorRouteDetailPage() {
           </View>
         </View>
       </ScrollView>
-      </ScrollEdgeFallback>
-
       {/* Send sheet (Item 10) */}
       <OutdoorSendSheet
         visible={sendSheetOpen}

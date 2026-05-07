@@ -116,9 +116,7 @@ export type CalendarDayRingProps = {
 
   // Caller computes from useThemeColors() + state, passes hex strings
   outerBaseColor: string;
-  outerCompletedColor: string;
   innerBaseColor: string;
-  innerCompletedColor: string;
   ringTrackColor: string;
   selectedBg: string;
   dayTextColor: string;
@@ -147,9 +145,7 @@ export function CalendarDayRing(props: CalendarDayRingProps) {
       isToday={props.isToday}
       isCurrentMonth={props.isCurrentMonth ?? true}
       outerBaseColor={props.outerBaseColor}
-      outerCompletedColor={props.outerCompletedColor}
       innerBaseColor={props.innerBaseColor}
-      innerCompletedColor={props.innerCompletedColor}
       ringTrackColor={props.ringTrackColor}
       selectedBg={props.selectedBg}
       dayTextColor={props.dayTextColor}

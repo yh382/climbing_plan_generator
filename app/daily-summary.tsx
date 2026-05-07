@@ -29,8 +29,6 @@ import SessionGroupHeader from "../src/features/dailysummary/SessionGroupHeader"
 import useSettingsStore from "../src/store/useSettingsStore";
 import { useUserStore } from "../src/store/useUserStore";
 import ClimbItemCard from "../src/components/shared/ClimbItemCard";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 function resolveDateParam(raw: string | string[] | undefined): string {
   const v = Array.isArray(raw) ? raw[0] : raw;
   if (!v || v === "today") return localDateString();
@@ -88,7 +86,6 @@ export default function DailySummaryScreen() {
     !!data.activeSession || data.sessions.length > 0 || data.quickLogs.length > 0;
 
   return (
-    <ScrollEdgeFallback>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
@@ -241,7 +238,6 @@ export default function DailySummaryScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
-    </ScrollEdgeFallback>
   );
 }
 

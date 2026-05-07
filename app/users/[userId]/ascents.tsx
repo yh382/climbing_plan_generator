@@ -28,7 +28,6 @@ import { useThemeColors } from "../../../src/lib/useThemeColors";
 import { useSettings } from "../../../src/contexts/SettingsContext";
 import { useUserStore } from "../../../src/store/useUserStore";
 import { HeaderButton } from "../../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import ClimbItemCard from "../../../src/components/shared/ClimbItemCard";
 import { useUserAscents } from "../../../src/features/profile/hooks/useUserAscents";
 import type {
@@ -222,7 +221,6 @@ export default function UserAscentsScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollEdgeFallback>
           <FlatList
             data={ascents}
             keyExtractor={(it) => it.routeKey}
@@ -241,7 +239,6 @@ export default function UserAscentsScreen() {
               ) : null
             }
           />
-        </ScrollEdgeFallback>
       )}
     </View>
   );

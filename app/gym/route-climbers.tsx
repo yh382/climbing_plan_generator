@@ -17,7 +17,6 @@ import { useThemeColors } from '../../src/lib/useThemeColors';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { theme } from '../../src/lib/theme';
 import { NativeSegmentedControl } from '../../src/components/ui/NativeSegmentedControl';
-import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
 import { gymsCatalogApi } from '../../src/features/gymsCatalog/api';
 import type {
   GymRoute,
@@ -69,7 +68,6 @@ export default function GymRouteClimbersPage() {
   return (
     <>
       <Stack.Screen options={{ title }} />
-      <ScrollEdgeFallback>
       <ScrollView
         style={styles.container}
         contentInsetAdjustmentBehavior="automatic"
@@ -103,7 +101,6 @@ export default function GymRouteClimbersPage() {
           ))
         )}
       </ScrollView>
-      </ScrollEdgeFallback>
     </>
   );
 }

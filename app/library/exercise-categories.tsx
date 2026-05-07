@@ -7,7 +7,6 @@ import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "@/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { NATIVE_HEADER_LARGE, withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { theme } from "@/lib/theme";
@@ -67,7 +66,6 @@ export default function ExerciseCategoriesScreen() {
   }, [ordered]);
 
   return (
-    <ScrollEdgeFallback>
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={s.scrollContent}
@@ -110,7 +108,6 @@ export default function ExerciseCategoriesScreen() {
         </View>
       ))}
     </ScrollView>
-    </ScrollEdgeFallback>
   );
 }
 

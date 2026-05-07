@@ -12,7 +12,6 @@ import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { HeaderButton } from "@/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { pickMediaFromLibrary } from "@/lib/mediaPicker";
 import {
   readDayList,
@@ -231,7 +230,6 @@ export default function EditLogMediaScreen() {
         }}
       />
 
-      <ScrollEdgeFallback>
       <FlatList
         data={mediaItems}
         keyExtractor={(m) => m.id}
@@ -262,7 +260,6 @@ export default function EditLogMediaScreen() {
           ) : null
         }
       />
-      </ScrollEdgeFallback>
     </View>
   );
 }

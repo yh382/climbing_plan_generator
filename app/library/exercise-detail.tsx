@@ -31,7 +31,6 @@ import type { ExerciseDetail } from "../../src/features/exercises/types";
 import { parseExerciseName } from "../../src/lib/exerciseUtils";
 import { useFavoriteIds } from "../../src/features/home/exercises/favoritesApi";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { GOAL_LABEL, LEVEL_LABEL } from "../../src/features/home/exercises/model/labels";
 
 type ExerciseContext = "custom" | "library" | "execution";
@@ -321,7 +320,6 @@ export default function ExerciseDetailScreen() {
         </Stack.Toolbar>
       )}
 
-      <ScrollEdgeFallback>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -487,8 +485,6 @@ export default function ExerciseDetailScreen() {
           </View>
         ) : null}
       </Animated.ScrollView>
-      </ScrollEdgeFallback>
-
       {/* Bottom CTA */}
       <View style={[s.bottomFloat, { paddingBottom: insets.bottom + 12 }]}>
         {context === "custom" ? (

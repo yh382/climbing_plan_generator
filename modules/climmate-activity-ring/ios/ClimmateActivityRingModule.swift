@@ -40,9 +40,7 @@ public class ClimmateActivityRingModule: Module {
             Prop("isCurrentMonth") { (v: CalendarDayRingView, x: Bool)  in v.isCurrentMonth = x }
 
             Prop("outerBaseColor")        { (v: CalendarDayRingView, x: String) in v.outerBaseColor = x }
-            Prop("outerCompletedColor")   { (v: CalendarDayRingView, x: String) in v.outerCompletedColor = x }
             Prop("innerBaseColor")        { (v: CalendarDayRingView, x: String) in v.innerBaseColor = x }
-            Prop("innerCompletedColor")   { (v: CalendarDayRingView, x: String) in v.innerCompletedColor = x }
             Prop("ringTrackColor")        { (v: CalendarDayRingView, x: String) in v.ringTrackColor = x }
             Prop("selectedBg")            { (v: CalendarDayRingView, x: String) in v.selectedBg = x }
             Prop("dayTextColor")          { (v: CalendarDayRingView, x: String) in v.dayTextColor = x }

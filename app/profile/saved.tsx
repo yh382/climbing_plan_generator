@@ -10,7 +10,6 @@ import { useCommunityStore } from "../../src/store/useCommunityStore";
 import { FeedPost as FeedPostType } from "../../src/types/community";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useSettings } from "src/contexts/SettingsContext";
 import type { ThemeColors } from "../../src/lib/theme";
 
@@ -57,7 +56,6 @@ export default function SavedPosts() {
           <ActivityIndicator size="small" color={colors.textSecondary} />
         </View>
       ) : (
-        <ScrollEdgeFallback>
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
@@ -84,7 +82,6 @@ export default function SavedPosts() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={posts.length === 0 ? { flex: 1 } : undefined}
         />
-        </ScrollEdgeFallback>
       )}
 
       <CommentSheet

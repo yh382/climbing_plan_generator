@@ -23,13 +23,7 @@ class CalendarDayRingView: ExpoView {
 
     // Caller-provided colors (all hex)
     @objc var outerBaseColor: String = "#A08060"        { didSet { updateView() } }
-    // B2-FU2 (2026-05-05): deprecated. Small ring now mirrors ActivityRingSwiftUI
-    // which uses a single accent color + darken/lighten gradient. JS prop kept
-    // for caller compatibility; remove next window after callers stop passing it.
-    @objc var outerCompletedColor: String = "#8B6914"   { didSet { updateView() } }
     @objc var innerBaseColor: String = "#306E6F"        { didSet { updateView() } }
-    // B2-FU2 (2026-05-05): deprecated. See outerCompletedColor.
-    @objc var innerCompletedColor: String = "#265858"   { didSet { updateView() } }
     @objc var ringTrackColor: String = "#E5E7EB"        { didSet { updateView() } }
     @objc var selectedBg: String = "#306E6F"            { didSet { updateView() } }
     @objc var dayTextColor: String = "#374151"          { didSet { updateView() } }
@@ -59,10 +53,7 @@ class CalendarDayRingView: ExpoView {
                 planProgress: planProgress,
                 isSelected: isSelected, isToday: isToday, isCurrentMonth: isCurrentMonth,
                 outerBase: Color(hex: outerBaseColor),
-                outerCompleted: Color(hex: outerCompletedColor),
                 innerBase: isSelected ? Color.white : Color(hex: innerBaseColor),
-                innerCompleted: isSelected ? Color.white.opacity(0.8)
-                                           : Color(hex: innerCompletedColor),
                 ringTrack: isSelected ? Color.white.opacity(0.25)
                                       : Color(hex: ringTrackColor),
                 selectedBg: Color(hex: selectedBg),
@@ -97,9 +88,7 @@ struct CalendarDayRingSwiftUI: View {
     let isCurrentMonth: Bool
 
     let outerBase: Color
-    let outerCompleted: Color
     let innerBase: Color
-    let innerCompleted: Color
     let ringTrack: Color
     let selectedBg: Color
     let dayTextColor: Color

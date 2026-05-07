@@ -6,7 +6,6 @@ import { communityApi } from "../../src/features/community/api";
 import type { BlockedUserOut } from "../../src/features/community/types";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useSettings } from "src/contexts/SettingsContext";
 import type { ThemeColors } from "../../src/lib/theme";
 
@@ -48,7 +47,6 @@ export default function BlockedUsers() {
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.textSecondary} />
       ) : (
-        <ScrollEdgeFallback>
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
@@ -72,7 +70,6 @@ export default function BlockedUsers() {
             </View>
           ))}
         </ScrollView>
-        </ScrollEdgeFallback>
       )}
     </View>
   );

@@ -18,8 +18,6 @@ import ConversationListSheet from "@/features/coachChat/components/ConversationL
 import TaskBar from "@/features/coachChat/components/TaskBar";
 import MessageBubble from "@/features/coachChat/components/MessageBubble";
 import ThinkingBubble from "@/features/coachChat/components/ThinkingBubble";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 const MODE_STARTER_PROMPTS: Record<Exclude<CoachMode, "none">, { zh: string; en: string }> = {
   plan: { zh: "帮我制定一个训练计划", en: "Help me create a training plan" },
   actions: { zh: "根据我的数据推荐训练动作", en: "Recommend exercises based on my data" },
@@ -242,7 +240,6 @@ export default function ClimmateScreen() {
       </Stack.Toolbar>
 
       {/* Messages ScrollView — always rendered */}
-      <ScrollEdgeFallback>
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
@@ -269,8 +266,6 @@ export default function ClimmateScreen() {
           ))}
           {showThinking && <ThinkingBubble />}
         </ScrollView>
-      </ScrollEdgeFallback>
-
       {/* Greeting — absolutely positioned with explicit height */}
       {showGreeting && !showThinking && !inputFocused && (
         <View

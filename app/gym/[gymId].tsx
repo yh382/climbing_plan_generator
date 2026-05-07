@@ -224,7 +224,7 @@ export default function GymMapScreen() {
             Fades to 0 when the sheet is fully expanded so the list
             isn't crowded. */}
         <Animated.View
-          style={[styles.topBar, { paddingTop: insets.top + 8 }, topBarStyle]}
+          style={[styles.topBar, { paddingTop: insets.top }, topBarStyle]}
           pointerEvents={isFullDetent ? 'none' : 'box-none'}
         >
           <View>
@@ -441,7 +441,9 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       // the right vertical pill (which is taller) grows downward —
       // mirrors MapTopBar.overlay's alignment.
       alignItems: 'flex-start',
-      paddingHorizontal: 12,
+      // 16pt + paddingTop:insets.top aligns the back button with the
+      // system nav-bar button (left edge 16pt, center Y at insets.top+22).
+      paddingHorizontal: 16,
       gap: 8,
     },
     peekContentRoot: {

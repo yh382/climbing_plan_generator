@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Image, TouchableOpacity,
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeSegmentedControl } from "../../src/components/ui/NativeSegmentedControl";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useSettings } from "src/contexts/SettingsContext";
 import type { ThemeColors } from "../../src/lib/theme";
@@ -24,7 +23,6 @@ export default function HelpCenter() {
   }, [navigation, lang]);
 
   return (
-    <ScrollEdgeFallback>
     <ScrollView
       style={styles.container}
       contentInsetAdjustmentBehavior="automatic"
@@ -107,7 +105,6 @@ export default function HelpCenter() {
         </View>
       )}
     </ScrollView>
-    </ScrollEdgeFallback>
   );
 }
 

@@ -46,8 +46,6 @@ import { recalcIntensityForDate } from "../src/services/stats/intensityCalculato
 import { withHeaderTheme } from "../src/lib/nativeHeaderOptions";
 import { HeaderButton } from "../src/components/ui/HeaderButton";
 import { useThemeColors } from "../src/lib/useThemeColors";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 // Live Activity
 import { updateLiveActivity } from "../src/lib/liveActivityBridge";
 
@@ -507,7 +505,6 @@ export default function Journal() {
         onMonthChange={() => {}}
       />
 
-      <ScrollEdgeFallback>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
@@ -560,8 +557,6 @@ export default function Journal() {
           </View>
         </View>
       </ScrollView>
-      </ScrollEdgeFallback>
-
       <LogSendModal
         visible={sendModalOpen}
         title={pendingGrade ? `${tr("记录", "Log")} ${labelOf(pendingGrade)}` : tr("记录", "Log")}

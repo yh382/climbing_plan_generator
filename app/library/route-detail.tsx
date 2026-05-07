@@ -22,7 +22,6 @@ import { format, parseISO } from "date-fns";
 
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
 import { getColorForGrade } from "../../lib/gradeColors";
 import { pickMediaFromLibrary } from "../../src/lib/mediaPicker";
 import { toFileUri, uploadLogMediaBatch } from "../../src/features/journal/api";
@@ -359,7 +358,6 @@ export default function RouteDetailScreen() {
     <>
       <Stack.Screen options={{ title: "Route Detail", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: "soft" }, headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} /> }} />
       <View style={s.container}>
-      <ScrollEdgeFallback>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Media section - starts at top of screen, extends behind status bar + nav bar */}
         <View style={[s.mediaContainer, { height: SCREEN_W * 1.2 }]}>
@@ -489,8 +487,6 @@ export default function RouteDetailScreen() {
         </View>
 
       </ScrollView>
-      </ScrollEdgeFallback>
-
       </View>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button

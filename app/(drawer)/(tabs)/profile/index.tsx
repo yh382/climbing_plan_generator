@@ -22,8 +22,6 @@ import { calculateKPIs } from "../../../../src/services/stats";
 
 import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../../src/components/shared/ProfileTabBar";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 const TABS = ["posts", "stats", "badges", "lists"] as const;
 
 // COMPAT 用白图标对抗 cover 图（iOS 17/18 没有 Liquid Glass 容器）；iOS 26
@@ -317,7 +315,6 @@ export default function ProfileScreen() {
   // --------------------- render ---------------------
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollEdgeFallback>
       <Animated.ScrollView
         ref={scrollRef}
         onScroll={scrollHandler}
@@ -388,8 +385,6 @@ export default function ProfileScreen() {
           </View>
         </PagerView>
       </Animated.ScrollView>
-      </ScrollEdgeFallback>
-
       {/* Native toolbar: settings + share menu.
           iOS 26 Liquid Glass renders these inside a translucent capsule;
           black SF Symbols read better against the glass than white.

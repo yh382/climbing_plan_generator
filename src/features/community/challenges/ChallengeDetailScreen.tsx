@@ -33,8 +33,6 @@ import { useUserStore } from "@/store/useUserStore";
 import ChallengeDetailsModal from "./ChallengeDetailsModal";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 const COVER_H = 280;
 const SIDE_PADDING = 12;
 
@@ -192,7 +190,6 @@ export default function ChallengeDetailScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <ScrollEdgeFallback>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -359,8 +356,6 @@ export default function ChallengeDetailScreen() {
           </View>
         )}
       </Animated.ScrollView>
-      </ScrollEdgeFallback>
-
       <ChallengeDetailsModal
         visible={detailsOpen}
         onClose={() => setDetailsOpen(false)}

@@ -19,7 +19,6 @@ import { useThemeColors } from '../../src/lib/useThemeColors';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { theme } from '../../src/lib/theme';
 import { NativeSegmentedControl } from '../../src/components/ui/NativeSegmentedControl';
-import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import type {
   OutdoorRoute,
@@ -70,7 +69,6 @@ export default function RouteClimbersPage() {
   return (
     <>
       <Stack.Screen options={{ title }} />
-      <ScrollEdgeFallback>
       <ScrollView
         style={styles.container}
         contentInsetAdjustmentBehavior="automatic"
@@ -104,7 +102,6 @@ export default function RouteClimbersPage() {
           ))
         )}
       </ScrollView>
-      </ScrollEdgeFallback>
     </>
   );
 }

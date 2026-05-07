@@ -15,8 +15,6 @@ import { HeaderButton } from '../../src/components/ui/HeaderButton';
 import { NativeSegmentedControl } from '../../src/components/ui/NativeSegmentedControl';
 import { theme } from '../../src/lib/theme';
 import { BetaSegment } from '../../src/features/outdoor/components/BetaSegment';
-import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
-
 // Mock data for community (backend will provide real data)
 type ActivityItem = {
   id: string;
@@ -74,7 +72,6 @@ export default function CragCommunityPage() {
           headerTitleStyle: { fontSize: 17 },
         }}
       />
-      <ScrollEdgeFallback>
       <ScrollView style={styles.container} contentInsetAdjustmentBehavior="automatic">
         <View style={styles.body}>
           <NativeSegmentedControl
@@ -93,7 +90,6 @@ export default function CragCommunityPage() {
           )}
         </View>
       </ScrollView>
-      </ScrollEdgeFallback>
     </>
   );
 }

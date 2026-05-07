@@ -213,7 +213,7 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
       )}
 
       <Animated.View
-        style={[styles.overlay, { top: insets.top + 8, opacity }]}
+        style={[styles.overlay, { top: insets.top, opacity }]}
         pointerEvents={hidden ? "none" : "box-none"}
       >
         {/* Left button */}
@@ -350,8 +350,12 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
 const styles = StyleSheet.create({
   overlay: {
     position: "absolute",
-    left: 12,
-    right: 12,
+    // 16pt + size=44 → button center X ≈ 38pt; matches the system nav-bar
+    // button left-edge inset so map mode's back button doesn't read as
+    // "lower + further left" when transitioning from a normal stack screen.
+    // top=insets.top puts the 44pt button center at +22 == iOS nav-bar center.
+    left: 16,
+    right: 16,
     zIndex: 50,
     flexDirection: "row",
     // flex-start: back button (left) stays anchored to the top when the

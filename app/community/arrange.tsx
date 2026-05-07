@@ -39,8 +39,6 @@ import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMNS = 3;
 const GAP = 8;
@@ -323,7 +321,6 @@ export default function ArrangeScreen() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <ScrollEdgeFallback>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           contentInsetAdjustmentBehavior="automatic"
@@ -348,7 +345,6 @@ export default function ArrangeScreen() {
             ))}
           </View>
         </ScrollView>
-      </ScrollEdgeFallback>
     </GestureHandlerRootView>
   );
 }

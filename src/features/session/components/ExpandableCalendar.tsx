@@ -122,9 +122,7 @@ export default function ExpandableCalendar({
     const isDark = colors.background === "#000000";
     return {
       outerBaseColor: "#A08060",
-      outerCompletedColor: "#8B6914",
       innerBaseColor: colors.accent,
-      innerCompletedColor: "#265858",
       ringTrackColor: isDark ? "#38383A" : "#E5E7EB",
       selectedBg: colors.accent,
       dayTextColor: isDark ? "#E5E7EB" : "#374151",

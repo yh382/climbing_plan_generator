@@ -9,12 +9,9 @@ import { useThemeColors } from "../../lib/useThemeColors";
 import AnalysisScreen from "../analysis/AnalysisScreen";
 import ActivitySegmentBar from "./ActivitySegmentBar";
 import ActivitySubtitle from "./ActivitySubtitle";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 export default function AnalysisSegment() {
   const colors = useThemeColors();
   return (
-    <ScrollEdgeFallback>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
@@ -25,6 +22,5 @@ export default function AnalysisSegment() {
       <ActivitySegmentBar />
       <AnalysisScreen embedded />
     </ScrollView>
-    </ScrollEdgeFallback>
   );
 }

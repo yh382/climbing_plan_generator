@@ -25,8 +25,6 @@ import { BetaCard } from '../../src/features/outdoor/components/BetaCard';
 import BetaPlayerSheet, {
   type BetaPlayerSheetHandle,
 } from '../../src/features/outdoor/components/BetaPlayerSheet';
-import { ScrollEdgeFallback } from '@/components/shared/ScrollEdgeFallback';
-
 const PAGE_SIZE = 20;
 
 export default function GymRouteBetaPage() {
@@ -174,7 +172,6 @@ export default function GymRouteBetaPage() {
             </View>
           </ScrollView>
         ) : (
-          <ScrollEdgeFallback>
           <FlatList
             data={betas}
             keyExtractor={(b) => b.id}
@@ -198,7 +195,6 @@ export default function GymRouteBetaPage() {
               ) : null
             }
           />
-          </ScrollEdgeFallback>
         )}
       </View>
       <BetaPlayerSheet

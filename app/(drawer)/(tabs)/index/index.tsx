@@ -27,8 +27,6 @@ import { outdoorApi } from "@/features/outdoor/api";
 import type { Area } from "@/features/outdoor/types";
 import AreaCard from "@/features/outdoor/components/AreaCard";
 import { mapHref, areaMapHref } from "@/features/mapscreen/navigation";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 // Derive banner data from blog source (auto-updates when blogs change)
 const BLOG_BANNERS: HomeBlogBannerItem[] = MOCK_BLOGS.slice(0, 3).map((blog) => ({
   id: blog.id,
@@ -257,7 +255,6 @@ export default function HomeScreen() {
         <Stack.Toolbar.Button icon="map" onPress={() => router.push(mapHref())} />
         <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search" as any)} />
       </Stack.Toolbar>
-      <ScrollEdgeFallback>
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.background }}
         contentInsetAdjustmentBehavior="automatic"
@@ -341,7 +338,6 @@ export default function HomeScreen() {
         {/* Challenges — dark skewed cards */}
       <ChallengesSection challenges={featuredChallenges} />
     </ScrollView>
-    </ScrollEdgeFallback>
     </>
   );
 }

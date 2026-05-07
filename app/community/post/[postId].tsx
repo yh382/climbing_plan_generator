@@ -24,8 +24,6 @@ import { useUserStore } from "@/store/useUserStore";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { theme } from "@/lib/theme";
 import type { FeedPost as FeedPostType } from "@/types/community";
-import { ScrollEdgeFallback } from "@/components/shared/ScrollEdgeFallback";
-
 export default function SinglePostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const router = useRouter();
@@ -81,7 +79,6 @@ export default function SinglePostScreen() {
   }, []);
 
   return (
-    <ScrollEdgeFallback>
     <ScrollView
       style={styles.container}
       contentInsetAdjustmentBehavior="automatic"
@@ -188,7 +185,6 @@ export default function SinglePostScreen() {
         />
       )}
     </ScrollView>
-    </ScrollEdgeFallback>
   );
 }
 
