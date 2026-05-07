@@ -2,8 +2,14 @@
 //
 // Window D1 — types for /users/{userId}/ascents (profile follower /
 // following → user ascents page).
+//
+// Window BA — wire-format types are now generated from
+// docs/openapi.json via openapi-typescript and re-exported here. The FE
+// camelCase domain type (`AggregatedClimbItem` in
+// `features/journal/loglist/types.ts`) is intentionally distinct: the
+// page-level normaliser maps wire → domain in `useUserAscents.mapItem`.
 
-import type { AggregatedClimbItem } from "../journal/loglist/types";
+import type { components } from "../../types/api";
 
 export type AscentsLocationFilter = "all" | "outdoor" | "gym";
 export type AscentsWallFilter = "all" | "boulder" | "rope";
@@ -19,32 +25,9 @@ export type AscentsFilter = {
   limit?: number;
 };
 
-/** Wire-shape of /users/{user_id}/ascents response.
- *
- *  ``ascents`` matches the backend Pydantic ``AggregatedClimbItem`` —
- *  snake_case keys, mirroring the FE ``AggregatedClimbItem`` after a
- *  per-field rename in the page-level normaliser.
- */
-export type UserAscentsApiItem = {
-  route_key: string;
-  name: string;
-  grade: string;
-  wall_type: string;
-  attempts_total: number;
-  send_count: number;
-  style: AggregatedClimbItem["style"];
-  feel: AggregatedClimbItem["feel"] | null;
-  note: string | null;
-  media: AggregatedClimbItem["media"] | null;
-  outdoor_route_id: string | null;
-  gym_route_id: string | null;
-  latest_id: string;
-  raw_ids: string[];
-  /** ISO 8601 (UTC). */
-  created_at: string;
-};
+/** Wire-shape of one item in /users/{user_id}/ascents response.
+ *  Generated from the BE Pydantic ``AggregatedClimbItem``. */
+export type UserAscentsApiItem = components["schemas"]["AggregatedClimbItem"];
 
-export type UserAscentsResponse = {
-  ascents: UserAscentsApiItem[];
-  next_cursor: string | null;
-};
+/** Wire-shape of /users/{user_id}/ascents response. */
+export type UserAscentsResponse = components["schemas"]["UserAscentsResponse"];

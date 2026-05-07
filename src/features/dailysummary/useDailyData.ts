@@ -18,10 +18,19 @@ import { useUserStore } from "../../store/useUserStore";
 import { readDayList, readSessionList } from "../journal/loglist/storage";
 import type {
   AggregatedClimbItem,
-  AggregatedStyle,
   LocalDayLogItem,
 } from "../journal/loglist/types";
 import type { SendStyle, Feel } from "../journal/loglist/types";
+import type { components } from "../../types/api";
+
+// Window BA — wire-format types come from openapi-typescript codegen.
+// FE camelCase domain types (e.g. `AggregatedClimbItem`) stay
+// hand-written; mapping happens in the `mapLog` / `mapAggregated`
+// helpers below.
+type PublicLogItem = components["schemas"]["PublicLogItem"];
+type PublicAggregatedItem = components["schemas"]["AggregatedClimbItem"];
+type PublicSessionItem = components["schemas"]["PublicSessionItem"];
+type PublicDailyResponse = components["schemas"]["PublicDailyOut"];
 import { computeDailyIntensity } from "../../services/stats/intensityCalculator";
 import { aggregateByRoute } from "../../lib/aggregateClimbItems";
 import { api } from "../../lib/apiClient";
@@ -391,69 +400,6 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
 }
 
 // ─── Remote (other-user) branch ────────────────────────────────────
-
-type PublicLogItem = {
-  id: string;
-  session_id: string | null;
-  date: string;
-  wall_type: string;
-  grade_system: string;
-  grade_text: string;
-  grade_score: number;
-  result: string;
-  feel: string | null;
-  style_tags: string[] | null;
-  attempts: number;
-  route_name: string | null;
-  outdoor_route_id?: string | null;
-  gym_route_id?: string | null;
-  note: string | null;
-  media: any[] | null;
-  visibility: string;
-  created_at: string;
-};
-
-/** Window DAILY_GROUP — backend-aggregated per-route fold. Optional so older
- *  backend versions degrade gracefully (FE recomputes from raw logs). */
-type PublicAggregatedItem = {
-  route_key: string;
-  name: string;
-  grade: string;
-  wall_type: string;
-  attempts_total: number;
-  send_count: number;
-  style: AggregatedStyle;
-  feel: string | null;
-  note: string | null;
-  media: any[] | null;
-  outdoor_route_id: string | null;
-  gym_route_id: string | null;
-  latest_id: string;
-  raw_ids: string[];
-  created_at: string;
-};
-
-type PublicSessionItem = {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  duration_minutes: number | null;
-  gym_name: string | null;
-  visibility: string;
-  summary: any | null;
-  logs: PublicLogItem[];
-  aggregated?: PublicAggregatedItem[];
-};
-
-type PublicDailyResponse = {
-  user_id: string;
-  username: string;
-  avatar_url: string | null;
-  date: string;
-  sessions: PublicSessionItem[];
-  quick_logs: PublicLogItem[];
-  aggregated_quick_logs?: PublicAggregatedItem[];
-};
 
 const SEND_RESULTS = new Set(["send", "flash", "onsight"]);
 

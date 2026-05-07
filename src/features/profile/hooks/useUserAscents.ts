@@ -112,7 +112,7 @@ export function useUserAscents(
       }
       return;
     }
-    cursorRef.current = res.next_cursor;
+    cursorRef.current = res.next_cursor ?? null;
     setState({
       ascents: res.ascents.map(mapItem),
       loading: false,
@@ -134,7 +134,7 @@ export function useUserAscents(
       }
       return;
     }
-    cursorRef.current = res.next_cursor;
+    cursorRef.current = res.next_cursor ?? null;
     setState({
       ascents: res.ascents.map(mapItem),
       loading: false,
@@ -155,7 +155,7 @@ export function useUserAscents(
       setState((s) => ({ ...s, loadingMore: false }));
       return;
     }
-    cursorRef.current = res.next_cursor;
+    cursorRef.current = res.next_cursor ?? null;
     setState((s) => ({
       ...s,
       ascents: [...s.ascents, ...res.ascents.map(mapItem)],

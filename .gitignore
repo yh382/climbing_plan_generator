@@ -42,3 +42,7 @@ app-example
 # Ignore native build directories (root only, not modules/)
 /ios/
 /android/
+
+# Window BA — synced from docs/contracts/ by scripts/sync-fe-contracts.sh.
+# Source of truth lives in docs/contracts/, never edit the synced copy.
+src/contracts/
