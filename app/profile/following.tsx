@@ -27,9 +27,6 @@ interface FollowUser {
   avatar_url: string | null;
   display_name?: string;
   is_following?: boolean;
-  /** Window D1 — see followers.tsx for shape. */
-  boulder_max?: string | null;
-  total_sends?: number;
 }
 
 export default function FollowingScreen() {
@@ -139,42 +136,28 @@ export default function FollowingScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: FollowUser }) => {
-    const sends = item.total_sends ?? 0;
-    const boulderText = item.boulder_max ?? "—";
-    const statsLine = `${boulderText} · ${sends} sends`;
-    return (
-      <TouchableOpacity
-        style={styles.row}
-        onPress={() =>
-          router.push({
-            pathname: "/users/[userId]/ascents",
-            params: {
-              userId: item.user_id,
-              username: item.display_name || item.username,
-            },
-          } as any)
-        }
-        activeOpacity={0.7}
-      >
-        {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={20} color={colors.textSecondary} />
-          </View>
-        )}
-        <View style={styles.info}>
-          <Text style={styles.username} numberOfLines={1}>
-            {item.display_name || item.username}
-          </Text>
-          <Text style={styles.handle} numberOfLines={1}>@{item.username}</Text>
-          <Text style={styles.stats} numberOfLines={1}>{statsLine}</Text>
+  const renderItem = ({ item }: { item: FollowUser }) => (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => router.push(`/community/u/${item.user_id}` as any)}
+      activeOpacity={0.7}
+    >
+      {item.avatar_url ? (
+        <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+          <Ionicons name="person" size={20} color={colors.textSecondary} />
         </View>
-        {renderButton(item)}
-      </TouchableOpacity>
-    );
-  };
+      )}
+      <View style={styles.info}>
+        <Text style={styles.username} numberOfLines={1}>
+          {item.display_name || item.username}
+        </Text>
+        <Text style={styles.handle} numberOfLines={1}>@{item.username}</Text>
+      </View>
+      {renderButton(item)}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -220,7 +203,6 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     info: { flex: 1, marginLeft: 12 },
     username: { fontSize: 15, fontWeight: "700", color: c.textPrimary },
     handle: { fontSize: 13, color: c.textSecondary, marginTop: 1 },
-    stats: { fontSize: 12, color: c.textTertiary, marginTop: 2, fontWeight: "500" },
     followBtn: {
       paddingHorizontal: 14,
       paddingVertical: 7,

@@ -103,16 +103,9 @@ export default function UserAscentsScreen() {
       headerLeft: () => (
         <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
       ),
-      headerRight: !isSelf && targetUserId
-        ? () => (
-            <HeaderButton
-              icon="person.crop.circle"
-              onPress={() => router.push(`/community/u/${targetUserId}` as any)}
-            />
-          )
-        : undefined,
+      headerRight: undefined,
     });
-  }, [navigation, router, tr, colors, resolvedUsername, isSelf, targetUserId]);
+  }, [navigation, router, tr, colors, resolvedUsername]);
 
   const handleSelectLocation = useCallback((index: number) => {
     setLocationType(LOCATION_OPTIONS[index] ?? "all");

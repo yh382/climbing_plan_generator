@@ -73,6 +73,11 @@ export interface ProfileHeaderProps {
   onMessagePress?: () => void;
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
+  /** Window D1 — tap on the Grade + Sends row jumps to the user's
+   *  historical ascents page. Both own profile and public profile pass
+   *  this so the entry point is symmetric. Omit to leave the row
+   *  non-tappable. */
+  onAscentsPress?: () => void;
   onYearInReviewPress?: () => void;
   headerTitleAnimStyle: any;
   topPadding?: number;
@@ -100,6 +105,7 @@ export default function ProfileHeader({
   onMessagePress,
   onFollowersPress,
   onFollowingPress,
+  onAscentsPress,
   onYearInReviewPress,
   headerTitleAnimStyle,
   scrollY,
@@ -230,17 +236,35 @@ export default function ProfileHeader({
 
           {/* Row 2: Grade | Sends + Action */}
           <View style={styles.statsEditRow}>
-            <View style={styles.statsRow}>
-              <View style={styles.statFieldItem}>
-                <Text style={styles.statFieldNum}>{gradeDisplay}</Text>
-                <Text style={styles.statFieldLabel}>Grade</Text>
+            {onAscentsPress ? (
+              <TouchableOpacity
+                style={styles.statsRow}
+                onPress={onAscentsPress}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statFieldItem}>
+                  <Text style={styles.statFieldNum}>{gradeDisplay}</Text>
+                  <Text style={styles.statFieldLabel}>Grade</Text>
+                </View>
+                <View style={styles.statFieldDivider} />
+                <View style={styles.statFieldItem}>
+                  <Text style={styles.statFieldNum}>{totalSends}</Text>
+                  <Text style={styles.statFieldLabel}>Sends</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.statsRow}>
+                <View style={styles.statFieldItem}>
+                  <Text style={styles.statFieldNum}>{gradeDisplay}</Text>
+                  <Text style={styles.statFieldLabel}>Grade</Text>
+                </View>
+                <View style={styles.statFieldDivider} />
+                <View style={styles.statFieldItem}>
+                  <Text style={styles.statFieldNum}>{totalSends}</Text>
+                  <Text style={styles.statFieldLabel}>Sends</Text>
+                </View>
               </View>
-              <View style={styles.statFieldDivider} />
-              <View style={styles.statFieldItem}>
-                <Text style={styles.statFieldNum}>{totalSends}</Text>
-                <Text style={styles.statFieldLabel}>Sends</Text>
-              </View>
-            </View>
+            )}
 
             {isOwnProfile ? (
               <TouchableOpacity

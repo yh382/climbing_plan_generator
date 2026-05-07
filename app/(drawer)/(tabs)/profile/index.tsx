@@ -345,6 +345,11 @@ export default function ProfileScreen() {
           onEditPress={() => router.push("/profile/edit")}
           onFollowersPress={() => router.push("/profile/followers" as any)}
           onFollowingPress={() => router.push("/profile/following" as any)}
+          onAscentsPress={
+            me?.id
+              ? () => router.push(`/users/${me.id}/ascents` as any)
+              : undefined
+          }
           headerTitleAnimStyle={{}}
           scrollY={scrollY}
         />

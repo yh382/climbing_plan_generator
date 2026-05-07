@@ -333,6 +333,7 @@ export default function PublicProfileScreen() {
           onMessagePress={handleMessage}
           onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
           onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
+          onAscentsPress={() => router.push(`/users/${id}/ascents` as any)}
           headerTitleAnimStyle={headerTitleAnimStyle}
           scrollY={scrollY}
         />
