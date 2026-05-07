@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import { setApiAuthToken, api } from "src/lib/apiClient";
+import { setSentryUserFromToken, clearSentryUser, addAuthBreadcrumb } from "src/lib/sentry";
 
 const ACCESS_TOKEN_KEY = "climmate_access_token";
 const REFRESH_TOKEN_KEY = "climmate_refresh_token";
@@ -35,6 +36,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       ]);
 
       setApiAuthToken(access ?? null);
+      setSentryUserFromToken(access ?? null);
       set({
         accessToken: access ?? null,
         refreshToken: refresh ?? null,
@@ -42,6 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } catch {
       setApiAuthToken(null);
+      clearSentryUser();
       set({ accessToken: null, refreshToken: null, isHydrating: false });
     }
   },
@@ -52,6 +55,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     }
     setApiAuthToken(accessToken);
+    setSentryUserFromToken(accessToken);
+    addAuthBreadcrumb("login");
     set({
       accessToken,
       refreshToken: typeof refreshToken === "string" ? refreshToken : null,
@@ -64,6 +69,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     ]);
     setApiAuthToken(null);
+    addAuthBreadcrumb("logout");
+    clearSentryUser();
     set({ accessToken: null, refreshToken: null });
   },
 
@@ -74,6 +81,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     ]);
     setApiAuthToken(null);
+    addAuthBreadcrumb("delete_account");
+    clearSentryUser();
     set({ accessToken: null, refreshToken: null });
   },
 
@@ -85,6 +94,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     if (access) {
       setApiAuthToken(access);
+      setSentryUserFromToken(access);
       set({ accessToken: access, refreshToken: refresh ?? null });
     }
   },

@@ -35,6 +35,7 @@ import {
   clearBackupSnapshot,
 } from "../features/journal/sync/localBackup";
 import { syncWidgetFromStore } from "../lib/widgetBridge";
+import { Sentry } from "../lib/sentry";
 import { startLiveActivity, updateLiveActivity, endLiveActivity } from "../lib/liveActivityBridge";
 import { localDateString, localDateStringFromMs } from "../lib/localDate";
 import { recalcIntensityForDate } from "../services/stats/intensityCalculator";
@@ -726,6 +727,12 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         const startTime = Date.now();
         const sessionKey = String(startTime);
         const localDate = keyOf(new Date(startTime)); // YYYY-MM-DD in user's local timezone
+        Sentry.addBreadcrumb({
+          category: "session",
+          message: "startSession",
+          level: "info",
+          data: { discipline, locationType, hasGymId: !!gymId },
+        });
         set({
           activeSession: {
             startTime,
@@ -788,6 +795,13 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
       endSession: async () => {
         const { activeSession, sessions, logs } = get();
         if (!activeSession) return null;
+
+        Sentry.addBreadcrumb({
+          category: "session",
+          message: "endSession",
+          level: "info",
+          data: { discipline: activeSession.discipline },
+        });
 
         const endTime = Date.now();
         const durationMs = endTime - activeSession.startTime;

@@ -17,6 +17,7 @@ import useLogsStore, { type LogType } from "../../../store/useLogsStore";
 import { localDateString } from "../../../lib/localDate";
 import { computeSessionStats } from "../../../services/sessionStats";
 import { pushLiveActivityStatsThrottled } from "../../../lib/liveActivityThrottle";
+import { Sentry } from "../../../lib/sentry";
 
 export type RouteKind = "outdoor" | "gym";
 
@@ -122,6 +123,12 @@ async function pushSessionStatsToLiveActivity(
 }
 
 export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> {
+  Sentry.addBreadcrumb({
+    category: "log",
+    message: "enqueueRouteSendLog",
+    level: "info",
+    data: { routeKind: input.routeKind, routeStyle: input.routeStyle },
+  });
   const today = localDateString(); // YYYY-MM-DD in user's LOCAL timezone
   const wallType = mapStyleToWallType(input.routeKind, input.routeStyle);
   const itemId = newId();
@@ -195,6 +202,12 @@ export async function enqueueRouteSendLog(input: RouteSendInput): Promise<void> 
  * no feel; sendCount=0 + attemptsTotal=1 in the local list.
  */
 export async function enqueueRouteAttemptLog(input: RouteAttemptInput): Promise<void> {
+  Sentry.addBreadcrumb({
+    category: "log",
+    message: "enqueueRouteAttemptLog",
+    level: "info",
+    data: { routeKind: input.routeKind, routeStyle: input.routeStyle },
+  });
   const today = localDateString(); // YYYY-MM-DD in user's LOCAL timezone
   const wallType = mapStyleToWallType(input.routeKind, input.routeStyle);
   const itemId = newId();

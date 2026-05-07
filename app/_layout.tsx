@@ -1,5 +1,11 @@
 // app/_layout.tsx
+// Initialize Sentry as early as possible so RN's red-box / unhandled-rejection
+// handlers are patched before any other module-level work (gesture-handler,
+// stores, font loaders) runs.
+import { initSentry, Sentry } from "../src/lib/sentry";
+initSentry();
 import "react-native-gesture-handler";
+
 import { useThemeColors } from "@/lib/useThemeColors";
 import React, { useEffect, useState, useCallback } from "react";
 import { AppState, View, StyleSheet, useColorScheme, Platform } from "react-native";
@@ -107,7 +113,7 @@ function RootStack() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
 
@@ -292,3 +298,7 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Sentry.wrap enables touch event breadcrumbs + auto-instrumentation. It also
+// installs an ErrorBoundary at the root so React tree crashes are captured.
+export default Sentry.wrap(RootLayout);

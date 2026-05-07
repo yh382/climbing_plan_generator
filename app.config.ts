@@ -58,6 +58,15 @@ const config: ExpoConfig = {
   },
 
   plugins: [
+    [
+      "@sentry/react-native/expo",
+      {
+        // Used by EAS Build to upload JS source maps so dashboard stack traces
+        // are readable. SENTRY_AUTH_TOKEN must be set as an EAS Secret.
+        organization: "climmate-studio-llc",
+        project: "climmate-rn",
+      },
+    ],
     "expo-font",
     "expo-router",
     "expo-location",

@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { notifyAuthExpired } from "src/lib/authEvents";
+import { addApiBreadcrumb, captureApiError } from "src/lib/sentry";
 
 
 const API_BASE =
@@ -96,8 +97,9 @@ async function request<T>(
     ...(options.headers || {}),
   };
 
+  const method = options.method || "GET";
   const res = await fetch(url, {
-    method: options.method || "GET",
+    method,
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -125,12 +127,21 @@ async function request<T>(
       notifyAuthExpired();
     }
 
-    throw new ApiError(
+    addApiBreadcrumb(method, path, res.status);
+    const apiErr = new ApiError(
       res.status,
       typeof detail === "string" ? detail : null,
       text
     );
+    // Only fan errors out to Sentry for server-side / network anomalies.
+    // 4xx is generally expected client behaviour and would just be noise.
+    if (res.status >= 500) {
+      captureApiError(apiErr, { method, url: path, status: res.status });
+    }
+    throw apiErr;
   }
+
+  addApiBreadcrumb(method, path, res.status);
 
   // Handle empty-body success responses (e.g. 204 No Content from DELETE
   // endpoints). Without this, res.json() throws "JSON Parse error: Unexpected
