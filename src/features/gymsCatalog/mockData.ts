@@ -1,6 +1,12 @@
-// Mock indoor gym + 60 active routes + 4 archived. Used when
-// EXPO_PUBLIC_MOCK_GYM_CATALOG=1 so the frontend can be developed
-// without seeded backend data.
+// Mock indoor gym + 60 active routes + 4 archived.
+//
+// ⚠️ Window D1-FU (2026-05-06): the same payload now ships in BE via
+// alembic migration `d1fu_seed_demo_gym_catalog` (uuid5-deterministic
+// IDs), and `EXPO_PUBLIC_MOCK_GYM_CATALOG` defaults to 0. This file is
+// retained as a dev escape hatch only — set the flag to "1" if BE is
+// unreachable and you need to bring up gym pages without a backend.
+// Note that mock UUIDs here (`gr-ws-east-000` etc.) are NOT valid
+// PG UUIDs, so any logs created in mock mode never round-trip to BE.
 //
 // Generator is procedural so changing wall/grade distribution is one
 // config edit, not a 60-line patch.

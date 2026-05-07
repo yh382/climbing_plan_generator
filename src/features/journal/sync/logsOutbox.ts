@@ -142,13 +142,34 @@ export async function flushLogsOutbox(opts: {
         status !== null ? `${status} ${msg}` : msg,
       );
 
+      // D1-FU: surface mock-mode orphan IDs explicitly. Logs created
+      // before EXPO_PUBLIC_MOCK_GYM_CATALOG flipped to 0 carry mock
+      // route IDs (e.g. `gr-ws-east-000`) that aren't valid PG UUIDs,
+      // so the BE 422-rejects them. Tagging the warning helps users
+      // recognize "old mock-mode logs not syncing" without grepping.
       if (ev.type === "create") {
+        const gymRouteId = ev.payload?.gym_route_id;
+        const outdoorRouteId = ev.payload?.outdoor_route_id;
+        if (gymRouteId && !/^[0-9a-f-]{36}$/i.test(String(gymRouteId))) {
+          console.warn(
+            `[indoor-mock] gym_route_id=${gymRouteId} is not a valid UUID ` +
+              `(legacy mock-mode log); BE will not accept it.`,
+          );
+        }
+        // outdoor parity — same diagnostic for accidental string IDs.
+        if (outdoorRouteId && !/^[0-9a-f-]{36}$/i.test(String(outdoorRouteId))) {
+          console.warn(
+            `[outdoor-mock] outdoor_route_id=${outdoorRouteId} is not a valid UUID.`,
+          );
+        }
+
         // 4xx → client-side error, retry will never succeed. Drop the event
         // to prevent the outbox from wedging forever. Examples:
         //   - 409 Conflict: row already exists
         //   - 404 Session not found: stale _sessionKey pointing to a deleted
         //     session (outbox event outlived its session)
-        //   - 400 Bad Request: malformed payload (e.g. unknown grade)
+        //   - 400/422 Bad Request: malformed payload (e.g. unknown grade,
+        //     non-UUID gym_route_id from legacy mock mode)
         // 5xx → treat as transient and keep in queue.
         if (status !== null && status >= 400 && status < 500) continue;
         if (msg.includes("409")) continue; // legacy string-match fallback

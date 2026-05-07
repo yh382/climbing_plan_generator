@@ -3,13 +3,18 @@ import { Alert, Linking, Platform, useColorScheme } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 
-import { Host, Form, Section, Button, Picker, Text, LabeledContent, Label, HStack, ZStack, Spacer, Image } from "@expo/ui/swift-ui";
-import { pickerStyle, tag, frame, buttonStyle, background, shapes, font, foregroundStyle, scrollContentBackground } from "@expo/ui/swift-ui/modifiers";
+import { Host, Form, Section, Picker, Text, LabeledContent, Label, ZStack, Image } from "@expo/ui/swift-ui";
+import { pickerStyle, tag, frame, background, shapes, font, foregroundStyle, scrollContentBackground } from "@expo/ui/swift-ui/modifiers";
 
 import { useSettings } from "src/contexts/SettingsContext";
 import { useAuthStore } from "src/store/useAuthStore";
 import { useThemeColors } from "src/lib/useThemeColors";
-import { NATIVE_HEADER_LARGE, withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
+import {
+  HEADER_TRANSPARENT,
+  NATIVE_HEADER_LARGE,
+  withHeaderTheme,
+} from "../../src/lib/nativeHeaderOptions";
+import { SettingsRow } from "./_components/SettingsRow";
 
 // 类型定义
 type UnitSystem = "imperial" | "metric";
@@ -64,6 +69,11 @@ export default function Settings() {
       // settings/_layout.tsx for full rationale.
       headerLargeTitle: false,
       headerShown: true,
+      // Restore Liquid Glass / soft fade — COMPAT regression dropped
+      // these earlier and left a hard divider on iOS 26 (mirror of
+      // app/inbox/_layout.tsx).
+      headerTransparent: HEADER_TRANSPARENT,
+      scrollEdgeEffects: { top: "soft" },
       title: tr("设置", "Settings"),
     });
   }, [navigation, tr, colors]);
@@ -141,34 +151,35 @@ export default function Settings() {
         <Form modifiers={[scrollContentBackground("hidden"), background(isDark ? colors.background : colors.backgroundSecondary)]}>
           {/* Account */}
           <Section title={tr("账户", "Account")}>
-            <Button onPress={() => router.push("/settings/notifications" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="bell.fill" bg="#FF9500" />
-                <Text>{tr("通知", "Notifications")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/settings/privacy" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="hand.raised.fill" bg="#5856D6" />
-                <Text>{tr("隐私", "Privacy")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/change-password" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="key.fill" bg="#8E8E93" />
-                <Text>{tr("修改密码", "Change Password")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => Alert.alert(tr("提示", "Notice"), tr("该功能暂未开放", "This feature is coming soon."))} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="crown.fill" bg="#FFD60A" />
-                <Text>{tr("订阅计划", "Subscription Plan")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
+            <SettingsRow
+              icon="bell.fill"
+              iconBg="#FF9500"
+              label={tr("通知", "Notifications")}
+              onPress={() => router.push("/settings/notifications" as any)}
+            />
+            <SettingsRow
+              icon="hand.raised.fill"
+              iconBg="#5856D6"
+              label={tr("隐私", "Privacy")}
+              onPress={() => router.push("/settings/privacy" as any)}
+            />
+            <SettingsRow
+              icon="key.fill"
+              iconBg="#8E8E93"
+              label={tr("修改密码", "Change Password")}
+              onPress={() => router.push("/change-password" as any)}
+            />
+            <SettingsRow
+              icon="crown.fill"
+              iconBg="#FFD60A"
+              label={tr("订阅计划", "Subscription Plan")}
+              onPress={() =>
+                Alert.alert(
+                  tr("提示", "Notice"),
+                  tr("该功能暂未开放", "This feature is coming soon."),
+                )
+              }
+            />
           </Section>
 
           {/* Display */}
@@ -221,88 +232,82 @@ export default function Settings() {
 
           {/* Activity */}
           <Section title={tr("活动", "Activity")}>
-            <Button onPress={() => router.push("/profile/saved" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="bookmark.fill" bg="#007AFF" />
-                <Text>{tr("收藏", "Saved")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/profile/blocked" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="slash.circle.fill" bg="#FF3B30" />
-                <Text>{tr("已屏蔽", "Blocked")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/profile/comments" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="bubble.left.fill" bg="#34C759" />
-                <Text>{tr("评论", "Comments")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/profile/mentions" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="at" bg="#5856D6" />
-                <Text>{tr("提及", "Mentions")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => router.push("/profile/likes" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="heart.fill" bg="#FF2D55" />
-                <Text>{tr("点赞", "Likes")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
+            <SettingsRow
+              icon="bookmark.fill"
+              iconBg="#007AFF"
+              label={tr("收藏", "Saved")}
+              onPress={() => router.push("/profile/saved" as any)}
+            />
+            <SettingsRow
+              icon="slash.circle.fill"
+              iconBg="#FF3B30"
+              label={tr("已屏蔽", "Blocked")}
+              onPress={() => router.push("/profile/blocked" as any)}
+            />
+            <SettingsRow
+              icon="bubble.left.fill"
+              iconBg="#34C759"
+              label={tr("评论", "Comments")}
+              onPress={() => router.push("/profile/comments" as any)}
+            />
+            <SettingsRow
+              icon="at"
+              iconBg="#5856D6"
+              label={tr("提及", "Mentions")}
+              onPress={() => router.push("/profile/mentions" as any)}
+            />
+            <SettingsRow
+              icon="heart.fill"
+              iconBg="#FF2D55"
+              label={tr("点赞", "Likes")}
+              onPress={() => router.push("/profile/likes" as any)}
+            />
           </Section>
 
           {/* Misc */}
           <Section>
-            <Button onPress={() => router.push("/settings/help" as any)} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="questionmark.circle.fill" bg="#8E8E93" />
-                <Text>{tr("帮助", "Help")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
+            <SettingsRow
+              icon="questionmark.circle.fill"
+              iconBg="#8E8E93"
+              label={tr("帮助", "Help")}
+              onPress={() => router.push("/settings/help" as any)}
+            />
           </Section>
 
           {/* Legal */}
           <Section title={tr("法律", "Legal")}>
-            <Button onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/privacy")} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="doc.text.fill" bg="#8E8E93" />
-                <Text>{tr("隐私政策", "Privacy Policy")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={() => Linking.openURL("https://yh382.github.io/climmate-legal/terms")} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="doc.plaintext.fill" bg="#8E8E93" />
-                <Text>{tr("使用条款", "Terms of Service")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
+            <SettingsRow
+              icon="doc.text.fill"
+              iconBg="#8E8E93"
+              label={tr("隐私政策", "Privacy Policy")}
+              onPress={() =>
+                Linking.openURL("https://yh382.github.io/climmate-legal/privacy")
+              }
+            />
+            <SettingsRow
+              icon="doc.plaintext.fill"
+              iconBg="#8E8E93"
+              label={tr("使用条款", "Terms of Service")}
+              onPress={() =>
+                Linking.openURL("https://yh382.github.io/climmate-legal/terms")
+              }
+            />
           </Section>
 
           {/* Destructive actions */}
           <Section>
-            <Button onPress={handleLogout} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="rectangle.portrait.and.arrow.right" bg="#FF3B30" />
-                <Text>{tr("退出登录", "Logout")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
-            <Button onPress={handleDeleteAccount} modifiers={[buttonStyle("plain")]}>
-              <HStack spacing={12} alignment="center">
-                <SettingIcon name="trash.fill" bg="#FF3B30" />
-                <Text>{tr("删除账号", "Delete Account")}</Text>
-                <Spacer />
-              </HStack>
-            </Button>
+            <SettingsRow
+              icon="rectangle.portrait.and.arrow.right"
+              iconBg="#FF3B30"
+              label={tr("退出登录", "Logout")}
+              onPress={handleLogout}
+            />
+            <SettingsRow
+              icon="trash.fill"
+              iconBg="#FF3B30"
+              label={tr("删除账号", "Delete Account")}
+              onPress={handleDeleteAccount}
+            />
           </Section>
         </Form>
       </Host>

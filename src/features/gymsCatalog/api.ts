@@ -1,7 +1,9 @@
-// Indoor gym catalog API client (Window AR)
-// Mock-first: when EXPO_PUBLIC_MOCK_GYM_CATALOG=1 the dev build serves
-// fixture data without touching the backend, so the FE can iterate
-// before any indoor gym is seeded into prod Neon.
+// Indoor gym catalog API client (Window AR; D1-FU flipped to BE-first).
+// Default path hits the real backend — BE seed migration
+// `d1fu_seed_demo_gym_catalog` ships the demo gym + 60 routes.
+// Mock fallback is retained as a dev escape hatch:
+// `EXPO_PUBLIC_MOCK_GYM_CATALOG=1` forces local fixtures
+// (src/features/gymsCatalog/mockData.ts).
 
 import { api } from '../../lib/apiClient';
 import type { BetaCreateInput, BetaOut } from '../outdoor/betaApi';

@@ -8,7 +8,16 @@ export default function SettingsSubLayout() {
   const themed = withHeaderTheme(colors);
 
   return (
-    <Stack screenOptions={{ ...NATIVE_HEADER_BASE, ...themed }}>
+    <Stack
+      screenOptions={{
+        ...NATIVE_HEADER_BASE,
+        ...themed,
+        // D1-FU: hide back-button label on every sub-page so iOS shows
+        // just the `‹` chevron instead of "‹ Settings". Applies to
+        // notifications / privacy / help / change-password / etc.
+        headerBackTitle: "",
+      }}
+    >
       <Stack.Screen
         name="index"
         options={{
