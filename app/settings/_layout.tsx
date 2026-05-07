@@ -13,9 +13,12 @@ export default function SettingsSubLayout() {
         ...NATIVE_HEADER_BASE,
         ...themed,
         // D1-FU: hide back-button label on every sub-page so iOS shows
-        // just the `‹` chevron instead of "‹ Settings". Applies to
-        // notifications / privacy / help / change-password / etc.
+        // just the `‹` chevron instead of "‹ Settings". `headerBackTitle:
+        // ''` alone leaves the parent title visible on iOS native-stack
+        // — `headerBackButtonDisplayMode: 'minimal'` is the actual lever
+        // (mirror of app/gym/route-beta.tsx + outdoor/route-beta.tsx).
         headerBackTitle: "",
+        headerBackButtonDisplayMode: "minimal",
       }}
     >
       <Stack.Screen
