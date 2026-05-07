@@ -1,14 +1,18 @@
-import React, { useLayoutEffect } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { Alert, Linking, Platform, useColorScheme } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import * as Sharing from "expo-sharing";
 
 import { Host, Form, Section, Picker, Text, LabeledContent, Label, ZStack, Image } from "@expo/ui/swift-ui";
 import { pickerStyle, tag, frame, background, shapes, font, foregroundStyle, scrollContentBackground } from "@expo/ui/swift-ui/modifiers";
 
 import { useSettings } from "src/contexts/SettingsContext";
 import { useAuthStore } from "src/store/useAuthStore";
+import { useUserStore } from "src/store/useUserStore";
 import { useThemeColors } from "src/lib/useThemeColors";
+import { downloadAccountExport } from "src/features/account/api";
+import DeleteAccountModal from "src/features/account/components/DeleteAccountModal";
 import {
   HEADER_TRANSPARENT,
   NATIVE_HEADER_LARGE,
@@ -46,6 +50,10 @@ export default function Settings() {
   const isDark = useColorScheme() === "dark";
   const logout = useAuthStore((s) => s.logout);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
+  const username = useUserStore((s) => s.user?.username ?? "");
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const {
     ready,
@@ -99,44 +107,52 @@ export default function Settings() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      tr("删除账号", "Delete Account"),
-      tr(
-        "此操作不可撤销，你的所有数据（训练记录、帖子、消息等）将被永久删除。确定要继续吗？",
-        "This action cannot be undone. All your data (training logs, posts, messages, etc.) will be permanently deleted. Are you sure?"
-      ),
-      [
-        { text: tr("取消", "Cancel"), style: "cancel" },
-        {
-          text: tr("永久删除", "Delete Forever"),
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              tr("最终确认", "Final Confirmation"),
-              tr("请再次确认：删除后无法恢复。", "Please confirm again: this cannot be reversed."),
-              [
-                { text: tr("取消", "Cancel"), style: "cancel" },
-                {
-                  text: tr("确认删除", "Confirm Delete"),
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      await deleteAccount();
-                      router.replace("/login");
-                    } catch {
-                      Alert.alert(
-                        tr("错误", "Error"),
-                        tr("删除失败，请稍后重试。", "Failed to delete account. Please try again later.")
-                      );
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    if (!username) {
+      Alert.alert(
+        tr("错误", "Error"),
+        tr("用户信息加载中，请稍后重试。", "User info still loading, please try again."),
+      );
+      return;
+    }
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    await deleteAccount();
+    setDeleteModalOpen(false);
+    router.replace("/login");
+  };
+
+  const handleExportData = async () => {
+    if (exporting) return;
+    setExporting(true);
+    let exportUri: string | null = null;
+    try {
+      const { uri } = await downloadAccountExport();
+      exportUri = uri;
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        throw new Error(tr("无法分享文件", "Sharing unavailable"));
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/zip",
+        dialogTitle: tr("导出我的数据", "Export my data"),
+        UTI: "public.zip-archive",
+      });
+    } catch (e: any) {
+      Alert.alert(
+        tr("导出失败", "Export Failed"),
+        e?.message ?? tr("请稍后重试。", "Please try again later."),
+      );
+    } finally {
+      setExporting(false);
+      // Best-effort cache cleanup so the zip doesn't pile up if the user
+      // exports repeatedly. iOS may evict cacheDirectory anyway.
+      if (exportUri) {
+        const FileSystem = await import("expo-file-system/legacy");
+        FileSystem.deleteAsync(exportUri, { idempotent: true }).catch(() => {});
+      }
+    }
   };
 
   return (
@@ -294,6 +310,20 @@ export default function Settings() {
             />
           </Section>
 
+          {/* Data & Account */}
+          <Section title={tr("数据", "Data")}>
+            <SettingsRow
+              icon="square.and.arrow.down.fill"
+              iconBg="#34C759"
+              label={
+                exporting
+                  ? tr("正在导出…", "Exporting…")
+                  : tr("导出我的数据", "Export my data")
+              }
+              onPress={handleExportData}
+            />
+          </Section>
+
           {/* Destructive actions */}
           <Section>
             <SettingsRow
@@ -311,6 +341,14 @@ export default function Settings() {
           </Section>
         </Form>
       </Host>
+
+      <DeleteAccountModal
+        visible={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirmed={handleConfirmDelete}
+        username={username}
+        tr={tr}
+      />
     </>
   );
 }

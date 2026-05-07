@@ -95,7 +95,11 @@ export default function LoginScreen() {
           .filter(Boolean)
           .join(" ") || undefined;
 
-      const res = await authApi.appleSignIn(identityToken, fullName);
+      const res = await authApi.appleSignIn(
+        identityToken,
+        fullName,
+        credential.authorizationCode,
+      );
       if (!res?.access_token) throw new Error("Missing access_token");
 
       await (setToken as any)(res.access_token, res.refresh_token ?? null, true);

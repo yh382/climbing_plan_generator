@@ -8,6 +8,7 @@ import { Animated, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../../../lib/useThemeColors";
+import { useSettings } from "../../../contexts/SettingsContext";
 
 // Matches the NATIVE_TAB_BAR_HEIGHT constant used elsewhere in the app
 // (e.g. src/features/coachChat/components/Composer.tsx).
@@ -28,6 +29,7 @@ const FLOAT_PILL_RESERVED = 60 + 15;
 
 export default function ScrollToTopFab({ visible, onPress, elevated = false }: Props) {
   const colors = useThemeColors();
+  const { tr } = useSettings();
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -57,7 +59,7 @@ export default function ScrollToTopFab({ visible, onPress, elevated = false }: P
         style={[styles.button, { backgroundColor: colors.cardDark }]}
         activeOpacity={0.8}
         onPress={onPress}
-        accessibilityLabel="Scroll to top"
+        accessibilityLabel={tr("回到顶部", "Scroll to top")}
         accessibilityRole="button"
       >
         <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
