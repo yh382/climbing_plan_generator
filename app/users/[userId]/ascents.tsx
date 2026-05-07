@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { NativeSegmentedControl } from "../../../src/components/ui/NativeSegmentedControl";
 
 import {
@@ -46,6 +47,13 @@ export default function UserAscentsScreen() {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // iOS 26 floating header doesn't push content — pad the container by the
+  // rendered header height so filter row + list don't slip under the status
+  // bar. iOS<26 (HEADER_TRANSPARENT undefined) keeps the standard opaque
+  // header that already eats into screen space, so no padding needed.
+  const headerHeight = useHeaderHeight();
+  const headerPad = HEADER_TRANSPARENT ? headerHeight : 0;
 
   const targetUserId = Array.isArray(params.userId) ? params.userId[0] : params.userId;
   const initialUsername = Array.isArray(params.username)
@@ -152,7 +160,7 @@ export default function UserAscentsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: headerPad }]}>
       <View style={styles.filtersWrap}>
         <NativeSegmentedControl
           options={[
