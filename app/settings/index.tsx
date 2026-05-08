@@ -11,7 +11,7 @@ import { useSettings } from "src/contexts/SettingsContext";
 import { useAuthStore } from "src/store/useAuthStore";
 import { useUserStore } from "src/store/useUserStore";
 import { useThemeColors } from "src/lib/useThemeColors";
-import { downloadAccountExport } from "src/features/account/api";
+import { downloadAccountExport, resendVerification } from "src/features/account/api";
 import DeleteAccountModal from "src/features/account/components/DeleteAccountModal";
 import {
   HEADER_TRANSPARENT,
@@ -51,9 +51,11 @@ export default function Settings() {
   const logout = useAuthStore((s) => s.logout);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
   const username = useUserStore((s) => s.user?.username ?? "");
+  const emailVerified = useUserStore((s) => s.user?.email_verified ?? true);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   const {
     ready,
@@ -123,6 +125,38 @@ export default function Settings() {
     router.replace("/login");
   };
 
+  const handleResendVerification = async () => {
+    if (resendingVerification) return;
+    setResendingVerification(true);
+    try {
+      const result = await resendVerification();
+      if (result.ok) {
+        Alert.alert(
+          tr("验证邮件已发送", "Verification email sent"),
+          tr(
+            "请检查邮箱（包括垃圾邮件夹），点击链接完成验证。",
+            "Check your inbox (including spam) and tap the link to verify.",
+          ),
+        );
+      } else {
+        Alert.alert(
+          tr("请稍后再试", "Please wait a moment"),
+          tr(
+            `${result.retry_after_seconds} 秒后可再次发送。`,
+            `Try again in ${result.retry_after_seconds} seconds.`,
+          ),
+        );
+      }
+    } catch (e: any) {
+      Alert.alert(
+        tr("发送失败", "Send failed"),
+        e?.message ?? tr("请稍后重试。", "Please try again later."),
+      );
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   const handleExportData = async () => {
     if (exporting) return;
     setExporting(true);
@@ -167,6 +201,18 @@ export default function Settings() {
         <Form modifiers={[scrollContentBackground("hidden"), background(isDark ? colors.background : colors.backgroundSecondary)]}>
           {/* Account */}
           <Section title={tr("账户", "Account")}>
+            {!emailVerified && (
+              <SettingsRow
+                icon="envelope.badge.fill"
+                iconBg="#FF9500"
+                label={
+                  resendingVerification
+                    ? tr("发送中…", "Sending…")
+                    : tr("邮箱未验证 - 点击重发", "Email not verified — tap to resend")
+                }
+                onPress={handleResendVerification}
+              />
+            )}
             <SettingsRow
               icon="bell.fill"
               iconBg="#FF9500"

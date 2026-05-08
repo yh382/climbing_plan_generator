@@ -5,6 +5,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
+import { api, ApiError } from "src/lib/apiClient";
+
 const API_BASE =
   Constants.expoConfig?.extra?.API_BASE || process.env.EXPO_PUBLIC_API_BASE;
 const ACCESS_TOKEN_KEY = "climmate_access_token";
@@ -37,6 +39,31 @@ export async function downloadAccountExport(): Promise<ExportResult> {
     throw new Error(`Export failed (${res.status})`);
   }
   return { uri: res.uri, filename };
+}
+
+/**
+ * Re-issue a verify-email token + send via Resend.
+ *
+ * BE returns `{ ok: true }` on success or `{ ok: false, retry_after_seconds }`
+ * when the 60-second cooldown is in effect (so the FE can show "wait Ns"
+ * without retrying). 4xx is reserved for "already verified".
+ */
+export type ResendVerificationResult = {
+  ok: boolean;
+  retry_after_seconds: number;
+};
+
+export async function resendVerification(): Promise<ResendVerificationResult> {
+  try {
+    return await api.post<ResendVerificationResult>(
+      "/users/me/resend-verification",
+    );
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 400) {
+      throw new Error("Email already verified");
+    }
+    throw e;
+  }
 }
 
 /**
