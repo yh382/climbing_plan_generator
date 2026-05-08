@@ -136,7 +136,12 @@ async function request<T>(
     // Only fan errors out to Sentry for server-side / network anomalies.
     // 4xx is generally expected client behaviour and would just be noise.
     if (res.status >= 500) {
-      captureApiError(apiErr, { method, url: path, status: res.status });
+      captureApiError(apiErr, {
+        method,
+        url: path,
+        status: res.status,
+        backend_release: res.headers.get("x-backend-release") ?? null,
+      });
     }
     throw apiErr;
   }

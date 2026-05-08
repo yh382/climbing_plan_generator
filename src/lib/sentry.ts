@@ -152,7 +152,15 @@ export function addApiBreadcrumb(method: string, url: string, status: number): v
   });
 }
 
-export function captureApiError(err: unknown, ctx: { method: string; url: string; status: number }): void {
+export function captureApiError(
+  err: unknown,
+  ctx: {
+    method: string;
+    url: string;
+    status: number;
+    backend_release?: string | null;
+  },
+): void {
   if (!initialized) return;
   // Strip any free-form server response body off the error before capture so
   // it doesn't ride out as exception.value or originalException.body. Keep the
