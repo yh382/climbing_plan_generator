@@ -2,6 +2,19 @@
 import "dotenv/config";
 import type { ExpoConfig } from "expo/config";
 
+// Reverse-client-id URL scheme required by Google iOS OAuth so the Safari
+// redirect routes back into the app. Derived from the iOS OAuth client id —
+// configured as an EAS Secret + .env value (`EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID`).
+// Empty when the env var is missing (e.g. fresh clones); the Google button will
+// disable itself in that case rather than crash.
+const googleIosClientId = (process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID ?? "").trim();
+const googleReverseScheme = googleIosClientId
+  ? `com.googleusercontent.apps.${googleIosClientId.replace(
+      /\.apps\.googleusercontent\.com$/,
+      "",
+    )}`
+  : null;
+
 const config: ExpoConfig = {
   name: "climMate",
   slug: "climMate",
@@ -34,6 +47,13 @@ const config: ExpoConfig = {
       // Widget & Live Activity support
       NSSupportsLiveActivities: true,
       NSSupportsLiveActivitiesFrequentUpdates: true,
+
+      // Register Google's reverse-client-id URL scheme so the OAuth redirect
+      // dispatches back into the app. Only included when the client id env
+      // var is set (avoids an empty/dangling URL scheme on dev forks).
+      ...(googleReverseScheme && {
+        CFBundleURLTypes: [{ CFBundleURLSchemes: [googleReverseScheme] }],
+      }),
     },
 
   },

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { authApi } from "../api";
+import { useGoogleAuth } from "../useGoogleAuth";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -41,6 +42,9 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [googleRequest, googleResponse, promptGoogleAsync] = useGoogleAuth();
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   const usernameTrim = username.trim();
   const emailTrim = email.trim();
@@ -88,6 +92,54 @@ export default function SignupScreen() {
       Alert.alert(t("Apple Sign In failed"), e?.message ?? t("Unknown error"));
     }
   };
+
+  const onGoogleSignIn = async () => {
+    if (!googleRequest || googleBusy) return;
+    setGoogleBusy(true);
+    try {
+      await promptGoogleAsync();
+    } catch (e: any) {
+      Alert.alert(t("Google Sign In failed"), e?.message ?? t("Unknown error"));
+      setGoogleBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!googleResponse) return;
+    if (googleResponse.type !== "success") {
+      if (googleResponse.type === "error") {
+        Alert.alert(
+          t("Google Sign In failed"),
+          googleResponse.error?.message ?? t("Unknown error"),
+        );
+      }
+      setGoogleBusy(false);
+      return;
+    }
+    const idToken = googleResponse.params?.id_token;
+    if (!idToken) {
+      Alert.alert(t("Google Sign In failed"), t("Missing ID token"));
+      setGoogleBusy(false);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await authApi.googleSignIn(idToken);
+        if (!res?.access_token) throw new Error("Missing access_token");
+        await setToken(res.access_token, res.refresh_token ?? null);
+        router.replace("/(drawer)/(tabs)" as any);
+      } catch (e: any) {
+        const msg = e?.message ?? t("Unknown error");
+        const isConflict = msg.includes("already registered with");
+        Alert.alert(
+          isConflict ? t("Account exists") : t("Google Sign In failed"),
+          msg,
+        );
+      } finally {
+        setGoogleBusy(false);
+      }
+    })();
+  }, [googleResponse, router, setToken]);
 
   const onCreate = async () => {
     if (!canSubmit || loading) return;
@@ -222,6 +274,21 @@ export default function SignupScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* Google 按钮 */}
+        <TouchableOpacity
+          disabled={!googleRequest || googleBusy}
+          onPress={onGoogleSignIn}
+          style={[
+            styles.applePill,
+            { marginTop: 10, opacity: !googleRequest || googleBusy ? 0.5 : 1 },
+          ]}
+        >
+          <Ionicons name="logo-google" size={18} color={colors.textPrimary} />
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textPrimary }}>
+            {googleBusy ? t('Connecting...') : t('Sign up with Google')}
+          </Text>
+        </TouchableOpacity>
 
         {/* 登录入口 */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, marginBottom: 40 }}>

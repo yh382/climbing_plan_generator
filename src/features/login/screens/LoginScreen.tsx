@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { api } from "../../../lib/apiClient";
 import { authApi } from "../api";
+import { useGoogleAuth } from "../useGoogleAuth";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -50,6 +51,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // Google sign-in: hook returns a loaded request + the most recent prompt
+  // response. We disable the button until the request loads (avoids tapping
+  // before the OAuth URL is ready) and react to the response in a useEffect.
+  const [googleRequest, googleResponse, promptGoogleAsync] = useGoogleAuth();
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   const canSubmit = useMemo(
     () => email.trim().length > 0 && password.length > 0,
@@ -109,6 +116,63 @@ export default function LoginScreen() {
       Alert.alert(t("Apple Sign In failed"), e?.message ?? t("Unknown error"));
     }
   };
+
+  const onGoogleSignIn = async () => {
+    if (!googleRequest || googleBusy) return;
+    setGoogleBusy(true);
+    try {
+      // promptAsync handles cancellations internally; the actual response
+      // (success/cancel/error) is delivered via the `googleResponse` effect
+      // below, so this call is fire-and-forget aside from setting the busy
+      // flag for button affordance.
+      await promptGoogleAsync();
+    } catch (e: any) {
+      Alert.alert(t("Google Sign In failed"), e?.message ?? t("Unknown error"));
+      setGoogleBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!googleResponse) return;
+    if (googleResponse.type !== "success") {
+      // 'cancel' / 'dismiss' are user-initiated and shouldn't error.
+      // 'error' is rare (e.g. mis-configured client) — surface so we notice.
+      if (googleResponse.type === "error") {
+        Alert.alert(
+          t("Google Sign In failed"),
+          googleResponse.error?.message ?? t("Unknown error"),
+        );
+      }
+      setGoogleBusy(false);
+      return;
+    }
+    const idToken = googleResponse.params?.id_token;
+    if (!idToken) {
+      Alert.alert(t("Google Sign In failed"), t("Missing ID token"));
+      setGoogleBusy(false);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await authApi.googleSignIn(idToken);
+        if (!res?.access_token) throw new Error("Missing access_token");
+        await (setToken as any)(res.access_token, res.refresh_token ?? null, true);
+        router.replace("/(drawer)/(tabs)" as any);
+      } catch (e: any) {
+        const msg = e?.message ?? t("Unknown error");
+        // BE returns 400 with "Email already registered with X. Please sign
+        // in with that method." for cross-provider conflicts.
+        const isConflict = msg.includes("already registered with");
+        Alert.alert(
+          isConflict ? t("Account exists") : t("Google Sign In failed"),
+          msg,
+        );
+      } finally {
+        setGoogleBusy(false);
+      }
+    })();
+  }, [googleResponse, router, setToken]);
 
   const onForgot = () => {
     router.push("/(auth)/forgot-password");
@@ -226,6 +290,21 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* Google 按钮 — 与 Apple 同样的轮廓胶囊 + 多色 G 图标 */}
+        <TouchableOpacity
+          disabled={!googleRequest || googleBusy}
+          onPress={onGoogleSignIn}
+          style={[
+            styles.applePill,
+            { marginTop: 10, opacity: !googleRequest || googleBusy ? 0.5 : 1 },
+          ]}
+        >
+          <Ionicons name="logo-google" size={18} color={colors.textPrimary} />
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textPrimary }}>
+            {googleBusy ? t('Connecting...') : t('Continue with Google')}
+          </Text>
+        </TouchableOpacity>
 
         {/* 注册入口 */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>

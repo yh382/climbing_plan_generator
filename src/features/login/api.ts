@@ -26,4 +26,7 @@ export const authApi = {
       // server-side /auth/revoke at account deletion (Apple guideline).
       authorization_code: authorizationCode ?? undefined,
     }),
+
+  googleSignIn: (idToken: string) =>
+    api.post<AuthTokens>('/auth/google', { id_token: idToken }),
 };
