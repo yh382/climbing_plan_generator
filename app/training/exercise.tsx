@@ -16,10 +16,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 
 import ExerciseTimer from "../../src/features/session/components/ExerciseTimer";
-import LogWorkoutSheet from "../../src/features/session/components/LogWorkoutSheet";
 import { useI18N } from "../../lib/i18n";
 import type { PlanV3SessionItem } from "../../src/types/plan";
 import useActiveWorkoutStore from "../../src/store/useActiveWorkoutStore";
+import useSessionSheetHandoffStore from "../../src/store/useSessionSheetHandoffStore";
 import { exercisesApi } from "../../src/features/exercises/api";
 
 export default function ExerciseTrainingScreen() {
@@ -44,7 +44,9 @@ export default function ExerciseTrainingScreen() {
     return null;
   }, [params.sessionItem]);
 
-  const [showLogSheet, setShowLogSheet] = useState(false);
+  // LogWorkout moved to formSheet route — sheet-container-audit A1.
+  const workoutLoggedAt = useSessionSheetHandoffStore((s) => s.workoutLoggedAt);
+  const lastSeenLogAtRef = React.useRef(workoutLoggedAt);
   const [showInfo, setShowInfo] = useState(false);
   const [allDone, setAllDone] = useState(false);
   const [enrichedImage, setEnrichedImage] = useState<string | null>(null);
@@ -80,10 +82,14 @@ export default function ExerciseTrainingScreen() {
     router.dismiss(2);
   }, [exerciseIndex, sessionData, updateSessionData, router]);
 
-  const handleLogSave = useCallback((data: any) => {
-    setShowLogSheet(false);
-    markExerciseCompleted();
-  }, [markExerciseCompleted]);
+  // Pick up workout-logged signal from app/session-log-workout.tsx and
+  // mark the exercise completed. Ref-guard so we only react to new emissions.
+  useEffect(() => {
+    if (workoutLoggedAt && workoutLoggedAt !== lastSeenLogAtRef.current) {
+      lastSeenLogAtRef.current = workoutLoggedAt;
+      markExerciseCompleted();
+    }
+  }, [workoutLoggedAt, markExerciseCompleted]);
 
   if (!sessionItem) {
     return (
@@ -140,7 +146,7 @@ export default function ExerciseTrainingScreen() {
         {allDone ? (
           <TouchableOpacity
             style={styles.logBtnComplete}
-            onPress={() => setShowLogSheet(true)}
+            onPress={() => router.push(`/session-log-workout?exerciseName=${encodeURIComponent(exerciseName)}`)}
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark-circle" size={20} color="#FFF" />
@@ -151,7 +157,7 @@ export default function ExerciseTrainingScreen() {
         ) : (
           <TouchableOpacity
             style={styles.logBtnDefault}
-            onPress={() => setShowLogSheet(true)}
+            onPress={() => router.push(`/session-log-workout?exerciseName=${encodeURIComponent(exerciseName)}`)}
             activeOpacity={0.7}
           >
             <Ionicons name="clipboard-outline" size={18} color="#6B7280" />
@@ -206,14 +212,6 @@ export default function ExerciseTrainingScreen() {
         </Pressable>
       </Modal>
 
-      {/* Log Workout Sheet */}
-      <LogWorkoutSheet
-        visible={showLogSheet}
-        exerciseName={exerciseName}
-        onSave={handleLogSave}
-        onClose={() => setShowLogSheet(false)}
-        isZH={isZH}
-      />
     </View>
   );
 }

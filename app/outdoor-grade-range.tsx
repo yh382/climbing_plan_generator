@@ -1,73 +1,62 @@
-// src/features/outdoor/components/GradeRangeSheet.tsx
-// TrueSheet for picking a grade range (YDS + V-scale). Two-tap min/max selection.
+// app/outdoor-grade-range.tsx
+// Native iOS formSheet route for picking a YDS / V-scale grade range.
+// Migrated from src/features/outdoor/components/GradeRangeSheet.tsx
+// (sheet-container-audit A1). Two-tap min/max selection; writes result to
+// useOutdoorFiltersStore which the caller (RoutesSegment) subscribes to.
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TrueSheet } from "@lodev09/react-native-true-sheet";
-import { useThemeColors } from "../../../lib/useThemeColors";
-import { theme } from "../../../lib/theme";
-import { useSettings } from "../../../contexts/SettingsContext";
-
-export type GradeRange = {
-  min: string | null;
-  max: string | null;
-};
-
-type Props = {
-  visible: boolean;
-  onClose: () => void;
-  onApply: (range: GradeRange) => void;
-  initial: GradeRange;
-  /** "yds" for roped grades, "v" for boulder. If omitted, shows both lists. */
-  system?: "yds" | "v";
-};
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { theme } from "@/lib/theme";
+import { useSettings } from "@/contexts/SettingsContext";
+import useOutdoorFiltersStore from "@/store/useOutdoorFiltersStore";
 
 const YDS = [
-  "5.5","5.6","5.7","5.8","5.9",
-  "5.10a","5.10b","5.10c","5.10d",
-  "5.11a","5.11b","5.11c","5.11d",
-  "5.12a","5.12b","5.12c","5.12d",
-  "5.13a","5.13b","5.13c","5.13d",
-  "5.14a","5.14b","5.14c","5.14d",
-  "5.15a","5.15b","5.15c",
+  "5.5", "5.6", "5.7", "5.8", "5.9",
+  "5.10a", "5.10b", "5.10c", "5.10d",
+  "5.11a", "5.11b", "5.11c", "5.11d",
+  "5.12a", "5.12b", "5.12c", "5.12d",
+  "5.13a", "5.13b", "5.13c", "5.13d",
+  "5.14a", "5.14b", "5.14c", "5.14d",
+  "5.15a", "5.15b", "5.15c",
 ];
-const V = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10","V11","V12","V13","V14","V15","V16"];
+const V = ["V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16"];
 
-export default function GradeRangeSheet({ visible, onClose, onApply, initial, system }: Props) {
+export default function OutdoorGradeRangeRoute() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { tr } = useSettings();
+  const router = useRouter();
+  const navigation = useNavigation();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const sheetRef = useRef<TrueSheet>(null);
-  const isPresented = useRef(false);
+  useEffect(() => {
+    navigation.setOptions({ title: tr("难度范围", "Grade Range") });
+  }, [navigation, tr]);
+
+  const params = useLocalSearchParams<{ system?: "yds" | "v" }>();
+  const grades = params.system === "v" ? V : YDS;
+
+  const initial = useOutdoorFiltersStore((s) => s.gradeRange);
+  const setGradeRange = useOutdoorFiltersStore((s) => s.setGradeRange);
 
   const [minG, setMinG] = useState<string | null>(initial.min);
   const [maxG, setMaxG] = useState<string | null>(initial.max);
 
-  useEffect(() => {
-    if (visible && !isPresented.current) {
-      sheetRef.current?.present();
-      isPresented.current = true;
-      setMinG(initial.min);
-      setMaxG(initial.max);
-    } else if (!visible && isPresented.current) {
-      sheetRef.current?.dismiss();
-      isPresented.current = false;
-    }
-  }, [visible, initial]);
-
-  const grades = system === "v" ? V : YDS;
-
   const handlePick = (g: string) => {
-    // If no min → set min. If no max → set max (must be >= min). Else reset min.
     if (minG === null || (minG !== null && maxG !== null)) {
       setMinG(g);
       setMaxG(null);
       return;
     }
-    // minG set, maxG null
     const minIdx = grades.indexOf(minG);
     const gIdx = grades.indexOf(g);
     if (gIdx < minIdx) {
@@ -85,31 +74,23 @@ export default function GradeRangeSheet({ visible, onClose, onApply, initial, sy
   };
 
   const handleApply = () => {
-    onApply({ min: minG, max: maxG ?? minG });
-    onClose();
+    setGradeRange({ min: minG, max: maxG ?? minG });
+    router.back();
   };
 
   const handleClear = () => {
-    setMinG(null);
-    setMaxG(null);
-    onApply({ min: null, max: null });
-    onClose();
+    setGradeRange({ min: null, max: null });
+    router.back();
   };
 
   return (
-    <TrueSheet
-      ref={sheetRef}
-      detents={["auto"]}
-      backgroundColor={colors.sheetBackground}
-      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
-      dimmed
-      onDidDismiss={() => {
-        isPresented.current = false;
-        onClose();
-      }}
-    >
-      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: insets.bottom + 20 }}>
-        <Text style={styles.title}>{tr("难度范围", "Grade Range")}</Text>
+    <>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 20, paddingTop: 8 }}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.hint}>
           {minG === null
             ? tr("点击选择最低难度", "Tap to pick minimum")
@@ -118,7 +99,7 @@ export default function GradeRangeSheet({ visible, onClose, onApply, initial, sy
             : `${minG} — ${maxG}`}
         </Text>
 
-        <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={styles.gridWrap}>
+        <View style={styles.gridWrap}>
           {grades.map((g) => {
             const active = inRange(g);
             return (
@@ -132,14 +113,17 @@ export default function GradeRangeSheet({ visible, onClose, onApply, initial, sy
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: colors.sheetCardBackground }]} onPress={handleClear}>
+          <TouchableOpacity
+            style={[styles.footerBtn, { backgroundColor: colors.sheetCardBackground }]}
+            onPress={handleClear}
+          >
             <Text style={[styles.footerText, { color: colors.textPrimary }]}>{tr("清除", "Clear")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.footerBtn, { backgroundColor: colors.pillBackground }]}
+            style={[styles.footerBtn, { backgroundColor: colors.pillBackground, opacity: minG === null ? 0.5 : 1 }]}
             onPress={handleApply}
             disabled={minG === null}
           >
@@ -148,19 +132,13 @@ export default function GradeRangeSheet({ visible, onClose, onApply, initial, sy
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </TrueSheet>
+      </ScrollView>
+    </>
   );
 }
 
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    title: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 18,
-      color: c.textPrimary,
-      textAlign: "center",
-    },
     hint: {
       fontFamily: theme.fonts.regular,
       fontSize: 13,
@@ -187,7 +165,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 13,
       color: c.textPrimary,
     },
-    gridTextActive: { color: "#FFFFFF" },
+    gridTextActive: { color: c.pillText },
     footer: { flexDirection: "row", gap: 10, marginTop: 12 },
     footerBtn: {
       flex: 1,

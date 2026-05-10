@@ -1,8 +1,8 @@
 // src/features/analysis/TrainingVolumeChart.tsx
-import React, { useMemo, useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { useRouter } from "expo-router";
 import { TrainingVolumeChartNative } from "../../../modules/climmate-charts/src";
 import { useVolumeSlots, type LogType, type TimeRange } from "./useVolumeSlots";
 import { useThemeColors } from "../../lib/useThemeColors";
@@ -45,11 +45,11 @@ type TrainingVolumeChartComponentProps = {
 export default function TrainingVolumeChart({ isActive = true }: TrainingVolumeChartComponentProps = {}) {
   const colors = useThemeColors();
   const { tr } = useSettings();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [timeRange, setTimeRange] = useState<TimeRange>("W");
   const [selectedTypes, setSelectedTypes] = useState<LogType[]>(["boulder"]);
   const { logs } = useLogsStore();
-  const helpRef = useRef<TrueSheet>(null);
 
   const [intensityData, setIntensityData] = useState<DailyIntensityStore>({});
 
@@ -105,7 +105,7 @@ export default function TrainingVolumeChart({ isActive = true }: TrainingVolumeC
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity onPress={() => helpRef.current?.present()} style={styles.helpBtn}>
+          <TouchableOpacity onPress={() => router.push("/volume-help")} style={styles.helpBtn}>
             <Ionicons name="help-circle-outline" size={20} color={colors.chartLabel} />
           </TouchableOpacity>
         </View>
@@ -146,49 +146,6 @@ export default function TrainingVolumeChart({ isActive = true }: TrainingVolumeC
         </View>
       </View>
 
-      <TrueSheet
-        ref={helpRef}
-        detents={[0.4, 0.9]}
-        backgroundColor={colors.sheetBackground}
-        grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
-        dimmed
-        dimmedDetentIndex={0}
-      >
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetHeaderTitle}>{tr("训练量", "Training Volume")}</Text>
-        </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.sheetBody}>
-            <View>
-              <Text style={styles.sheetSectionTitle}>{tr("训练量柱状图", "Volume Bar Chart")}</Text>
-              <Text style={styles.sheetBodyText}>
-                {tr(
-                  "展示你每天/每周/每月的攀登次数，按难度等级分颜色堆叠。",
-                  "Shows your daily/weekly/monthly climb count, color-stacked by grade category."
-                )}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.sheetSectionTitle}>{tr("费劲程度（虚线, 0-1）", "Intensity (dashed line, 0-1)")}</Text>
-              <Text style={styles.sheetBodyText}>
-                {tr(
-                  `综合反映每次训练的费劲程度，基于：\n• 你对路线难度的主观感受（soft / solid / hard）\n• 每条路线的尝试次数\n• 完攀情况\n\n数值越接近 1 代表这次训练越费劲，越接近 0 代表越轻松。`,
-                  `Reflects how hard each session felt, based on:\n• Subjective feel per route (soft / solid / hard)\n• Number of attempts\n• Send success\n\nCloser to 1 = harder session, closer to 0 = easier.`
-                )}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.sheetSectionTitle}>{tr("怎么看？", "How to Read")}</Text>
-              <Text style={styles.sheetBodyText}>
-                {tr(
-                  "对比训练量和费劲程度的变化趋势，可以了解你的训练节奏是否合理。量大但不费劲说明积累充分，量小但费劲说明在挑战极限。",
-                  "Compare volume and intensity trends to gauge your training rhythm. High volume + low intensity = solid base building. Low volume + high intensity = pushing limits."
-                )}
-              </Text>
-            </View>
-          </View>
-        </ScrollView>
-      </TrueSheet>
     </View>
   );
 }
@@ -221,32 +178,4 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   chartContainer: { marginTop: 12 },
   legendRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "center" },
   legendTitle: { fontSize: 11, fontWeight: "700", fontFamily: theme.fonts.bold, color: colors.chartValue, marginRight: 4 },
-  sheetHeader: {
-    paddingHorizontal: 22,
-    paddingTop: 26,
-    paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.cardBorder,
-  },
-  sheetHeaderTitle: {
-    fontSize: 15,
-    fontWeight: "600" as const,
-    fontFamily: theme.fonts.bold,
-    color: colors.textPrimary,
-    textAlign: "center" as const,
-  },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, gap: 14 },
-  sheetSectionTitle: {
-    fontSize: 13,
-    fontWeight: "700" as const,
-    fontFamily: theme.fonts.bold,
-    color: colors.chartTitle,
-    marginBottom: 4,
-  },
-  sheetBodyText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.regular,
-    color: colors.chartValue,
-    lineHeight: 20,
-  },
 });

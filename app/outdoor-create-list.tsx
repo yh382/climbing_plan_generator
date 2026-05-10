@@ -1,7 +1,11 @@
-// src/features/outdoor/components/CreateListSheet.tsx
-// TrueSheet for creating a new outdoor route list.
+// app/outdoor-create-list.tsx
+// Native iOS formSheet route for creating a new outdoor route list.
+// Migrated from src/features/outdoor/components/CreateListSheet.tsx
+// (sheet-container-audit A1). Calls outdoorListsApi.create directly; on
+// success writes the new list into useOutdoorSheetHandoffStore so callers
+// (ListsSection / AddToListSheet) can react.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,57 +15,51 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TrueSheet } from "@lodev09/react-native-true-sheet";
-import { useThemeColors } from "../../../lib/useThemeColors";
-import { theme } from "../../../lib/theme";
-import { useSettings } from "../../../contexts/SettingsContext";
-import { outdoorListsApi } from "../listsApi";
-import type { OutdoorList } from "../types";
+import { useNavigation, useRouter } from "expo-router";
+import { useThemeColors } from "@/lib/useThemeColors";
+import { theme } from "@/lib/theme";
+import { useSettings } from "@/contexts/SettingsContext";
+import { outdoorListsApi } from "@/features/outdoor/listsApi";
+import useOutdoorSheetHandoffStore from "@/store/useOutdoorSheetHandoffStore";
 
-type Props = {
-  visible: boolean;
-  onClose: () => void;
-  onCreated: (list: OutdoorList) => void;
-  /** When provided, the sheet is in edit mode and saves via PATCH instead of POST. */
-  editing?: OutdoorList;
-};
-
-export default function CreateListSheet({ visible, onClose, onCreated, editing }: Props) {
+export default function OutdoorCreateListRoute() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { tr } = useSettings();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const sheetRef = useRef<TrueSheet>(null);
-  const isPresented = useRef(false);
+  const setLastCreatedList = useOutdoorSheetHandoffStore((s) => s.setLastCreatedList);
+  const editingList = useOutdoorSheetHandoffStore((s) => s.editingList);
+  const setEditingList = useOutdoorSheetHandoffStore((s) => s.setEditingList);
+  const setLastUpdatedList = useOutdoorSheetHandoffStore((s) => s.setLastUpdatedList);
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const isEditing = !!editingList;
+
+  const [name, setName] = useState(editingList?.name ?? "");
+  const [description, setDescription] = useState(editingList?.description ?? "");
   const [saving, setSaving] = useState(false);
 
+  // setOptions merges with parent _layout options (unlike <Stack.Screen options>
+  // which REPLACES in this Expo Router version, blowing away presentation:"formSheet").
+  const navigation = useNavigation();
   useEffect(() => {
-    if (visible && !isPresented.current) {
-      sheetRef.current?.present();
-      isPresented.current = true;
-    } else if (!visible && isPresented.current) {
-      sheetRef.current?.dismiss();
-      isPresented.current = false;
-    }
-  }, [visible]);
+    navigation.setOptions({
+      title: isEditing ? tr("编辑清单", "Edit List") : tr("新建清单", "Create List"),
+    });
+  }, [navigation, isEditing, tr]);
 
+  // Clear the editing slot when the route unmounts so a subsequent push without
+  // a fresh setEditingList(...) renders the create mode.
   useEffect(() => {
-    if (visible) {
-      setName(editing?.name ?? "");
-      setDescription(editing?.description ?? "");
-      setSaving(false);
-    }
-  }, [visible, editing]);
+    return () => {
+      setEditingList(null);
+    };
+  }, [setEditingList]);
 
   const canSave = name.trim().length > 0 && !saving;
-  const isEditing = !!editing;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -71,10 +69,14 @@ export default function CreateListSheet({ visible, onClose, onCreated, editing }
         name: name.trim(),
         description: description.trim() || undefined,
       };
-      const saved = editing
-        ? await outdoorListsApi.update(editing.id, payload)
-        : await outdoorListsApi.create(payload);
-      onCreated(saved);
+      if (editingList) {
+        const updated = await outdoorListsApi.update(editingList.id, payload);
+        setLastUpdatedList(updated);
+      } else {
+        const saved = await outdoorListsApi.create(payload);
+        setLastCreatedList(saved);
+      }
+      router.back();
     } catch (e: any) {
       const msg = e?.message ?? tr("保存失败", "Failed to save");
       Alert.alert(tr("保存失败", "Failed to save"), msg);
@@ -83,34 +85,18 @@ export default function CreateListSheet({ visible, onClose, onCreated, editing }
   };
 
   return (
-    <TrueSheet
-      ref={sheetRef}
-      // Fixed detents (was ["auto"]) — auto-sizing combined with autoFocus-triggered
-      // keyboard pushed the sheet above the safe area on some layouts. Fixed detents
-      // keep the sheet anchored while ScrollView handles any overflow inside.
-      detents={[0.6, 0.9]}
-      backgroundColor={colors.sheetBackground}
-      grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
-      dimmed
-      onDidDismiss={() => {
-        Keyboard.dismiss();
-        isPresented.current = false;
-        onClose();
-      }}
-    >
+    <>
       <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingTop: 20,
           paddingBottom: insets.bottom + 20,
+          paddingTop: 8,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>
-          {isEditing ? tr("编辑清单", "Edit List") : tr("新建清单", "Create List")}
-        </Text>
-
         <Text style={styles.label}>{tr("名称", "Name")}</Text>
         <TextInput
           value={name}
@@ -119,6 +105,7 @@ export default function CreateListSheet({ visible, onClose, onCreated, editing }
           placeholderTextColor={colors.textTertiary}
           style={styles.input}
           maxLength={120}
+          autoFocus
         />
 
         <Text style={styles.label}>{tr("简介 (可选)", "Description (optional)")}</Text>
@@ -152,19 +139,12 @@ export default function CreateListSheet({ visible, onClose, onCreated, editing }
           )}
         </TouchableOpacity>
       </ScrollView>
-    </TrueSheet>
+    </>
   );
 }
 
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    title: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 18,
-      color: c.textPrimary,
-      textAlign: "center",
-      marginBottom: 20,
-    },
     label: {
       fontFamily: theme.fonts.medium,
       fontSize: 12,

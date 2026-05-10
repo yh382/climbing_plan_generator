@@ -2,7 +2,7 @@
 // TrueSheet for toggling an outdoor route in/out of the user's lists.
 // ✓ indicator uses useRouteContainment; "+ Create new list" row opens CreateListSheet inline.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -15,13 +15,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useThemeColors } from "../../../lib/useThemeColors";
 import { theme } from "../../../lib/theme";
 import { useSettings } from "../../../contexts/SettingsContext";
 import { outdoorListsApi } from "../listsApi";
 import { useRouteContainment } from "../useUserLists";
 import type { OutdoorList } from "../types";
-import CreateListSheet from "./CreateListSheet";
+import useOutdoorSheetHandoffStore from "../../../store/useOutdoorSheetHandoffStore";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -43,9 +44,12 @@ export default function AddToListSheet({ visible, onClose, routeId, routeName }:
 
   const [lists, setLists] = useState<OutdoorList[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
-  const [createVisible, setCreateVisible] = useState(false);
   const { contains, toggle } = useRouteContainment(routeId);
   const [busyListId, setBusyListId] = useState<string | null>(null);
+  const router = useRouter();
+  // Handoff from app/outdoor-create-list.tsx — sheet-container-audit A1.
+  const lastCreatedList = useOutdoorSheetHandoffStore((s) => s.lastCreatedList);
+  const setLastCreatedList = useOutdoorSheetHandoffStore((s) => s.setLastCreatedList);
 
   useEffect(() => {
     if (visible && !isPresented.current) {
@@ -99,14 +103,25 @@ export default function AddToListSheet({ visible, onClose, routeId, routeName }:
     }
   };
 
-  const handleCreated = (newList: OutdoorList) => {
-    setLists((prev) => [newList, ...prev]);
-    setCreateVisible(false);
-    // Auto-add the current route to the new list.
-    if (routeId) {
-      handleToggle(newList.id);
-    }
-  };
+  const handleCreated = useCallback(
+    (newList: OutdoorList) => {
+      setLists((prev) => [newList, ...prev]);
+      // Auto-add the current route to the new list.
+      if (routeId) {
+        handleToggle(newList.id);
+      }
+    },
+    // handleToggle isn't memoized — depend on routeId so the closure refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routeId],
+  );
+
+  // Pick up handoff from app/outdoor-create-list.tsx (only when this sheet is visible).
+  useEffect(() => {
+    if (!visible || !lastCreatedList) return;
+    handleCreated(lastCreatedList);
+    setLastCreatedList(null);
+  }, [visible, lastCreatedList, handleCreated, setLastCreatedList]);
 
   return (
     <>
@@ -118,6 +133,10 @@ export default function AddToListSheet({ visible, onClose, routeId, routeName }:
         dimmed
         onDidDismiss={() => {
           isPresented.current = false;
+          // Defense-in-depth: clear any unconsumed handoff so a future
+          // AddToListSheet open doesn't auto-toggle a stale list.
+          // (sheet-container-audit A1 frontend-reviewer Blocker 2.)
+          setLastCreatedList(null);
           onClose();
         }}
       >
@@ -179,7 +198,7 @@ export default function AddToListSheet({ visible, onClose, routeId, routeName }:
 
                 <TouchableOpacity
                   style={styles.createRow}
-                  onPress={() => setCreateVisible(true)}
+                  onPress={() => router.push("/outdoor-create-list")}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.plusCircle, { backgroundColor: colors.accent }]}>
@@ -194,12 +213,6 @@ export default function AddToListSheet({ visible, onClose, routeId, routeName }:
           </ScrollView>
         </View>
       </TrueSheet>
-
-      <CreateListSheet
-        visible={createVisible}
-        onClose={() => setCreateVisible(false)}
-        onCreated={handleCreated}
-      />
     </>
   );
 }

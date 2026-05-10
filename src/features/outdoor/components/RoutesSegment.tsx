@@ -21,7 +21,7 @@ import FilterChip from "../../../components/ui/FilterChip";
 import { outdoorApi } from "../api";
 import type { OutdoorRoute } from "../types";
 import RouteListCard from "./RouteListCard";
-import GradeRangeSheet, { type GradeRange } from "./GradeRangeSheet";
+import useOutdoorFiltersStore from "../../../store/useOutdoorFiltersStore";
 
 type SectionData = {
   title: string; // "Sector · Wall"
@@ -41,8 +41,10 @@ export default function RoutesSegment({ areaId }: Props) {
   const [routes, setRoutes] = useState<OutdoorRoute[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [gradeRange, setGradeRange] = useState<GradeRange>({ min: null, max: null });
-  const [gradeSheetVisible, setGradeSheetVisible] = useState(false);
+  // Grade range filter lives in useOutdoorFiltersStore so the picker formSheet
+  // route (app/outdoor-grade-range.tsx) can write it back — sheet-container-audit A1.
+  const gradeRange = useOutdoorFiltersStore((s) => s.gradeRange);
+  const setGradeRange = useOutdoorFiltersStore((s) => s.setGradeRange);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +104,7 @@ export default function RoutesSegment({ areaId }: Props) {
   const handleClearAll = useCallback(() => {
     setQuery("");
     setGradeRange({ min: null, max: null });
-  }, []);
+  }, [setGradeRange]);
 
   const hasFilter = !!query || gradeActive;
 
@@ -132,7 +134,7 @@ export default function RoutesSegment({ areaId }: Props) {
       <View style={styles.chipRow}>
         <FilterChip
           label={gradeChipLabel}
-          onPress={() => setGradeSheetVisible(true)}
+          onPress={() => router.push("/outdoor-grade-range")}
           active={gradeActive}
           dropdown
         />
@@ -185,12 +187,6 @@ export default function RoutesSegment({ areaId }: Props) {
         />
       )}
 
-      <GradeRangeSheet
-        visible={gradeSheetVisible}
-        onClose={() => setGradeSheetVisible(false)}
-        onApply={setGradeRange}
-        initial={gradeRange}
-      />
     </View>
   );
 }

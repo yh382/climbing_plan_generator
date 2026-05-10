@@ -23,7 +23,8 @@ import { useSettings } from "../../../src/contexts/SettingsContext";
 import { outdoorListsApi } from "../../../src/features/outdoor/listsApi";
 import type { OutdoorListDetail, OutdoorListItem } from "../../../src/features/outdoor/types";
 import RouteListCard from "../../../src/features/outdoor/components/RouteListCard";
-import CreateListSheet from "../../../src/features/outdoor/components/CreateListSheet";
+import useOutdoorSheetHandoffStore from "../../../src/store/useOutdoorSheetHandoffStore";
+import type { OutdoorList } from "../../../src/features/outdoor/types";
 import { listMapHref } from "../../../src/features/mapscreen/navigation";
 
 export default function ListDetailPage() {
@@ -38,7 +39,10 @@ export default function ListDetailPage() {
   const [detail, setDetail] = useState<OutdoorListDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [editVisible, setEditVisible] = useState(false);
+  // Edit-list moved to formSheet route — sheet-container-audit A1.
+  const setEditingList = useOutdoorSheetHandoffStore((s) => s.setEditingList);
+  const lastUpdatedList = useOutdoorSheetHandoffStore((s) => s.lastUpdatedList);
+  const setLastUpdatedList = useOutdoorSheetHandoffStore((s) => s.setLastUpdatedList);
   const mountedRef = useRef(true);
 
   const isOwner = !viewingOtherUser && !!detail; // owner check also enforced backend-side via /me
@@ -65,6 +69,13 @@ export default function ListDetailPage() {
       mountedRef.current = false;
     };
   }, [fetchDetail]);
+
+  // Merge updated list back from app/outdoor-create-list.tsx edit mode.
+  useEffect(() => {
+    if (!lastUpdatedList) return;
+    setDetail((p) => (p ? { ...p, ...lastUpdatedList } : p));
+    setLastUpdatedList(null);
+  }, [lastUpdatedList, setLastUpdatedList]);
 
   const handleDeleteList = useCallback(() => {
     if (!detail) return;
@@ -152,7 +163,15 @@ export default function ListDetailPage() {
         ) : null}
         {isOwner ? (
           <Stack.Toolbar.Menu icon="ellipsis">
-            <Stack.Toolbar.MenuAction icon="pencil" onPress={() => setEditVisible(true)}>
+            <Stack.Toolbar.MenuAction
+              icon="pencil"
+              onPress={() => {
+                if (!detail) return;
+                // Pass detail to the formSheet route via handoff store.
+                setEditingList(detail as unknown as OutdoorList);
+                router.push("/outdoor-create-list");
+              }}
+            >
               {tr("编辑详情", "Edit details")}
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction icon="trash" onPress={handleDeleteList}>
@@ -225,15 +244,6 @@ export default function ListDetailPage() {
             </Swipeable>
           );
         }}
-      />
-      <CreateListSheet
-        visible={editVisible}
-        onClose={() => setEditVisible(false)}
-        onCreated={(updated) => {
-          setDetail((p) => (p ? { ...p, ...updated } : p));
-          setEditVisible(false);
-        }}
-        editing={detail}
       />
     </View>
   );

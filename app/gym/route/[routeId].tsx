@@ -55,9 +55,7 @@ import {
   finishUpload,
 } from '../../../src/lib/uploadActivityBridge';
 import type { PickedMediaItem } from '../../../src/features/community/types';
-import BetaShareSheet, {
-  type BetaShareSheetHandle,
-} from '../../../src/features/outdoor/components/BetaShareSheet';
+import useBetaShareHandoffStore from '../../../src/store/useBetaShareHandoffStore';
 import OutdoorSendSheet, {
   type OutdoorSendDraft,
 } from '../../../src/features/outdoor/sendSheet/OutdoorSendSheet';
@@ -129,11 +127,12 @@ export default function GymRouteDetailPage() {
   const [sendSheetOpen, setSendSheetOpen] = useState(false);
   const [pendingBetaVideo, setPendingBetaVideo] =
     useState<PickedMediaItem | null>(null);
-  const betaShareSheetRef = useRef<BetaShareSheetHandle | null>(null);
+  // BetaShareSheet migrated to formSheet route — sheet-container-audit A1.
+  const setPendingBetaShareVideo = useBetaShareHandoffStore((s) => s.setPendingVideo);
 
   // Picks a single video via system PHPicker, enforces the 90s cap, then
   // dispatches to either 'send' (re-open OutdoorSendSheet w/ beta) or
-  // 'direct' (present BetaShareSheet standalone).
+  // 'direct' (push outdoor-beta-share formSheet standalone).
   const pickAndDispatchBeta = useCallback(
     async (flow: 'send' | 'direct') => {
       if (!route) return;
@@ -155,15 +154,16 @@ export default function GymRouteDetailPage() {
       }
       setSendSheetOpen(false);
       if (flow === 'direct') {
+        setPendingBetaShareVideo(videoItem);
         requestAnimationFrame(() => {
-          betaShareSheetRef.current?.present(videoItem);
+          router.push(`/outdoor-beta-share?routeId=${encodeURIComponent(route.id)}&routeKind=gym`);
         });
       } else {
         setPendingBetaVideo(videoItem);
         requestAnimationFrame(() => setSendSheetOpen(true));
       }
     },
-    [route, tr],
+    [route, tr, router, setPendingBetaShareVideo],
   );
 
   useEffect(() => {
@@ -665,13 +665,8 @@ export default function GymRouteDetailPage() {
         tr={tr}
       />
 
-      <BetaShareSheet
-        ref={(h) => {
-          betaShareSheetRef.current = h;
-        }}
-        routeId={route.id}
-        routeKind="gym"
-      />
+      {/* Pure share-beta flow now lives at app/outdoor-beta-share.tsx
+          (sheet-container-audit A1; ?routeKind=gym). */}
     </>
   );
 }

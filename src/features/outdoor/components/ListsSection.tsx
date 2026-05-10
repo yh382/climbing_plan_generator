@@ -22,7 +22,7 @@ import { useSettings } from "../../../contexts/SettingsContext";
 import { outdoorListsApi } from "../listsApi";
 import type { OutdoorList } from "../types";
 import ListCard from "./ListCard";
-import CreateListSheet from "./CreateListSheet";
+import useOutdoorSheetHandoffStore from "../../../store/useOutdoorSheetHandoffStore";
 
 type Props = {
   /** When present, show that user's public lists (read-only). When absent, show current user's own lists. */
@@ -46,7 +46,10 @@ export default function ListsSection({ userId, showCreate = true, contentPadding
   const [lists, setLists] = useState<OutdoorList[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [createVisible, setCreateVisible] = useState(false);
+  // Create-list moved to formSheet route (app/outdoor-create-list.tsx);
+  // handoff via useOutdoorSheetHandoffStore — sheet-container-audit A1.
+  const lastCreatedList = useOutdoorSheetHandoffStore((s) => s.lastCreatedList);
+  const setLastCreatedList = useOutdoorSheetHandoffStore((s) => s.setLastCreatedList);
   const mountedRef = useRef(true);
 
   const fetchLists = useCallback(async () => {
@@ -88,11 +91,17 @@ export default function ListsSection({ userId, showCreate = true, contentPadding
     router.push(`/profile/lists/${list.id}${params}` as any);
   };
 
-  const handleCreated = (newList: OutdoorList) => {
+  const handleCreated = useCallback((newList: OutdoorList) => {
     setLists((prev) => [newList, ...prev]);
-    setCreateVisible(false);
     router.push(`/profile/lists/${newList.id}` as any);
-  };
+  }, [router]);
+
+  // Pick up handoff from app/outdoor-create-list.tsx
+  useEffect(() => {
+    if (!lastCreatedList) return;
+    handleCreated(lastCreatedList);
+    setLastCreatedList(null);
+  }, [lastCreatedList, handleCreated, setLastCreatedList]);
 
   if (loading) {
     return (
@@ -108,7 +117,7 @@ export default function ListsSection({ userId, showCreate = true, contentPadding
   const header = showCreateBtn ? (
     <TouchableOpacity
       style={[styles.createRow, { backgroundColor: colors.backgroundSecondary }]}
-      onPress={() => setCreateVisible(true)}
+      onPress={() => router.push("/outdoor-create-list")}
       activeOpacity={0.7}
     >
       <View style={[styles.plusCircle, { backgroundColor: colors.accent }]}>
@@ -166,18 +175,7 @@ export default function ListsSection({ userId, showCreate = true, contentPadding
     />
   );
 
-  return (
-    <>
-      {body}
-      {showCreateBtn ? (
-        <CreateListSheet
-          visible={createVisible}
-          onClose={() => setCreateVisible(false)}
-          onCreated={handleCreated}
-        />
-      ) : null}
-    </>
-  );
+  return body;
 }
 
 const styles = StyleSheet.create({

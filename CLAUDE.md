@@ -20,6 +20,22 @@
 - 用 `TrueSheet`（`@lodev09/react-native-true-sheet`）— **不用** `Modal + PanResponder`
 - 用 `ActionSheetIOS` — **不用** `SmartBottomSheet` (menu mode)
 - 用 `NativeSegmentedControl`（`@react-native-segmented-control/segmented-control`）
+- **FormSheet route** — focused task / picker / info sheet 走 expo-router `Stack.Screen presentation:"formSheet"` + `sheetAllowedDetents` + `sheetGrabberVisible: true`；**三约束**：(a) route 文件必须 `app/` root（不在 nested directory 含 `_layout.tsx` 下），(b) Stack.Screen 注册必须根 `app/_layout.tsx`，(c) **禁用 in-screen `<Stack.Screen options>`** — 实测它是 REPLACE 不是 merge，会冲掉 `presentation:"formSheet"` + 其他 sheet config，formSheet 退化到普通 push。不满足任一 → fallback 到普通 push 动画。UIKit 容器自动 nav bar / Liquid Glass / grabber / detents / cornerRadius。Working pattern: [app/recent-climbs.tsx](app/recent-climbs.tsx) / [app/body-info.tsx](app/body-info.tsx) / [app/csm-help.tsx](app/csm-help.tsx)。i18n title 走 `useNavigation().setOptions({ title })`（这个 API merge 正确）；_layout 提供 English fallback title 兜底首帧。
+
+#### FormSheet Handoff Pattern（sheet-container-audit A1 标准化 2026-05-10）
+
+FormSheet route 跨在 caller JSX 树之外 → 经典 `visible/onApply` prop callback 失效。3 种 handoff 变体（全走小颗粒 zustand store, 命名 `src/store/use<Feature>SheetHandoffStore.ts` / `use<Feature>FiltersStore.ts`）：
+
+1. **Pure picker（caller useState → store）**：filter 状态从 caller `useState` 提到 store；route 直接写 store；caller selector 订阅。例：[`useOutdoorFiltersStore`](src/store/useOutdoorFiltersStore.ts) for `outdoor-grade-range`。
+2. **Input + output slots**：caller 推前 `setInput(...)` + `router.push(...)`；route 读 input + 写 output；caller `useEffect` 监 output → 消费 + 清。例：[`useOutdoorSheetHandoffStore`](src/store/useOutdoorSheetHandoffStore.ts) `editingList` / `lastCreatedList` / `lastUpdatedList` for `outdoor-create-list`。
+3. **Signal-only (timestamp / nonce)**：route 发 `emitX()` → `Date.now()`；caller `useRef` 记 lastSeen，`useEffect` 仅当 newer 才响应。**避免 stale-boolean trap**。例：[`useSessionSheetHandoffStore`](src/store/useSessionSheetHandoffStore.ts) `workoutLoggedAt` for `session-log-workout`。
+
+**Lifecycle ownership 规约**：
+- Route 拥有 **output** slots 的 lifecycle — `useEffect cleanup` 清自己写的 output（防 unconsumed leak 进下次 push）
+- Caller 拥有 **input** slots 的 lifecycle — 自己 push 前 set，consume 后 clear
+- 多 caller 订阅同一 slot 时（如 CreateList 有 ListsSection / AddToListSheet / [listId] 3 caller），**preserved-side TrueSheet caller**（AddToListSheet）`onDidDismiss` 加 defensive `setOutput(null)` 防 stale 残留
+
+**Modal-on-modal 风险（R9 / R10）**：preserved TrueSheet 内开 formSheet route = 双 UISheetPresentationController 栈，行为待真机验证。AddToListSheet → `/outdoor-create-list` 是首个 A1 验证点；A1.5 OutdoorSendSheet → CommentSheet 同样风险。fallback 路径：(a) 被嵌套侧也改 formSheet route（双 formSheet 栈 modal-on-modal 仍可能 break）/ (b) 内联到 caller 不再 nested。
 
 ### Theme / Dark mode
 
