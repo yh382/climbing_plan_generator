@@ -9,7 +9,8 @@ import "react-native-gesture-handler";
 import { useThemeColors } from "@/lib/useThemeColors";
 import React, { useEffect, useState, useCallback } from "react";
 import { AppState, View, StyleSheet, useColorScheme, Platform } from "react-native";
-import { Stack, SplashScreen, useRouter, useSegments } from "expo-router";
+import { Stack, SplashScreen, useRouter, useSegments, router } from "expo-router";
+import { HeaderButton } from "../src/components/ui/HeaderButton";
 import { ThemeProvider, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { NATIVE_HEADER_BASE, NATIVE_HEADER_LARGE, HEADER_TRANSPARENT, withHeaderTheme } from "../src/lib/nativeHeaderOptions";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -108,20 +109,52 @@ function RootStack() {
       <Stack.Screen name="settings" options={{ headerShown: false }} />
       <Stack.Screen name="gym-community" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
       <Stack.Screen name="inbox" options={{ headerShown: false }} />
-      {/* Coach pushed from Home — root-managed Stack provides back chevron. */}
-      <Stack.Screen
-        name="coach"
-        options={{
-          ...NATIVE_HEADER_BASE,
-          headerShown: true,
-          headerBackTitle: "",
-          headerBackButtonDisplayMode: "minimal",
-          headerTransparent: HEADER_TRANSPARENT,
-          scrollEdgeEffects: { top: "soft" },
-        }}
-      />
+      {/* Coach is nested in app/coach/_layout.tsx — same pattern as
+          settings / profile / inbox. Hiding the root header here lets the
+          nested Stack own the chrome (transparent header + soft scroll
+          edge); registering it directly on the root Stack rendered an
+          opaque white nav-bar backdrop. */}
+      <Stack.Screen name="coach" options={{ headerShown: false }} />
       {/* Legacy /climmate deeplink redirect — see app/climmate/index.tsx */}
       <Stack.Screen name="climmate" options={{ headerShown: false }} />
+
+      {/* Profile β — native iOS formSheet routes. Registered at root level
+          (not in app/profile/_layout.tsx) because presentation:"formSheet"
+          on a nested-stack screen falls back to a regular push animation.
+          UIKit handles nav bar (Liquid Glass on iOS 26) + grabber +
+          detents + cornerRadius natively. */}
+      <Stack.Screen
+        name="recent-climbs"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          // omit sheetCornerRadius — iOS will match the device-screen corner
+          // radius so the sheet's top corners align cleanly with the status
+          // bar / Dynamic Island cutout, the way Apple's own sheets do.
+          title: "Recent Climbs",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="body-info"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          // omit sheetCornerRadius — iOS will match the device-screen corner
+          // radius so the sheet's top corners align cleanly with the status
+          // bar / Dynamic Island cutout, the way Apple's own sheets do.
+          title: "Body Info",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
     </Stack>
   );
 }

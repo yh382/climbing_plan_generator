@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Alert, Keyboard, Platform, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { useHeaderHeight } from "@react-navigation/elements";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
 import { NativeTextView } from "../../modules/native-input/src";
+import { HeaderButton } from "@/components/ui/HeaderButton";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCoachChatStore } from "@/features/coachChat/state/coachChatStore";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -28,7 +27,6 @@ export default function ClimmateScreen() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const navigation = useNavigation();
-  const headerHeight = useHeaderHeight();
   const { height: windowHeight } = useWindowDimensions();
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -36,8 +34,9 @@ export default function ClimmateScreen() {
   const [inputText, setInputText] = useState("");
   const [inputHeight, setInputHeight] = useState(48);
   const [inputFocused, setInputFocused] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [wantsFocus, setWantsFocus] = useState(false);
+  const keyboardVisible = keyboardHeight > 0;
   const androidInputRef = useRef<TextInput>(null);
 
   const coach = useCoachChatStore((s) => s.state);
@@ -61,42 +60,55 @@ export default function ClimmateScreen() {
   }, []);
 
   // ── Native header ──────────────────────────────────────────────────────────
+  // Match profile/badges, profile/followers etc. — only override title +
+  // custom chevron. The screen registration in app/_layout.tsx supplies
+  // `headerTransparent: HEADER_TRANSPARENT` + soft scrollEdge top, which
+  // gives iOS<26 the native translucent blur material (no visible divider)
+  // and iOS 26+ the liquid-glass floating header.
   useLayoutEffect(() => {
     navigation.setOptions({
-      ...withHeaderTheme(colors),
       title: "Coach Paddi",
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
     });
-  }, [navigation, colors]);
+  }, [navigation]);
 
   // Load conversations from backend on mount
   useEffect(() => {
     if (accessToken) loadConversations();
   }, [accessToken, loadConversations]);
 
-  // Track keyboard visibility for padding adjustment
+  // Track keyboard height so the bottom bar can ride above the keyboard.
+  // KeyboardAvoidingView+absolute positioning doesn't reliably lift the bar on
+  // iOS, so we anchor `bottom: keyboardHeight` instead.
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
+    const show = Keyboard.addListener("keyboardWillShow", (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
     const hide = Keyboard.addListener("keyboardWillHide", () => {
-      setKeyboardVisible(false);
+      setKeyboardHeight(0);
       setWantsFocus(false);
     });
     return () => { show.remove(); hide.remove(); };
   }, []);
 
-  // Auto-focus input on screen entry. Window α: Coach moved from tab to push
-  // route — increased delay (150 → 350ms) so push transition + native input
-  // mount complete before requesting first-responder, otherwise iOS swallows
-  // the focus mid-animation.
+  // Auto-focus input only AFTER the iOS push transition fully ends. A fixed
+  // timeout used to race the slide-in: the keyboard would start rising while
+  // the screen was still mid-push, producing the "black flash sliding from
+  // the left" artifact (UIKit drew the keyboard over the not-yet-settled
+  // viewport). `transitionEnd` fires once the push animation is complete,
+  // so the keyboard now rises into a stable layout.
   useFocusEffect(
     useCallback(() => {
-      const timer = setTimeout(() => {
+      const unsub = navigation.addListener("transitionEnd" as never, () => {
         setWantsFocus(true);
         if (Platform.OS === "android") {
           androidInputRef.current?.focus();
         }
-      }, 350);
-      return () => clearTimeout(timer);
-    }, []),
+      });
+      return unsub;
+    }, [navigation]),
   );
 
   const mode = coach.mode;
@@ -298,17 +310,24 @@ export default function ClimmateScreen() {
         </View>
       )}
 
-      {/* Bottom input area — floats above tab bar with scroll edge effect */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
-        keyboardVerticalOffset={0}
+      {/* Bottom input area — floats above tab bar; rides above the keyboard
+          via `bottom: keyboardHeight` (KAV + absolute positioning is flaky). */}
+      <View
+        ref={bottomBarRef}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: keyboardHeight,
+          paddingBottom: keyboardVisible ? 12 : insets.bottom + 12,
+        }}
       >
-        <View ref={bottomBarRef} style={{ paddingBottom: keyboardVisible ? 12 : insets.bottom + 12 }}>
-          {/* TaskBar — flow layout */}
-          <TaskBar currentMode={mode} onToggleMode={handleToggleMode} visible={coach.taskBarVisible} />
+        {/* TaskBar — flow layout */}
+        <TaskBar currentMode={mode} onToggleMode={handleToggleMode} visible={coach.taskBarVisible} />
 
-          {/* Input bar — glass pill matching tab bar material */}
+          {/* Input bar — glass pill matching tab bar material. Solid
+              backgroundColor fallback prevents the brief "black through
+              transparent pill" frame before GlassView mounts its blur. */}
           <View
             style={{
               borderRadius: 22,
@@ -317,6 +336,7 @@ export default function ClimmateScreen() {
               borderWidth: inputFocused ? 0.8 : 0.3,
               borderColor: inputFocused ? colors.accent : colors.border,
               height: inputHeight,
+              backgroundColor: colors.background,
             }}
           >
             {Platform.OS === "ios" && (
@@ -331,7 +351,7 @@ export default function ClimmateScreen() {
               <NativeTextView
                 style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
                 text={inputText}
-                placeholder="Ask Paddi"
+                placeholder={tr("问问 Paddi", "Ask Paddi")}
                 maxHeight={110}
                 submitOnReturn
                 returnKeyType="send"
@@ -350,7 +370,7 @@ export default function ClimmateScreen() {
                 ref={androidInputRef}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder="Ask Paddi"
+                placeholder={tr("问问 Paddi", "Ask Paddi")}
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 returnKeyType="send"
@@ -368,8 +388,7 @@ export default function ClimmateScreen() {
               />
             )}
           </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Mode detail overlay */}
       <ModeDetailOverlay

@@ -17,7 +17,11 @@ export default function DrawerLayout() {
   const scheme = useColorScheme();
   const tabsIdx = segments.indexOf("(tabs)" as never);
   const currentTab = tabsIdx >= 0 ? (segments[tabsIdx + 1] as string | undefined) : undefined;
-  const swipeEnabled = !currentTab || SWIPE_TABS.has(currentTab);
+  // Only enable drawer edge-swipe on tabs that opted in. When the user has
+  // pushed a root-Stack route on top of the drawer (e.g. /coach), there is
+  // no `(tabs)` in segments → currentTab is undefined → swipe must be off so
+  // iOS native swipe-back pops the screen instead of revealing the drawer.
+  const swipeEnabled = !!currentTab && SWIPE_TABS.has(currentTab);
   const drawerBg = scheme === "dark" ? DRAWER_BG_DARK : DRAWER_BG_LIGHT;
 
   return (

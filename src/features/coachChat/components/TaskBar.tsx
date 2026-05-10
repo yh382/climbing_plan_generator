@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
+import { GlassView } from "expo-glass-effect";
 import { useThemeColors } from "@/lib/useThemeColors";
 import Animated, {
   useAnimatedStyle,
@@ -69,6 +70,14 @@ export default function TaskBar({ currentMode, onToggleMode, visible }: Props) {
               pressed && { opacity: 0.7 },
             ]}
           >
+            {Platform.OS === "ios" && (
+              <GlassView
+                glassEffectStyle="regular"
+                isInteractive
+                tintColor={active ? colors.accent : undefined}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
             <Ionicons
               name={t.icon as any}
               size={16}
@@ -99,13 +108,16 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
+    overflow: "hidden",
     borderWidth: 0.8,
     borderColor: colors.cardBorder,
-    backgroundColor: colors.cardBackground,
+    // iOS: 让底层 GlassView 显出来；Android: 保留实色 fallback
+    backgroundColor: Platform.OS === "ios" ? "transparent" : colors.cardBackground,
   },
   chipActive: {
     borderColor: colors.accent,
-    backgroundColor: "rgba(48,110,111,0.08)",
+    // iOS 上由 GlassView 的 tintColor=accent 染色；Android 用实色高亮
+    backgroundColor: Platform.OS === "ios" ? "transparent" : "rgba(48,110,111,0.08)",
   },
   label: {
     fontSize: 13,
