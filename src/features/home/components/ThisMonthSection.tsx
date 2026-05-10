@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import useLogsStore from "@/store/useLogsStore";
-import { NativeSegmentedControl } from "@/components/ui";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
@@ -20,17 +19,54 @@ function getMonthEnd(monthStart: string): string {
   return `${ny}-${String(nm).padStart(2, "0")}-01`;
 }
 
-type Discipline = "boulder" | "rope";
+type SessionLike = { date: string; discipline: string; sends: number; best?: string | null };
 
-// LogType values: "boulder" | "toprope" | "lead". "rope" UI cell aggregates
-// both rope variants. Mapping kept local — this is the only consumer.
-function matchesDiscipline(logType: string, discipline: Discipline): boolean {
-  if (discipline === "boulder") return logType === "boulder";
-  return logType === "toprope" || logType === "lead";
+// Pick the highest grade for a given discipline group from this-month sessions,
+// then convert into the user's preferred display scale (Font for boulder /
+// French for rope when set). Returns "" when no qualifying grade exists.
+function pickBestForGroup(
+  sessions: SessionLike[],
+  group: "boulder" | "rope",
+  boulderScale: "V" | "Font",
+  ropeScale: "YDS" | "French",
+): string {
+  let bestRaw = "";
+  let bestRawDiscipline = "";
+  let bestScore = -1;
+  for (const se of sessions) {
+    const isBoulder = se.discipline === "boulder";
+    const isRope = se.discipline === "toprope" || se.discipline === "lead";
+    if (group === "boulder" && !isBoulder) continue;
+    if (group === "rope" && !isRope) continue;
+    const raw = se.best;
+    if (!raw || raw === "—" || raw === "V?") continue;
+    const score = getGradeScore(raw, se.discipline as "boulder" | "toprope" | "lead");
+    if (score > bestScore) {
+      bestScore = score;
+      bestRaw = raw;
+      bestRawDiscipline = se.discipline;
+    }
+  }
+  if (!bestRaw) return "";
+  try {
+    if (group === "boulder" && boulderScale === "Font") {
+      return scoreToGrade(gradeToScore(bestRaw, "vscale"), "font");
+    }
+    if (group === "rope" && ropeScale === "French") {
+      const sourceSystem = bestRawDiscipline === "boulder" ? "vscale" : "yds";
+      return scoreToGrade(gradeToScore(bestRaw, sourceSystem), "french");
+    }
+  } catch {
+    // Fall through to raw on conversion failure.
+  }
+  return bestRaw;
 }
 
-// "This Month" no-card section: large primary number + B/R toggle.
-// Phase 4 ships segment-only (R10 fallback); pager swipe deferred.
+// "This Month" section — single unified read of sessions/sends, plus a Best
+// cell that combines max boulder + max rope grades into one string ("V7 /
+// 5.11b"). Discipline-toggle UI was removed in Window TAB_AND_HOME polish:
+// users with mixed boulder + rope logs see both at once; pure boulder / pure
+// rope users see a single grade. No redundant computation across pages.
 export function ThisMonthSection() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -38,78 +74,44 @@ export function ThisMonthSection() {
   const { tr, boulderScale, ropeScale } = useSettings();
   const monthStart = useMemo(getMonthStart, []);
   const monthEnd = useMemo(() => getMonthEnd(monthStart), [monthStart]);
-  const [discipline, setDiscipline] = useState<Discipline>("boulder");
   const { sessions } = useLogsStore();
 
   const stats = useMemo(() => {
-    const monthSessions = sessions.filter(
-      (se) => se.date >= monthStart && se.date < monthEnd && matchesDiscipline(se.discipline, discipline),
-    );
+    const monthSessions = sessions.filter((se) => se.date >= monthStart && se.date < monthEnd);
     const totalSends = monthSessions.reduce((sum, se) => sum + se.sends, 0);
-
-    let bestRaw = "";
-    let bestRawDiscipline = "";
-    let bestScore = -1;
-    for (const se of monthSessions) {
-      if (!se.best || se.best === "—" || se.best === "V?") continue;
-      const score = getGradeScore(se.best, se.discipline);
-      if (score > bestScore) {
-        bestScore = score;
-        bestRaw = se.best;
-        bestRawDiscipline = se.discipline;
-      }
-    }
-
-    let bestDisplay = bestRaw;
-    if (bestRaw) {
-      try {
-        if (discipline === "boulder" && boulderScale === "Font") {
-          const score = gradeToScore(bestRaw, "vscale");
-          bestDisplay = scoreToGrade(score, "font");
-        } else if (discipline === "rope" && ropeScale === "French") {
-          // Source could be YDS ("5.11b"); convert to French.
-          const score = gradeToScore(bestRaw, bestRawDiscipline === "boulder" ? "vscale" : "yds");
-          bestDisplay = scoreToGrade(score, "french");
-        }
-      } catch {
-        bestDisplay = bestRaw;
-      }
-    }
-
+    const bestBoulder = pickBestForGroup(monthSessions, "boulder", boulderScale, ropeScale);
+    const bestRope = pickBestForGroup(monthSessions, "rope", boulderScale, ropeScale);
+    const bestParts = [bestBoulder, bestRope].filter(Boolean);
     return {
       sessions: monthSessions.length,
       sends: totalSends,
-      best: bestDisplay || "—",
+      best: bestParts.length > 0 ? bestParts.join(" / ") : "—",
     };
-  }, [sessions, monthStart, monthEnd, discipline, boulderScale, ropeScale]);
+  }, [sessions, monthStart, monthEnd, boulderScale, ropeScale]);
 
   const goToActivity = () => router.push("/(drawer)/(tabs)/activity" as any);
 
   return (
     <View style={styles.section}>
-      <View style={styles.headerRow}>
-        <Text style={styles.label}>{tr("本月", "This Month")}</Text>
-        <View style={styles.segmentWrap}>
-          <NativeSegmentedControl
-            options={[tr("抱石", "Boulder"), tr("线路", "Rope")]}
-            selectedIndex={discipline === "boulder" ? 0 : 1}
-            onSelect={(i) => setDiscipline(i === 0 ? "boulder" : "rope")}
-            style={{ height: 28 }}
-          />
-        </View>
-      </View>
+      <Text style={styles.label}>{tr("本月", "This Month")}</Text>
 
       <Pressable style={styles.statsRow} onPress={goToActivity}>
         <View style={styles.statCol}>
-          <Text style={styles.statValue}>{stats.sends}</Text>
-          <Text style={styles.statLabel}>{tr("send 数", "Sends")}</Text>
-        </View>
-        <View style={styles.statCol}>
-          <Text style={styles.statValue}>{stats.sessions}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>
+            {stats.sessions}
+          </Text>
           <Text style={styles.statLabel}>{tr("场次", "Sessions")}</Text>
         </View>
         <View style={styles.statCol}>
-          <Text style={styles.statValue}>{stats.best}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>
+            {stats.sends}
+          </Text>
+          <Text style={styles.statLabel}>{tr("send 数", "Sends")}</Text>
+        </View>
+        <View style={styles.statCol}>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {stats.best}
+          </Text>
           <Text style={styles.statLabel}>{tr("最高级别", "Best")}</Text>
         </View>
       </Pressable>
@@ -123,20 +125,12 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 16,
       marginBottom: theme.spacing.sectionGap,
     },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 14,
-    },
     label: {
       fontFamily: theme.fonts.bold,
       fontSize: 14,
       color: c.textSecondary,
       letterSpacing: 0.3,
-    },
-    segmentWrap: {
-      width: 160,
+      marginBottom: 14,
     },
     statsRow: {
       flexDirection: "row",
@@ -144,6 +138,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     },
     statCol: {
       flex: 1,
+      alignItems: "center",
     },
     statValue: {
       fontFamily: theme.fonts.monoMedium,
@@ -151,10 +146,12 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       color: c.textPrimary,
       letterSpacing: -1,
       marginBottom: 4,
+      textAlign: "center",
     },
     statLabel: {
       fontFamily: theme.fonts.regular,
       fontSize: 12,
       color: c.textTertiary,
+      textAlign: "center",
     },
   });
