@@ -5,6 +5,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Pressable,
   ActivityIndicator,
   Alert,
   Share,
@@ -24,15 +25,13 @@ import { useThemeColors } from "../../../src/lib/useThemeColors";
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
-  useAnimatedStyle,
-  interpolate,
-  Extrapolate,
 } from "react-native-reanimated";
 
 import ProfileHeader from "../../../src/components/shared/ProfileHeader";
 import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
-import ProfilePostGrid from "../../../src/features/profile/components/ProfilePostGrid";
+import SendsSection from "../../../src/features/profile/components/fivecorefunction/SendsSection";
 import PublicStatsSection from "../../../src/features/profile/components/PublicStatsSection";
+import ListsSection from "../../../src/features/outdoor/components/ListsSection";
 import BadgeCard from "../../../src/features/profile/components/badgessection/BadgeCard";
 import type { Badge, BadgeSectionKey, BadgeTier } from "../../../src/features/profile/components/badgessection/types";
 import { usePublicProfile, PublicBadge } from "../../../src/features/community/hooks";
@@ -74,8 +73,6 @@ const BADGE_GROUPS: { key: string; title: string; filter: (b: Badge) => boolean;
   { key: "monthly", title: "Monthly", filter: (b) => b.section === "monthly" },
 ];
 
-const SCROLL_THRESHOLD = 44;
-
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -83,7 +80,9 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { tt } = useI18N();
 
-  const { profile, posts, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
+  // β: posts grid is replaced by SendsSection (BE-backed video log filter);
+  // we no longer destructure `posts` from the public profile hook.
+  const { profile, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
   const { width } = useWindowDimensions();
 
   const badgeCardSize = useMemo(() => (width - 24 - 12) / 3, [width]);
@@ -209,9 +208,9 @@ export default function PublicProfileScreen() {
     }).catch(() => {});
   }, [profile]);
 
-  // Tabs
-  const TABS = ["posts", "stats", "badges"] as const;
-  const [activeTab, setActiveTab] = useState("posts");
+  // Tabs (Window β KAYA — 3-segment underline matches /profile self view)
+  const TABS = ["sends", "stats", "lists"] as const;
+  const [activeTab, setActiveTab] = useState("sends");
   const pagerRef = useRef<PagerView>(null);
   const tabScrollPosition = useSharedValue(0);
   const { height: screenHeight } = useWindowDimensions();
@@ -266,14 +265,6 @@ export default function PublicProfileScreen() {
     });
   }, [navigation, router]);
 
-  const headerTitleAnimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0], Extrapolate.CLAMP),
-    transform: [
-      { scale: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [1, 0.92], Extrapolate.CLAMP) },
-      { translateY: interpolate(scrollY.value, [0, SCROLL_THRESHOLD], [0, -10], Extrapolate.CLAMP) },
-    ],
-  }));
-
   // Privacy helpers
   const privacy = profile?.privacy;
 
@@ -298,7 +289,13 @@ export default function PublicProfileScreen() {
     );
   }
 
-  const gradeDisplay = `${profile.boulderMax || "—"}/${profile.routeMax || "—"}`;
+  // Stat strip 4-up: B Best / R Best / Sends / Badges (mirror self profile).
+  const statStripItems = [
+    { num: profile.boulderMax || "—", lbl: "B Best" },
+    { num: profile.routeMax || "—", lbl: "R Best" },
+    { num: String(profile.totalSends ?? 0), lbl: "Sends" },
+    { num: String(badges.length), lbl: "Badges" },
+  ];
 
   return (
     <View style={dynStyles.screenRoot}>
@@ -307,7 +304,7 @@ export default function PublicProfileScreen() {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={[2]}
       >
         {/* [0] Cover/gradient + header */}
         <ProfileHeader
@@ -316,13 +313,10 @@ export default function PublicProfileScreen() {
           avatarUrl={profile.avatarUrl}
           coverUrl={profile.coverUrl}
           bio={profile.bio}
-          location={profile.location}
           homeGym={profile.homeGym}
           followersCount={localFollowersCount}
           followingCount={profile.followingCount}
-          gradeDisplay={gradeDisplay}
-          totalSends={profile.totalSends}
-          isOwnProfile={false}
+          viewMode="other"
           isFollowing={isFollowing}
           followLoading={followLoading}
           msgLoading={msgLoading}
@@ -330,12 +324,30 @@ export default function PublicProfileScreen() {
           onMessagePress={handleMessage}
           onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
           onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
-          onAscentsPress={() => router.push(`/users/${id}/ascents` as any)}
-          headerTitleAnimStyle={headerTitleAnimStyle}
           scrollY={scrollY}
         />
 
-        {/* [1] Tab bar (sticky) */}
+        {/* [1] Content shell + 4-up stat strip — tap → ascents page */}
+        <View style={dynStyles.contentShell}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View ascents history"
+            onPress={() => router.push(`/users/${id}/ascents` as any)}
+            style={({ pressed }) => [
+              dynStyles.statStrip,
+              pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            {statStripItems.map((it) => (
+              <View key={it.lbl} style={dynStyles.statStripCell}>
+                <Text style={dynStyles.statStripNum}>{it.num}</Text>
+                <Text style={dynStyles.statStripLbl}>{it.lbl}</Text>
+              </View>
+            ))}
+          </Pressable>
+        </View>
+
+        {/* [2] Tab bar (sticky) */}
         <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
 
         {/* Content — PagerView for swipe + smooth tab animation */}
@@ -348,7 +360,7 @@ export default function PublicProfileScreen() {
           onPageScrollStateChanged={onPageScrollStateChanged}
           overdrag
         >
-          <View key="posts" style={dynStyles.contentArea}>
+          <View key="sends" style={dynStyles.contentArea}>
             <View onLayout={handlePageLayout(0)}>
               {privacy?.posts === false ? (
                 <PrivateSection
@@ -356,16 +368,14 @@ export default function PublicProfileScreen() {
                   colors={colors}
                 />
               ) : (
-                <ProfilePostGrid
-                  posts={posts as any}
-                  onPressPost={(post) => router.push({ pathname: "/community/user-posts", params: { userId: id, initialPostId: post.id } } as any)}
-                />
+                <SendsSection userId={id!} viewMode="other" />
               )}
             </View>
           </View>
 
           <View key="stats" style={dynStyles.contentArea}>
             <View onLayout={handlePageLayout(1)}>
+              {/* Stats card (public) — body info / lists / radar are self-only */}
               {privacy?.analysis === false ? (
                 <PrivateSection
                   message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
@@ -374,11 +384,8 @@ export default function PublicProfileScreen() {
               ) : profile ? (
                 <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
               ) : null}
-            </View>
-          </View>
 
-          <View key="badges" style={dynStyles.contentArea}>
-            <View onLayout={handlePageLayout(2)}>
+              {/* Badges (public, sub-section under Stats segment) */}
               {privacy?.badges === false ? (
                 <PrivateSection
                   message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
@@ -418,6 +425,16 @@ export default function PublicProfileScreen() {
                   ))}
                 </View>
               )}
+            </View>
+          </View>
+
+          <View key="lists" style={dynStyles.contentArea}>
+            <View onLayout={handlePageLayout(2)} style={{ minHeight: screenHeight * 0.6 }}>
+              <ListsSection
+                userId={id}
+                contentPaddingHorizontal={16}
+                inScrollView
+              />
             </View>
           </View>
         </PagerView>
@@ -463,6 +480,32 @@ const createDynStyles = (colors: ReturnType<typeof useThemeColors>) => StyleShee
   contentArea: { minHeight: 400 },
   emptyState: { padding: 48, alignItems: "center" },
   emptyText: { color: colors.textTertiary, marginTop: 8 },
+  // Content shell + 4-up stat strip — mirrors self profile layout
+  contentShell: {
+    backgroundColor: colors.background,
+    marginTop: -35,
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    paddingTop: 4,
+  },
+  statStrip: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  statStripCell: { flex: 1, alignItems: "center" },
+  statStripNum: { fontSize: 17, fontWeight: "700", color: colors.textPrimary },
+  statStripLbl: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginTop: 2,
+  },
   // Badges
   badgeSectionBlock: { marginBottom: 16 },
   badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textSecondary, marginBottom: 8, paddingHorizontal: 12 },

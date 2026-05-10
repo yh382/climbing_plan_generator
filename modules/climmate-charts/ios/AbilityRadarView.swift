@@ -49,7 +49,9 @@ private struct AbilityRadarSwiftUI: View {
             let radius = size / 2 - 44
 
             ZStack {
-                // 5 grid levels
+                // 5 pentagonal grid levels — vertex-aligned with the 5
+                // ability axes (Hevy-style would use circles, but pentagon
+                // reads better when the axes are the primary structure).
                 ForEach([20, 40, 60, 80, 100], id: \.self) { level in
                     let r = radius * Double(level) / 100
                     let pts = gridPoints(center: center, radius: r)
@@ -59,7 +61,8 @@ private struct AbilityRadarSwiftUI: View {
                         .stroke(gridStroke, lineWidth: 1)
                 }
 
-                // 5 axis lines
+                // 5 axis lines (still polygon-aligned so labels read
+                // alongside their axis)
                 ForEach(0..<5, id: \.self) { i in
                     Path { p in
                         p.move(to: center)
@@ -68,27 +71,17 @@ private struct AbilityRadarSwiftUI: View {
                     .stroke(gridStroke, lineWidth: 1)
                 }
 
-                // Data polygon
+                // Data polygon (no vertex dots — matches the Hevy reference;
+                // shape carries the value, dots add visual noise)
                 let dataPts = dataPolygonPoints(center: center, radius: radius)
                 Polygon(points: dataPts)
                     .fill(dataColor.opacity(0.4))
                 Polygon(points: dataPts)
                     .stroke(dataColor, lineWidth: 2)
 
-                // Data point dots
+                // Axis labels at 112% radius
                 ForEach(0..<5, id: \.self) { i in
-                    let val = data[keyPath: axes[i].value]
-                    let pt = pointOnCircle(center: center, radius: radius * val / 100, angleIndex: i)
-                    Circle()
-                        .fill(dataColor)
-                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                        .frame(width: 8, height: 8)
-                        .position(pt)
-                }
-
-                // Axis labels at 116% radius (matches RN getPoint(116, ...))
-                ForEach(0..<5, id: \.self) { i in
-                    let labelPt = pointOnCircle(center: center, radius: radius * 1.16, angleIndex: i)
+                    let labelPt = pointOnCircle(center: center, radius: radius * 1.12, angleIndex: i)
                     Text(axes[i].label)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(labelColor)

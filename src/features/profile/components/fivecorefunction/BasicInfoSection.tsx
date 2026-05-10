@@ -23,9 +23,13 @@ import type { HeaderViewModel } from "../basicinfo/types";
 export default function BasicInfoSection({
   user,
   styles,
+  hideRadar = false,
 }: {
   user: HeaderViewModel;
   styles: any;
+  /** When true, the ability radar block is omitted — used in the body-info
+   *  sheet where the radar already lives in the parent card. */
+  hideRadar?: boolean;
 }) {
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
@@ -60,7 +64,7 @@ export default function BasicInfoSection({
       </TouchableOpacity>
 
       {/* 2) Ability Radar */}
-      <AbilityRadar data={radarData} styles={styles} />
+      {hideRadar ? null : <AbilityRadar data={radarData} styles={styles} />}
 
       {/* 3) Anthropometrics */}
       <AnthropometricCard styles={styles} profile={profile} user={user} />

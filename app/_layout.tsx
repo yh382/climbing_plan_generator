@@ -155,6 +155,62 @@ function RootStack() {
           ),
         }}
       />
+      {/* Analysis CSM help — native formSheet (sheet-container-audit A1).
+          Title is overridden inside app/csm-help.tsx with tr(). */}
+      <Stack.Screen
+        name="csm-help"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      {/* Outdoor grade range picker — formSheet (sheet-container-audit A1).
+          Reads/writes useOutdoorFiltersStore. Title overridden in route. */}
+      <Stack.Screen
+        name="outdoor-grade-range"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      {/* Outdoor create-list — formSheet (sheet-container-audit A1).
+          Writes useOutdoorSheetHandoffStore.lastCreatedList on success. */}
+      <Stack.Screen
+        name="outdoor-create-list"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      {/* Session log workout — formSheet (sheet-container-audit A1).
+          Emits via useSessionSheetHandoffStore on save. */}
+      <Stack.Screen
+        name="session-log-workout"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
     </Stack>
   );
 }

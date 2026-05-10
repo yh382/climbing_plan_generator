@@ -123,6 +123,14 @@ export const communityApi = {
   getUserPosts: (userId: string, skip = 0, limit = 20) =>
     api.get<UserPostOut[]>(`/posts/user/${userId}?skip=${skip}&limit=${limit}`),
 
+  // KAYA mode: sends = a user's video log posts. Reuses /posts/user/{id}
+  // with attachment_type=log + has_video=true filter (Window β).
+  getUserSends: (userId: string, skip = 0, limit = 20) =>
+    api.get<UserPostOut[]>(
+      `/posts/user/${userId}?skip=${skip}&limit=${limit}` +
+        `&attachment_type=log&has_video=true`,
+    ),
+
   getGymPosts: (gymId: string, skip = 0, limit = 20) =>
     api.get<any[]>(`/posts?gym_id=${gymId}&skip=${skip}&limit=${limit}`),
 

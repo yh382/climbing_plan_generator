@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { View, StyleSheet, Share, useWindowDimensions, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, Share, useWindowDimensions, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,17 +12,18 @@ import { useThemeColors } from "@/lib/useThemeColors";
 const NATIVE_TAB_BAR_HEIGHT = 49;
 import { api } from "../../../../src/lib/apiClient";
 
-import PostsSection from "../../../../src/features/profile/components/fivecorefunction/PostsSection";
-import BadgesSection from "../../../../src/features/profile/components/fivecorefunction/BadgesSection";
-import StatsSection from "../../../../src/features/profile/components/StatsSection";
+import SendsSection from "../../../../src/features/profile/components/fivecorefunction/SendsSection";
+import StatsAndBadgesSection from "../../../../src/features/profile/components/fivecorefunction/StatsAndBadgesSection";
 import ListsSection from "../../../../src/features/outdoor/components/ListsSection";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import useLogsStore from "../../../../src/store/useLogsStore";
 import { calculateKPIs } from "../../../../src/services/stats";
+import { useBadgesProgress } from "@/features/community/hooks";
 
 import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
-import ProfileTabBar from "../../../../src/components/shared/ProfileTabBar";
-const TABS = ["posts", "stats", "badges", "lists"] as const;
+import ProfileTabBar, { PROFILE_TABS } from "../../../../src/components/shared/ProfileTabBar";
+
+const TABS: readonly ["sends", "stats", "lists"] = ["sends", "stats", "lists"];
 
 // COMPAT 用白图标对抗 cover 图（iOS 17/18 没有 Liquid Glass 容器）；iOS 26
 // SF Symbol 落在 Liquid Glass capsule 里，黑图标对比更柔和。
@@ -236,24 +237,22 @@ export default function ProfileScreen() {
     };
   }, [me, profile, kpis]);
 
-  const [activeTab, setActiveTab] = useState<string>("posts");
-  const [expandBody, setExpandBody] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("sends");
 
   // React to navigation params
   useEffect(() => {
-    if (
-      params.initialTab === "stats" ||
-      params.initialTab === "badges" ||
-      params.initialTab === "lists"
-    ) {
-      setActiveTab(params.initialTab);
-      const idx = TABS.indexOf(params.initialTab);
+    // Legacy "badges" deep-links collapse onto the stats segment; lists
+    // gets its own segment now.
+    let target: (typeof TABS)[number] | null = null;
+    if (params.initialTab === "lists") target = "lists";
+    else if (params.initialTab === "stats" || params.initialTab === "badges")
+      target = "stats";
+    if (target) {
+      setActiveTab(target);
+      const idx = TABS.indexOf(target);
       pagerRef.current?.setPage(idx);
     }
-    if (params.expandBody === "true") {
-      setExpandBody(true);
-    }
-  }, [params.initialTab, params.expandBody]);
+  }, [params.initialTab]);
 
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollY = useSharedValue(0);
@@ -261,7 +260,21 @@ export default function ProfileScreen() {
     scrollY.value = e.contentOffset.y;
   });
 
-  const gradeDisplay = `${user.stats.boulderGrade}/${user.stats.routeGrade}`;
+  // ── Phase 6: 4-up stat strip below cover ──
+  const { badges: rawBadges } = useBadgesProgress();
+  const unlockedBadgesCount = useMemo(
+    () => rawBadges.filter((b: any) => b?.isAwarded).length,
+    [rawBadges],
+  );
+  const statStripItems = useMemo(
+    () => [
+      { num: user.stats.boulderGrade, lbl: "B Best" },
+      { num: user.stats.routeGrade, lbl: "R Best" },
+      { num: String(user.stats.totalSends ?? 0), lbl: "Sends" },
+      { num: String(unlockedBadgesCount), lbl: "Badges" },
+    ],
+    [user.stats, unlockedBadgesCount],
+  );
 
   // --------------------- pager (swipe tabs) ---------------------
   const pagerRef = useRef<PagerView>(null);
@@ -269,7 +282,7 @@ export default function ProfileScreen() {
 
   // Shared value driven by PagerView onPageScroll for smooth tab indicator animation
   const tabScrollPosition = useSharedValue(
-    TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts"),
+    Math.max(0, TABS.indexOf("sends" as (typeof TABS)[number])),
   );
 
   // Track content height per tab page so PagerView grows to fit
@@ -332,24 +345,39 @@ export default function ProfileScreen() {
           avatarUrl={user.avatar}
           coverUrl={me?.cover_url ?? null}
           bio={user.bio || null}
-          location={user.location || null}
           homeGym={user.homeGym || null}
           followersCount={followCounts.followers}
           followingCount={followCounts.following}
-          gradeDisplay={gradeDisplay}
-          totalSends={user.stats.totalSends}
-          isOwnProfile={isOwnProfile}
+          viewMode={isOwnProfile ? "self" : "other"}
           onEditPress={() => router.push("/profile/edit")}
           onFollowersPress={() => router.push("/profile/followers" as any)}
           onFollowingPress={() => router.push("/profile/following" as any)}
-          onAscentsPress={
-            me?.id
-              ? () => router.push(`/users/${me.id}/ascents` as any)
-              : undefined
-          }
-          headerTitleAnimStyle={{}}
           scrollY={scrollY}
         />
+
+        {/* Content shell: rounded top corners + -24 overlap into cover (mockup) */}
+        <View style={styles.contentShell}>
+          {/* Phase 6: 4-up stat strip — tap → user ascents page (replaces
+              the old ProfileHeader Grade/Sends row's onAscentsPress entry). */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View ascents history"
+            onPress={() => {
+              if (me?.id) router.push(`/users/${me.id}/ascents` as any);
+            }}
+            style={({ pressed }) => [
+              styles.statStrip,
+              pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            {statStripItems.map((it) => (
+              <View key={it.lbl} style={styles.statStripCell}>
+                <Text style={styles.statStripNum}>{it.num}</Text>
+                <Text style={styles.statStripLbl}>{it.lbl}</Text>
+              </View>
+            ))}
+          </Pressable>
+        </View>
 
         {/* [1] Tab bar (sticky) */}
         <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
@@ -357,30 +385,40 @@ export default function ProfileScreen() {
         <PagerView
           ref={pagerRef}
           style={{ height: pagerHeight }}
-          initialPage={TABS.indexOf((params.initialTab as (typeof TABS)[number]) || "posts")}
+          initialPage={Math.max(
+            0,
+            TABS.indexOf(
+              (params.initialTab === "sends" ||
+              params.initialTab === "stats" ||
+              params.initialTab === "lists"
+                ? params.initialTab
+                : "sends") as (typeof TABS)[number],
+            ),
+          )}
           onPageScroll={onPageScroll}
           onPageSelected={onPageSelected}
           onPageScrollStateChanged={onPageScrollStateChanged}
           overdrag
         >
-          <View key="posts" style={styles.contentArea}>
+          <View key="sends" style={styles.contentArea}>
             <View onLayout={handlePageLayout(0)}>
-              <PostsSection />
+              {me?.id ? <SendsSection userId={me.id} viewMode="self" /> : null}
             </View>
           </View>
           <View key="stats" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(1)}>
-              {headerVM ? <StatsSection user={headerVM} styles={styles} initialExpandBody={expandBody} scrollRef={scrollRef as any} /> : null}
-            </View>
-          </View>
-          <View key="badges" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(2)}>
-              <BadgesSection styles={styles} />
+            <View onLayout={handlePageLayout(1)} style={{ minHeight: screenHeight * 0.6 }}>
+              {headerVM ? (
+                <StatsAndBadgesSection user={headerVM} parentStyles={styles} />
+              ) : null}
             </View>
           </View>
           <View key="lists" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(3)} style={{ minHeight: screenHeight * 0.6 }}>
-              <ListsSection userId={viewedUserId} showCreate={isOwnProfile} contentPaddingHorizontal={16} inScrollView />
+            <View onLayout={handlePageLayout(2)} style={{ minHeight: screenHeight * 0.6 }}>
+              <ListsSection
+                showCreate
+                contentPaddingHorizontal={16}
+                inScrollView
+              />
             </View>
           </View>
         </PagerView>
@@ -432,6 +470,41 @@ export default function ProfileScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   contentArea: { minHeight: 300, backgroundColor: colors.background },
+
+  // Mockup: white card "上吸" into cover via rounded top + negative margin
+  // so the rounded corners carve into the cover image. Radius matched by
+  // ProfileHeader's COVER_OVERLAP so cover image fills the cut-out area.
+  contentShell: {
+    backgroundColor: colors.background,
+    marginTop: -35,
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    paddingTop: 4,
+  },
+  statStrip: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  statStripCell: { flex: 1, alignItems: "center" },
+  statStripNum: {
+    fontSize: 17,
+    fontWeight: "700",
+    fontFamily: theme.fonts.monoMedium,
+    color: colors.textPrimary,
+  },
+  statStripLbl: {
+    fontSize: 10,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginTop: 2,
+  },
 
   basicInfoContainer: { padding: 16, backgroundColor: colors.background },
   analysisCard: {

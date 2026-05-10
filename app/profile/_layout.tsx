@@ -23,6 +23,10 @@ export default function ProfileLayout() {
       <Stack.Screen name="saved" options={{ title: "Saved", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="lists" options={{ headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="lists/[listId]" options={{ headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      {/* recent-climbs / body-info are formSheet routes — registered in
+          app/_layout.tsx (root native-stack) instead of here, because
+          presentation: 'formSheet' on a nested-stack screen can fall back
+          to a regular push animation. */}
     </Stack>
   );
 }
