@@ -31,12 +31,10 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { key: "plan", label: "Plan Library", icon: "clipboard-outline", route: "/library/plans" },
-  { key: "exercise", label: "Exercise Library", icon: "barbell-outline", route: "/library/exercise-categories" },
-  { key: "lists", label: "My Lists", icon: "list-outline", route: "/profile/lists" },
-  { key: "blog", label: "Blog", icon: "reader-outline", route: "/blog" },
+  { key: "plan", label: "Templates", icon: "clipboard-outline", route: "/library/plans" },
+  { key: "exercise", label: "Exercises", icon: "barbell-outline", route: "/library/exercise-categories" },
   { key: "challenge", label: "Challenges", icon: "trophy-outline", route: "/community/challenges" },
-  { key: "event", label: "Events", icon: "calendar-outline", route: "/community/events" },
+  { key: "lists", label: "My Lists", icon: "list-outline", route: "/profile/lists" },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -104,6 +102,7 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
     <View style={drawerWrapStyles.root}>
       <DrawerContentScrollView
         {...props}
+        style={drawerWrapStyles.scrollFlex}
         contentContainerStyle={styles.scroll}
       >
         <View style={styles.titleRow}>
@@ -119,9 +118,10 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
             onPress={() => handlePress(item.route)}
           />
         ))}
+      </DrawerContentScrollView>
 
+      <View style={styles.bottomSection}>
         <View style={styles.divider} />
-
         {BOTTOM_ITEMS.map((item) => (
           <DrawerRow
             key={item.key}
@@ -131,7 +131,8 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
             onPress={() => handlePress(item.route)}
           />
         ))}
-      </DrawerContentScrollView>
+      </View>
+
       <Animated.View
         pointerEvents="none"
         style={[drawerWrapStyles.overlay, overlayStyle]}
@@ -142,6 +143,7 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
 
 const drawerWrapStyles = StyleSheet.create({
   root: { flex: 1 },
+  scrollFlex: { flex: 1 },
   overlay: {
     position: "absolute",
     top: 0,
@@ -178,6 +180,10 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.border,
       marginVertical: 16,
+    },
+    bottomSection: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
     },
   });
 

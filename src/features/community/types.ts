@@ -46,13 +46,13 @@ export interface UserPostOut {
 }
 
 export interface RankOut {
-  userId: string;
+  user_id: string;
   username?: string;
-  avatarUrl?: string;
-  totalPoints: number;
-  boulderPoints: number;
-  ropePoints: number;
-  rankPosition?: number;
+  avatar_url?: string;
+  total_points: number;
+  boulder_points: number;
+  rope_points: number;
+  rank_position?: number;
 }
 
 export interface BadgeProgressOut {

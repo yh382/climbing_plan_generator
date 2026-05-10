@@ -102,13 +102,26 @@ function RootStack() {
       />
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="gyms" options={{ headerShown: false }} />
-      <Stack.Screen name="map" options={{ headerShown: false }} />
       <Stack.Screen name="analysis" options={{ ...NATIVE_HEADER_LARGE, headerShown: true }} />
       <Stack.Screen name="action" options={{ headerShown: false }} />
       <Stack.Screen name="change-password" options={{ ...NATIVE_HEADER_BASE, headerShown: true, headerBackTitle: "", headerBackButtonDisplayMode: "minimal" }} />
       <Stack.Screen name="settings" options={{ headerShown: false }} />
       <Stack.Screen name="gym-community" options={{ ...NATIVE_HEADER_BASE, headerShown: true }} />
       <Stack.Screen name="inbox" options={{ headerShown: false }} />
+      {/* Coach pushed from Home — root-managed Stack provides back chevron. */}
+      <Stack.Screen
+        name="coach"
+        options={{
+          ...NATIVE_HEADER_BASE,
+          headerShown: true,
+          headerBackTitle: "",
+          headerBackButtonDisplayMode: "minimal",
+          headerTransparent: HEADER_TRANSPARENT,
+          scrollEdgeEffects: { top: "soft" },
+        }}
+      />
+      {/* Legacy /climmate deeplink redirect — see app/climmate/index.tsx */}
+      <Stack.Screen name="climmate" options={{ headerShown: false }} />
     </Stack>
   );
 }

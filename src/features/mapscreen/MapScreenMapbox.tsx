@@ -34,6 +34,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useThemeColors } from '../../lib/useThemeColors';
+import { getMapSheetBottomInset } from '../../lib/sheetInsets';
 import { useSettings } from '../../contexts/SettingsContext';
 import { theme } from '../../lib/theme';
 import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
@@ -1242,7 +1243,7 @@ export default function MapScreenMapbox({
         onDetentChange={sheet.onDetentChange}
       >
         {mode.kind === 'gyms' ? (
-          <View style={[styles.gymsSheetContent, { paddingBottom: insets.bottom }]}>
+          <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
             <GymList
               gyms={gyms}
               areas={gymsData.areas}
@@ -1275,7 +1276,7 @@ export default function MapScreenMapbox({
               {
                 paddingTop:
                   mode.kind === 'area' && !searchExpanded ? 76 : 4,
-                paddingBottom: insets.bottom + 20,
+                paddingBottom: getMapSheetBottomInset(insets) + 20,
               },
             ]}
             showsVerticalScrollIndicator={false}
@@ -1473,7 +1474,7 @@ export default function MapScreenMapbox({
             content layer; the native footer view is mounted later by
             TrueSheet's container, so its z-order is on top of both. */}
         <ScrollView
-          contentContainerStyle={[styles.detailScrollContent, { paddingBottom: insets.bottom + 8 }]}
+          contentContainerStyle={[styles.detailScrollContent, { paddingBottom: getMapSheetBottomInset(insets) + 8 }]}
           showsVerticalScrollIndicator={false}
         >
           {detailGym && (

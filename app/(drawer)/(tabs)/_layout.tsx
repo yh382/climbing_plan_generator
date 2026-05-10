@@ -71,7 +71,20 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
-      {/* 3. Community */}
+      {/* 3. Map */}
+      <NativeTabs.Trigger name="map">
+        {isIOS ? (
+          <NativeTabs.Trigger.Icon sf={{ default: "map", selected: "map.fill" }} />
+        ) : (
+          <NativeTabs.Trigger.Icon src={{
+            default: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="map-outline" />,
+            selected: <NativeTabs.Trigger.VectorIcon family={Ionicons} name="map" />,
+          }} />
+        )}
+        <NativeTabs.Trigger.Label>Map</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      {/* 4. Community */}
       <NativeTabs.Trigger name="community">
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
@@ -84,7 +97,7 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Community</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
-      {/* 4. Profile */}
+      {/* 5. Profile */}
       <NativeTabs.Trigger name="profile">
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -95,12 +108,6 @@ export default function TabsLayout() {
           }} />
         )}
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      {/* 5. Climmate — separated (role="search" triggers iOS 26 floating pill) */}
-      <NativeTabs.Trigger name="climmate" role="search">
-        <NativeTabs.Trigger.Icon src={require("../../../assets/images/tab_climmate.png")} renderingMode="template" />
-        <NativeTabs.Trigger.Label>Climmate</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

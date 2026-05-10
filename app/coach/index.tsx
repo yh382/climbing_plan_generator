@@ -5,7 +5,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Stack } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { NativeTextView } from "../../../../modules/native-input/src";
+import { NativeTextView } from "../../modules/native-input/src";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
@@ -65,7 +65,6 @@ export default function ClimmateScreen() {
     navigation.setOptions({
       ...withHeaderTheme(colors),
       title: "Coach Paddi",
-      headerLeft: () => null,
     });
   }, [navigation, colors]);
 
@@ -84,7 +83,10 @@ export default function ClimmateScreen() {
     return () => { show.remove(); hide.remove(); };
   }, []);
 
-  // Auto-focus input when tab gains focus
+  // Auto-focus input on screen entry. Window α: Coach moved from tab to push
+  // route — increased delay (150 → 350ms) so push transition + native input
+  // mount complete before requesting first-responder, otherwise iOS swallows
+  // the focus mid-animation.
   useFocusEffect(
     useCallback(() => {
       const timer = setTimeout(() => {
@@ -92,7 +94,7 @@ export default function ClimmateScreen() {
         if (Platform.OS === "android") {
           androidInputRef.current?.focus();
         }
-      }, 150);
+      }, 350);
       return () => clearTimeout(timer);
     }, []),
   );

@@ -20,8 +20,6 @@ import { useChatStore } from "../../store/useChatStore";
 import GymsTab from "./gyms/GymsTab";
 import ScrollToTopFab from "./components/ScrollToTopFab";
 import { setBlockVideoTaps } from "@/components/shared/MediaCarousel";
-import { pickMediaFromLibrary } from "@/lib/mediaPicker";
-import { setPendingMedia } from "./pendingMedia";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -87,30 +85,15 @@ export default function CommunityScreen() {
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [commentPostOwnerId, setCommentPostOwnerId] = useState<string | undefined>(undefined);
   const [commentPostCount, setCommentPostCount] = useState<number | undefined>(undefined);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res = await communityApi.getUnreadCount();
-      setUnreadNotifCount(res.count ?? 0);
-    } catch {
-      // silently ignore
-    }
-  }, []);
-
-  // Poll unread count every 30s — ONLY when this screen is focused.
-  // Previously used useEffect() which kept polling in background → battery drain.
+  // Chat unread polling — drives the global chat badge (consumed elsewhere).
+  // Notification unread polling moved to home toolbar's inbox icon.
   useFocusEffect(
     useCallback(() => {
-      fetchUnreadCount();
-      pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
       startUnreadPolling();
       return () => {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         stopUnreadPolling();
       };
-    }, [fetchUnreadCount, startUnreadPolling, stopUnreadPolling])
+    }, [startUnreadPolling, stopUnreadPolling]),
   );
 
   // Fetch feed on mount
@@ -139,14 +122,7 @@ export default function CommunityScreen() {
     }
   }, [routeParams.tab]);
 
-  const toggleMode = useCallback(() => {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(150, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
-    );
-    setMode((m) => (m === "feed" ? "gyms" : "feed"));
-  }, []);
-
-  // Native iOS header (no large title — Toolbar button shows mode)
+  // Native iOS header (no large title)
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -305,47 +281,8 @@ export default function CommunityScreen() {
 
   return (
     <>
-      {/* 左侧: [+] [⇌ Feed/Gyms] — 两个独立胶囊 */}
-      <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button
-          icon="plus"
-          onPress={async () => {
-            const items = await pickMediaFromLibrary({ maxSelect: 10 });
-            if (items.length === 0) return;
-            setPendingMedia(items);
-            router.push("/community/create" as any);
-          }}
-        />
-        <Stack.Toolbar.Button
-          separateBackground
-          onPress={toggleMode}
-          style={{ fontWeight: "700" }}
-        >
-          {mode === "feed" ? "⇌ Feed" : "⇌ Gyms"}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
-
-      {/* 右侧: [🏆 rank] [📥 inbox] — rank 独立页；inbox 合并 chat + notifications（AB 切到 /inbox）*/}
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon="trophy"
-          onPress={() => router.push("/community/rank" as any)}
-        />
-        <Stack.Toolbar.Button
-          icon="tray"
-          onPress={() => {
-            setUnreadNotifCount(0);
-            router.push("/inbox" as any);
-          }}
-        >
-          {/* Badge 方案 A: 沿用现有 fontSize:1 + 空字符串 hack，保留默认 iOS 红点。
-              Stack.Toolbar.Badge 底层是 text badge 组件，style 无法改 backgroundColor；
-              若 A 在实机不显示，切方案 B 自绘 absolute-positioned <View style={styles.unreadDot}/>。 */}
-          {(totalUnread > 0 || unreadNotifCount > 0) && (
-            <Stack.Toolbar.Badge style={{ fontSize: 1 }}>{''}</Stack.Toolbar.Badge>
-          )}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+      {/* Topbar 极简: 仅 For You / Following segment（在 feedListHeader 内）。
+          rank → home RankCard；inbox → home toolbar；compose → 由 γ 删除路由。 */}
 
       {/* Feed FlatList (mode === "gyms" 时隐藏) */}
       <FlatList
