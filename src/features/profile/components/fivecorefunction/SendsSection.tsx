@@ -144,15 +144,15 @@ export default function SendsSection({ userId, viewMode }: SendsSectionProps) {
         <Ionicons name="videocam-outline" size={36} color={colors.border} />
         <Text style={styles.emptyTitle}>
           {tr(
-            viewMode === "self" ? "还没有视频 send" : "暂无视频 send",
+            viewMode === "self" ? "还没有 send" : "暂无 send",
             "No sends yet",
           )}
         </Text>
         {viewMode === "self" ? (
           <Text style={styles.emptyHint}>
             {tr(
-              "记录攀登时附上视频，它会出现在这里",
-              "Log a climb with video to see your sends here",
+              "记录攀登，它会出现在这里",
+              "Log a climb and it will appear here",
             )}
           </Text>
         ) : null}
