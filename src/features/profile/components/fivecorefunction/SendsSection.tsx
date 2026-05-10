@@ -64,10 +64,20 @@ export default function SendsSection({ userId, viewMode }: SendsSectionProps) {
 
   useEffect(() => {
     if (!userId) return;
-    if (!cache || cache.items.length === 0) {
+    // Only fetch when there's no cache entry at all. Once `fetchUserSends`
+    // starts it writes a `{ loading: true, items: [] }` row, so subsequent
+    // re-renders that update `cache` don't retrigger us.
+    //
+    // BUGFIX: previously this depended on `cache` and gated on
+    // `cache.items.length === 0`, which created a tight refetch loop —
+    // every `set()` produced a new `cache` reference, useEffect re-fired,
+    // and users with zero video sends never satisfied the
+    // `items.length > 0` exit condition.
+    if (!cache) {
       fetchUserSends(userId);
     }
-  }, [userId, cache, fetchUserSends]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, fetchUserSends]);
 
   const items = cache?.items ?? [];
   const initialLoading = !cache || (cache.loading && items.length === 0);
