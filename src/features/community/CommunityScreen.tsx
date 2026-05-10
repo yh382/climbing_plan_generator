@@ -38,9 +38,9 @@ export default function CommunityScreen() {
   const currentUserId = useUserStore((s) => s.user?.id);
   const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
 
-  // Upload progress UI is now driven by the global Live Activity (see
-  // postUploadManager → uploadActivityBridge). Errors surface their own Alert
-  // from postUploadManager; nothing for this screen to track locally.
+  // Upload progress UI is driven by the global Live Activity surface
+  // (uploadActivityBridge). KAYA: post creation now happens implicitly via
+  // auto-share when a climb log includes video — no compose flow on this screen.
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -196,18 +196,6 @@ export default function CommunityScreen() {
           setBlockVideoTaps(true);
           try { await Share.share({ message: 'Check out this post on ClimMate!' }); } catch {}
           setBlockVideoTaps(false);
-        }}
-        onEdit={() => {
-          const mediaUrls = (item.media || []).map((m: any) => m.url).filter(Boolean);
-          router.push({
-            pathname: "/community/create",
-            params: {
-              postId: item.id,
-              editContent: item.content || "",
-              editMedia: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : undefined,
-              editVisibility: "public",
-            },
-          });
         }}
         onDelete={() => {
           Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [

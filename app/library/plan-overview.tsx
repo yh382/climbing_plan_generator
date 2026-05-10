@@ -355,22 +355,6 @@ export default function PlanOverviewScreen() {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis.circle">
           <Stack.Toolbar.MenuAction
-            icon="square.and.pencil"
-            onPress={() => {
-              router.push({
-                pathname: '/community/create',
-                params: {
-                  prefillAttachType: 'plan',
-                  prefillAttachId: planId,
-                  prefillAttachTitle: plan?.title || '',
-                  prefillAttachSubtitle: `${totalWeeks} weeks · ${sessionsPerWeek || '—'} sessions/wk · ${plan?.trainingType || ''}`,
-                },
-              });
-            }}
-          >
-            Share to Post
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
             icon="square.and.arrow.up"
             onPress={async () => {
               await Share.share({ message: `Check out "${plan?.title}" training plan on ClimMate!` });

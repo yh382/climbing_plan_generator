@@ -109,18 +109,6 @@ export default function SinglePostScreen() {
           onShare={async () => {
             try { await Share.share({ message: "Check out this post on ClimMate!" }); } catch {}
           }}
-          onEdit={isOwn ? () => {
-            const mediaUrls = (post.media || []).map((m) => m.url).filter(Boolean);
-            router.push({
-              pathname: "/community/create",
-              params: {
-                postId: post.id,
-                editContent: post.content || "",
-                editMedia: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : undefined,
-                editVisibility: "public",
-              },
-            });
-          } : undefined}
           onDelete={isOwn ? () => {
             Alert.alert("Delete Post", "Are you sure?", [
               { text: "Cancel", style: "cancel" },

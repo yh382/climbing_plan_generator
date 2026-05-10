@@ -158,22 +158,6 @@ export default function UserPostsScreen() {
           } catch {}
         }}
         isOwn={!!currentUserId && item.user?.id === currentUserId}
-        onEdit={
-          currentUserId && item.user?.id === currentUserId
-            ? () => {
-                const mediaUrls = (item.media || []).map((m: any) => m.url).filter(Boolean);
-                router.push({
-                  pathname: "/community/create",
-                  params: {
-                    postId: item.id,
-                    editContent: item.content || "",
-                    editMedia: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : undefined,
-                    editVisibility: "public",
-                  },
-                });
-              }
-            : undefined
-        }
         onDelete={
           currentUserId && item.user?.id === currentUserId
             ? () => {

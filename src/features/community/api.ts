@@ -69,10 +69,9 @@ export async function uploadSingleFileToR2(
 
 export async function uploadPostMedia(
   items: PickedMediaItem[],
-  /** R2 presign category. Defaults to `'posts'` to preserve behavior for
-   *  existing callers (community/create, journal/LogSendModal, etc.).
-   *  New callers can pass a different category — e.g. `'outdoor_routes'`
-   *  for user-submitted route photos — without touching the other sites. */
+  /** R2 presign category. Defaults to `'posts'`; callers can pass a
+   *  different category — e.g. `'outdoor_routes'` for user-submitted
+   *  route photos — without touching the other sites. */
   category: string = 'posts'
 ): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
   return Promise.all(

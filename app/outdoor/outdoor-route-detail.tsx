@@ -26,9 +26,7 @@ import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/G
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
-import BetaShareSheet, {
-  type BetaShareSheetHandle,
-} from '../../src/features/outdoor/components/BetaShareSheet';
+import useBetaShareHandoffStore from '../../src/store/useBetaShareHandoffStore';
 import { pickMediaFromLibrary } from '../../src/lib/mediaPicker';
 import type { PickedMediaItem } from '../../src/features/community/types';
 import {
@@ -215,12 +213,13 @@ export default function OutdoorRouteDetailPage() {
   const [pendingBetaVideo, setPendingBetaVideo] =
     useState<PickedMediaItem | null>(null);
 
-  const betaShareSheetRef = useRef<BetaShareSheetHandle | null>(null);
+  // BetaShareSheet migrated to formSheet route — sheet-container-audit A1.
+  const setPendingBetaShareVideo = useBetaShareHandoffStore((s) => s.setPendingVideo);
 
   // Picks a single video via system PHPicker, enforces the 90s cap, then
   // dispatches to either the send-integrated flow ('send' → re-open
   // OutdoorSendSheet with beta attached) or the standalone share flow
-  // ('direct' → present BetaShareSheet).
+  // ('direct' → push outdoor-beta-share formSheet).
   const pickAndDispatchBeta = useCallback(
     async (flow: 'send' | 'direct') => {
       if (!route) return;
@@ -242,15 +241,16 @@ export default function OutdoorRouteDetailPage() {
       }
       setSendSheetOpen(false);
       if (flow === 'direct') {
+        setPendingBetaShareVideo(videoItem);
         requestAnimationFrame(() => {
-          betaShareSheetRef.current?.present(videoItem);
+          router.push(`/outdoor-beta-share?routeId=${encodeURIComponent(route.id)}&routeKind=outdoor`);
         });
       } else {
         setPendingBetaVideo(videoItem);
         requestAnimationFrame(() => setSendSheetOpen(true));
       }
     },
-    [route, tr],
+    [route, tr, router, setPendingBetaShareVideo],
   );
 
   const onSendDone = useCallback(async (draft: OutdoorSendDraft) => {
@@ -311,8 +311,8 @@ export default function OutdoorRouteDetailPage() {
         updateUpload(uploadId, 0.6, 'uploading');
 
         let thumbnailUrl: string | undefined;
-        // Prefer the cover frame the user picked in cover-picker; fall back
-        // to auto-generated thumbnail if for some reason no coverUri is set.
+        // Prefer the caller-supplied cover frame; fall back to auto-generated
+        // thumbnail if for some reason no coverUri is set.
         const localThumbUri =
           pendingBetaVideo.coverUri ??
           (await (async () => {
@@ -616,16 +616,8 @@ export default function OutdoorRouteDetailPage() {
         routeName={route.name}
       />
 
-      {/* Pure share-beta sheet — opened from the camera button in the
-          action row. Skips the send log entirely: just a video preview +
-          comment + Submit. Parallel to the Send sheet's attached-beta
-          flow, which wraps a send log around the upload. */}
-      <BetaShareSheet
-        ref={(h) => {
-          betaShareSheetRef.current = h;
-        }}
-        routeId={route.id}
-      />
+      {/* Pure share-beta flow now lives at app/outdoor-beta-share.tsx
+          (sheet-container-audit A1). */}
     </>
   );
 }

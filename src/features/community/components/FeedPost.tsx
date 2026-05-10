@@ -59,11 +59,8 @@ interface Props {
   onPress: (userId: string) => void;
   onPressComment: (id: string) => void;
   onSave: (id: string) => void;
-  /** @deprecated Use isOwn + action callbacks instead */
-  onThreeDot?: () => void;
   isOwn?: boolean;
   onShare?: () => void;
-  onEdit?: () => void;
   onDelete?: () => void;
   onReport?: () => void;
 
@@ -127,10 +124,8 @@ function FeedPost({
   onPress,
   onPressComment,
   onSave,
-  onThreeDot,
   isOwn,
   onShare,
-  onEdit,
   onDelete,
   onReport,
   isVisible = true,
@@ -185,13 +180,12 @@ function FeedPost({
               )}
             </View>
           </TouchableOpacity>
-          {(onEdit || onDelete || onReport) ? (
+          {(onDelete || onReport) ? (
             <TouchableOpacity
               style={{ padding: 4 }}
               onPress={() => {
                 const options: string[] = [];
                 const actions: (() => void)[] = [];
-                if (isOwn && onEdit) { options.push("Edit"); actions.push(onEdit); }
                 if (isOwn && onDelete) { options.push("Delete"); actions.push(onDelete); }
                 if (!isOwn && onReport) { options.push("Report"); actions.push(onReport); }
                 options.push("Cancel");
