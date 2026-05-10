@@ -19,6 +19,8 @@ import useLogsStore from "@/store/useLogsStore";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import FeedPost from "@/features/community/components/FeedPost";
 import CommentSheet from "@/features/community/components/CommentSheet";
+import EditCaptionSheet from "@/features/community/components/EditCaptionSheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { communityApi } from "@/features/community/api";
 import { mapRawPost, toFeedPost } from "@/features/community/utils";
 import { useCommunityStore } from "@/store/useCommunityStore";
@@ -40,7 +42,9 @@ export default function UserPostsScreen() {
   // userId param may be missing when navigating from own profile
   const resolvedUserId = userId || currentUserId;
   const isOwn = !!currentUserId && resolvedUserId === currentUserId;
-  const { toggleLike, toggleSave, deletePost } = useCommunityStore();
+  const { toggleLike, toggleSave, deletePost, updatePost } = useCommunityStore();
+  const editCaptionSheetRef = useRef<TrueSheet>(null);
+  const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
 
   // Header
   useLayoutEffect(() => {
@@ -158,6 +162,14 @@ export default function UserPostsScreen() {
           } catch {}
         }}
         isOwn={!!currentUserId && item.user?.id === currentUserId}
+        onEdit={
+          currentUserId && item.user?.id === currentUserId
+            ? () => {
+                setEditingPost({ id: item.id, content: item.content || "" });
+                editCaptionSheetRef.current?.present();
+              }
+            : undefined
+        }
         onDelete={
           currentUserId && item.user?.id === currentUserId
             ? () => {
@@ -263,6 +275,17 @@ export default function UserPostsScreen() {
         postId={commentPostId ?? ""}
         postOwnerId={commentPostOwnerId}
         commentCount={commentPostCount}
+      />
+      <EditCaptionSheet
+        sheetRef={editCaptionSheetRef}
+        postId={editingPost?.id ?? null}
+        initialContent={editingPost?.content ?? ""}
+        onSave={async (id, content) => {
+          await updatePost(id, { content_text: content });
+          setPosts((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, content } : p))
+          );
+        }}
       />
     </>
   );

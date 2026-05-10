@@ -11,6 +11,8 @@ import { withHeaderTheme } from "@/lib/nativeHeaderOptions";
 import FeedPost from "./components/FeedPost";
 import { NativeSegmentedControl } from "@/components/ui";
 import CommentSheet from "./components/CommentSheet";
+import EditCaptionSheet from "./components/EditCaptionSheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 // SmartBottomSheet removed — replaced by inline popover
 import { useCommunityStore } from "../../store/useCommunityStore";
 import { useUserStore } from "../../store/useUserStore";
@@ -34,7 +36,7 @@ export default function CommunityScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
-  const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, deletePost } = useCommunityStore();
+  const { posts, toggleLike, toggleSave, fetchFeed, feedLoading, feedMode, setFeedMode, deletePost, updatePost } = useCommunityStore();
   const currentUserId = useUserStore((s) => s.user?.id);
   const { totalUnread, startUnreadPolling, stopUnreadPolling } = useChatStore();
 
@@ -178,6 +180,9 @@ export default function CommunityScreen() {
     minimumViewTime: 300,
   }).current;
 
+  const editCaptionSheetRef = useRef<TrueSheet>(null);
+  const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
+
   const renderItem = useCallback(({ item }: any) => {
     return (
       <FeedPost
@@ -196,6 +201,10 @@ export default function CommunityScreen() {
           setBlockVideoTaps(true);
           try { await Share.share({ message: 'Check out this post on ClimMate!' }); } catch {}
           setBlockVideoTaps(false);
+        }}
+        onEdit={() => {
+          setEditingPost({ id: item.id, content: item.content || '' });
+          editCaptionSheetRef.current?.present();
         }}
         onDelete={() => {
           Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
@@ -324,6 +333,15 @@ export default function CommunityScreen() {
         postId={commentPostId ?? ''}
         postOwnerId={commentPostOwnerId}
         commentCount={commentPostCount}
+      />
+
+      <EditCaptionSheet
+        sheetRef={editCaptionSheetRef}
+        postId={editingPost?.id ?? null}
+        initialContent={editingPost?.content ?? ''}
+        onSave={async (id, content) => {
+          await updatePost(id, { content_text: content });
+        }}
       />
 
     </>

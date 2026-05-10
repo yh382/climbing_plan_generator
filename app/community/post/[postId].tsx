@@ -1,6 +1,6 @@
 // app/community/post/[postId].tsx
 // Single post view — navigated from notification tap / deep link
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -17,6 +17,8 @@ import useLogsStore from "@/store/useLogsStore";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import FeedPost from "@/features/community/components/FeedPost";
 import CommentSheet from "@/features/community/components/CommentSheet";
+import EditCaptionSheet from "@/features/community/components/EditCaptionSheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { communityApi } from "@/features/community/api";
 import { mapRawPost, toFeedPost } from "@/features/community/utils";
 import { useCommunityStore } from "@/store/useCommunityStore";
@@ -30,7 +32,9 @@ export default function SinglePostScreen() {
   const navigation = useNavigation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { toggleLike, toggleSave, deletePost } = useCommunityStore();
+  const { toggleLike, toggleSave, deletePost, updatePost } = useCommunityStore();
+  const editCaptionSheetRef = useRef<TrueSheet>(null);
+  const [editingDraft, setEditingDraft] = useState<string>("");
   const currentUserId = useUserStore((s) => s.user?.id);
 
   useLayoutEffect(() => {
@@ -109,6 +113,10 @@ export default function SinglePostScreen() {
           onShare={async () => {
             try { await Share.share({ message: "Check out this post on ClimMate!" }); } catch {}
           }}
+          onEdit={isOwn ? () => {
+            setEditingDraft(post.content || "");
+            editCaptionSheetRef.current?.present();
+          } : undefined}
           onDelete={isOwn ? () => {
             Alert.alert("Delete Post", "Are you sure?", [
               { text: "Cancel", style: "cancel" },
@@ -170,6 +178,17 @@ export default function SinglePostScreen() {
           postId={postId as string}
           postOwnerId={post.user.id}
           commentCount={post.comments}
+        />
+      )}
+      {post && (
+        <EditCaptionSheet
+          sheetRef={editCaptionSheetRef}
+          postId={post.id}
+          initialContent={editingDraft}
+          onSave={async (id, content) => {
+            await updatePost(id, { content_text: content });
+            setPost((p) => (p ? { ...p, content } : p));
+          }}
         />
       )}
     </ScrollView>

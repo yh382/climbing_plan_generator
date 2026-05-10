@@ -61,6 +61,9 @@ interface Props {
   onSave: (id: string) => void;
   isOwn?: boolean;
   onShare?: () => void;
+  /** BA γ1.1: caption-only edit (no media / visibility — those derive
+   * from the source climb log). Caller opens an EditCaptionSheet. */
+  onEdit?: () => void;
   onDelete?: () => void;
   onReport?: () => void;
 
@@ -126,6 +129,7 @@ function FeedPost({
   onSave,
   isOwn,
   onShare,
+  onEdit,
   onDelete,
   onReport,
   isVisible = true,
@@ -180,12 +184,13 @@ function FeedPost({
               )}
             </View>
           </TouchableOpacity>
-          {(onDelete || onReport) ? (
+          {(onEdit || onDelete || onReport) ? (
             <TouchableOpacity
               style={{ padding: 4 }}
               onPress={() => {
                 const options: string[] = [];
                 const actions: (() => void)[] = [];
+                if (isOwn && onEdit) { options.push("Edit"); actions.push(onEdit); }
                 if (isOwn && onDelete) { options.push("Delete"); actions.push(onDelete); }
                 if (!isOwn && onReport) { options.push("Report"); actions.push(onReport); }
                 options.push("Cancel");
