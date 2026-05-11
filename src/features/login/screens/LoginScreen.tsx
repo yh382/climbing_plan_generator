@@ -10,11 +10,16 @@ import {
   Platform,
   ImageBackground,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StatusBar,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
+  Dimensions,
   useColorScheme,
 } from "react-native";
+
+const COVER_HEIGHT = Math.round(Dimensions.get("window").height * 0.35);
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -187,32 +192,45 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: colors.background }}
     >
-      {/* 1. 背景图区 (320px) */}
-      <ImageBackground source={loginBg} style={{ height: 320, width: '100%' }} resizeMode="cover">
-        <StatusBar barStyle="light-content" />
-        <LinearGradient
-          colors={isDark
-            ? ['rgba(0,0,0,0)', 'rgba(0,0,0,0.65)', '#000000']
-            : ['rgba(255,255,255,0)', 'rgba(255,255,255,0.65)', '#ffffff']}
-          locations={[0, 0.55, 1]}
-          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 180 }}
-        />
-      </ImageBackground>
+      {/* Cover + mascot region — tap to dismiss keyboard. The ScrollView
+          below already handles tap-to-dismiss via keyboardShouldPersistTaps,
+          but those props don't reach this region. */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View>
+          {/* 1. 背景图区 (35% of screen) */}
+          <ImageBackground source={loginBg} style={{ height: COVER_HEIGHT, width: '100%' }} resizeMode="cover">
+            <StatusBar barStyle="light-content" />
+            <LinearGradient
+              colors={isDark
+                ? ['rgba(0,0,0,0)', 'rgba(0,0,0,0.65)', '#000000']
+                : ['rgba(255,255,255,0)', 'rgba(255,255,255,0.65)', '#ffffff']}
+              locations={[0, 0.55, 1]}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 180 }}
+            />
+          </ImageBackground>
 
-      {/* 2. Mascot (叠加在图/白交界) */}
-      <View style={{ alignItems: 'center', marginTop: -40, marginBottom: 14, zIndex: 10 }}>
-        <View style={{
-          width: 80, height: 80, borderRadius: 40,
-          backgroundColor: colors.background, borderWidth: 3, borderColor: colors.border,
-          alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden',
-        }}>
-          <Image source={mascotImg} style={{ width: 58, height: 58, tintColor: isDark ? '#fff' : '#1C1C1E' }} resizeMode="contain" />
+          {/* 2. Mascot (叠加在图/白交界) */}
+          <View style={{ alignItems: 'center', marginTop: -40, marginBottom: 14, zIndex: 10 }}>
+            <View style={{
+              width: 80, height: 80, borderRadius: 40,
+              backgroundColor: colors.background, borderWidth: 3, borderColor: colors.border,
+              alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
+            }}>
+              <Image source={mascotImg} style={{ width: 58, height: 58, tintColor: isDark ? '#fff' : '#1C1C1E' }} resizeMode="contain" />
+            </View>
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
 
-      {/* 3. 白色表单区 */}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 22 }} keyboardShouldPersistTaps="handled">
+      {/* 3. 白色表单区 — flexGrow + space-between 把按钮组钉在底部，
+              与 Signup 屏的按钮组在同一 Y 位置。 */}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 22, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* 上区：title + subtitle + inputs + remember row */}
+        <View>
         {/* 标题 */}
         <Text style={{
           fontSize: 28, fontFamily: theme.fonts.black, color: colors.textPrimary,
@@ -265,7 +283,11 @@ export default function LoginScreen() {
             <Text style={{ fontSize: 13, color: colors.textTertiary }}>Forgot password?</Text>
           </Pressable>
         </View>
+        </View>
 
+        {/* 下区：Login 按钮 + or + social + Sign up link，钉在底部。
+              marginTop:16 保底防小机型上下区零间距挤压。 */}
+        <View style={{ marginTop: 16 }}>
         {/* Login 按钮 (深色胶囊) */}
         <Pressable
           onPress={onLogin} disabled={!canSubmit || loading}
@@ -313,6 +335,7 @@ export default function LoginScreen() {
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Sign up</Text>
           </Pressable>
         </View>
+        </View>{/* 下区 end */}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -323,7 +346,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingVertical: 11,
     marginBottom: 11,
   },
   inputText: {

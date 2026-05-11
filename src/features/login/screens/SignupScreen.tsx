@@ -11,7 +11,10 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  Dimensions,
 } from "react-native";
+
+const TOP_PADDING = Math.round(Dimensions.get("window").height * 0.07);
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -169,7 +172,12 @@ export default function SignupScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="dark-content" />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 80 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: TOP_PADDING, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* 上区：mascot + title + subtitle + 4 inputs */}
+        <View>
         {/* Mascot */}
         <View style={{ alignItems: 'center', marginBottom: 14 }}>
           <View style={{
@@ -248,7 +256,11 @@ export default function SignupScreen() {
         {confirm.length > 0 && !passwordsMatch ? (
           <Text style={styles.errorText}>{t("Passwords do not match")}</Text>
         ) : null}
+        </View>{/* 上区 end */}
 
+        {/* 下区：Create account + or + social + Log in link，钉在底部。
+              marginTop:16 保底防小机型上下区零间距挤压。 */}
+        <View style={{ marginTop: 16 }}>
         {/* Create account 按钮 */}
         <Pressable
           disabled={!canSubmit || loading}
@@ -291,12 +303,13 @@ export default function SignupScreen() {
         </TouchableOpacity>
 
         {/* 登录入口 */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, marginBottom: 40 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
           <Text style={{ fontSize: 13, color: colors.textTertiary }}>Already have an account? </Text>
           <Pressable onPress={() => router.back()}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Log in</Text>
           </Pressable>
         </View>
+        </View>{/* 下区 end */}
       </ScrollView>
     </View>
   );
@@ -308,14 +321,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '700',
     fontFamily: theme.fonts.bold,
     color: colors.textSecondary,
-    marginBottom: 6,
-    marginTop: 12,
+    marginBottom: 4,
+    marginTop: 8,
   },
   inputWrap: {
     backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingVertical: 11,
   },
   inputError: {
     borderWidth: 1,
@@ -343,7 +356,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 20,
   },
   darkPillText: {
     fontSize: 15,
