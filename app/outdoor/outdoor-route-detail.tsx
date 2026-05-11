@@ -481,8 +481,12 @@ export default function OutdoorRouteDetailPage() {
             // Optimistic add so the hero carousel updates without waiting
             // for the next focus refetch. The defensive delete branch
             // above intentionally skips this — no point promoting a beta
-            // we're about to tear down.
-            setBetas((prev) => [created, ...prev]);
+            // we're about to tear down. Dedupe by id in case a focus
+            // refetch raced ahead and already inserted this beta.
+            setBetas((prev) => [
+              created,
+              ...prev.filter((b) => b.id !== created.id),
+            ]);
           }
         }
 
@@ -655,7 +659,7 @@ export default function OutdoorRouteDetailPage() {
                 color={userHasSent ? SENDED_TICK : '#FFFFFF'}
               />
               <Text style={styles.primaryBtnText}>
-                {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}
+                {userHasSent ? tr('已完成', 'Sent') : tr('完成', 'Send')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

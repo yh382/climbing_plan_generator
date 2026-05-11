@@ -577,7 +577,7 @@ export default function GymRouteDetailPage() {
                   isArchived && { color: colors.textTertiary },
                 ]}
               >
-                {userHasSent ? tr('已完成', 'Sended') : tr('完成', 'Send')}
+                {userHasSent ? tr('已完成', 'Sent') : tr('完成', 'Send')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
