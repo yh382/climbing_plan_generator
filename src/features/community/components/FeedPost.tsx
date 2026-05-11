@@ -23,29 +23,15 @@ import MediaCarousel from "../../../components/shared/MediaCarousel";
 import { presentImageViewer } from "../../../../modules/climmate-image-viewer/src";
 import { PostAttachmentCard } from "../../../components/shared/PostAttachmentCard";
 
-function buildAttachmentProps(att: PostAttachment) {
-  if (att.type === "plan") {
-    return {
-      type: "plan" as const,
-      data: {
-        name: att.title,
-        totalWeeks: att.metrics?.find((m) => m.label === "Weeks")?.value || "—",
-        sessionsPerWeek:
-          att.metrics?.find((m) => m.label === "Sessions/wk")?.value || "—",
-        type: att.metrics?.find((m) => m.label === "Type")?.value || "—",
-      },
-    };
-  }
+function buildPlanProps(att: PostAttachment) {
   return {
-    type: "routeLog" as const,
+    type: "plan" as const,
     data: {
-      gymName: att.metrics?.find((m) => m.label === "Gym")?.value || "—",
-      date: att.metrics?.find((m) => m.label === "Date")?.value || "—",
-      sends: att.metrics?.find((m) => m.label === "Sends")?.value || "—",
-      bestGrade: att.metrics?.find((m) => m.label === "Best")?.value || "—",
-      duration: att.metrics?.find((m) => m.label === "Duration")?.value
-        || att.subtitle?.split(" · ")[2]
-        || "—",
+      name: att.title,
+      totalWeeks: att.metrics?.find((m) => m.label === "Weeks")?.value || "—",
+      sessionsPerWeek:
+        att.metrics?.find((m) => m.label === "Sessions/wk")?.value || "—",
+      type: att.metrics?.find((m) => m.label === "Type")?.value || "—",
     },
   };
 }
@@ -116,6 +102,73 @@ function ExpandableText({
         </TouchableOpacity>
       ) : null}
     </View>
+  );
+}
+
+
+function LogAttachmentBlock({
+  attachment,
+  gymName,
+  onPress,
+}: {
+  attachment: PostAttachment;
+  gymName?: string;
+  onPress: () => void;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const isSend = attachment.result === "send";
+  const grade = attachment.gradeText;
+  const routeName = attachment.routeName || attachment.title;
+  // route-sub: prefer gym name + wall type; fall back to subtitle from BE.
+  const subParts: string[] = [];
+  if (gymName) subParts.push(gymName);
+  if (attachment.wallType) subParts.push(attachment.wallType);
+  const routeSub = subParts.length > 0 ? subParts.join(" · ") : attachment.subtitle;
+
+  // result-row text — only render when NOT a send (send is conveyed by the pill).
+  let resultText: string | null = null;
+  if (!isSend && attachment.result) {
+    resultText = attachment.result === "attempt" ? "Attempt" : attachment.result;
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.logCard}
+      activeOpacity={0.7}
+      onPress={onPress}
+    >
+      {(grade || isSend) ? (
+        <View style={styles.pillRow}>
+          {grade ? (
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{grade}</Text>
+            </View>
+          ) : null}
+          {isSend ? (
+            <View style={[styles.pill, styles.pillSend]}>
+              <Text style={styles.pillText}>SEND</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      {routeName ? (
+        <Text style={styles.routeName} numberOfLines={2}>
+          {routeName}
+        </Text>
+      ) : null}
+      {routeSub ? (
+        <Text style={styles.routeSub} numberOfLines={1}>
+          {routeSub}
+        </Text>
+      ) : null}
+      {resultText ? (
+        <View style={styles.resultRow}>
+          <Text style={styles.resultText}>{resultText}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
   );
 }
 
@@ -242,12 +295,20 @@ function FeedPost({
 
       {/* 3. Attachment (shared card) - 图片下面 */}
       {post.attachment ? (
-        <View style={styles.attachmentBlock}>
-          <PostAttachmentCard
-            {...buildAttachmentProps(post.attachment)}
+        post.attachment.type === "plan" ? (
+          <View style={styles.attachmentBlock}>
+            <PostAttachmentCard
+              {...buildPlanProps(post.attachment)}
+              onPress={() => onPressAttachment(post)}
+            />
+          </View>
+        ) : (
+          <LogAttachmentBlock
+            attachment={post.attachment}
+            gymName={post.gymName}
             onPress={() => onPressAttachment(post)}
           />
-        </View>
+        )
       ) : null}
 
       {/* 4. Text (below card, expandable) - 卡片下面 */}
@@ -325,4 +386,48 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
   gymTag: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
   gymTagText: { fontSize: 12, fontFamily: theme.fonts.regular, color: colors.textSecondary },
+
+  // BF — Strava-mode log card (replaces routeLog PostAttachmentCard for log/session)
+  logCard: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
+    marginBottom: 6,
+  },
+  pillRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  pill: {
+    backgroundColor: colors.cardDark,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  pillSend: { backgroundColor: colors.accent },
+  pillText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fonts.monoMedium,
+    letterSpacing: 0.3,
+  },
+  routeName: {
+    fontSize: 17,
+    fontWeight: "700",
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  routeSub: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  resultRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  resultText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.regular,
+    color: colors.textSecondary,
+  },
 });

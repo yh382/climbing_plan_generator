@@ -145,16 +145,10 @@ export default function MediaSelectScreen() {
       .filter((m) => selectedIds.has(m.id))
       .map((m) => m.url);
 
-    const dateLabel = date || "—";
-
     router.push({
       pathname: "/community/create",
       params: {
         prefillMedia: JSON.stringify(selectedUrls),
-        prefillAttachType: "session",
-        prefillAttachId: sessionId!,
-        prefillAttachTitle: `${sessionInfo?.gymName} · ${dateLabel}`,
-        prefillAttachSubtitle: `${sessionInfo?.sends} sends · ${sessionInfo?.bestGrade} · ${sessionInfo?.duration}`,
         ...(localGymId && sessionInfo?.gymName ? { prefillGymId: localGymId, prefillGymName: sessionInfo.gymName } : {}),
       },
     });

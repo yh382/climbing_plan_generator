@@ -278,8 +278,14 @@ export default function CommunityScreen() {
 
   return (
     <>
-      {/* Topbar 极简: 仅 For You / Following segment（在 feedListHeader 内）。
-          rank → home RankCard；inbox → home toolbar；compose → 由 γ 删除路由。 */}
+      {/* BF — Strava-mode compose entry: native toolbar "+" button.
+          rank → home RankCard；inbox → home toolbar；compose → /community/create. */}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="plus"
+          onPress={() => router.push('/community/create' as any)}
+        />
+      </Stack.Toolbar>
 
       {/* Feed FlatList (mode === "gyms" 时隐藏) */}
       <FlatList

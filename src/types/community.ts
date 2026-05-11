@@ -28,6 +28,15 @@ export interface PostAttachment {
   userId?: string;
   /** Window AY — date (YYYY-MM-DD) of the referenced session. */
   date?: string;
+  /** Window BF — Strava-mode log card fields pulled from
+   *  attachment_meta flat keys (see services/auto_share.py). */
+  routeName?: string;
+  gradeText?: string;
+  /** Mirrors ClimbLog.result on the BE — narrow union mirrors the climb_log
+   *  schema (see climbing_plan_backend/schemas/climb_log.py); fallback string
+   *  kept so legacy posts that pre-date the enum still render. */
+  result?: 'send' | 'attempt' | 'flash' | 'onsight' | string;
+  wallType?: string;
 }
 
 // 媒体项（图片或视频）

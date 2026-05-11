@@ -75,6 +75,18 @@ export async function uploadPostMedia(
    *  for user-submitted route photos — without touching the other sites. */
   category: string = 'posts'
 ): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
+  // BF — Strava-mode invariants: ≤10 images / =1 video / mutually exclusive.
+  // Only enforced on the upload path so existing posts with looser composition
+  // (legacy mixed media, >10 images) still render unchanged on the read side.
+  // Non-'posts' categories (e.g. 'outdoor_routes' route photos) skip the gate.
+  if (category === 'posts' && items.length > 0) {
+    const allImages = items.every(i => i.mediaType === 'image');
+    const allVideos = items.every(i => i.mediaType === 'video');
+    if (!allImages && !allVideos) throw new Error('Mixed media types not allowed');
+    if (allImages && items.length > 10) throw new Error('Max 10 images per post');
+    if (allVideos && items.length > 1) throw new Error('Max 1 video per post');
+  }
+
   return Promise.all(
     items.map(async (item) => {
       let fileUri: string;

@@ -56,6 +56,12 @@ export function toFeedPost(post: UserPostOut): FeedPost {
       metrics: post.attachmentMeta?.metrics || undefined,
       userId: post.attachmentMeta?.user_id || undefined,
       date: post.attachmentMeta?.date || undefined,
+      // BF — Strava-mode log card flat fields (auto_share stores these
+      // directly on attachment_meta; mapper surfaces them for FeedPost).
+      routeName: post.attachmentMeta?.route_name || undefined,
+      gradeText: post.attachmentMeta?.grade_text || undefined,
+      result: post.attachmentMeta?.result || undefined,
+      wallType: post.attachmentMeta?.wall_type || undefined,
     } : undefined,
     likes: post.likeCount,
     comments: post.commentCount,

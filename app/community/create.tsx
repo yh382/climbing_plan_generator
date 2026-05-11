@@ -1,10 +1,10 @@
 // app/community/create.tsx
 
-import React, { useState, useEffect, useMemo, useLayoutEffect, useRef, useCallback } from "react";
+import React, { useState, useMemo, useLayoutEffect, useRef, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Modal,
-  Pressable, Dimensions,
+  Pressable, Dimensions, ActionSheetIOS,
 } from "react-native";
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from "expo-image";
@@ -19,10 +19,8 @@ import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useCommunityStore } from "../../src/store/useCommunityStore";
 import type { PickedMediaItem } from "../../src/features/community/types";
-import { PostAttachmentCard } from "../../src/components/shared/PostAttachmentCard";
 import LocationSheet from "../../src/features/community/components/LocationSheet";
 import GymTagSheet from "../../src/features/community/components/GymTagSheet";
-import { setAttachmentCallback } from "../../src/features/community/pendingAttachment";
 import { consumePendingMedia } from "../../src/features/community/pendingMedia";
 import { setPostDraft } from "../../src/features/community/pendingPostDraft";
 import { consumeCoverUpdate } from "../../src/features/community/pendingCoverUpdate";
@@ -35,7 +33,13 @@ const AUDIENCE_OPTIONS = [
   { value: 'private' as const, label: 'Private', icon: 'lock-closed-outline' as const },
 ];
 
-const MAX_MEDIA = 20;
+// BF — Strava-mode: ≤10 images / =1 video / mutually exclusive
+const MAX_IMAGES = 10;
+const MAX_VIDEOS = 1;
+
+function mediaLimitFor(items: PickedMediaItem[]): number {
+  return items[0]?.mediaType === 'video' ? MAX_VIDEOS : MAX_IMAGES;
+}
 
 const VISIBILITY_TO_AUDIENCE: Record<string, 'public' | 'followers' | 'private'> = {
   'public': 'public',
@@ -67,10 +71,6 @@ export default function CreatePostScreen() {
     editMedia?: string;
     editVisibility?: string;
     prefillMedia?: string;
-    prefillAttachType?: string;
-    prefillAttachId?: string;
-    prefillAttachTitle?: string;
-    prefillAttachSubtitle?: string;
     prefillGymId?: string;
     prefillGymName?: string;
     fromPicker?: string;
@@ -102,22 +102,6 @@ export default function CreatePostScreen() {
   const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>(
     params.editVisibility ? (VISIBILITY_TO_AUDIENCE[params.editVisibility] || 'public') : 'public'
   );
-  const [attachedWidget, setAttachedWidget] = useState<{
-    id: string;
-    type: 'plan' | 'session' | 'log';
-    title: string;
-    subtitle: string;
-  } | null>(() => {
-    if (params.prefillAttachType) {
-      return {
-        id: params.prefillAttachId || '',
-        type: params.prefillAttachType as 'plan' | 'session' | 'log',
-        title: params.prefillAttachTitle || '',
-        subtitle: params.prefillAttachSubtitle || '',
-      };
-    }
-    return null;
-  });
 
   // Gym selector — auto-populate from prefill params (e.g., share from session)
   const [selectedGym, setSelectedGym] = useState<{ id: string; name: string } | null>(() => {
@@ -132,13 +116,10 @@ export default function CreatePostScreen() {
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
 
   // Popover visibility
-  const [attachPopoverVisible, setAttachPopoverVisible] = useState(false);
   const [visibilityPopoverVisible, setVisibilityPopoverVisible] = useState(false);
 
   // Popover positioning
-  const attachBtnRef = useRef<View>(null);
   const visibilityBtnRef = useRef<View>(null);
-  const [attachPopoverPos, setAttachPopoverPos] = useState({ x: 0, y: 0 });
   const [visibilityPopoverPos, setVisibilityPopoverPos] = useState({ x: 0, y: 0 });
 
   // Cover picker queue — navigate to cover-picker for each video sequentially
@@ -169,17 +150,6 @@ export default function CreatePostScreen() {
     navigateToNextCoverPicker();
   }, [mediaList, navigateToNextCoverPicker]);
 
-  // Attachment callback: when returning from select-session/select-plan
-  const setAttachedWidgetRef = useRef(setAttachedWidget);
-  setAttachedWidgetRef.current = setAttachedWidget;
-
-  useEffect(() => {
-    setAttachmentCallback((item) => {
-      setAttachedWidgetRef.current(item);
-    });
-    return () => setAttachmentCallback(null);
-  }, []);
-
   // Consume media from device picker or cover updates when returning
   useFocusEffect(
     useCallback(() => {
@@ -189,8 +159,9 @@ export default function CreatePostScreen() {
         setMediaList(prev => {
           const existingIds = new Set(prev.map(m => m.id));
           const unique = pending.filter(m => !existingIds.has(m.id));
-          const remaining = MAX_MEDIA - prev.length;
-          const toAdd = unique.slice(0, remaining);
+          const limit = mediaLimitFor([...prev, ...unique]);
+          const remaining = limit - prev.length;
+          const toAdd = unique.slice(0, Math.max(0, remaining));
           return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
         });
       }
@@ -211,12 +182,33 @@ export default function CreatePostScreen() {
     }, [navigateToNextCoverPicker])
   );
 
-  const handleAddMedia = async () => {
-    if (mediaList.length >= MAX_MEDIA) return;
+  const pickAndAppend = async (mediaType: 'images' | 'videos') => {
+    const limit = mediaType === 'videos' ? MAX_VIDEOS : MAX_IMAGES;
+    if (mediaList.length >= limit) return;
     const items = await pickMediaFromLibrary({
-      maxSelect: MAX_MEDIA - mediaList.length,
+      maxSelect: limit - mediaList.length,
+      mediaType,
     });
     if (items.length === 0) return;
+
+    // Video → push to trimmer first. Trimmer routes to cover-picker, which
+    // writes the final PickedMediaItem (with `coverUri`) into the pendingMedia
+    // bridge; create.tsx's useFocusEffect consumes it on return.
+    if (mediaType === 'videos') {
+      const video = items[0];
+      router.push({
+        pathname: '/community/video-trimmer' as any,
+        params: {
+          videoUri: video.uri,
+          duration: String(video.duration || 0),
+          id: video.id,
+          width: String(video.width),
+          height: String(video.height),
+        },
+      });
+      return;
+    }
+
     setMediaList(prev => {
       const existingIds = new Set(prev.map(m => m.id));
       const unique = items.filter(m => !existingIds.has(m.id));
@@ -224,15 +216,37 @@ export default function CreatePostScreen() {
     });
   };
 
-  const handleRemoveMedia = (index: number) => {
-    setMediaList(prev => prev.filter((_, i) => i !== index));
+  // BF — image / video are mutually exclusive. Show 2-option ActionSheet;
+  // disable the conflicting option, or Alert-confirm clearing on switch.
+  const handleAddMedia = () => {
+    const currentType: 'image' | 'video' | null =
+      mediaList.length === 0 ? null : (mediaList[0].mediaType as 'image' | 'video');
+
+    if (currentType === null) {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Photos', 'Video', 'Cancel'], cancelButtonIndex: 2 },
+        (idx) => {
+          if (idx === 0) pickAndAppend('images');
+          else if (idx === 1) pickAndAppend('videos');
+        },
+      );
+      return;
+    }
+
+    if (currentType === 'image') {
+      // Already have images. Tapping "+" just continues adding images.
+      pickAndAppend('images');
+      return;
+    }
+
+    // currentType === 'video' — already 1 video selected. New post = video full.
+    // (MAX_VIDEOS=1, the "+" tile is gated off in JSX once we hit the limit.)
+    pickAndAppend('videos');
   };
 
-  const openAttachPopover = () => {
-    attachBtnRef.current?.measureInWindow((x, y) => {
-      setAttachPopoverPos({ x, y });
-      setAttachPopoverVisible(true);
-    });
+
+  const handleRemoveMedia = (index: number) => {
+    setMediaList(prev => prev.filter((_, i) => i !== index));
   };
 
   const openVisibilityPopover = () => {
@@ -244,7 +258,7 @@ export default function CreatePostScreen() {
 
   // Post via API (create or update)
   const handlePost = async () => {
-    if (mediaList.length === 0 && !attachedWidget && !(content?.trim())) return;
+    if (mediaList.length === 0 && !(content?.trim())) return;
     if (posting) return;
 
     // ── Edit mode: synchronous upload (need to confirm success) ──
@@ -291,14 +305,14 @@ export default function CreatePostScreen() {
 
     // ── New post: background upload → navigate immediately ──
     submitPostInBackground(
-      { content, mediaList, attachedWidget, location, selectedGym, visibility },
+      { content, mediaList, attachedWidget: null, location, selectedGym, visibility },
       mediaList,
     );
     router.dismissAll();
     router.navigate("/(drawer)/(tabs)/community" as any);
   };
 
-  const canPost = mediaList.length > 0 || !!attachedWidget || (content?.trim().length ?? 0) > 0;
+  const canPost = mediaList.length > 0 || (content?.trim().length ?? 0) > 0;
   // Show "Next" when 2+ media in non-edit mode (to go to arrange page)
   const showNext = !isEditMode && mediaList.length >= 2;
 
@@ -309,13 +323,13 @@ export default function CreatePostScreen() {
     setPostDraft({
       content,
       mediaList,
-      attachedWidget,
+      attachedWidget: null,
       location,
       selectedGym,
       visibility,
     });
     router.push('/community/arrange' as any);
-  }, [content, mediaList, attachedWidget, location, selectedGym, visibility, router]);
+  }, [content, mediaList, location, selectedGym, visibility, router]);
 
   const handleNextToArrangeRef = useRef(handleNextToArrange);
   handleNextToArrangeRef.current = handleNextToArrange;
@@ -389,7 +403,7 @@ export default function CreatePostScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-            {mediaList.length < MAX_MEDIA && (
+            {mediaList.length < mediaLimitFor(mediaList) && (
               <TouchableOpacity style={styles.addMediaBtn} onPress={handleAddMedia} activeOpacity={0.7}>
                 <Ionicons name="add" size={24} color="#9CA3AF" />
               </TouchableOpacity>
@@ -412,43 +426,6 @@ export default function CreatePostScreen() {
             <View style={styles.sourceBadge}>
               <Ionicons name="fitness-outline" size={14} color={colors.accent} />
               <Text style={styles.sourceText}>Shared from session</Text>
-            </View>
-          )}
-
-          {/* Attached Widget Preview */}
-          {attachedWidget && (
-            <View style={styles.attachmentPreview}>
-              {attachedWidget.type === 'plan' ? (
-                <PostAttachmentCard
-                  type="plan"
-                  data={{
-                    name: attachedWidget.title,
-                    totalWeeks: attachedWidget.subtitle.split(' · ')[0]?.replace(' weeks', '') || '—',
-                    sessionsPerWeek: attachedWidget.subtitle.split(' · ')[1]?.replace(' sessions/wk', '') || '—',
-                    type: attachedWidget.subtitle.split(' · ')[2] || '—',
-                  }}
-                />
-              ) : (
-                <PostAttachmentCard
-                  type="routeLog"
-                  data={{
-                    gymName: attachedWidget.title.split(' · ')[0] || '—',
-                    date: attachedWidget.title.split(' · ')[1] || '—',
-                    sends: attachedWidget.subtitle.split(' · ')[0]?.replace(' sends', '') || '—',
-                    bestGrade: attachedWidget.subtitle.split(' · ')[1] || '—',
-                    duration: attachedWidget.subtitle.split(' · ')[2] || '—',
-                  }}
-                />
-              )}
-              <TouchableOpacity
-                onPress={() => setAttachedWidget(null)}
-                style={styles.removeAttachBtn}
-                hitSlop={8}
-              >
-                <View style={styles.removeAttachCircle}>
-                  <Ionicons name="close" size={10} color="#FFF" />
-                </View>
-              </TouchableOpacity>
             </View>
           )}
 
@@ -502,21 +479,6 @@ export default function CreatePostScreen() {
             />
           </TouchableOpacity>
 
-          {/* Attachment */}
-          <View ref={attachBtnRef} collapsable={false}>
-            <TouchableOpacity
-              onPress={openAttachPopover}
-              style={styles.toolbarIconBtn}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="attach"
-                size={22}
-                color={attachedWidget ? colors.textPrimary : colors.textTertiary}
-              />
-            </TouchableOpacity>
-          </View>
-
           {/* Cover Picker — only when videos exist */}
           {hasVideos && !isEditMode && (
             <TouchableOpacity
@@ -563,52 +525,6 @@ export default function CreatePostScreen() {
         onSelect={(gym) => setSelectedGym(gym)}
       />
 
-      {/* Attachment Popover */}
-      <Modal
-        transparent
-        visible={attachPopoverVisible}
-        animationType="none"
-        onRequestClose={() => setAttachPopoverVisible(false)}
-      >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          onPress={() => setAttachPopoverVisible(false)}
-          activeOpacity={1}
-        />
-        <View style={[styles.popover, {
-          bottom: (SCREEN_HEIGHT - attachPopoverPos.y) + 12,
-          left: attachPopoverPos.x - 8,
-        }]}>
-          <TouchableOpacity
-            onPress={() => {
-              setAttachPopoverVisible(false);
-              router.push('/community/select-session');
-            }}
-            style={[styles.popoverRow, styles.popoverRowBorder]}
-          >
-            <View style={styles.popoverIcon}>
-              <Ionicons name="barbell" size={16} color={colors.textPrimary} />
-            </View>
-            <Text style={styles.popoverText}>Session</Text>
-            <Ionicons name="chevron-forward" size={13} color={colors.textTertiary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setAttachPopoverVisible(false);
-              router.push('/community/select-plan');
-            }}
-            style={styles.popoverRow}
-          >
-            <View style={styles.popoverIcon}>
-              <Ionicons name="flash" size={16} color={colors.textPrimary} />
-            </View>
-            <Text style={styles.popoverText}>Plan</Text>
-            <Ionicons name="chevron-forward" size={13} color={colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
       {/* Visibility Popover */}
       <Modal
         transparent
@@ -642,7 +558,7 @@ export default function CreatePostScreen() {
               >
                 <View style={[
                   styles.popoverIcon,
-                  isSelected && { backgroundColor: '#1C1C1E' },
+                  isSelected && { backgroundColor: colors.cardDark },
                 ]}>
                   <Ionicons
                     name={opt.icon as any}
@@ -657,7 +573,7 @@ export default function CreatePostScreen() {
                   {opt.label}
                 </Text>
                 {isSelected && (
-                  <Ionicons name="checkmark" size={15} color="#306E6F" />
+                  <Ionicons name="checkmark" size={15} color={colors.accent} />
                 )}
               </TouchableOpacity>
             );
@@ -684,25 +600,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textPrimary,
     minHeight: 120,
     lineHeight: 28,
-  },
-  attachmentPreview: {
-    position: 'relative',
-    marginTop: 12,
-    paddingHorizontal: 6,
-  },
-  removeAttachBtn: {
-    position: 'absolute',
-    top: -6,
-    right: 0,
-    zIndex: 1,
-  },
-  removeAttachCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   locationChip: {
     flexDirection: 'row',
@@ -771,7 +668,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
   // Bottom toolbar
@@ -789,7 +686,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.cardDark,
     borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 13,
