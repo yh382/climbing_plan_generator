@@ -11,7 +11,7 @@ import {
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
@@ -28,6 +28,7 @@ import { RouteDescriptionCard } from '../../src/features/outdoor/components/Rout
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
 import useBetaShareHandoffStore from '../../src/store/useBetaShareHandoffStore';
 import { pickMediaFromLibrary } from '../../src/lib/mediaPicker';
+import { consumePendingMedia } from '../../src/features/community/pendingMedia';
 import type { PickedMediaItem } from '../../src/features/community/types';
 import {
   uploadSingleFileToR2,
@@ -40,12 +41,15 @@ import {
   updateUpload,
   finishUpload,
 } from '../../src/lib/uploadActivityBridge';
-import { betaApi } from '../../src/features/outdoor/betaApi';
+import { betaApi, type BetaOut } from '../../src/features/outdoor/betaApi';
 import {
   enqueueRouteSendLog,
   enqueueRouteAttemptLog,
   flushLogsOutboxNow,
 } from '../../src/features/journal/sync/enqueueRouteSendLog';
+import { trackSessionBeta } from '../../src/features/journal/sync/sessionBetaTracker';
+import useLogsStore from '../../src/store/useLogsStore';
+import type { LogMedia } from '../../src/features/journal/loglist/types';
 
 const SCREEN_W = Dimensions.get('window').width;
 const PHOTO_H = SCREEN_W * 0.82;
@@ -86,6 +90,10 @@ export default function OutdoorRouteDetailPage() {
 
   const [route, setRoute] = useState<OutdoorRoute | null>(null);
   const [ascents, setAscents] = useState<RouteAscent[]>([]);
+  // Betas feed the hero carousel — see `carouselPhotos` below. Discarding a
+  // session deletes the user's own betas backend-side; on the next focus
+  // refetch they drop out of the carousel automatically.
+  const [betas, setBetas] = useState<BetaOut[]>([]);
   const [loading, setLoading] = useState(true);
   const currentUserId = useUserStore((s) => s.user?.id);
   // B2 #2: greyed Send button when current user already has a non-attempt
@@ -111,9 +119,11 @@ export default function OutdoorRouteDetailPage() {
     Promise.all([
       outdoorApi.getRoute(id),
       outdoorApi.getAscents(id),
-    ]).then(([r, a]) => {
+      betaApi.listForRoute(id).catch(() => [] as BetaOut[]),
+    ]).then(([r, a, b]) => {
       if (r) setRoute(r);
       setAscents(a ?? []);
+      setBetas(b ?? []);
       setLoading(false);
     });
   }, [id]);
@@ -129,11 +139,24 @@ export default function OutdoorRouteDetailPage() {
     );
   }, [router, route]);
 
-  // Build photo carousel (topo is rendered separately by RouteTopoCard)
+  // Build photo carousel (topo is rendered separately by RouteTopoCard).
+  // Beta thumbnails (newest first) lead, then the route's official photos —
+  // user-uploaded covers represent the route just as well, and lead so a
+  // freshly-shared beta becomes the hero immediately. When the session is
+  // discarded the betas are deleted backend-side; the focus refetch below
+  // drops them from the carousel without any manual cleanup here.
   const carouselPhotos = useMemo((): PhotoItem[] => {
     if (!route) return [];
-    return (route.photos ?? []).map((p) => ({ url: p.url, caption: p.caption }));
-  }, [route]);
+    const betaPhotos: PhotoItem[] = [...betas]
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      .filter((b) => !!b.thumbnail_url)
+      .map((b) => ({ url: b.thumbnail_url as string }));
+    const routePhotos: PhotoItem[] = (route.photos ?? []).map((p) => ({
+      url: p.url,
+      caption: p.caption,
+    }));
+    return [...betaPhotos, ...routePhotos];
+  }, [route, betas]);
 
   // Climber rows for GradeSuggestionCard. avgStars comes from `route.stars`
   // (backend aggregate) as the single source of truth — per-log stars
@@ -216,10 +239,16 @@ export default function OutdoorRouteDetailPage() {
   // BetaShareSheet migrated to formSheet route — sheet-container-audit A1.
   const setPendingBetaShareVideo = useBetaShareHandoffStore((s) => s.setPendingVideo);
 
+  // Flag: when the user navigates away to trim/cover the send sheet, we want
+  // to re-present it on return regardless of whether they finished or backed
+  // out. Consumed by the useFocusEffect below.
+  const awaitingBetaTrimReturn = useRef(false);
+
   // Picks a single video via system PHPicker, enforces the 90s cap, then
-  // dispatches to either the send-integrated flow ('send' → re-open
-  // OutdoorSendSheet with beta attached) or the standalone share flow
-  // ('direct' → push outdoor-beta-share formSheet).
+  // dispatches to either the send-integrated flow ('send' → push to
+  // video-trimmer → cover-picker → re-open OutdoorSendSheet with beta
+  // attached on return) or the standalone share flow ('direct' → push
+  // outdoor-beta-share formSheet).
   const pickAndDispatchBeta = useCallback(
     async (flow: 'send' | 'direct') => {
       if (!route) return;
@@ -246,15 +275,77 @@ export default function OutdoorRouteDetailPage() {
           router.push(`/outdoor-beta-share?routeId=${encodeURIComponent(route.id)}&routeKind=outdoor`);
         });
       } else {
-        setPendingBetaVideo(videoItem);
-        requestAnimationFrame(() => setSendSheetOpen(true));
+        // Route through trim → cover-picker. Cover-picker writes the final
+        // PickedMediaItem (with coverUri) into pendingMedia; useFocusEffect
+        // below consumes it on return and re-presents the send sheet.
+        awaitingBetaTrimReturn.current = true;
+        requestAnimationFrame(() => {
+          router.push({
+            pathname: '/community/video-trimmer',
+            params: {
+              videoUri: videoItem.uri,
+              duration: String(videoItem.duration || 0),
+              id: videoItem.id,
+              width: String(videoItem.width ?? 0),
+              height: String(videoItem.height ?? 0),
+              source: 'outdoor-route-beta',
+            },
+          });
+        });
       }
     },
     [route, tr, router, setPendingBetaShareVideo],
   );
 
+  // Trim/cover-picker return — consume the staged video (if any) and
+  // re-present the send sheet so the user lands back where they were.
+  useFocusEffect(
+    useCallback(() => {
+      if (!awaitingBetaTrimReturn.current) return;
+      awaitingBetaTrimReturn.current = false;
+      const pending = consumePendingMedia();
+      const videoItem = pending?.find((m) => m.mediaType === 'video') ?? null;
+      if (videoItem) setPendingBetaVideo(videoItem);
+      requestAnimationFrame(() => setSendSheetOpen(true));
+    }, []),
+  );
+
+  // Refetch betas whenever the screen regains focus. Two cases drive this:
+  //   1. User shared a beta on the standalone /outdoor-beta-share screen and
+  //      bounced back — pick up the new thumbnail in the hero carousel.
+  //   2. User discarded a session that owned betas — those rows are gone
+  //      backend-side and need to drop out of the carousel here too.
+  // Skips the initial focus (the main useEffect already fetched).
+  const skipFirstBetaFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (skipFirstBetaFocus.current) {
+        skipFirstBetaFocus.current = false;
+        return;
+      }
+      if (!id) return;
+      betaApi
+        .listForRoute(id)
+        .then((b) => setBetas(b ?? []))
+        .catch(() => {});
+    }, [id]),
+  );
+
   const onSendDone = useCallback(async (draft: OutdoorSendDraft) => {
     if (!id || !route) return;
+
+    // Surface the local cover as the log's media so the daily-summary
+    // thumbnail renders immediately. The persistent R2 thumbnail_url lives
+    // on the Beta record (not the log) — this entry is local-only display.
+    const video = pendingBetaVideo;
+    const localMedia: LogMedia[] | undefined = video
+      ? [{
+          id: video.id,
+          type: 'video',
+          uri: video.uri,
+          coverUri: video.coverUri,
+        }]
+      : undefined;
 
     // 1. ClimbLog FIRST (local + outbox). Rating can be lost; the user's send
     //    record cannot. enqueue is fire-and-forget — outbox will retry.
@@ -265,6 +356,7 @@ export default function OutdoorRouteDetailPage() {
         routeName: route.name,
         routeStyle: route.style,
         draft,
+        media: localMedia,
         sessionGymName:
           route.crag_name ||
           route.area_name ||
@@ -297,24 +389,41 @@ export default function OutdoorRouteDetailPage() {
       // Silent — outbox would retry in real impl
     }
 
-    // 2. If the user attached a beta video, run the full upload pipeline
-    //    (compress → thumbnail → R2 → POST beta) before returning. The
-    //    send sheet stays open with "Submitting…" shown until this completes.
-    //    The comment doubles as the beta description — one field, two uses.
-    let betaUploaded = false;
-    if (pendingBetaVideo) {
+    // Close sheet immediately. The beta upload (if any) runs fire-and-forget
+    // below — TrueSheet was sitting on top of the in-app UploadToastOverlay
+    // (and iOS suppresses an app's own Live Activity in foreground), so
+    // holding the sheet open during a ~10s upload hid all progress feedback.
+    // Toast / LA reads from useUploadProgressStore via the bridge.
+    setPendingBetaVideo(null);
+    setSendSheetOpen(false);
+
+    if (!video) {
+      const summary = `${draft.style} · ${draft.attempts} att · ${draft.feel}`;
+      Alert.alert(tr('记录成功', 'Logged!'), summary);
+      return;
+    }
+
+    // Capture sessionKey BEFORE the async upload — enqueueRouteSendLog
+    // guarantees an active session by now, and we want the tracker tied
+    // to that session even if it ends/discards while the upload is in
+    // flight. Empty string is fine (tracker is a no-op on empty key).
+    const activeSessionAtSend = useLogsStore.getState().activeSession;
+    const sessionKey = activeSessionAtSend
+      ? String(activeSessionAtSend.startTime)
+      : '';
+
+    // Beta upload — async, no await. Progress + completion shown via toast.
+    void (async () => {
       const uploadId = startUpload(tr('上传 Beta…', 'Uploading beta…'), 'la');
       try {
         updateUpload(uploadId, 0, 'compressing');
-        const compressedUri = await compressVideo(pendingBetaVideo.uri,
+        const compressedUri = await compressVideo(video.uri,
           (p) => updateUpload(uploadId, p * 0.6, 'compressing'));
         updateUpload(uploadId, 0.6, 'uploading');
 
         let thumbnailUrl: string | undefined;
-        // Prefer the caller-supplied cover frame; fall back to auto-generated
-        // thumbnail if for some reason no coverUri is set.
         const localThumbUri =
-          pendingBetaVideo.coverUri ??
+          video.coverUri ??
           (await (async () => {
             try {
               const VT = await import('expo-video-thumbnails');
@@ -350,35 +459,39 @@ export default function OutdoorRouteDetailPage() {
         );
         updateUpload(uploadId, 0.95);
 
-        await betaApi.createForRoute(id, {
+        const created = await betaApi.createForRoute(id, {
           media_url: mediaUrl,
           thumbnail_url: thumbnailUrl,
           description: draft.comment?.trim() || null,
         });
 
+        // Track for discard cleanup. If the session ended/discarded while we
+        // were uploading, discard already ran without us — best-effort delete
+        // here mirrors that intent.
+        if (created?.id) {
+          if (sessionKey) {
+            trackSessionBeta(sessionKey, created.id).catch(() => {});
+          }
+          const stillActive = useLogsStore.getState().activeSession;
+          const stillSameSession =
+            stillActive && String(stillActive.startTime) === sessionKey;
+          if (!stillSameSession && sessionKey) {
+            betaApi.deleteOwn(created.id).catch(() => {});
+          } else {
+            // Optimistic add so the hero carousel updates without waiting
+            // for the next focus refetch. The defensive delete branch
+            // above intentionally skips this — no point promoting a beta
+            // we're about to tear down.
+            setBetas((prev) => [created, ...prev]);
+          }
+        }
+
         finishUpload(uploadId, 'success');
-        betaUploaded = true;
       } catch (err: any) {
-        // Surface upload failures but don't block the log — send is
-        // already recorded. We still clear the pending video so the
-        // next send-sheet open starts fresh instead of showing a stale
-        // "attached" row from a failed upload.
         const msg = err?.detail || err?.message || tr('Beta 上传失败', 'Beta upload failed');
         finishUpload(uploadId, 'error', msg);
-        Alert.alert(tr('Beta 上传失败', 'Beta upload failed'), msg);
-      } finally {
-        setPendingBetaVideo(null);
       }
-    }
-
-    setSendSheetOpen(false);
-    const summary = `${draft.style} · ${draft.attempts} att · ${draft.feel}`;
-    Alert.alert(
-      tr('记录成功', 'Logged!'),
-      betaUploaded
-        ? tr(`${summary}\nBeta 已上传`, `${summary}\nBeta uploaded`)
-        : summary,
-    );
+    })();
   }, [id, route, tr, pendingBetaVideo]);
 
   const handleShareBeta = useCallback(

@@ -451,7 +451,13 @@ const createAggregatedStyles = (colors: ReturnType<typeof useThemeColors>) =>
       marginBottom: 8,
       borderRadius: 12,
       flexDirection: "row",
-      alignItems: "center",
+      // stretch so the content side fills the thumb-defined 80px height
+      // (no centering gap when the note is absent).
+      alignItems: "stretch",
+      // Forces card height ≥ thumb height (80). Content padding is tuned
+      // below so natural content height stays ≤ 80 → card is exactly 80,
+      // thumb fills it edge-to-edge with no gap.
+      minHeight: 80,
       overflow: "hidden",
       borderWidth: 0.6,
       borderColor: colors.cardBorder,
@@ -460,26 +466,37 @@ const createAggregatedStyles = (colors: ReturnType<typeof useThemeColors>) =>
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 2 },
     },
+    // Fixed 80×80. Earlier attempt left height implicit + relied on
+    // alignItems:'stretch' to fill, but expo-image with width/height:'100%'
+    // in a height-undefined parent fell back to the image's intrinsic
+    // dimensions (often 1080×1920) and exploded the card vertically.
     thumbContainer: {
-      width: 64,
-      height: 64,
+      width: 80,
+      height: 80,
+      // Right corners rounded to mirror the card's left corners — thumb
+      // reads as a self-contained rounded square at the card's leading
+      // edge. Left corners are clipped by the card's overflow:hidden.
+      borderTopRightRadius: 12,
+      borderBottomRightRadius: 12,
+      overflow: "hidden",
     },
     thumb: {
-      width: 64,
-      height: 64,
+      width: 80,
+      height: 80,
     },
     thumbPlaceholder: {
-      width: 64,
-      height: 64,
+      width: 80,
+      height: 80,
       backgroundColor: colors.backgroundSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
     content: {
       flex: 1,
-      paddingVertical: 14,
+      paddingVertical: 10,
       paddingHorizontal: 12,
       gap: 3,
+      justifyContent: "center",
     },
     titleRow: {
       flexDirection: "row",

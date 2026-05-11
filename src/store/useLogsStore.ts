@@ -5,6 +5,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shallow } from "zustand/shallow";
 import { useCallback } from "react";
 import { api, ApiError } from "../lib/apiClient";
+import { betaApi } from "../features/outdoor/betaApi";
+import {
+  clearSessionBetas,
+  readSessionBetas,
+} from "../features/journal/sync/sessionBetaTracker";
 import {
   enqueueSessionEvent,
   purgeSessionOutboxByKey,
@@ -925,6 +930,9 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
           clearBackupSnapshot().catch(() => {});
           syncWidgetFromStore();
+          // Betas uploaded during the session are kept (this is the
+          // success path); just drop the tracker so it doesn't leak.
+          clearSessionBetas(sessionKey).catch(() => {});
           return newSession;
         } catch (err) {
           console.error("[endSession] Error:", err);
@@ -975,6 +983,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
 
           clearBackupSnapshot().catch(() => {});
           syncWidgetFromStore();
+          clearSessionBetas(sessionKey).catch(() => {});
           return fallbackSession;
         }
       },
@@ -1147,6 +1156,24 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
         // 7) Purge any queued outbox events for this session.
         await purgeSessionOutboxByKey(sessionKey).catch(() => {});
         await purgeLogsOutboxBySessionKey(sessionKey).catch(() => {});
+
+        // 7b) Delete any beta videos uploaded during this session. Tracked
+        //     by sessionBetaTracker when the upload pipeline successfully
+        //     creates a Beta row. Fire-and-forget — backend cascades R2.
+        (async () => {
+          try {
+            const betaIds = await readSessionBetas(sessionKey);
+            await Promise.all(
+              betaIds.map((bid) =>
+                betaApi.deleteOwn(bid).catch((err) => {
+                  if (__DEV__) console.warn("[discardActiveSession] beta delete failed:", bid, err);
+                }),
+              ),
+            );
+          } finally {
+            await clearSessionBetas(sessionKey).catch(() => {});
+          }
+        })();
 
         // 8) Backend DELETE (fire-and-forget).
         if (serverId) {

@@ -113,6 +113,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     card: {
       marginHorizontal: 16,
       marginTop: 8,
+      marginBottom: 12,
       backgroundColor: colors.cardDark,
       borderRadius: 16,
       padding: 18,
