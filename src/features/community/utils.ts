@@ -62,6 +62,10 @@ export function toFeedPost(post: UserPostOut): FeedPost {
       gradeText: post.attachmentMeta?.grade_text || undefined,
       result: post.attachmentMeta?.result || undefined,
       wallType: post.attachmentMeta?.wall_type || undefined,
+      // BF_polished — full nested meta passthrough so SessionCard can read
+      // `summary` / `log_grades` / `active_duration_minutes` / `location_type`
+      // without a second mapper.
+      meta: post.attachmentMeta || undefined,
     } : undefined,
     likes: post.likeCount,
     comments: post.commentCount,

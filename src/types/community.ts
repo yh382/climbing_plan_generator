@@ -37,6 +37,11 @@ export interface PostAttachment {
    *  kept so legacy posts that pre-date the enum still render. */
   result?: 'send' | 'attempt' | 'flash' | 'onsight' | string;
   wallType?: string;
+  /** Window BF_polished — full nested attachment_meta passthrough.
+   *  SessionCard reads `summary` / `log_grades` / `active_duration_minutes` /
+   *  `location_type` / `gym_name` directly from this. Kept as `any` so flat
+   *  keys above and nested objects can co-exist without a tagged-union dance. */
+  meta?: Record<string, any>;
 }
 
 // 媒体项（图片或视频）

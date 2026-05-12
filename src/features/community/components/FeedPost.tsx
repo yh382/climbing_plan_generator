@@ -22,6 +22,7 @@ import { FeedPost as FeedPostType, PostAttachment } from "../../../types/communi
 import MediaCarousel from "../../../components/shared/MediaCarousel";
 import { presentImageViewer } from "../../../../modules/climmate-image-viewer/src";
 import { PostAttachmentCard } from "../../../components/shared/PostAttachmentCard";
+import SessionCard from "./SessionCard";
 
 function buildPlanProps(att: PostAttachment) {
   return {
@@ -302,6 +303,11 @@ function FeedPost({
               onPress={() => onPressAttachment(post)}
             />
           </View>
+        ) : post.attachment.type === "session" ? (
+          // BF_polished — Strava-mode session auto-share. Rings + pyramid
+          // come from auto_share.create_session_post (BE) and render via
+          // SessionCard, which is a pure read of attachment.meta.
+          <SessionCard post={post} />
         ) : (
           <LogAttachmentBlock
             attachment={post.attachment}
