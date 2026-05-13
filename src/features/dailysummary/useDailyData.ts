@@ -484,12 +484,17 @@ function dominantDiscipline(logs: PublicLogItem[]): SessionEntry["discipline"] {
 function mapSession(remote: PublicSessionItem, date: string): SessionEntry {
   const sends = remote.logs.filter((l) => SEND_RESULTS.has(l.result));
   const best = bestGradeFor(remote.logs.map(mapLog));
+  // Prefer B2 active_duration_minutes (excludes paused segments) so the
+  // daily-summary timer matches the SessionCard rendering — both pull from
+  // the same authoritative training-time field. Falls back to wall-clock
+  // duration_minutes for pre-B2 sessions where active_duration is null.
+  const authoritativeMin = remote.active_duration_minutes ?? remote.duration_minutes;
   return {
     id: remote.id,
     date,
     startTime: remote.start_time,
     endTime: remote.end_time ?? remote.start_time,
-    duration: formatDuration(remote.duration_minutes),
+    duration: formatDuration(authoritativeMin),
     gymName: remote.gym_name ?? "",
     discipline: dominantDiscipline(remote.logs),
     sessionKey: remote.id,

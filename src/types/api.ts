@@ -1038,9 +1038,38 @@ export interface paths {
         put?: never;
         /**
          * Forgot Password
-         * @description Always returns ok=true (silent — don't leak whether email exists).
+         * @description Email a reset link if the user exists. Always returns ok=true so the
+         *     response shape is constant — protects against email-enumeration probes
+         *     that would otherwise reveal which addresses are registered.
+         *
+         *     Apple users are silent-skipped: their account has no password to reset.
          */
         post: operations["forgot_password_auth_forgot_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google Sign In
+         * @description Sign in / register with a Google-issued ID token.
+         *
+         *     Mirrors `apple_sign_in`. Conflict policy: if an account already exists
+         *     with the same email but a different provider, we 400 — explicit "use
+         *     your original sign-in method" beats silently linking accounts the user
+         *     didn't ask to link. Connected-Accounts linking is a follow-up window.
+         */
+        post: operations["google_sign_in_auth_google_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1126,6 +1155,51 @@ export interface paths {
         put?: never;
         /** Register */
         post: operations["register_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Password
+         * @description Consume a reset-password token, set new password hash, revoke every
+         *     refresh session for the user (forces re-login on all devices).
+         */
+        post: operations["reset_password_auth_reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Email
+         * @description Email-link landing page — flips email_verified=True on success.
+         *
+         *     Returns inline HTML rather than JSON because the link is opened in a
+         *     browser. Failure modes (expired / consumed / unknown) all render a
+         *     user-facing error page so the browser doesn't show a raw 4xx.
+         */
+        get: operations["verify_email_auth_verify_email_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1917,6 +1991,30 @@ export interface paths {
          * @description Delete a conversation.
          */
         delete: operations["delete_conversation_coach_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coach/daily-prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily Prompt
+         * @description Return today's home Coach card prompt + plan summary.
+         *
+         *     Cached by ``(user_id, UTC date)`` in ``coach_daily_prompts``; one
+         *     LLM call per user per day. Failure returns ``{prompt: null, ...}``
+         *     so the FE can render its hardcoded fallback copy.
+         */
+        get: operations["get_daily_prompt_coach_daily_prompt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5123,7 +5221,18 @@ export interface paths {
         post?: never;
         /**
          * Delete Me
-         * @description Permanently delete the current user and all associated data (CASCADE).
+         * @description Permanently delete the current user and all associated data.
+         *
+         *     GDPR Art. 17 (right to erasure):
+         *     - DB rows: CASCADE handles climb_logs / posts / badges / chats / etc.
+         *     - R2 media: enumerate & best-effort batch-delete (avatar, cover, log media,
+         *       post media). R2-GC will sweep up any leftovers.
+         *     - Apple Sign-in: best-effort revoke of refresh_token at appleid.apple.com.
+         *     - Auth state: revoke all refresh_sessions before delete (CASCADE handles
+         *       it too, but explicit makes intent obvious in audit logs).
+         *
+         *     All best-effort steps are wrapped — a failing R2 / Apple call must NOT
+         *     block the deletion the user has already confirmed twice.
          */
         delete: operations["delete_me_users_me_delete"];
         options?: never;
@@ -5157,6 +5266,26 @@ export interface paths {
         };
         /** List My Comments */
         get: operations["list_my_comments_users_me_comments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export My Data
+         * @description Stream a zip of JSON files containing all personal data for the user.
+         */
+        get: operations["export_my_data_users_me_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5257,6 +5386,30 @@ export interface paths {
         put?: never;
         /** Update Push Token */
         post: operations["update_push_token_users_me_push_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/resend-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Verification
+         * @description Re-issue a verify-email token + dispatch via Resend.
+         *
+         *     Cooldown: 60 seconds between consecutive sends per user (prevents email
+         *     bombardment from accidental double-tap or abuse). Already-verified users
+         *     get 4xx instead of a silent ack so the FE can hide the banner immediately.
+         */
+        post: operations["resend_verification_users_me_resend_verification_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5794,6 +5947,8 @@ export interface components {
         };
         /** AppleSignInIn */
         AppleSignInIn: {
+            /** Authorization Code */
+            authorization_code?: string | null;
             /** Full Name */
             full_name?: string | null;
             /** Identity Token */
@@ -7070,6 +7225,18 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /**
+         * CoachDailyPromptOut
+         * @description Window BC γ3 — home Coach card payload.
+         */
+        CoachDailyPromptOut: {
+            /** Generated At */
+            generated_at?: string | null;
+            /** Prompt */
+            prompt?: string | null;
+            /** Today Plan Summary */
+            today_plan_summary?: string | null;
+        };
         /** CoachMessageOut */
         CoachMessageOut: {
             /** Content */
@@ -7903,6 +8070,11 @@ export interface components {
         ForgotPasswordIn: {
             /** Email */
             email: string;
+        };
+        /** GoogleSignInIn */
+        GoogleSignInIn: {
+            /** Id Token */
+            id_token: string;
         };
         /** GradeBin */
         GradeBin: {
@@ -9305,6 +9477,8 @@ export interface components {
         };
         /** PublicSessionItem */
         PublicSessionItem: {
+            /** Active Duration Minutes */
+            active_duration_minutes?: number | null;
             /**
              * Aggregated
              * @default []
@@ -9514,6 +9688,13 @@ export interface components {
              * @enum {string}
              */
             target_type: "user" | "post";
+        };
+        /** ResetPasswordIn */
+        ResetPasswordIn: {
+            /** New Password */
+            new_password: string;
+            /** Token */
+            token: string;
         };
         /** RevertResponse */
         RevertResponse: {
@@ -13335,6 +13516,39 @@ export interface operations {
             };
         };
     };
+    google_sign_in_auth_google_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleSignInIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_auth_login_post: {
         parameters: {
             query?: never;
@@ -13474,6 +13688,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_auth_reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_email_auth_verify_email_get: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */
@@ -15120,6 +15398,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_daily_prompt_coach_daily_prompt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachDailyPromptOut"];
                 };
             };
         };
@@ -20787,6 +21085,8 @@ export interface operations {
             query?: {
                 skip?: number;
                 limit?: number;
+                attachment_type?: string | null;
+                has_video?: boolean;
             };
             header?: never;
             path: {
@@ -22321,6 +22621,26 @@ export interface operations {
             };
         };
     };
+    export_my_data_users_me_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     list_favorites_users_me_favorite_exercises_get: {
         parameters: {
             query?: {
@@ -22495,6 +22815,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_verification_users_me_resend_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
