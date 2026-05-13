@@ -575,7 +575,11 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               }
               continue;
             }
-            const durationMin = s.duration_minutes || 0;
+            // Prefer B2 active_duration_minutes (excludes paused segments)
+            // so self-view daily-summary matches the SessionCard. Falls back
+            // to wall-clock duration_minutes for pre-B2 rows where the new
+            // column is null.
+            const durationMin = s.active_duration_minutes ?? s.duration_minutes ?? 0;
             const h = Math.floor(durationMin / 60);
             const m = durationMin % 60;
             const durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
