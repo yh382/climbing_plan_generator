@@ -50,6 +50,11 @@ export type ActiveSessionInfo = {
   startTime: number;
   gymName: string;
   discipline: SessionEntry["discipline"];
+  /** ms-epoch when the session entered status=paused (B2 60-min inactivity
+   *  auto-pause or explicit user pause). null while active. Surfaced so the
+   *  daily-summary ActiveSessionCard can render Resume controls + a frozen
+   *  timer instead of a running clock. */
+  pausedAt: number | null;
 };
 
 export type DailyKpis = {
@@ -369,6 +374,7 @@ function useLocalDailyData(date: string, enabled: boolean): DailyData {
             startTime: activeSession.startTime,
             gymName: activeSession.gymName,
             discipline: activeSession.discipline,
+            pausedAt: activeSession.pausedAt ?? null,
           }
         : null;
     return aggregate({

@@ -57,9 +57,12 @@ export default function SessionCard({ post }: Props) {
     (meta.active_duration_minutes as number | undefined) ??
     (meta.duration_minutes as number | undefined) ??
     0;
-  const timeOnWallPct = Math.min(1, timeOnWallMin / 120); // 2h goal — same as RingsPage daily
-  // RingsPage expects topsRatePct as 0-100 (not 0-1) — it both displays the
-  // raw value as `${pct}%` and divides by 100 internally for the ring stroke.
+  // Both pct values are 0-100 (matches RingsPage's contract used in
+  // daily-summary: `useDailyData.ts` ships `timeOnWallPct = round((min/120)*100)`,
+  // DualActivityRing's wrapper divides by 100 for the native ring stroke).
+  // Passing 0-1 here previously caused the time ring to render ~0%.
+  const TIME_ON_WALL_GOAL_MIN = 120; // 2h — same goal as daily-summary
+  const timeOnWallPct = Math.min(100, Math.round((timeOnWallMin / TIME_ON_WALL_GOAL_MIN) * 100));
   const topsRatePct = attempts > 0 ? Math.round((sends / attempts) * 100) : 0;
   const gradeData: LogGradeRow[] = Array.isArray(meta.log_grades) ? meta.log_grades : [];
 

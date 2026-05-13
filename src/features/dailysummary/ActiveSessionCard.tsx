@@ -1,7 +1,10 @@
 // src/features/dailysummary/ActiveSessionCard.tsx
 // Highlighted card shown at the top of today's daily summary when a session
-// is in progress. Includes a live 1-second timer and an END SESSION button
-// that calls useLogsStore.endSession().
+// is in progress. Renders one of two states:
+//   • active  — live 1-second timer + END SESSION action sheet
+//   • paused  — frozen timer + RESUME button beside END SESSION
+// B2 60-min inactivity auto-pauses sessions backend-side, so this card must
+// expose a Resume affordance instead of silently leaving the timer frozen.
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActionSheetIOS, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -16,6 +19,8 @@ type Props = {
    *  footer text — empty string is OK (footer hides). discipline is
    *  intentionally not displayed here (often mixed mid-session). */
   gymName: string;
+  /** ms-epoch when the session was paused (auto or manual). null = active. */
+  pausedAt?: number | null;
 };
 
 function formatElapsed(ms: number): string {
@@ -28,18 +33,37 @@ function formatElapsed(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-export default function ActiveSessionCard({ startTime, gymName }: Props) {
+export default function ActiveSessionCard({ startTime, gymName, pausedAt = null }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const endSession = useLogsStore((s) => s.endSession);
   const discardActiveSession = useLogsStore((s) => s.discardActiveSession);
-  const [elapsed, setElapsed] = useState(() => Date.now() - startTime);
+  const resumeSession = useLogsStore((s) => s.resumeSession);
+  const isPaused = pausedAt !== null;
+  // Active: live wall-clock elapsed; paused: frozen at pausedAt-startTime so
+  // the timer doesn't keep ticking past the auto-pause point.
+  const [elapsed, setElapsed] = useState(() =>
+    isPaused ? (pausedAt as number) - startTime : Date.now() - startTime,
+  );
 
   useEffect(() => {
+    if (isPaused) {
+      setElapsed((pausedAt as number) - startTime);
+      return;
+    }
+    setElapsed(Date.now() - startTime);
     const id = setInterval(() => setElapsed(Date.now() - startTime), 1000);
     return () => clearInterval(id);
-  }, [startTime]);
+  }, [startTime, isPaused, pausedAt]);
+
+  const handleResume = useCallback(async () => {
+    try {
+      await resumeSession();
+    } catch (e) {
+      console.warn("[ActiveSessionCard] resumeSession failed:", e);
+    }
+  }, [resumeSession]);
 
   // B2-FU: 3-option sheet aligned with journal.tsx free-form path so the
   // End / Discard UX is identical regardless of which surface initiated the
@@ -93,13 +117,22 @@ export default function ActiveSessionCard({ startTime, gymName }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <View style={styles.dot} />
-        <Text style={styles.badge}>{tr("进行中", "ACTIVE")}</Text>
+        <View style={[styles.dot, isPaused && styles.dotPaused]} />
+        <Text style={styles.badge}>
+          {isPaused ? tr("已暂停", "PAUSED") : tr("进行中", "ACTIVE")}
+        </Text>
       </View>
       <Text style={styles.timer}>{formatElapsed(elapsed)}</Text>
-      <TouchableOpacity style={styles.endBtn} onPress={handleEnd} activeOpacity={0.85}>
-        <Text style={styles.endBtnText}>{tr("结束 Session", "END SESSION")}</Text>
-      </TouchableOpacity>
+      <View style={styles.btnRow}>
+        {isPaused && (
+          <TouchableOpacity style={styles.resumeBtn} onPress={handleResume} activeOpacity={0.85}>
+            <Text style={styles.resumeBtnText}>{tr("继续计时", "RESUME")}</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.endBtn} onPress={handleEnd} activeOpacity={0.85}>
+          <Text style={styles.endBtnText}>{tr("结束 Session", "END SESSION")}</Text>
+        </TouchableOpacity>
+      </View>
       {/* Small footer: crag/gym name only — no discipline. Mid-session
           discipline is often mixed (TR warmup → lead project) and can
           mislead more than help. */}
@@ -130,6 +163,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderRadius: 4,
       backgroundColor: "#FF3B30",
     },
+    dotPaused: {
+      backgroundColor: "#8E8E93",
+    },
     badge: {
       fontSize: 11,
       fontFamily: theme.fonts.bold,
@@ -149,9 +185,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       color: "#8E8E93",
       letterSpacing: 0.2,
     },
-    endBtn: {
+    btnRow: {
+      flexDirection: "row",
+      alignItems: "center",
       marginTop: 16,
-      alignSelf: "flex-start",
+      gap: 10,
+      flexWrap: "wrap",
+    },
+    endBtn: {
       backgroundColor: "#FFFFFF",
       borderRadius: 20,
       paddingHorizontal: 18,
@@ -161,6 +202,18 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 13,
       fontFamily: theme.fonts.bold,
       color: colors.cardDark,
+      letterSpacing: 0.5,
+    },
+    resumeBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: 20,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
+    resumeBtnText: {
+      fontSize: 13,
+      fontFamily: theme.fonts.bold,
+      color: "#FFFFFF",
       letterSpacing: 0.5,
     },
   });
