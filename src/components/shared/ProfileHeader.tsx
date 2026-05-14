@@ -396,10 +396,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: "rgba(255,255,255,0.55)",
     },
-    // Window BG — Edit pill restyled to match the other-profile
-    // Follow/Chat outline aesthetic (translucent white + hairline
-    // border) so both self and other surfaces share the same chrome.
-    // Was an opaque cardDark pill before.
     editPill: {
       position: "absolute",
       right: 18,
@@ -409,9 +405,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.18)",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: "rgba(255,255,255,0.4)",
+      backgroundColor: colors.accent,
     },
     editPillText: {
       fontSize: 14,

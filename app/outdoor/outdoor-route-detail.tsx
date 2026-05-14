@@ -347,61 +347,60 @@ export default function OutdoorRouteDetailPage() {
         }]
       : undefined;
 
-    // 1. ClimbLog FIRST (local + outbox). Rating can be lost; the user's send
-    //    record cannot. enqueue is fire-and-forget — outbox will retry.
-    try {
-      await enqueueRouteSendLog({
-        routeKind: 'outdoor',
-        routeId: route.id,
-        routeName: route.name,
-        routeStyle: route.style,
-        draft,
-        media: localMedia,
-        sessionGymName:
-          route.crag_name ||
-          route.area_name ||
-          route.sector_name ||
-          route.wall_name ||
-          'Outdoor',
-        sessionLocationType: 'outdoor',
-      });
-      // Push to backend immediately so the Climbers list updates within
-      // the same interaction instead of waiting for the next Journal-tab
-      // focus to flush. Silent on failure — the queued event retries.
-      await flushLogsOutboxNow();
-      try {
-        const fresh = await outdoorApi.getAscents(id);
-        setAscents(fresh ?? []);
-      } catch {
-        // Non-fatal — Climbers list will refresh on next mount.
-      }
-    } catch (e) {
-      console.warn('[outdoor send] enqueue log failed:', e);
-    }
-
-    // 2. Rating (best-effort).
-    try {
-      await outdoorApi.rateRoute(id, { stars: draft.stars, comment: draft.comment || undefined });
-      // Refresh the route so aggregate stars/rating_count reflect the new rating.
-      const updatedRoute = await outdoorApi.getRoute(id);
-      if (updatedRoute) setRoute(updatedRoute);
-    } catch {
-      // Silent — outbox would retry in real impl
-    }
-
-    // Close sheet immediately. The beta upload (if any) runs fire-and-forget
-    // below — TrueSheet was sitting on top of the in-app UploadToastOverlay
+    // Dismiss FIRST. TrueSheet sat on top of the in-app UploadToastOverlay
     // (and iOS suppresses an app's own Live Activity in foreground), so
-    // holding the sheet open during a ~10s upload hid all progress feedback.
-    // Toast / LA reads from useUploadProgressStore via the bridge.
+    // holding the sheet open during the ~10s upload hid all progress feedback.
+    // Sync calls below run fire-and-forget — toast/LA reads from
+    // useUploadProgressStore via the bridge.
     setPendingBetaVideo(null);
     setSendSheetOpen(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
     if (!video) {
       const summary = `${draft.style} · ${draft.attempts} att · ${draft.feel}`;
       Alert.alert(tr('记录成功', 'Logged!'), summary);
-      return;
     }
+
+    // ClimbLog + rating sync — fire-and-forget. enqueue's outbox layer
+    // already provides retry semantics; the user's interaction completes
+    // the moment the sheet dismisses.
+    void (async () => {
+      try {
+        await enqueueRouteSendLog({
+          routeKind: 'outdoor',
+          routeId: route.id,
+          routeName: route.name,
+          routeStyle: route.style,
+          draft,
+          media: localMedia,
+          sessionGymName:
+            route.crag_name ||
+            route.area_name ||
+            route.sector_name ||
+            route.wall_name ||
+            'Outdoor',
+          sessionLocationType: 'outdoor',
+        });
+        flushLogsOutboxNow()
+          .then(() => outdoorApi.getAscents(id))
+          .then((fresh) => setAscents(fresh ?? []))
+          .catch(() => {
+            // Non-fatal — Climbers list will refresh on next mount.
+          });
+      } catch (e) {
+        console.warn('[outdoor send] enqueue log failed:', e);
+      }
+
+      try {
+        await outdoorApi.rateRoute(id, { stars: draft.stars, comment: draft.comment || undefined });
+        const updatedRoute = await outdoorApi.getRoute(id);
+        if (updatedRoute) setRoute(updatedRoute);
+      } catch {
+        // Silent — outbox would retry in real impl
+      }
+    })();
+
+    if (!video) return;
 
     // Capture sessionKey BEFORE the async upload — enqueueRouteSendLog
     // guarantees an active session by now, and we want the tracker tied

@@ -35,6 +35,17 @@ internal struct UploadToastBody: View {
     }
   }
 
+  // iOS 26 glass capsule adapts to the system appearance (light/dark) — use
+  // `.primary` so the label tracks the same. Fallback path always renders a
+  // dark translucent capsule, so the label stays white.
+  private var labelColor: Color {
+    if #available(iOS 26.0, *) {
+      return .primary
+    } else {
+      return .white
+    }
+  }
+
   var body: some View {
     HStack(spacing: 10) {
       Image(systemName: iconName)
@@ -43,7 +54,7 @@ internal struct UploadToastBody: View {
 
       Text(state.label.isEmpty ? "Uploading…" : state.label)
         .font(.system(size: 14, weight: .medium))
-        .foregroundColor(.white)
+        .foregroundColor(labelColor)
         .lineLimit(1)
         .truncationMode(.tail)
 

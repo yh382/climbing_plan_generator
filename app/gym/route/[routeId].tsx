@@ -258,59 +258,70 @@ export default function GymRouteDetailPage() {
     async (draft: OutdoorSendDraft) => {
       if (!route) return;
 
-      // 1. ClimbLog FIRST (local + outbox). The user's send record is
-      //    durable; rating below is best-effort.
-      try {
-        await enqueueRouteSendLog({
-          routeKind: 'gym',
-          routeId: route.id,
-          routeName: route.name ?? '',
-          routeStyle: route.style,
-          draft,
-          sessionGymName: route.gym_name || 'Gym',
-          sessionGymId: route.gym_id ?? null,
-          sessionLocationType: 'gym',
-        });
-        await flushLogsOutboxNow();
+      const video = pendingBetaVideo;
+
+      // Dismiss FIRST. Mirrors outdoor — TrueSheet would otherwise sit on
+      // top of the in-app upload toast and hide all progress feedback for
+      // the ~10s+ beta upload. Toast/LA reads from useUploadProgressStore.
+      setPendingBetaVideo(null);
+      setSendSheetOpen(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      const summary = `${draft.style} · ${draft.attempts} att · ${draft.feel}`;
+      if (!video) {
+        Alert.alert(tr('记录成功', 'Logged!'), summary);
+      }
+
+      // ClimbLog + rating sync — fire-and-forget.
+      void (async () => {
         try {
-          const fresh = await gymsCatalogApi.getAscents(route.id);
-          setAscents(fresh ?? []);
-        } catch {
-          // Non-fatal — Climbers list will refresh on next mount.
+          await enqueueRouteSendLog({
+            routeKind: 'gym',
+            routeId: route.id,
+            routeName: route.name ?? '',
+            routeStyle: route.style,
+            draft,
+            sessionGymName: route.gym_name || 'Gym',
+            sessionGymId: route.gym_id ?? null,
+            sessionLocationType: 'gym',
+          });
+          flushLogsOutboxNow()
+            .then(() => gymsCatalogApi.getAscents(route.id))
+            .then((fresh) => setAscents(fresh ?? []))
+            .catch(() => {
+              // Non-fatal — Climbers list will refresh on next mount.
+            });
+        } catch (e) {
+          console.warn('[gym send] enqueue log failed:', e);
         }
-      } catch (e) {
-        console.warn('[gym send] enqueue log failed:', e);
-      }
 
-      // 2. Record the rating. Comment doubles as the beta description if
-      //    a beta video is attached — same one-field-two-uses pattern as
-      //    outdoor.
-      try {
-        await gymsCatalogApi.rateRoute(route.id, {
-          stars: draft.stars,
-          comment: draft.comment || undefined,
-        });
-        const updated = await gymsCatalogApi.getRoute(route.id);
-        setRoute(updated);
-      } catch {
-        // Outbox-style retry not yet wired for gym; failure surfaces below.
-      }
+        try {
+          await gymsCatalogApi.rateRoute(route.id, {
+            stars: draft.stars,
+            comment: draft.comment || undefined,
+          });
+          const updated = await gymsCatalogApi.getRoute(route.id);
+          setRoute(updated);
+        } catch {
+          // Outbox-style retry not yet wired for gym; surfaced via toast on
+          // the beta-upload path below if applicable.
+        }
+      })();
 
-      // 2. If a beta video came along, push it through the same compress
-      //    → thumbnail → R2 → POST /gym/routes/{id}/beta pipeline outdoor
-      //    uses. Send sheet stays in "Submitting…" state until this resolves.
-      let betaUploaded = false;
-      if (pendingBetaVideo) {
+      if (!video) return;
+
+      // Beta upload — async, no await. Progress + completion shown via toast.
+      void (async () => {
         const uploadId = startUpload(tr('上传 Beta…', 'Uploading beta…'), 'la');
         try {
           updateUpload(uploadId, 0, 'compressing');
-          const compressedUri = await compressVideo(pendingBetaVideo.uri,
+          const compressedUri = await compressVideo(video.uri,
             (p) => updateUpload(uploadId, p * 0.6, 'compressing'));
           updateUpload(uploadId, 0.6, 'uploading');
 
           let thumbnailUrl: string | undefined;
           const localThumbUri =
-            pendingBetaVideo.coverUri ??
+            video.coverUri ??
             (await (async () => {
               try {
                 const VT = await import('expo-video-thumbnails');
@@ -352,28 +363,12 @@ export default function GymRouteDetailPage() {
             description: draft.comment?.trim() || null,
           });
           finishUpload(uploadId, 'success');
-          betaUploaded = true;
         } catch (err: any) {
           const msg =
             err?.detail || err?.message || tr('Beta 上传失败', 'Beta upload failed');
           finishUpload(uploadId, 'error', msg);
-          Alert.alert(tr('Beta 上传失败', 'Beta upload failed'), msg);
-        } finally {
-          setPendingBetaVideo(null);
         }
-      }
-
-      setSendSheetOpen(false);
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
-      const summary = `${draft.style} · ${draft.attempts} att · ${draft.feel}`;
-      Alert.alert(
-        tr('记录成功', 'Logged!'),
-        betaUploaded
-          ? tr(`${summary}\nBeta 已上传`, `${summary}\nBeta uploaded`)
-          : summary,
-      );
+      })();
     },
     [pendingBetaVideo, route, tr],
   );

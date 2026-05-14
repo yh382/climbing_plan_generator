@@ -31,8 +31,11 @@ import { calculateMonthlyKPIs } from "@/services/stats";
 
 import AbilityRadar from "../basicinfo/cards/AbilityRadar";
 import BadgesSection from "./BadgesSection";
+import VerticalGradePyramid from "./cards/VerticalGradePyramid";
+import { NativeSegmentedControl } from "@/components/ui";
 
 import type { HeaderViewModel } from "../basicinfo/types";
+import type { LogType } from "@/services/stats/types";
 
 interface Props {
   user: HeaderViewModel;
@@ -83,6 +86,10 @@ export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
     flex: 10,
     sta: 10,
   };
+
+  // Grade pyramid type toggle — independent of the Stats card month nav; the
+  // pyramid covers all-time logs so the user sees their full climbing range.
+  const [pyramidType, setPyramidType] = useState<LogType>("boulder");
 
   return (
     <View style={styles.container}>
@@ -143,7 +150,27 @@ export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
         </View>
       </View>
 
-      {/* 2) Ability Radar — tap opens BasicInfo sheet */}
+      {/* 2) Grade pyramid — compact vertical bar card (all-time) */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {tr("难度分布", "Grade Pyramid")}
+          </Text>
+        </View>
+        <View style={styles.statsCard}>
+          <View style={styles.pyramidToggleRow}>
+            <NativeSegmentedControl
+              options={[tr("抱石", "Boulder"), tr("绳攀", "Rope")]}
+              selectedIndex={pyramidType === "boulder" ? 0 : 1}
+              onSelect={(i) => setPyramidType(i === 0 ? "boulder" : "lead")}
+              style={{ height: 28 }}
+            />
+          </View>
+          <VerticalGradePyramid logs={logs} type={pyramidType} />
+        </View>
+      </View>
+
+      {/* 3) Ability Radar — tap opens BasicInfo sheet */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
@@ -166,7 +193,7 @@ export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
         </Pressable>
       </View>
 
-      {/* 3) Badges — full-bleed: BadgesSection has its own internal padding;
+      {/* 4) Badges — full-bleed: BadgesSection has its own internal padding;
              negate the container's paddingHorizontal so we don't double it. */}
       <View style={[styles.section, styles.badgesBleed]}>
         <BadgesSection styles={parentStyles} />
@@ -240,6 +267,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: 12,
+    },
+    pyramidToggleRow: {
+      marginBottom: 8,
     },
     monthLabel: {
       fontSize: 15,

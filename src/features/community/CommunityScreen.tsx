@@ -124,7 +124,10 @@ export default function CommunityScreen() {
     }
   }, [routeParams.tab]);
 
-  // Native iOS header (no large title)
+  // Native iOS header (empty title — the segmented control lives in the
+  // Stack.Toolbar below so it shares the UIBarButtonItem baseline with the
+  // "+" button. headerTitle's titleView slot uses a different baseline than
+  // bar button items, which produced a visible vertical drift.).
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -143,22 +146,9 @@ export default function CommunityScreen() {
   const feedListData = useMemo(() => posts, [posts]);
 
 
-  // Memoize header to prevent @expo/ui SwiftUI Host components (NativeSegmentedControl)
-  // from being remounted when unrelated state changes (e.g. commentPostId for CommentSheet)
-  const feedListHeader = useMemo(() => {
-    return (
-      <View style={{ paddingHorizontal: theme.spacing.screenPadding }}>
-        <View style={styles.topTabsWrap}>
-          <NativeSegmentedControl
-            options={[tr("推荐", "For You"), tr("关注", "Following")]}
-            selectedIndex={feedMode === "all" ? 0 : 1}
-            onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
-            style={{ height: 32 }}
-          />
-        </View>
-      </View>
-    );
-  }, [feedMode, styles, setFeedMode, tr]);
+  // PillTabs moved into navigation.setOptions headerTitle (above); no in-list
+  // header needed — FlatList's top edge meets the iOS nav bar directly.
+  const feedListHeader = null;
 
   // Visibility tracking — only ONE post plays at a time (the most visible one)
   // Clear active post when leaving Community tab → pauses all videos
@@ -278,6 +268,25 @@ export default function CommunityScreen() {
 
   return (
     <>
+      {/* BH — For You / Following NativeSegmentedControl rides the
+          UIBarButtonItem baseline (same as the "+" button) via
+          Stack.Toolbar.View. `hidesSharedBackground` removes the UIKit
+          shared bar-button glass chrome — without it, iOS 26's
+          `headerTransparent + scrollEdgeEffects: { top: 'soft' }` floating
+          Liquid Glass look gets replaced by a solid bar-button backdrop. */}
+      {mode === "feed" ? (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.View hidesSharedBackground>
+            <NativeSegmentedControl
+              options={[tr("推荐", "For You"), tr("关注", "Following")]}
+              selectedIndex={feedMode === "all" ? 0 : 1}
+              onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
+              style={{ width: 200, height: 32 }}
+            />
+          </Stack.Toolbar.View>
+        </Stack.Toolbar>
+      ) : null}
+
       {/* BF — Strava-mode compose entry: native toolbar "+" button.
           rank → home RankCard；inbox → home toolbar；compose → /community/create. */}
       <Stack.Toolbar placement="right">
@@ -355,10 +364,6 @@ export default function CommunityScreen() {
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  topTabsWrap: {
-    marginBottom: 8,
-  },
-
   feedScopeRow: {
     flexDirection: "row",
     gap: 8,
