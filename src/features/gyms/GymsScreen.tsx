@@ -23,6 +23,7 @@ import { MapTopBar } from "../mapscreen/components/MapTopBar";
 import { MapSearchBar } from "../mapscreen/components/MapSearchBar";
 import { useMapSheetState, DETENT_COLLAPSED } from "../mapscreen/hooks/useMapSheetState";
 import { GymList } from "./components/GymList";
+import { GymsSavedSpotsRow } from "../mapscreen/components/GymsSavedSpotsRow";
 import { GymDetailCard } from "./components/GymDetailCard";
 import { AreaDetailCard } from "../outdoor/components/AreaDetailCard";
 import { outdoorApi } from "../outdoor/api";
@@ -431,6 +432,7 @@ export default function GymsScreen() {
           row leaks behind the home indicator.
         */}
         <View style={[styles.sheetContent, { paddingBottom: insets.bottom }]}>
+          <GymsSavedSpotsRow onSelectArea={onSelectAreaFromList} />
           <GymList
             gyms={gyms}
             areas={areas}

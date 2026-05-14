@@ -14,14 +14,6 @@ export function mapHref(): Href {
   return isCN ? ('/gyms' as any) : ('/map' as any);
 }
 
-/** Entry point for an area / crag detail map. */
-export function areaMapHref(areaId: string, areaName?: string): Href {
-  return {
-    pathname: (isCN ? '/outdoor/crag-map' : '/map') as any,
-    params: areaName ? { areaId, areaName } : { areaId },
-  };
-}
-
 /** Entry point for an outdoor list detail map. */
 export function listMapHref(listId: string): Href {
   return {

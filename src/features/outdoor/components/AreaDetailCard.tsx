@@ -9,7 +9,8 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import type { Area } from '../types';
-import { areaMapHref } from '../../mapscreen/navigation';
+import { mapHref } from '../../mapscreen/navigation';
+import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
 
 interface AreaDetailCardProps {
   area: Area;
@@ -31,7 +32,12 @@ export function AreaDetailCard({ area, onClose, onViewRoutes }: AreaDetailCardPr
       onViewRoutes();
       return;
     }
-    router.push(areaMapHref(area.id, area.name));
+    // Mirror SavedSpotsCarousel: highlight + go to gyms map. CN gyms
+    // sheet's GymsSavedSpotsRow surfaces the highlighted area at index
+    // 0; user taps it to drill into area mode. Single entry path keeps
+    // the state machine simple and consistent with overseas Mapbox.
+    useMapSavedSpotHighlightStore.getState().setHighlight(area.id);
+    router.push(mapHref());
   };
 
   return (

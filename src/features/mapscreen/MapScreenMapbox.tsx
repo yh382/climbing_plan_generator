@@ -65,6 +65,7 @@ import {
   glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import { HeaderButton } from '../../components/ui/HeaderButton';
+import usePreviousTabStore from '../../store/usePreviousTabStore';
 import {
   GlassUnionGroup,
   glassEffectUnion,
@@ -72,6 +73,7 @@ import {
 import type { GymPlace, LatLng } from '../../../lib/poi/types';
 
 import { GymList } from '../gyms/components/GymList';
+import { GymsSavedSpotsRow } from './components/GymsSavedSpotsRow';
 import { GymDetailCard } from '../gyms/components/GymDetailCard';
 import { GymDetailFooter } from '../gyms/components/GymDetailFooter';
 import { useGymsColors } from '../gyms/useGymsColors';
@@ -135,14 +137,14 @@ const HIDDEN_LINE_LAYERS = [
 const HIDDEN_STYLE = { visibility: 'none' as const };
 
 export interface MapScreenMapboxProps {
-  initialAreaId?: string;
-  initialAreaName?: string;
+  /** External entry for list mode (profile/lists toolbar map button).
+   *  Area mode no longer accepts an external entry — it's always
+   *  entered internally via the gyms-sheet `GymsSavedSpotsRow` or area
+   *  list tap (`onSelectAreaFromList`). */
   initialListId?: string;
 }
 
 export default function MapScreenMapbox({
-  initialAreaId,
-  initialAreaName,
   initialListId,
 }: MapScreenMapboxProps) {
   const router = useRouter();
@@ -155,11 +157,18 @@ export default function MapScreenMapbox({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   // ---- Mode ----
-  const initialMode: MapMode = initialAreaId
-    ? { kind: 'area', areaId: initialAreaId, areaName: initialAreaName }
-    : initialListId
-      ? { kind: 'list', listId: initialListId }
-      : { kind: 'gyms' };
+  // Area mode is ALWAYS entered internally (via gyms-sheet Saved Spots
+  // row → `onSelectAreaFromList`). Home Saved Spots / AreaDetailCard
+  // navigate to gyms mode + highlight; the user then taps the spot in
+  // the sheet to drill in. This removes the cross-tab param-propagation
+  // bug entirely — `mode` only changes via in-component callbacks.
+  //
+  // List mode keeps its URL-param external path (profile/lists toolbar
+  // map button) because it has a single user-driven entry and no
+  // cross-list switching flow.
+  const initialMode: MapMode = initialListId
+    ? { kind: 'list', listId: initialListId }
+    : { kind: 'gyms' };
   const modeState = useMapMode(initialMode);
   const { mode, prevCamera, observeCamera, enterArea, enterList, backToGyms } = modeState;
 
@@ -812,9 +821,13 @@ export default function MapScreenMapbox({
   // ---- Navigations / actions ----
   const navigateToRoute = useCallback(
     (routeId: string) => {
+      // Dismiss the outdoor sheet before pushing — iOS otherwise presents
+      // the new screen behind a half-open modal sheet. Fire-and-forget so
+      // the dismiss animation overlaps with the push transition.
+      sheet.sheetRef.current?.dismiss().catch(() => {});
       router.push({ pathname: '/outdoor/outdoor-route-detail' as any, params: { id: routeId } });
     },
-    [router],
+    [router, sheet],
   );
 
   const navigateToCommunity = useCallback(() => {
@@ -837,7 +850,9 @@ export default function MapScreenMapbox({
 
   const onSelectAreaFromList = useCallback(
     (area: Area) => {
-      // Transition into area mode on the same MapView — no full-page push.
+      // Single entry path to area mode — also used by the gyms-sheet
+      // Saved Spots row (`GymsSavedSpotsRow`). Transitions on the same
+      // MapView; back button (chevron.left) reverts to gyms in place.
       enterArea(area.id, area.name);
     },
     [enterArea],
@@ -908,25 +923,42 @@ export default function MapScreenMapbox({
   const todaySendsBtn = useTodaySendsButton(dismissPrimarySheet);
 
   // B1 — re-present the primary sheet when the screen regains focus
-  // (e.g. after popping /daily-summary back). useMapSheetState's auto-
-  // present only fires once on mount; without this, dismissed sheets
-  // stay gone. Idempotent — TrueSheet.present() no-ops if already
-  // presented, so this also safely covers nav paths that didn't dismiss.
+  // Re-present primary sheet on focus, dismiss on blur. Destructure
+  // stable refs from `sheet` (a fresh object each render) so useCallback
+  // deps don't change every render — otherwise useFocusEffect would
+  // cleanup-then-setup on every render → infinite dismiss/present loop.
+  const sheetRefForFocus = sheet.sheetRef;
+  const sheetSafePresent = sheet.safePresent;
   useFocusEffect(
     useCallback(() => {
-      const id = requestAnimationFrame(() => {
-        sheet.sheetRef.current?.present(DETENT_MEDIUM).catch(() => {});
-      });
-      return () => cancelAnimationFrame(id);
-    }, [sheet]),
+      const id = requestAnimationFrame(() => sheetSafePresent(DETENT_MEDIUM));
+      return () => {
+        cancelAnimationFrame(id);
+        sheetRefForFocus.current?.dismiss().catch(() => {});
+      };
+    }, [sheetRefForFocus, sheetSafePresent]),
   );
+
+  // ---- Top bar back button — 2 branches ----
+  // - area mode: ALWAYS internal entry (only path is gyms-sheet
+  //   GymsSavedSpotsRow / area list tap → `onSelectAreaFromList`).
+  //   Back = chevron.left → revert to gyms-mode-in-place.
+  // - gyms / list mode: chevron.down → return to previous tab.
+  //   List has a single external entry (profile/lists toolbar map
+  //   button); we keep it returning straight to the previous tab.
+  const goToPreviousTab = useCallback(() => {
+    sheet.sheetRef.current?.dismiss().catch(() => {});
+    const previousTab = usePreviousTabStore.getState().previousTab;
+    const route = previousTab === 'index' ? '/' : `/${previousTab}`;
+    router.navigate(route as any);
+  }, [router, sheet]);
 
   const topBar = (
     <MapTopBar
       unionId="map-pill"
       leftButton={{
-        icon: 'chevron.left',
-        onPress: mode.kind === 'gyms' ? () => router.back() : onBackToGyms,
+        icon: mode.kind === 'area' ? 'chevron.left' : 'chevron.down',
+        onPress: mode.kind === 'area' ? onBackToGyms : goToPreviousTab,
       }}
       rightButtons={[
         ...mapViewControlButtons,
@@ -1244,6 +1276,7 @@ export default function MapScreenMapbox({
       >
         {mode.kind === 'gyms' ? (
           <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
+            <GymsSavedSpotsRow onSelectArea={onSelectAreaFromList} />
             <GymList
               gyms={gyms}
               areas={gymsData.areas}

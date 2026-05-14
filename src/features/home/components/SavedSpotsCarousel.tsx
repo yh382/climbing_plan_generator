@@ -6,7 +6,8 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
 import { outdoorApi } from "@/features/outdoor/api";
 import type { Area } from "@/features/outdoor/types";
-import { areaMapHref } from "@/features/mapscreen/navigation";
+import { mapHref } from "@/features/mapscreen/navigation";
+import useMapSavedSpotHighlightStore from "@/store/useMapSavedSpotHighlightStore";
 
 const MAX_SPOTS = 8;
 
@@ -58,7 +59,17 @@ export function SavedSpotsCarousel() {
             <Pressable
               key={area.id}
               style={styles.card}
-              onPress={() => router.push(areaMapHref(area.id, area.name))}
+              onPress={() => {
+                // Home Saved Spot tap = "go to map, with this spot
+                // highlighted at the top of the gyms-sheet row". The
+                // user then taps the highlighted spot inside the sheet
+                // to actually drill into area mode. Single entry path
+                // (always lands in gyms mode) sidesteps NativeTabs
+                // param-propagation issues and the cross-spot state
+                // sync bug.
+                useMapSavedSpotHighlightStore.getState().setHighlight(area.id);
+                router.navigate(mapHref());
+              }}
             >
               <View style={styles.cover}>
                 {cover ? (

@@ -2,13 +2,16 @@
 
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useUserStore } from "../../../src/store/useUserStore";
 import { setOnAuthExpired } from "@/lib/authEvents";
 import { useAuthStore } from "@/store/useAuthStore";
+import usePreviousTabStore, { type TabKey } from "@/store/usePreviousTabStore";
+
+const TRACKED_TAB_KEYS: readonly TabKey[] = ["index", "activity", "community", "profile"];
 
 const isIOS = Platform.OS === "ios";
 // iOS<26: NativeTabs default goes transparent when content scrolls to the
@@ -21,6 +24,7 @@ const tabBarNeedsOpaque = isIOS && iosVersion < 26;
 export default function TabsLayout() {
   const { user, fetchMe } = useUserStore();
   const router = useRouter();
+  const segments = useSegments();
   const accessToken = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
   const handledRef = useRef(false);
@@ -28,6 +32,29 @@ export default function TabsLayout() {
   useEffect(() => {
     if (accessToken && !user) fetchMe();
   }, [accessToken, user, fetchMe]);
+
+  // Track the most recent non-map tab so the Map screen's down-arrow can
+  // return the user to wherever they came from (Home / Activity / Community
+  // / Profile) instead of hard-coding Home.
+  const tabsIdx = segments.indexOf("(tabs)" as never);
+  const currentTab = tabsIdx >= 0 ? (segments[tabsIdx + 1] as string | undefined) : undefined;
+  // Show the tab bar ONLY when we're on a confirmed visible-tabbar tab.
+  // `currentTab !== 'map'` alone would briefly flash the bar during a push
+  // OUT of /map (segments switch the instant `router.push` fires; the push
+  // animation hasn't finished covering the screen yet, so the user sees
+  // tabbar pop in just before the new screen covers it). Whitelisting the
+  // visible tabs collapses that window — non-map non-tabs routes also keep
+  // the bar hidden, which is harmless because the push covers it anyway.
+  const tabBarHidden = !(
+    currentTab && (TRACKED_TAB_KEYS as readonly string[]).includes(currentTab)
+  );
+
+  useEffect(() => {
+    if (!currentTab || currentTab === "map") return;
+    if ((TRACKED_TAB_KEYS as readonly string[]).includes(currentTab)) {
+      usePreviousTabStore.getState().setPreviousTab(currentTab as TabKey);
+    }
+  }, [currentTab]);
 
   useEffect(() => {
     setOnAuthExpired(() => {
@@ -44,6 +71,10 @@ export default function TabsLayout() {
       tintColor="#306E6F"
       minimizeBehavior="never"
       disableTransparentOnScrollEdge={tabBarNeedsOpaque}
+      // Hide the native tab bar except on confirmed visible-tabbar tabs.
+      // See `tabBarHidden` derivation above for why we whitelist instead
+      // of just checking `currentTab !== 'map'`.
+      hidden={tabBarHidden}
     >
       {/* 1. Home */}
       <NativeTabs.Trigger name="index" contentStyle={{ backgroundColor: "transparent" }}>
