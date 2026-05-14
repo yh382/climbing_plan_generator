@@ -284,6 +284,29 @@ export default function ProfileScreen() {
   // bar fully pinned (chrome fully opaque). Driven from the bar's
   // worklet via spacer distance to headerHeight.
   const pinFadeProgress = useSharedValue<number>(0);
+  // Bumped by the spacer's onLayout — bar reads this in its worklet
+  // so the worklet re-runs after first layout and `measure()` returns
+  // a valid frame (without this, bar stays at -9999 until the user
+  // scrolls, visible on cold open of other-user profile).
+  //
+  // BG-FU v2: schedule extra rAF re-runs after onLayout because iOS
+  // `contentInsetAdjustmentBehavior: "automatic"` settles the inset
+  // ASYNCHRONOUSLY after layout (especially on Stack-push routes like
+  // community/u/[id]). Without these retries, measure() returns a
+  // pre-inset pageY value, the worklet computes `distanceToPin <= 0`,
+  // and the bar incorrectly pins at the top of the viewport for the
+  // first frame. The retries cover ~83ms (5 frames @ 60fps).
+  const spacerLayoutVersion = useSharedValue<number>(0);
+  const onSpacerLayout = useCallback(() => {
+    spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
+    let frame = 0;
+    const tick = () => {
+      spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
+      frame++;
+      if (frame < 5) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [spacerLayoutVersion]);
 
   // Window BG — Collapsing nav: nav-bar background fades from transparent
   // to opaque colors.background as the user scrolls past the cover (scrollY
@@ -407,6 +430,7 @@ export default function ProfileScreen() {
             carve. The spacer itself is transparent. */}
         <Animated.View
           ref={spacerRef}
+          onLayout={onSpacerLayout}
           style={{
             height: PROFILE_TAB_BAR_HEIGHT,
             marginTop: -35,
@@ -464,6 +488,7 @@ export default function ProfileScreen() {
         onTabPress={handleTabPress}
         scrollPosition={tabScrollPosition}
         spacerRef={spacerRef}
+        layoutVersion={spacerLayoutVersion}
         pinFadeProgress={pinFadeProgress}
       />
 

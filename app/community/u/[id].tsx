@@ -264,9 +264,27 @@ export default function PublicProfileScreen() {
   // BG fix v5 — bar lives OUTSIDE the ScrollView as an absolute overlay
   // (Fallback B). Spacer below holds the bar's slot; bar measures the
   // spacer's screen Y to position itself. pinFadeProgress drives the
-  // CollapsingHeader chrome.
+  // CollapsingHeader chrome; spacerLayoutVersion triggers the bar's
+  // worklet to re-run after first layout (otherwise measure() stays
+  // null until first scroll — visible on cold open of other-user
+  // profile as "bar missing until I scroll").
   const spacerRef = useAnimatedRef<Animated.View>();
   const pinFadeProgress = useSharedValue<number>(0);
+  const spacerLayoutVersion = useSharedValue<number>(0);
+  // BG-FU v2: schedule extra rAF re-runs after onLayout because iOS
+  // `contentInsetAdjustmentBehavior: "automatic"` settles ASYNC after
+  // layout on Stack-push routes (see profile/index.tsx for the full
+  // story — this screen is the exact symptom that motivated the fix).
+  const onSpacerLayout = useCallback(() => {
+    spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
+    let frame = 0;
+    const tick = () => {
+      spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
+      frame++;
+      if (frame < 5) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [spacerLayoutVersion]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -354,6 +372,7 @@ export default function PublicProfileScreen() {
             removed; see profile/index.tsx for the full rationale. */}
         <Animated.View
           ref={spacerRef}
+          onLayout={onSpacerLayout}
           style={{ height: PROFILE_TAB_BAR_HEIGHT, marginTop: -35 }}
         />
 
@@ -456,6 +475,7 @@ export default function PublicProfileScreen() {
         onTabPress={handleTabPress}
         scrollPosition={tabScrollPosition}
         spacerRef={spacerRef}
+        layoutVersion={spacerLayoutVersion}
         pinFadeProgress={pinFadeProgress}
       />
 

@@ -66,6 +66,15 @@ type Props = {
    */
   spacerRef: AnimatedRef<Animated.View>;
   /**
+   * Shared value bumped by the spacer's onLayout (parent-owned). The
+   * worklet reads this as a dependency so it re-runs after the spacer
+   * is first laid out — without this, `measure(spacerRef)` keeps
+   * returning null on the first paint (worklet only re-runs when
+   * shared values change; scrollY doesn't change on mount), leaving
+   * the bar stuck at the off-screen sentinel until the user scrolls.
+   */
+  layoutVersion: SharedValue<number>;
+  /**
    * Reanimated sink — written from this component's animated style
    * worklet every frame. 0 = bar at rest position, 1 = bar fully
    * pinned. Consumed by CollapsingHeaderBg/Title.
@@ -79,17 +88,22 @@ export default function StickyProfileTabBar({
   onTabPress,
   scrollPosition,
   spacerRef,
+  layoutVersion,
   pinFadeProgress,
 }: Props) {
   const headerHeight = useHeaderHeight();
 
   const animatedStyle = useAnimatedStyle(() => {
-    // Read scrollY so the worklet re-runs each frame the user scrolls.
-    // The shared value itself isn't used in the math — measure() supplies
-    // the live screen Y of the spacer, which already accounts for scroll
+    // Read scrollY + layoutVersion so the worklet re-runs each frame
+    // the user scrolls AND on layout changes (notably first paint —
+    // see `layoutVersion` prop doc for why). The shared values
+    // themselves aren't used in the math — measure() supplies the
+    // live screen Y of the spacer, which already accounts for scroll
     // offset, contentInset, parallax, everything.
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     scrollY.value;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    layoutVersion.value;
 
     const m = measure(spacerRef);
     if (m === null) {

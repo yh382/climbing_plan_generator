@@ -5,7 +5,7 @@
 // Sessions share a single fetchUserActivity call; Climbs is BE-driven
 // via useUserAscents and only renders for self profile.
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -19,6 +19,10 @@ import { useUserAscents } from "@/features/profile/hooks/useUserAscents";
 import ProfileMediaGrid from "./ProfileMediaGrid";
 import ProfileSessionList from "./ProfileSessionList";
 import ProfileLogList from "./ProfileLogList";
+import {
+  MediaGridSkeleton,
+  SessionListSkeleton,
+} from "./ActivitySkeleton";
 
 type Props = {
   userId: string;
@@ -111,6 +115,31 @@ export default function ActivityFeedSection({ userId, viewMode }: Props) {
   const sessionCountLabel = formatCount(sessionItems.length, hasMoreActivity);
   const climbsCountLabel = formatCount(ascentsState.ascents.length, ascentsState.hasMore);
 
+  // BG-FU — skeleton visibility logic. Two conditions OR-ed:
+  // (1) Genuine loading state: no cache yet OR loading + empty
+  // (2) Minimum display time floor: 200ms after mount, so the skeleton
+  //     is perceivable even when the network round-trip resolves in
+  //     under one frame. Without the floor, a fast cache write makes
+  //     the skeleton flash for ~16ms and the user feels "nothing
+  //     happened" on first paint.
+  //
+  // If the cache is already populated on mount (warm cache from a
+  // prior screen visit), skip the floor entirely so we don't flash a
+  // skeleton over data that's ready.
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  useEffect(() => {
+    if (cache && cache.items.length > 0) {
+      setMinTimeElapsed(true);
+      return;
+    }
+    const id = setTimeout(() => setMinTimeElapsed(true), 200);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isLoading =
+    !minTimeElapsed || !cache || (cache.loading && cache.items.length === 0);
+
   return (
     <View>
       <SubSection
@@ -126,7 +155,11 @@ export default function ActivityFeedSection({ userId, viewMode }: Props) {
             : undefined
         }
       >
-        <ProfileMediaGrid userId={userId} viewMode={viewMode} />
+        {isLoading ? (
+          <MediaGridSkeleton />
+        ) : (
+          <ProfileMediaGrid userId={userId} viewMode={viewMode} />
+        )}
       </SubSection>
 
       <SubSection
@@ -142,7 +175,11 @@ export default function ActivityFeedSection({ userId, viewMode }: Props) {
             : undefined
         }
       >
-        <ProfileSessionList userId={userId} viewMode={viewMode} />
+        {isLoading ? (
+          <SessionListSkeleton />
+        ) : (
+          <ProfileSessionList userId={userId} viewMode={viewMode} />
+        )}
       </SubSection>
 
       {viewMode === "self" ? (
