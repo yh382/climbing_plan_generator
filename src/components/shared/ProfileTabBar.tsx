@@ -16,13 +16,18 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 
 export const PROFILE_TABS = [
-  { key: "sends", label: "Sends" },
+  { key: "activity", label: "Activity" },
   { key: "stats", label: "Stats & Badges" },
   { key: "lists", label: "Lists" },
 ] as const;
 
 const TAB_COUNT = PROFILE_TABS.length;
 const UNDERLINE_WIDTH_RATIO = 0.4; // mockup: left:30%/right:30% → 40% wide
+
+// Public for the floating-bar layout in profile screens — they need the
+// exact bar height to reserve a spacer in the ScrollView content so the
+// PagerView lands beneath the bar's natural resting position.
+export const PROFILE_TAB_BAR_HEIGHT = 46;
 
 export interface ProfileTabBarProps {
   activeTab: string;

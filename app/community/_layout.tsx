@@ -19,8 +19,13 @@ export default function CommunityLayout() {
       <Stack.Screen name="cover-picker" options={{ title: 'Choose Cover', headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="video-trimmer" options={{ title: 'Trim Video', headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="search" options={{ headerShown: false }} />
-      <Stack.Screen name="u/[id]" options={{ scrollEdgeEffects: { top: 'soft' } }} />
+      {/* BG fix — explicit `top: 'none'` to override iOS 26's implicit
+          Liquid Glass scrollEdge fade. CollapsingHeaderBg owns the
+          nav-bar background here; the system fade would shade the sticky
+          tab bar. See profile/_layout.tsx for the same change. */}
+      <Stack.Screen name="u/[id]" options={{ scrollEdgeEffects: { top: 'hidden' } }} />
       <Stack.Screen name="user-posts" options={{ title: "Posts", scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen name="media-grid" options={{ title: "Media", headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Screen name="public-plan" />
     </Stack>
   );

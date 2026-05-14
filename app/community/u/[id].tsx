@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   ActivityIndicator,
   Alert,
   Share,
@@ -23,13 +22,17 @@ import { HeaderButton } from "../../../src/components/ui/HeaderButton";
 import { useThemeColors } from "../../../src/lib/useThemeColors";
 
 import Animated, {
-  useSharedValue,
+  useAnimatedRef,
   useAnimatedScrollHandler,
+  useSharedValue,
 } from "react-native-reanimated";
 
 import ProfileHeader from "../../../src/components/shared/ProfileHeader";
-import ProfileTabBar from "../../../src/components/shared/ProfileTabBar";
-import SendsSection from "../../../src/features/profile/components/fivecorefunction/SendsSection";
+import { PROFILE_TAB_BAR_HEIGHT } from "../../../src/components/shared/ProfileTabBar";
+import StickyProfileTabBar from "../../../src/components/shared/StickyProfileTabBar";
+import ActivityFeedSection from "../../../src/features/profile/components/fivecorefunction/ActivityFeedSection";
+import CollapsingHeaderBg from "../../../src/features/profile/components/CollapsingHeaderBg";
+import CollapsingHeaderTitle from "../../../src/features/profile/components/CollapsingHeaderTitle";
 import PublicStatsSection from "../../../src/features/profile/components/PublicStatsSection";
 import ListsSection from "../../../src/features/outdoor/components/ListsSection";
 import BadgeCard from "../../../src/features/profile/components/badgessection/BadgeCard";
@@ -80,8 +83,9 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { tt } = useI18N();
 
-  // β: posts grid is replaced by SendsSection (BE-backed video log filter);
-  // we no longer destructure `posts` from the public profile hook.
+  // BG: the Activity tab pulls polymorphic posts through
+  // ActivityFeedSection → useCommunityStore.userActivityByUserId, so we
+  // no longer destructure `posts` from the public profile hook.
   const { profile, badges, sessionSummary, loading } = usePublicProfile(id ?? null);
   const { width } = useWindowDimensions();
 
@@ -208,9 +212,9 @@ export default function PublicProfileScreen() {
     }).catch(() => {});
   }, [profile]);
 
-  // Tabs (Window β KAYA — 3-segment underline matches /profile self view)
-  const TABS = ["sends", "stats", "lists"] as const;
-  const [activeTab, setActiveTab] = useState("sends");
+  // Tabs (BG — renamed sends → activity to mirror /profile self view)
+  const TABS = ["activity", "stats", "lists"] as const;
+  const [activeTab, setActiveTab] = useState("activity");
   const pagerRef = useRef<PagerView>(null);
   const tabScrollPosition = useSharedValue(0);
   const { height: screenHeight } = useWindowDimensions();
@@ -257,13 +261,36 @@ export default function PublicProfileScreen() {
     scrollY.value = event.contentOffset.y;
   });
 
+  // BG fix v5 — bar lives OUTSIDE the ScrollView as an absolute overlay
+  // (Fallback B). Spacer below holds the bar's slot; bar measures the
+  // spacer's screen Y to position itself. pinFadeProgress drives the
+  // CollapsingHeader chrome.
+  const spacerRef = useAnimatedRef<Animated.View>();
+  const pinFadeProgress = useSharedValue<number>(0);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTransparent: HEADER_TRANSPARENT,
-      title: "",
+      // Belt-and-suspenders: see profile/index.tsx for why this is set
+      // both here AND in app/community/_layout.tsx.
+      scrollEdgeEffects: { top: "hidden" },
       headerLeft: () => <HeaderButton icon="chevron.backward" onPress={() => router.back()} />,
+      // Window BG — collapsing nav: nav bar fades opaque + mini avatar
+      // + name slides in as the user scrolls past the cover. Mirrors the
+      // self profile screen.
+      headerBackground: () => (
+        <CollapsingHeaderBg pinFadeProgress={pinFadeProgress} />
+      ),
+      headerTitle: () =>
+        profile ? (
+          <CollapsingHeaderTitle
+            pinFadeProgress={pinFadeProgress}
+            avatarUrl={profile.avatarUrl}
+            name={profile.displayName}
+          />
+        ) : null,
     });
-  }, [navigation, router]);
+  }, [navigation, router, pinFadeProgress, profile?.avatarUrl, profile?.displayName]);
 
   // Privacy helpers
   const privacy = profile?.privacy;
@@ -289,14 +316,6 @@ export default function PublicProfileScreen() {
     );
   }
 
-  // Stat strip 4-up: B Best / R Best / Sends / Badges (mirror self profile).
-  const statStripItems = [
-    { num: profile.boulderMax || "—", lbl: "B Best" },
-    { num: profile.routeMax || "—", lbl: "R Best" },
-    { num: String(profile.totalSends ?? 0), lbl: "Sends" },
-    { num: String(badges.length), lbl: "Badges" },
-  ];
-
   return (
     <View style={dynStyles.screenRoot}>
       <Animated.ScrollView
@@ -304,9 +323,8 @@ export default function PublicProfileScreen() {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
-        stickyHeaderIndices={[2]}
       >
-        {/* [0] Cover/gradient + header */}
+        {/* [0] Cover/gradient + header — KPI single-row pill lives inside */}
         <ProfileHeader
           name={profile.displayName}
           username={profile.username}
@@ -325,30 +343,19 @@ export default function PublicProfileScreen() {
           onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
           onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
           scrollY={scrollY}
+          gradeText={`${profile.boulderMax || "—"}/${profile.routeMax || "—"}`}
+          totalSends={profile.totalSends}
+          onKPIPress={() => router.push(`/users/${id}/ascents` as any)}
         />
 
-        {/* [1] Content shell + 4-up stat strip — tap → ascents page */}
-        <View style={dynStyles.contentShell}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View ascents history"
-            onPress={() => router.push(`/users/${id}/ascents` as any)}
-            style={({ pressed }) => [
-              dynStyles.statStrip,
-              pressed ? { opacity: 0.6 } : null,
-            ]}
-          >
-            {statStripItems.map((it) => (
-              <View key={it.lbl} style={dynStyles.statStripCell}>
-                <Text style={dynStyles.statStripNum}>{it.num}</Text>
-                <Text style={dynStyles.statStripLbl}>{it.lbl}</Text>
-              </View>
-            ))}
-          </Pressable>
-        </View>
-
-        {/* [2] Tab bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
+        {/* Tab bar spacer — transparent + marginTop:-35 to overlap up
+            into the cover image area so the bar's animated rounded
+            corners reveal cover (carve effect). v5.3: contentShell
+            removed; see profile/index.tsx for the full rationale. */}
+        <Animated.View
+          ref={spacerRef}
+          style={{ height: PROFILE_TAB_BAR_HEIGHT, marginTop: -35 }}
+        />
 
         {/* Content — PagerView for swipe + smooth tab animation */}
         <PagerView
@@ -360,7 +367,7 @@ export default function PublicProfileScreen() {
           onPageScrollStateChanged={onPageScrollStateChanged}
           overdrag
         >
-          <View key="sends" style={dynStyles.contentArea}>
+          <View key="activity" style={dynStyles.contentArea}>
             <View onLayout={handlePageLayout(0)}>
               {privacy?.posts === false ? (
                 <PrivateSection
@@ -368,7 +375,7 @@ export default function PublicProfileScreen() {
                   colors={colors}
                 />
               ) : (
-                <SendsSection userId={id!} viewMode="other" />
+                <ActivityFeedSection userId={id!} viewMode="other" />
               )}
             </View>
           </View>
@@ -439,6 +446,19 @@ export default function PublicProfileScreen() {
           </View>
         </PagerView>
       </Animated.ScrollView>
+
+      {/* BG fix v5 (Fallback B) — absolute-overlay sticky tab bar
+          rendered outside ScrollView so PagerView's native layer can't
+          draw above it during the pin transition. */}
+      <StickyProfileTabBar
+        scrollY={scrollY}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+        scrollPosition={tabScrollPosition}
+        spacerRef={spacerRef}
+        pinFadeProgress={pinFadeProgress}
+      />
+
       {/* Native toolbar menu (context menu from button position) */}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis">
@@ -480,32 +500,6 @@ const createDynStyles = (colors: ReturnType<typeof useThemeColors>) => StyleShee
   contentArea: { minHeight: 400 },
   emptyState: { padding: 48, alignItems: "center" },
   emptyText: { color: colors.textTertiary, marginTop: 8 },
-  // Content shell + 4-up stat strip — mirrors self profile layout
-  contentShell: {
-    backgroundColor: colors.background,
-    marginTop: -35,
-    borderTopLeftRadius: 35,
-    borderTopRightRadius: 35,
-    paddingTop: 4,
-  },
-  statStrip: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-    gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  statStripCell: { flex: 1, alignItems: "center" },
-  statStripNum: { fontSize: 17, fontWeight: "700", color: colors.textPrimary },
-  statStripLbl: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginTop: 2,
-  },
   // Badges
   badgeSectionBlock: { marginBottom: 16 },
   badgeSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textSecondary, marginBottom: 8, paddingHorizontal: 12 },

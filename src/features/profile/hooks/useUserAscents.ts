@@ -17,6 +17,7 @@ import type {
   AggregatedClimbItem,
   Feel,
   LocalDayLogItem,
+  LogMedia,
 } from "../../journal/loglist/types";
 
 type UserAscentsState = {
@@ -46,7 +47,11 @@ function mapItem(remote: UserAscentsApiItem): AggregatedClimbItem {
     style: remote.style,
     feel: ((remote.feel as Feel | null) ?? "solid") as Feel,
     note: remote.note ?? undefined,
-    media: undefined,
+    // Window BG fix — BE returns the representative log's media
+    // (`services/aggregate_climbs.py:98`); the FE was previously
+    // dropping it on the floor which left ClimbItemCard with no
+    // thumbnail (video logs rendered without their cover frame).
+    media: (remote.media as LogMedia[] | null) ?? undefined,
     outdoor_route_id: remote.outdoor_route_id,
     gym_route_id: remote.gym_route_id,
     latestId: remote.latest_id,

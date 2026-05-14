@@ -67,6 +67,14 @@ export interface ProfileHeaderProps {
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
   scrollY?: SharedValue<number>;
+  /** Window BG — single-line KPI pill (cover idblock below countsRow).
+   *  Reuses counts/countsNum/countsSep visual to mirror followers/following.
+   *  Pre-formatted as "V7/5.13b" (boulder + rope merged with a slash). */
+  gradeText?: string;
+  /** Window BG — total sends count rendered alongside gradeText. */
+  totalSends?: number;
+  /** Window BG — tap callback for the entire KPI pill row. */
+  onKPIPress?: () => void;
 }
 
 export default function ProfileHeader({
@@ -88,6 +96,9 @@ export default function ProfileHeader({
   onFollowersPress,
   onFollowingPress,
   scrollY,
+  gradeText,
+  totalSends,
+  onKPIPress,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
   const isDark = useColorScheme() === "dark";
@@ -216,6 +227,30 @@ export default function ProfileHeader({
             </Text>
           </Pressable>
         </View>
+        {/* Window BG — KPI single-row pill: V7/5.13b Grade · 74 Sends.
+            Reuses counts visuals so it matches the followers/following row
+            stacked directly above. Renders only when at least one value is
+            supplied (props are optional for backward compat). */}
+        {(gradeText !== undefined || totalSends !== undefined) && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View ascents history"
+            onPress={onKPIPress}
+            disabled={!onKPIPress}
+            hitSlop={6}
+            style={styles.kpiRow}
+          >
+            <Text style={styles.counts}>
+              <Text style={styles.countsNum}>{gradeText ?? "—"}</Text>
+              {" Grade"}
+            </Text>
+            <Text style={styles.countsSep}>·</Text>
+            <Text style={styles.counts}>
+              <Text style={styles.countsNum}>{String(totalSends ?? 0)}</Text>
+              {" Sends"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Action FAB (bottom-right) */}
@@ -336,6 +371,15 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
       gap: 6,
     },
+    // Window BG — single-row KPI pill below countsRow. Same shape as
+    // countsRow with a slightly tighter gap; pulls counts/countsNum/countsSep
+    // styles unchanged so it lines up visually 1:1.
+    kpiRow: {
+      marginTop: 6,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
     counts: {
       fontSize: 12,
       fontFamily: theme.fonts.regular,
@@ -352,20 +396,26 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: "rgba(255,255,255,0.55)",
     },
+    // Window BG — Edit pill restyled to match the other-profile
+    // Follow/Chat outline aesthetic (translucent white + hairline
+    // border) so both self and other surfaces share the same chrome.
+    // Was an opaque cardDark pill before.
     editPill: {
       position: "absolute",
       right: 18,
       bottom: ACTION_FAB_BOTTOM,
-      height: 34,
+      height: 40,
       paddingHorizontal: 18,
-      borderRadius: 999,
+      borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: colors.cardDark,
+      backgroundColor: "rgba(255,255,255,0.18)",
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: "rgba(255,255,255,0.4)",
     },
     editPillText: {
-      fontSize: 13,
-      fontWeight: "800",
+      fontSize: 14,
+      fontWeight: "700",
       fontFamily: theme.fonts.bold,
       color: "#FFFFFF",
     },

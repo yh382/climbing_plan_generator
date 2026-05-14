@@ -8,9 +8,13 @@ import { handleAwardedBadges } from './useBadgeUnlockStore';
 
 type FeedMode = 'all' | 'following';
 
-const SENDS_PAGE_SIZE = 24;
+const ACTIVITY_PAGE_SIZE = 24;
 
-export interface UserSendsCache {
+// Window BG — Profile Activity feed: per-user polymorphic post cache
+// (Media + Sessions both derive from this via FE-side filter). Replaces
+// the legacy `userSendsByUserId` cache (server-side filtered to
+// attachment_type=log) which BG retired alongside SendsSection.tsx.
+export interface UserActivityCache {
   items: FeedPost[];
   nextSkip: number;
   loading: boolean;
@@ -28,17 +32,18 @@ interface CommunityState {
   // My posts
   myPosts: FeedPost[];
 
-  // Window β — Profile KAYA: per-user video-sends cache. Shared by
-  // SendsSection (profile self/other) and γ Reels feed so the cursor
-  // pagination state survives across screens without refetching.
-  userSendsByUserId: Record<string, UserSendsCache>;
+  // Window BG — Profile Activity: per-user polymorphic post cache
+  // (Media + Sessions sub-sections derive from this with FE filters).
+  // Replaces the legacy β userSendsByUserId cache retired with
+  // SendsSection.tsx.
+  userActivityByUserId: Record<string, UserActivityCache>;
 
   // Actions
   setFeedMode: (mode: FeedMode) => void;
   fetchFeed: (refresh?: boolean) => Promise<void>;
   fetchMyPosts: () => Promise<void>;
-  fetchUserSends: (userId: string, refresh?: boolean) => Promise<void>;
-  loadMoreUserSends: (userId: string) => Promise<void>;
+  fetchUserActivity: (userId: string, refresh?: boolean) => Promise<void>;
+  loadMoreUserActivity: (userId: string) => Promise<void>;
   createPost: (data: UserPostCreateIn) => Promise<UserPostOut>;
   updatePost: (postId: string, data: { content_text?: string; media?: any[]; visibility?: string }) => Promise<void>;
   deletePost: (postId: string) => Promise<void>;
@@ -53,7 +58,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   feedError: null,
   feedMode: 'all' as FeedMode,
   myPosts: [],
-  userSendsByUserId: {},
+  userActivityByUserId: {},
 
   setFeedMode: (mode) => {
     if (mode === get().feedMode) return;
@@ -94,13 +99,12 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     }
   },
 
-  fetchUserSends: async (userId, refresh = false) => {
-    const cache = get().userSendsByUserId[userId];
-    // Skip if a request is already in flight (unless explicitly refreshing).
+  fetchUserActivity: async (userId, refresh = false) => {
+    const cache = get().userActivityByUserId[userId];
     if (cache?.loading && !refresh) return;
     set((state) => ({
-      userSendsByUserId: {
-        ...state.userSendsByUserId,
+      userActivityByUserId: {
+        ...state.userActivityByUserId,
         [userId]: {
           items: refresh ? [] : cache?.items ?? [],
           nextSkip: refresh ? 0 : cache?.nextSkip ?? 0,
@@ -111,78 +115,78 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       },
     }));
     try {
-      const raw = await communityApi.getUserSends(userId, 0, SENDS_PAGE_SIZE);
+      const raw = await communityApi.getUserPosts(userId, 0, ACTIVITY_PAGE_SIZE);
       const items = (raw as any[]).map((r) => toFeedPost(mapRawPost(r)));
       set((state) => ({
-        userSendsByUserId: {
-          ...state.userSendsByUserId,
+        userActivityByUserId: {
+          ...state.userActivityByUserId,
           [userId]: {
             items,
             nextSkip: items.length,
             loading: false,
-            exhausted: items.length < SENDS_PAGE_SIZE,
+            exhausted: items.length < ACTIVITY_PAGE_SIZE,
             error: null,
           },
         },
       }));
     } catch (e: any) {
-      if (__DEV__) console.warn('fetchUserSends error:', e?.message);
+      if (__DEV__) console.warn('fetchUserActivity error:', e?.message);
       set((state) => ({
-        userSendsByUserId: {
-          ...state.userSendsByUserId,
+        userActivityByUserId: {
+          ...state.userActivityByUserId,
           [userId]: {
-            items: state.userSendsByUserId[userId]?.items ?? [],
-            nextSkip: state.userSendsByUserId[userId]?.nextSkip ?? 0,
+            items: state.userActivityByUserId[userId]?.items ?? [],
+            nextSkip: state.userActivityByUserId[userId]?.nextSkip ?? 0,
             loading: false,
-            exhausted: state.userSendsByUserId[userId]?.exhausted ?? false,
-            error: e?.message ?? 'Failed to load sends',
+            exhausted: state.userActivityByUserId[userId]?.exhausted ?? false,
+            error: e?.message ?? 'Failed to load activity',
           },
         },
       }));
     }
   },
 
-  loadMoreUserSends: async (userId) => {
-    const cache = get().userSendsByUserId[userId];
+  loadMoreUserActivity: async (userId) => {
+    const cache = get().userActivityByUserId[userId];
     if (!cache || cache.loading || cache.exhausted) return;
     const skip = cache.nextSkip;
     set((state) => ({
-      userSendsByUserId: {
-        ...state.userSendsByUserId,
+      userActivityByUserId: {
+        ...state.userActivityByUserId,
         [userId]: { ...cache, loading: true, error: null },
       },
     }));
     try {
-      const raw = await communityApi.getUserSends(userId, skip, SENDS_PAGE_SIZE);
+      const raw = await communityApi.getUserPosts(userId, skip, ACTIVITY_PAGE_SIZE);
       const more = (raw as any[]).map((r) => toFeedPost(mapRawPost(r)));
       set((state) => {
-        const current = state.userSendsByUserId[userId];
+        const current = state.userActivityByUserId[userId];
         const merged = [...(current?.items ?? []), ...more];
         return {
-          userSendsByUserId: {
-            ...state.userSendsByUserId,
+          userActivityByUserId: {
+            ...state.userActivityByUserId,
             [userId]: {
               items: merged,
               nextSkip: merged.length,
               loading: false,
-              exhausted: more.length < SENDS_PAGE_SIZE,
+              exhausted: more.length < ACTIVITY_PAGE_SIZE,
               error: null,
             },
           },
         };
       });
     } catch (e: any) {
-      if (__DEV__) console.warn('loadMoreUserSends error:', e?.message);
+      if (__DEV__) console.warn('loadMoreUserActivity error:', e?.message);
       set((state) => {
-        const current = state.userSendsByUserId[userId];
+        const current = state.userActivityByUserId[userId];
         return {
-          userSendsByUserId: {
-            ...state.userSendsByUserId,
+          userActivityByUserId: {
+            ...state.userActivityByUserId,
             [userId]: {
               ...(current ?? { items: [], nextSkip: 0, exhausted: false }),
               loading: false,
-              error: e?.message ?? 'Failed to load more sends',
-            } as UserSendsCache,
+              error: e?.message ?? 'Failed to load more activity',
+            } as UserActivityCache,
           },
         };
       });

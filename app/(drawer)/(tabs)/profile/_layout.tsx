@@ -13,9 +13,14 @@ export default function ProfileLayout() {
           headerTransparent: true,
           headerTitle: "",
           headerLargeTitle: false,
-          scrollEdgeEffects: {
-            top: 'soft',
-          },
+          // BG fix — explicit `top: 'hidden'` (not omitted) to override
+          // iOS 26's implicit Liquid Glass scrollEdge soft fade. Window
+          // BG installs `CollapsingHeaderBg` via setOptions to handle the
+          // nav-bar background ourselves; the system fade on top of that
+          // shaded the sticky `StickyProfileTabBar`'s upper half because
+          // the bar is inside the scrollview content. Valid values per
+          // react-native-screens: 'automatic' | 'hard' | 'soft' | 'hidden'.
+          scrollEdgeEffects: { top: 'hidden' },
         }}
       />
     </Stack>

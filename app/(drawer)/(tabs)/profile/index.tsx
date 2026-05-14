@@ -1,9 +1,16 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Share, useWindowDimensions, Platform } from "react-native";
+import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { View, StyleSheet, Share, useWindowDimensions, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
+import CollapsingHeaderBg from "@/features/profile/components/CollapsingHeaderBg";
+import CollapsingHeaderTitle from "@/features/profile/components/CollapsingHeaderTitle";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { useSharedValue, useAnimatedScrollHandler } from "react-native-reanimated";
+import Animated, {
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 import PagerView from "react-native-pager-view";
 import * as Clipboard from 'expo-clipboard';
 import { theme } from "@/lib/theme";
@@ -12,25 +19,25 @@ import { useThemeColors } from "@/lib/useThemeColors";
 const NATIVE_TAB_BAR_HEIGHT = 49;
 import { api } from "../../../../src/lib/apiClient";
 
-import SendsSection from "../../../../src/features/profile/components/fivecorefunction/SendsSection";
+import ActivityFeedSection from "../../../../src/features/profile/components/fivecorefunction/ActivityFeedSection";
 import StatsAndBadgesSection from "../../../../src/features/profile/components/fivecorefunction/StatsAndBadgesSection";
 import ListsSection from "../../../../src/features/outdoor/components/ListsSection";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import useLogsStore from "../../../../src/store/useLogsStore";
 import { calculateKPIs } from "../../../../src/services/stats";
-import { useBadgesProgress } from "@/features/community/hooks";
 
 import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
-import ProfileTabBar, { PROFILE_TABS } from "../../../../src/components/shared/ProfileTabBar";
+import { PROFILE_TABS, PROFILE_TAB_BAR_HEIGHT } from "../../../../src/components/shared/ProfileTabBar";
+import StickyProfileTabBar from "../../../../src/components/shared/StickyProfileTabBar";
 
-const TABS: readonly ["sends", "stats", "lists"] = ["sends", "stats", "lists"];
+const TABS: readonly ["activity", "stats", "lists"] = ["activity", "stats", "lists"];
 
-// COMPAT 用白图标对抗 cover 图（iOS 17/18 没有 Liquid Glass 容器）；iOS 26
-// SF Symbol 落在 Liquid Glass capsule 里，黑图标对比更柔和。
-const TOOLBAR_ICON_COLOR =
-  Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26
-    ? "#000000"
-    : "#FFFFFF";
+// iOS 26+ runs the SF Symbols inside a Liquid Glass capsule that adapts
+// to the underlying material — light mode wants a dark symbol, dark mode
+// wants a light one. Pre-iOS-26 the toolbar sits directly over the cover
+// image, so white still gives the best contrast.
+const IS_IOS_26 =
+  Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
 
 type Units = "imperial" | "metric";
 type FollowCounts = { followers: number; following: number };
@@ -96,6 +103,10 @@ type HeaderViewModel = {
 export default function ProfileScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Toolbar tint adapts to the rendering context — see IS_IOS_26 comment
+  // above. iOS<26 keeps white (cover image background); iOS 26 follows the
+  // theme primary text color so Liquid Glass stays readable in both modes.
+  const toolbarIconColor = IS_IOS_26 ? colors.textPrimary : "#FFFFFF";
   const router = useRouter();
   const params = useLocalSearchParams<{ userId?: string; initialTab?: string; expandBody?: string }>();
 
@@ -237,16 +248,19 @@ export default function ProfileScreen() {
     };
   }, [me, profile, kpis]);
 
-  const [activeTab, setActiveTab] = useState<string>("sends");
+  const [activeTab, setActiveTab] = useState<string>("activity");
 
   // React to navigation params
   useEffect(() => {
     // Legacy "badges" deep-links collapse onto the stats segment; lists
-    // gets its own segment now.
+    // gets its own segment now. BG: legacy "sends" deep-links now route
+    // to the renamed "activity" tab so prod links don't break.
     let target: (typeof TABS)[number] | null = null;
     if (params.initialTab === "lists") target = "lists";
     else if (params.initialTab === "stats" || params.initialTab === "badges")
       target = "stats";
+    else if (params.initialTab === "activity" || params.initialTab === "sends")
+      target = "activity";
     if (target) {
       setActiveTab(target);
       const idx = TABS.indexOf(target);
@@ -260,21 +274,42 @@ export default function ProfileScreen() {
     scrollY.value = e.contentOffset.y;
   });
 
-  // ── Phase 6: 4-up stat strip below cover ──
-  const { badges: rawBadges } = useBadgesProgress();
-  const unlockedBadgesCount = useMemo(
-    () => rawBadges.filter((b: any) => b?.isAwarded).length,
-    [rawBadges],
-  );
-  const statStripItems = useMemo(
-    () => [
-      { num: user.stats.boulderGrade, lbl: "B Best" },
-      { num: user.stats.routeGrade, lbl: "R Best" },
-      { num: String(user.stats.totalSends ?? 0), lbl: "Sends" },
-      { num: String(unlockedBadgesCount), lbl: "Badges" },
-    ],
-    [user.stats, unlockedBadgesCount],
-  );
+  // BG fix v5 — `StickyProfileTabBar` now lives OUTSIDE the ScrollView
+  // as an absolute overlay (Fallback B), so PagerView's native layer
+  // can't draw over the bar mid-scroll. The spacer below reserves the
+  // bar's vertical slot inside the scroll content; the bar uses
+  // `measure(spacerRef)` to mirror that screen position frame-by-frame.
+  const spacerRef = useAnimatedRef<Animated.View>();
+  // 0 = bar at rest position (CollapsingHeader chrome invisible) → 1 =
+  // bar fully pinned (chrome fully opaque). Driven from the bar's
+  // worklet via spacer distance to headerHeight.
+  const pinFadeProgress = useSharedValue<number>(0);
+
+  // Window BG — Collapsing nav: nav-bar background fades from transparent
+  // to opaque colors.background as the user scrolls past the cover (scrollY
+  // ~ 0 → 200). Title morphs to a mini-avatar + name row in the same range.
+  // Stack.Toolbar on the right (⚙ + share menu) is independent and keeps
+  // rendering — verified on device.
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: HEADER_TRANSPARENT,
+      // Belt-and-suspenders: also set scrollEdgeEffects here in case
+      // setOptions overrides the _layout.tsx value rather than merging
+      // (RN/Expo Router behaviour differs across versions).
+      scrollEdgeEffects: { top: "hidden" },
+      headerBackground: () => (
+        <CollapsingHeaderBg pinFadeProgress={pinFadeProgress} />
+      ),
+      headerTitle: () => (
+        <CollapsingHeaderTitle
+          pinFadeProgress={pinFadeProgress}
+          avatarUrl={user.avatar}
+          name={user.name}
+        />
+      ),
+    });
+  }, [navigation, pinFadeProgress, user.avatar, user.name]);
 
   // --------------------- pager (swipe tabs) ---------------------
   const pagerRef = useRef<PagerView>(null);
@@ -282,7 +317,7 @@ export default function ProfileScreen() {
 
   // Shared value driven by PagerView onPageScroll for smooth tab indicator animation
   const tabScrollPosition = useSharedValue(
-    Math.max(0, TABS.indexOf("sends" as (typeof TABS)[number])),
+    Math.max(0, TABS.indexOf("activity" as (typeof TABS)[number])),
   );
 
   // Track content height per tab page so PagerView grows to fit
@@ -353,34 +388,30 @@ export default function ProfileScreen() {
           onFollowersPress={() => router.push("/profile/followers" as any)}
           onFollowingPress={() => router.push("/profile/following" as any)}
           scrollY={scrollY}
+          gradeText={`${user.stats.boulderGrade}/${user.stats.routeGrade}`}
+          totalSends={user.stats.totalSends}
+          onKPIPress={() => {
+            if (me?.id) router.push(`/users/${me.id}/ascents` as any);
+          }}
         />
 
-        {/* Content shell: rounded top corners + -24 overlap into cover (mockup) */}
-        <View style={styles.contentShell}>
-          {/* Phase 6: 4-up stat strip — tap → user ascents page (replaces
-              the old ProfileHeader Grade/Sends row's onAscentsPress entry). */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View ascents history"
-            onPress={() => {
-              if (me?.id) router.push(`/users/${me.id}/ascents` as any);
-            }}
-            style={({ pressed }) => [
-              styles.statStrip,
-              pressed ? { opacity: 0.6 } : null,
-            ]}
-          >
-            {statStripItems.map((it) => (
-              <View key={it.lbl} style={styles.statStripCell}>
-                <Text style={styles.statStripNum}>{it.num}</Text>
-                <Text style={styles.statStripLbl}>{it.lbl}</Text>
-              </View>
-            ))}
-          </Pressable>
-        </View>
-
-        {/* [1] Tab bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabPress={handleTabPress} scrollPosition={tabScrollPosition} />
+        {/* Tab bar spacer — reserves the bar's slot in the scroll
+            content so PagerView lands beneath the bar's natural
+            position. The actual bar is rendered as an absolute overlay
+            sibling of the ScrollView (below) and reads this spacer's
+            screen position via `measure(spacerRef)`.
+            v5.3 — `marginTop: -35` migrated here from the now-removed
+            `contentShell`. It overlaps the spacer 35pt up into the
+            cover image area (matching original mockup intent) so the
+            bar's animated rounded top corners reveal cover behind the
+            carve. The spacer itself is transparent. */}
+        <Animated.View
+          ref={spacerRef}
+          style={{
+            height: PROFILE_TAB_BAR_HEIGHT,
+            marginTop: -35,
+          }}
+        />
 
         <PagerView
           ref={pagerRef}
@@ -388,11 +419,11 @@ export default function ProfileScreen() {
           initialPage={Math.max(
             0,
             TABS.indexOf(
-              (params.initialTab === "sends" ||
-              params.initialTab === "stats" ||
-              params.initialTab === "lists"
-                ? params.initialTab
-                : "sends") as (typeof TABS)[number],
+              ((params.initialTab === "activity" || params.initialTab === "sends")
+                ? "activity"
+                : params.initialTab === "stats" || params.initialTab === "lists"
+                  ? params.initialTab
+                  : "activity") as (typeof TABS)[number],
             ),
           )}
           onPageScroll={onPageScroll}
@@ -400,9 +431,9 @@ export default function ProfileScreen() {
           onPageScrollStateChanged={onPageScrollStateChanged}
           overdrag
         >
-          <View key="sends" style={styles.contentArea}>
+          <View key="activity" style={styles.contentArea}>
             <View onLayout={handlePageLayout(0)}>
-              {me?.id ? <SendsSection userId={me.id} viewMode="self" /> : null}
+              {me?.id ? <ActivityFeedSection userId={me.id} viewMode="self" /> : null}
             </View>
           </View>
           <View key="stats" style={styles.contentArea}>
@@ -423,6 +454,19 @@ export default function ProfileScreen() {
           </View>
         </PagerView>
       </Animated.ScrollView>
+
+      {/* BG fix v5 (Fallback B) — absolute-overlay sticky tab bar,
+          rendered as a sibling of the ScrollView so PagerView's native
+          layer cannot draw above it during the pin transition. */}
+      <StickyProfileTabBar
+        scrollY={scrollY}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+        scrollPosition={tabScrollPosition}
+        spacerRef={spacerRef}
+        pinFadeProgress={pinFadeProgress}
+      />
+
       {/* Native toolbar: settings + share menu.
           iOS 26 Liquid Glass renders these inside a translucent capsule;
           black SF Symbols read better against the glass than white.
@@ -431,10 +475,10 @@ export default function ProfileScreen() {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="gearshape"
-          tintColor={TOOLBAR_ICON_COLOR}
+          tintColor={toolbarIconColor}
           onPress={() => router.push("/settings")}
         />
-        <Stack.Toolbar.Menu icon="square.and.arrow.up" tintColor={TOOLBAR_ICON_COLOR}>
+        <Stack.Toolbar.Menu icon="square.and.arrow.up" tintColor={toolbarIconColor}>
           <Stack.Toolbar.MenuAction
             icon="link"
             onPress={async () => {
@@ -470,41 +514,6 @@ export default function ProfileScreen() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   contentArea: { minHeight: 300, backgroundColor: colors.background },
-
-  // Mockup: white card "上吸" into cover via rounded top + negative margin
-  // so the rounded corners carve into the cover image. Radius matched by
-  // ProfileHeader's COVER_OVERLAP so cover image fills the cut-out area.
-  contentShell: {
-    backgroundColor: colors.background,
-    marginTop: -35,
-    borderTopLeftRadius: 35,
-    borderTopRightRadius: 35,
-    paddingTop: 4,
-  },
-  statStrip: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-    gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  statStripCell: { flex: 1, alignItems: "center" },
-  statStripNum: {
-    fontSize: 17,
-    fontWeight: "700",
-    fontFamily: theme.fonts.monoMedium,
-    color: colors.textPrimary,
-  },
-  statStripLbl: {
-    fontSize: 10,
-    fontFamily: theme.fonts.regular,
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginTop: 2,
-  },
 
   basicInfoContainer: { padding: 16, backgroundColor: colors.background },
   analysisCard: {

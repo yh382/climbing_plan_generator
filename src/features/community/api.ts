@@ -135,18 +135,6 @@ export const communityApi = {
   getUserPosts: (userId: string, skip = 0, limit = 20) =>
     api.get<UserPostOut[]>(`/posts/user/${userId}?skip=${skip}&limit=${limit}`),
 
-  // Sends grid: a user's log-attached posts (image + video both).
-  // BA γ1.2 follow-up: dropped `has_video=true` so users see their full
-  // log-share history, not just video sends. The filter still excludes
-  // free-form posts (attachment_type=null) and session shares
-  // (attachment_type='session') to keep the grid focused on per-climb
-  // entries — those still surface in the community feed.
-  getUserSends: (userId: string, skip = 0, limit = 20) =>
-    api.get<UserPostOut[]>(
-      `/posts/user/${userId}?skip=${skip}&limit=${limit}` +
-        `&attachment_type=log`,
-    ),
-
   getGymPosts: (gymId: string, skip = 0, limit = 20) =>
     api.get<any[]>(`/posts?gym_id=${gymId}&skip=${skip}&limit=${limit}`),
 
