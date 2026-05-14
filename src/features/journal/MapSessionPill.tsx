@@ -44,9 +44,13 @@ type Props = {
   /** Override the safe-area top inset (e.g. when the parent already nudges
    *  the layout). Defaults to insets.top + 8. */
   topOffset?: number;
+  /** Caller hook — fires before router.push to daily-summary so map screens
+   *  can dismiss any open TrueSheet (primary list / detail / area info)
+   *  before navigating, avoiding a half-open sheet on return. */
+  onBeforeNavigate?: () => void;
 };
 
-export default function MapSessionPill({ topOffset }: Props) {
+export default function MapSessionPill({ topOffset, onBeforeNavigate }: Props) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { tr } = useSettings();
@@ -97,9 +101,10 @@ export default function MapSessionPill({ topOffset }: Props) {
     >
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() =>
-          router.push({ pathname: "/daily-summary", params: { date: "today" } } as any)
-        }
+        onPress={() => {
+          onBeforeNavigate?.();
+          router.push({ pathname: "/daily-summary", params: { date: "today" } } as any);
+        }}
         style={[styles.pill, isPaused && styles.pillPaused]}
       >
         <View style={[styles.dot, isPaused && styles.dotPaused]} />

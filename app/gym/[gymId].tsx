@@ -184,8 +184,13 @@ export default function GymMapScreen() {
   return (
     <View style={styles.root}>
       {/* B2 #1: top-center "session active" pill — visible whenever a
-          climbing session is running while user explores the floor plan. */}
-      <MapSessionPill />
+          climbing session is running while user explores the floor plan.
+          Dismiss the peek sheet first so daily-summary push isn't masked. */}
+      <MapSessionPill
+        onBeforeNavigate={() => {
+          peekSheetRef.current?.dismiss().catch(() => {});
+        }}
+      />
 
       {/* Floor plan ~60% of screen */}
       <View style={styles.floorPlanWrap}>

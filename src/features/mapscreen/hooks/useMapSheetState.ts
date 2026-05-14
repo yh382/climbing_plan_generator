@@ -70,6 +70,10 @@ export interface UseMapSheetStateResult {
   onDetentChange: (e: { nativeEvent: { index: number } }) => void;
   /** Safely call TrueSheet.resize — guards against pre-present & post-dismiss races. */
   safeResize: (index: number) => void;
+  /** Safely call TrueSheet.present — no-ops if already presented (silences
+   *  TrueSheet's "sheet is already presented" warning that flooded the
+   *  console when mount-effect + focus-effect both raced to present()). */
+  safePresent: (index?: number) => void;
   /** Collapse to search-bar detent (no-op if already collapsed). */
   collapseSheet: () => void;
 }
@@ -107,25 +111,6 @@ export function useMapSheetState(options?: UseMapSheetStateOptions): UseMapSheet
     return [collapsed, 0.45, 0.8] as const;
   }, [collapsedOpt]);
 
-  // Safety net for initialDetentIndex declarative auto-present.
-  // `didMoveToWindow` can miss its presenter lookup behind navigation
-  // transitions; an explicit present() on the next frame guarantees the
-  // sheet settles at the configured initial detent every time the
-  // screen mounts.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      currentDetentRef.current = initialDetent;
-      sheetRef.current?.present(initialDetent).catch(() => {});
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      // Mark unpresented so any late resize during unmount transition
-      // doesn't try to touch a torn-down native view.
-      sheetPresentedRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const safeResize = useCallback((index: number) => {
     if (!sheetPresentedRef.current) return;
     // Flag this resize as programmatic so the upcoming onDetentChange
@@ -135,6 +120,46 @@ export function useMapSheetState(options?: UseMapSheetStateOptions): UseMapSheet
     // fires between onDidDismiss and componentWillUnmount could hit
     // SHEET_NOT_FOUND. We silence that here.
     sheetRef.current?.resize(index).catch(() => {});
+  }, []);
+
+  const safePresent = useCallback(
+    (index?: number) => {
+      const detent = index ?? initialDetent;
+      // Already presented → resize instead of re-presenting (TrueSheet
+      // logs a warning if present() is called twice; this is the
+      // contract the warning suggests).
+      if (sheetPresentedRef.current) {
+        safeResize(detent);
+        return;
+      }
+      // Optimistically flip the ref so re-entrant safePresent calls
+      // within the same tick (mount-effect + focus-effect race) coalesce
+      // to a single native present. onDidPresent will reassert true;
+      // dismiss callbacks reset to false.
+      sheetPresentedRef.current = true;
+      currentDetentRef.current = detent;
+      sheetRef.current?.present(detent).catch(() => {
+        // Roll back if native present rejected (e.g. ref torn down).
+        sheetPresentedRef.current = false;
+      });
+    },
+    [initialDetent, safeResize],
+  );
+
+  // Safety net for initialDetentIndex declarative auto-present.
+  // `didMoveToWindow` can miss its presenter lookup behind navigation
+  // transitions; an explicit present() on the next frame guarantees the
+  // sheet settles at the configured initial detent every time the
+  // screen mounts.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => safePresent(initialDetent));
+    return () => {
+      cancelAnimationFrame(id);
+      // Mark unpresented so any late resize during unmount transition
+      // doesn't try to touch a torn-down native view.
+      sheetPresentedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const collapseSheet = useCallback(() => {
@@ -179,6 +204,7 @@ export function useMapSheetState(options?: UseMapSheetStateOptions): UseMapSheet
     onDidDismiss,
     onDetentChange,
     safeResize,
+    safePresent,
     collapseSheet,
   };
 }

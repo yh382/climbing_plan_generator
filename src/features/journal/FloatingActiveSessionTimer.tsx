@@ -30,7 +30,8 @@ export default function FloatingActiveSessionTimer({
   const { activeSession } = useLogsStore();
   const { isActive: workoutActive, isMinimized: workoutMinimized } = useActiveWorkoutStore();
 
-  const hideOn = new Set(["calendar", "coach", "journal"]);
+  // `map` 上 MapSessionPill 已在顶部显示同源 timer；右下角浮窗会重复 + 遮挡 sheet。
+  const hideOn = new Set(["calendar", "coach", "journal", "map"]);
   const hasLog = !!activeSession;
   const hasWorkout = workoutActive && workoutMinimized;
   const shouldShow = (hasLog || hasWorkout) && !hideOn.has(currentRouteName ?? "");
