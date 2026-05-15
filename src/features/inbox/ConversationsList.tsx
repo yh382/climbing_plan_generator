@@ -16,6 +16,7 @@ import { useThemeColors } from "@/lib/useThemeColors";
 import { useChatStore } from "@/store/useChatStore";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { ChatConversationOut } from "@/features/chat/types";
+import { isSystemAssistant, resolveSystemContent } from "@/lib/systemAssistant";
 
 function relativeTime(iso?: string): string {
   if (!iso) return "";
@@ -87,6 +88,18 @@ export default function ConversationsList({ listHeader }: Props = {}) {
   const renderItem = useCallback(
     ({ item }: { item: ChatConversationOut }) => {
       const hasUnread = item.unread_count > 0;
+      const isOfficial = isSystemAssistant(item.other_user_id);
+
+      const displayName = isOfficial
+        ? tr("ClimMate 小助手", "ClimMate Assistant")
+        : item.other_user_name || tr("用户", "User");
+
+      const preview =
+        (isOfficial
+          ? resolveSystemContent(item.last_message_preview, tr)
+          : item.last_message_preview) ||
+        tr("暂无消息", "No messages yet");
+
       return (
         <TouchableOpacity
           style={styles.row}
@@ -102,11 +115,21 @@ export default function ConversationsList({ listHeader }: Props = {}) {
           )}
 
           <View style={styles.middle}>
-            <Text style={styles.name} numberOfLines={1}>
-              {item.other_user_name || tr("用户", "User")}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {isOfficial ? (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={14}
+                  color={colors.accent}
+                  style={styles.officialBadge}
+                />
+              ) : null}
+            </View>
             <Text style={styles.preview} numberOfLines={1}>
-              {item.last_message_preview || tr("暂无消息", "No messages yet")}
+              {preview}
             </Text>
           </View>
 
@@ -166,10 +189,19 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       justifyContent: "center",
     },
     middle: { flex: 1, gap: 3 },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
     name: {
       fontSize: 15,
       fontFamily: theme.fonts.bold,
       color: colors.textPrimary,
+      flexShrink: 1,
+    },
+    officialBadge: {
+      marginLeft: 2,
     },
     preview: {
       fontSize: 13,

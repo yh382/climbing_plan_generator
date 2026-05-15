@@ -4,16 +4,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { Host, Button as SUIButton } from "@expo/ui/swift-ui";
 import { frame, buttonStyle, labelStyle } from "@expo/ui/swift-ui/modifiers";
 import { useChatStore } from "../../../store/useChatStore";
 import { useUserStore } from "../../../store/useUserStore";
+import { useSettings } from "@/contexts/SettingsContext";
 import ChatBubble from "../components/ChatBubble";
 import ChatDateSeparator from "../components/ChatDateSeparator";
 import ChatInput from "../components/ChatInput";
 import type { ChatMessageOut } from "../types";
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
+import { isSystemAssistant, resolveSystemContent } from "@/lib/systemAssistant";
 
 type ChatListItem =
   | { type: "date"; key: string; iso: string }
@@ -65,9 +69,13 @@ export default function ChatScreen() {
   } = useChatStore();
 
   const flatListRef = useRef<FlatList>(null);
+  const { tr } = useSettings();
 
   const otherUser = conversations.find((c) => c.id === conversationId);
-  const headerTitle = otherUser?.other_user_name || "Chat";
+  const isOfficial = isSystemAssistant(otherUser?.other_user_id);
+  const headerTitle = isOfficial
+    ? tr("ClimMate 小助手", "ClimMate Assistant")
+    : otherUser?.other_user_name || "Chat";
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -84,8 +92,20 @@ export default function ChatScreen() {
           />
         </Host>
       ),
+      headerTitle: isOfficial
+        ? () => (
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitleText}>{headerTitle}</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={colors.accent}
+              />
+            </View>
+          )
+        : undefined,
     });
-  }, [navigation, router, headerTitle]);
+  }, [navigation, router, headerTitle, isOfficial, colors, styles]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -123,9 +143,17 @@ export default function ChatScreen() {
       if (item.type === "date") {
         return <ChatDateSeparator iso={item.iso} />;
       }
-      return <ChatBubble message={item.msg} isMe={item.msg.sender_id === myUserId} />;
+      // Sentinel content stored as a placeholder by the backend; localize at
+      // render time so we never have to migrate historical messages when
+      // copy changes. resolveSystemContent passes through real content.
+      const resolved = resolveSystemContent(item.msg.content, tr, { multiline: true });
+      const displayMsg =
+        resolved !== item.msg.content
+          ? { ...item.msg, content: resolved ?? item.msg.content }
+          : item.msg;
+      return <ChatBubble message={displayMsg} isMe={displayMsg.sender_id === myUserId} />;
     },
-    [myUserId],
+    [myUserId, tr],
   );
 
   return (
@@ -151,7 +179,9 @@ export default function ChatScreen() {
         ListEmptyComponent={
           initialized ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>Start a conversation</Text>
+              <Text style={styles.emptyText}>
+                {tr("开始对话", "Start a conversation")}
+              </Text>
             </View>
           ) : null
         }
@@ -169,4 +199,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   listContent: { paddingVertical: 8 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
   emptyText: { fontSize: 15, color: colors.textTertiary },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerTitleText: {
+    fontSize: 17,
+    fontFamily: theme.fonts.bold,
+    color: colors.textPrimary,
+  },
 });
