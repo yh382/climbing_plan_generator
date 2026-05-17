@@ -751,13 +751,19 @@ export default function MapScreenMapbox({
       // Highlight only when a route pin was tapped — wall/sector/crag taps
       // clear any previous highlight so WallGroup renders in natural order.
       setHighlightedRouteId(pin.level === 'route' ? pin.id : null);
-      // Title: for route pins show the parent wall's name (looked up by
-      // parent_id) so the sheet header reads like a location, not a grade.
+      // Title: for route pins show the parent wall's name. BK: synthetic
+      // walls are deduped from `areaData.pins`, so we prefer the
+      // route pin's own `parent_name` (shipped by BE) and only fall
+      // back to scanning pins for the rare non-synthetic wall case.
       if (pin.level === 'route') {
-        const parentWall = areaData.pins.find(
-          (p) => p.level === 'wall' && p.id === pin.parent_id,
-        );
-        setSheetTitle(parentWall?.name ?? '');
+        if (pin.parent_name) {
+          setSheetTitle(pin.parent_name);
+        } else {
+          const parentWall = areaData.pins.find(
+            (p) => p.level === 'wall' && p.id === pin.parent_id,
+          );
+          setSheetTitle(parentWall?.name ?? '');
+        }
       } else {
         setSheetTitle(pin.name);
       }

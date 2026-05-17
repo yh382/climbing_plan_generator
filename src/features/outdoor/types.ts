@@ -205,6 +205,11 @@ export type MapPin = {
    *  reconstruct the wall's route list + metadata when the user taps a
    *  route pin (sheet opens focused on that route). */
   parent_id?: string;
+  /** Only set when `level === 'route'` — name of the parent wall. Sent
+   *  by BE so the FE can render the sheet title and synthesize a wall
+   *  object even when wall pins are not in the list (BK: synthetic
+   *  walls are deduped against their parent Sector). */
+  parent_name?: string;
 };
 
 // ---- User Lists (Window U) ----

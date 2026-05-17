@@ -62,6 +62,12 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
   const wallGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'wall')), [pins]);
   const routeGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'route')), [pins]);
 
+  // BK: when BE drops synthetic wall pins (every wall == its parent
+  // sector), the wall zoom band (13-15) would otherwise show no pins at
+  // all. Extend the sector layer right up to the route layer so users
+  // see continuous coverage; the route fan-out picks up at zoom 15.
+  const sectorMaxZoom = wallGeoJSON.features.length > 0 ? ZOOM_SECTOR_MAX : ZOOM_ROUTE_MIN;
+
   const handleCragPress = useCallback(
     (e: { features: GeoJSON.Feature[] }) => handlePress(e, pins, onPinPress),
     [pins, onPinPress],
@@ -121,7 +127,7 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
           <MapboxGL.CircleLayer
             id="outdoor-sectors-pins"
             minZoomLevel={ZOOM_SECTOR_MIN}
-            maxZoomLevel={ZOOM_SECTOR_MAX}
+            maxZoomLevel={sectorMaxZoom}
             style={{
               circleRadius: ADAPTIVE_RADIUS,
               circleColor: PIN_COLORS.sector,
@@ -132,13 +138,13 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
           <MapboxGL.SymbolLayer
             id="outdoor-sectors-count"
             minZoomLevel={ZOOM_SECTOR_MIN}
-            maxZoomLevel={ZOOM_SECTOR_MAX}
+            maxZoomLevel={sectorMaxZoom}
             style={countLabelStyle()}
           />
           <MapboxGL.SymbolLayer
             id="outdoor-sectors-name"
             minZoomLevel={ZOOM_SECTOR_MIN}
-            maxZoomLevel={ZOOM_SECTOR_MAX}
+            maxZoomLevel={sectorMaxZoom}
             style={nameLabelStyle(nameColor, haloColor)}
           />
         </MapboxGL.ShapeSource>

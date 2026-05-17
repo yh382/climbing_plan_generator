@@ -39,22 +39,22 @@ export function useAreaData(areaId: string | undefined): UseAreaDataResult {
 
   // Multi-level fetch based on pin kind — identical semantics to crag-map.
   const loadWallsForPin = useCallback(async (pin: MapPin): Promise<Wall[]> => {
-    // Route-level pin — look up the parent wall from the already-loaded
-    // `pins` state (getMapPins emits parent_id on every route pin) and
-    // reconstruct its Wall object. No extra API call beyond getRoutes.
+    // Route-level pin — reconstruct the wall from the route pin's own
+    // metadata. BK: synthetic walls aren't in `pins` anymore (they're
+    // deduped against parent Sector for visual cleanliness), so we
+    // rely on `parent_id` + `parent_name` shipped on the route pin
+    // itself rather than looking up a wall pin.
     if (pin.level === 'route') {
       const parentId = pin.parent_id;
       if (!parentId) return [];
-      const wallPin = pins.find((p) => p.level === 'wall' && p.id === parentId);
-      if (!wallPin) return [];
       const wallRoutes = await outdoorApi.getRoutes(parentId);
       return [
         {
-          id: wallPin.id,
+          id: parentId,
           sector_id: '',
-          name: wallPin.name,
-          lat: wallPin.lat,
-          lng: wallPin.lng,
+          name: pin.parent_name ?? '',
+          lat: pin.lat,
+          lng: pin.lng,
           sort_order: 0,
           status: 'approved',
           route_count: wallRoutes.length,
