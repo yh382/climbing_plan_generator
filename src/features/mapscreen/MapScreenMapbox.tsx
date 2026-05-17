@@ -36,6 +36,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/useThemeColors';
 import { getMapSheetBottomInset } from '../../lib/sheetInsets';
 import { useSettings } from '../../contexts/SettingsContext';
+import useSettingsStore from '../../store/useSettingsStore';
 import { theme } from '../../lib/theme';
 import { TopFadeMaskView } from '../../components/shared/TopFadeMaskView';
 import MapSessionPill from '../journal/MapSessionPill';
@@ -331,27 +332,38 @@ export default function MapScreenMapbox({
   const [areaSearchResults, setAreaSearchResults] = useState<OutdoorRoute[] | null>(null);
   const [areaSearchQuery, setAreaSearchQuery] = useState('');
   const [loadingSheet, setLoadingSheet] = useState(false);
-  const [areaModeIndex, setAreaModeIndex] = useState(0); // 0=Routes, 1=Boulder
+  const primaryDiscipline = useSettingsStore((s) => s.primaryDiscipline);
+  const [areaModeIndex, setAreaModeIndex] = useState(
+    primaryDiscipline === "boulder" ? 1 : 0,
+  ); // 0=Routes, 1=Boulder
 
-  // BK fix: when entering area mode, default the Routes/Boulder toggle
-  // to whichever discipline actually has content. Without this, an
-  // all-boulder area (e.g. OpenBeta Bishop Mountain seed) lands on
-  // "Routes" tab with everything filtered out → empty sheet. Resets on
-  // every area transition so a previous boulder area doesn't pin the
-  // toggle to boulder when the user moves to a rope-only area.
+  // BK fix: when entering an area, default the toggle to the user's
+  // preferred discipline. If the area has zero of that, auto-switch
+  // to the other so the sheet isn't empty. Mixed areas stay on the
+  // user's preference (visible to them = consistent across areas).
   useEffect(() => {
     if (mode.kind !== 'area') return;
     const area = areaData.area;
     if (!area) return;
     const routeCount = (area.route_count ?? 0) - (area.boulder_count ?? 0);
     const boulderCount = area.boulder_count ?? 0;
-    if (boulderCount > 0 && routeCount === 0) {
-      setAreaModeIndex(1);
-    } else if (routeCount > 0 && boulderCount === 0) {
-      setAreaModeIndex(0);
+    const preferred = primaryDiscipline === "boulder" ? 1 : 0;
+    const preferredCount = preferred === 1 ? boulderCount : routeCount;
+    const otherCount = preferred === 1 ? routeCount : boulderCount;
+    if (preferredCount > 0) {
+      setAreaModeIndex(preferred);
+    } else if (otherCount > 0) {
+      setAreaModeIndex(preferred === 1 ? 0 : 1);
+    } else {
+      setAreaModeIndex(preferred);
     }
-    // Mixed area → keep current selection (user's last choice or default).
-  }, [mode.kind, areaData.area?.id, areaData.area?.route_count, areaData.area?.boulder_count]);
+  }, [
+    mode.kind,
+    areaData.area?.id,
+    areaData.area?.route_count,
+    areaData.area?.boulder_count,
+    primaryDiscipline,
+  ]);
 
   const [searchExpanded, setSearchExpanded] = useState(false);
   // Route id that the user tapped on the map — forwarded to WallGroup so

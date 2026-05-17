@@ -28,24 +28,23 @@ const PIN_COLORS = {
   route: '#FF453A',  // red
 } as const;
 
-/** Compact radius for route pins. Deliberately smaller than crag/sector/
- *  wall pins — routes are fanned out tightly around the parent wall, so
- *  bigger circles would overlap. The grade text was also dropped (tap
- *  the dot → sheet opens with the route focused, which shows the grade). */
-const ROUTE_RADIUS = 8;
+/** Compact radius for route pins. */
+const ROUTE_RADIUS = 6;
 
 /** Radius interpolates with route_count so a pin holding 1000 routes looks
- *  bigger than a pin holding 10. Values are picked to keep smaller pins
- *  readable and larger pins from overlapping on the map. */
+ *  bigger than a pin holding 10. BK: downsized by ~35% from the original
+ *  values so dense areas (Bishop / Hueco) don't pile circles on top of
+ *  each other. Single-route pins are now ~7px wide, large clusters
+ *  ~16px. */
 const ADAPTIVE_RADIUS: any = [
   'interpolate',
   ['linear'],
   ['get', 'route_count'],
-  0, 11,
-  10, 13,
-  50, 15,
-  200, 17,
-  1000, 20,
+  0, 7,
+  10, 9,
+  50, 11,
+  200, 13,
+  1000, 16,
 ];
 
 type MapPinClusterProps = {
@@ -235,7 +234,7 @@ function handlePress(
 function countLabelStyle(color: string = '#FFFFFF') {
   return {
     textField: ['to-string', ['get', 'route_count']] as any,
-    textSize: 11,
+    textSize: 9,
     textColor: color,
     textFont: ['DIN Pro Medium', 'Arial Unicode MS Regular'],
     textAllowOverlap: true,
@@ -244,20 +243,22 @@ function countLabelStyle(color: string = '#FFFFFF') {
   };
 }
 
-/** Pin name label — offset below the circle. */
+/** Pin name label — offset below the circle. Padding bumped so Mapbox's
+ *  built-in label collision drops conflicting names rather than letting
+ *  them overlap. */
 function nameLabelStyle(textColor: string, haloColor: string) {
   return {
     textField: ['get', 'name'] as any,
-    textSize: 11,
+    textSize: 10,
     textColor,
     textHaloColor: haloColor,
     textHaloWidth: 1.2,
     textAnchor: 'top' as const,
-    textOffset: [0, 1.3] as [number, number],
+    textOffset: [0, 1.6] as [number, number],
     textJustify: 'center' as const,
     textAllowOverlap: false,
     textIgnorePlacement: false,
-    textPadding: 4,
+    textPadding: 8,
     textMaxWidth: 10,
     symbolZOrder: 'auto' as const,
   };

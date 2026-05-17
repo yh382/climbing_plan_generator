@@ -8,6 +8,7 @@ import { Host, Form, Section, Picker, Text, LabeledContent, Label, ZStack, Image
 import { pickerStyle, tag, frame, background, shapes, font, foregroundStyle, scrollContentBackground } from "@expo/ui/swift-ui/modifiers";
 
 import { useSettings } from "src/contexts/SettingsContext";
+import useSettingsStore, { type PrimaryDiscipline } from "src/store/useSettingsStore";
 import { useAuthStore } from "src/store/useAuthStore";
 import { useUserStore } from "src/store/useUserStore";
 import { useThemeColors } from "src/lib/useThemeColors";
@@ -67,6 +68,8 @@ export default function Settings() {
     ropeScale,
     setRopeScale,
   } = useSettings();
+  const primaryDiscipline = useSettingsStore((s) => s.primaryDiscipline);
+  const setPrimaryDiscipline = useSettingsStore((s) => s.setPrimaryDiscipline);
 
   const tr = (zh: string, en: string) => (lang === "zh" ? zh : en);
 
@@ -288,6 +291,18 @@ export default function Settings() {
               >
                 <Text modifiers={[tag("metric")]}>{tr("公制", "Metric")}</Text>
                 <Text modifiers={[tag("imperial")]}>{tr("英制", "Imperial")}</Text>
+              </Picker>
+            </LabeledContent>
+            <LabeledContent label={
+              <Label title={tr("主要项目", "Primary Discipline")} icon={<SettingIcon name="figure.climbing" bg="#306E6F" />} />
+            }>
+              <Picker
+                selection={primaryDiscipline}
+                onSelectionChange={(v) => setPrimaryDiscipline(v as PrimaryDiscipline)}
+                modifiers={[pickerStyle("segmented"), frame({ width: 140 })]}
+              >
+                <Text modifiers={[tag("boulder")]}>{tr("抱石", "Boulder")}</Text>
+                <Text modifiers={[tag("rope")]}>{tr("绳攀", "Rope")}</Text>
               </Picker>
             </LabeledContent>
           </Section>
