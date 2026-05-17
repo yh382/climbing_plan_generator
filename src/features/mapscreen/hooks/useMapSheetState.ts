@@ -138,6 +138,13 @@ export function useMapSheetState(options?: UseMapSheetStateOptions): UseMapSheet
       // dismiss callbacks reset to false.
       sheetPresentedRef.current = true;
       currentDetentRef.current = detent;
+      // TrueSheet's initial present() doesn't fire onDetentChange, so the
+      // reactive mirror would otherwise stay stuck at the last detent
+      // before dismiss (e.g. LARGE) even though the sheet is now at
+      // `detent` (e.g. MEDIUM on focus re-present). Consumers that key UI
+      // off currentDetentIndex (top-bar hide-at-LARGE) would then render
+      // a stale hidden state.
+      setCurrentDetentIndex(detent);
       sheetRef.current?.present(detent).catch(() => {
         // Roll back if native present rejected (e.g. ref torn down).
         sheetPresentedRef.current = false;

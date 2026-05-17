@@ -11,7 +11,10 @@ import {
   MOCK_AREAS, MOCK_CRAGS, MOCK_SECTORS, MOCK_WALLS, MOCK_ROUTES,
 } from './mockData';
 
-const USE_MOCK = __DEV__;
+// BK: flipped off — real OpenBeta data now lives in prod DB. Keeping the
+// `if (USE_MOCK)` branches as escape hatch if we ever need to demo
+// offline; flip back to `__DEV__` temporarily for that case.
+const USE_MOCK = false;
 
 // ---- Mock helpers ----
 
@@ -28,7 +31,13 @@ export const outdoorApi = {
     const qs = new URLSearchParams();
     if (_params?.country) qs.set('country', _params.country);
     if (_params?.status) qs.set('status', _params.status);
-    return api.get<Area[]>(`/areas?${qs}`);
+    // BE returns PaginatedAreas { items, total, page, limit } — unwrap
+    // here so the public contract stays Area[]. Pagination not yet
+    // surfaced; assume the seed list fits in the default page (limit=20
+    // hits the BE — we ask for 100 to cover near-term growth).
+    qs.set('limit', '100');
+    const page = await api.get<{ items: Area[]; total: number }>(`/areas?${qs}`);
+    return page.items ?? [];
   },
 
   getArea: async (id: string): Promise<Area | null> => {

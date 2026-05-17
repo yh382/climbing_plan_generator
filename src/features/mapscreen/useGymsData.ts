@@ -90,12 +90,16 @@ export function useGymsData(enabled: boolean): UseGymsDataResult {
     })();
   }, [enabled, fetchNearby]);
 
-  // Outdoor area pins (fire-and-forget, non-blocking). Same semantics as
-  // the GymsScreen init: country=CN, status=approved.
+  // Outdoor area pins (fire-and-forget, non-blocking).
+  // BK fix: dropped country='CN' hardcode — this hook now serves the
+  // overseas MapboxMap as well, so it must return all approved areas
+  // regardless of country. CN-only filtering lives in CragMap's own data
+  // path; keeping the filter here was a stale assumption from before the
+  // map split.
   useEffect(() => {
     if (!enabled) return;
     outdoorApi
-      .listAreas({ country: 'CN', status: 'approved' })
+      .listAreas({ status: 'approved' })
       .then((data) => {
         if (data) setAreas(data);
       })
