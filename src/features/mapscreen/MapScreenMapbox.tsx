@@ -332,6 +332,27 @@ export default function MapScreenMapbox({
   const [areaSearchQuery, setAreaSearchQuery] = useState('');
   const [loadingSheet, setLoadingSheet] = useState(false);
   const [areaModeIndex, setAreaModeIndex] = useState(0); // 0=Routes, 1=Boulder
+
+  // BK fix: when entering area mode, default the Routes/Boulder toggle
+  // to whichever discipline actually has content. Without this, an
+  // all-boulder area (e.g. OpenBeta Bishop Mountain seed) lands on
+  // "Routes" tab with everything filtered out → empty sheet. Resets on
+  // every area transition so a previous boulder area doesn't pin the
+  // toggle to boulder when the user moves to a rope-only area.
+  useEffect(() => {
+    if (mode.kind !== 'area') return;
+    const area = areaData.area;
+    if (!area) return;
+    const routeCount = (area.route_count ?? 0) - (area.boulder_count ?? 0);
+    const boulderCount = area.boulder_count ?? 0;
+    if (boulderCount > 0 && routeCount === 0) {
+      setAreaModeIndex(1);
+    } else if (routeCount > 0 && boulderCount === 0) {
+      setAreaModeIndex(0);
+    }
+    // Mixed area → keep current selection (user's last choice or default).
+  }, [mode.kind, areaData.area?.id, areaData.area?.route_count, areaData.area?.boulder_count]);
+
   const [searchExpanded, setSearchExpanded] = useState(false);
   // Route id that the user tapped on the map — forwarded to WallGroup so
   // that route card is moved to the top of its wall's route list. Cleared
