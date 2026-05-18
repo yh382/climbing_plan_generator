@@ -10,16 +10,15 @@ import MapboxGL from '@rnmapbox/maps';
 import { useColorScheme } from 'react-native';
 import type { MapPin } from '../types';
 
-/** Zoom thresholds (BK retuned).
+/** Zoom thresholds (BL retuned — 2026-05-18).
  *
- * Blue crag pins cover the wider-area band (8-13); green sector pins
- * pick up from 13 and stay visible. When the area has truly distinct
- * per-route coords, red route pins overlay from ZOOM_ROUTE_MIN and the
- * sector layer caps there to let routes breathe. When the area has no
- * route pins (OpenBeta boulder = "5 problems on 1 boulder"), the green
- * sector pin IS the climbing unit and must never disappear — sector
- * layer has no maxZoomLevel in that case. */
-const ZOOM_CRAG_MIN = 8;
+ * Blue crag pins now have NO minZoom — they stay visible no matter how
+ * far you zoom out, so users entering a sparse area never see an empty
+ * map (BL real-device pain: "进 area 看不见蓝 pin"). Crag still has
+ * maxZoom=13 to hand off to sector pins on zoom-in. Green sector pins
+ * pick up at 13 and (when there are no route pins) stay visible at any
+ * zoom level — OpenBeta boulder data has no per-route coords, so the
+ * green sector pin IS the climbing unit. */
 const ZOOM_CRAG_MAX = 13;
 const ZOOM_SECTOR_MIN = 13;
 const ZOOM_SECTOR_MAX_WITH_ROUTES = 15;
@@ -100,12 +99,11 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
 
   return (
     <>
-      {/* Crag pins: visible zoom 8-11 */}
+      {/* Crag pins: visible at any zoom ≤ ZOOM_CRAG_MAX (no min). */}
       {cragGeoJSON.features.length > 0 && (
         <MapboxGL.ShapeSource id="outdoor-crags-src" shape={cragGeoJSON} onPress={handleCragPress}>
           <MapboxGL.CircleLayer
             id="outdoor-crags-pins"
-            minZoomLevel={ZOOM_CRAG_MIN}
             maxZoomLevel={ZOOM_CRAG_MAX}
             style={{
               circleRadius: ADAPTIVE_RADIUS,
@@ -116,13 +114,11 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
           />
           <MapboxGL.SymbolLayer
             id="outdoor-crags-count"
-            minZoomLevel={ZOOM_CRAG_MIN}
             maxZoomLevel={ZOOM_CRAG_MAX}
             style={countLabelStyle()}
           />
           <MapboxGL.SymbolLayer
             id="outdoor-crags-name"
-            minZoomLevel={ZOOM_CRAG_MIN}
             maxZoomLevel={ZOOM_CRAG_MAX}
             style={nameLabelStyle(nameColor, haloColor)}
           />

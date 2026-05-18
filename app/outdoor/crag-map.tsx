@@ -788,7 +788,11 @@ export default function CragMapPage() {
                   hitSlop={8}
                   style={styles.headerTitleHit}
                 >
-                  <Text style={styles.headerAreaName} numberOfLines={1}>
+                  <Text
+                    style={styles.headerAreaName}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {area?.name ?? areaName ?? tr('攀岩区', 'Area')}
                   </Text>
                 </TouchableOpacity>
@@ -1026,7 +1030,10 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       justifyContent: 'center',
     },
     headerTitleHit: {
-      maxWidth: '60%',
+      // 50% leaves symmetric space for the toolbar buttons either side
+      // (community pill left + chevron right). 60% allowed long area
+      // names to crash into the left button.
+      maxWidth: '50%',
     },
     headerAreaName: {
       fontFamily: theme.fonts.bold,
