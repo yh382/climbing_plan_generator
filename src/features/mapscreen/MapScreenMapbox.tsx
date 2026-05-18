@@ -1118,9 +1118,9 @@ export default function MapScreenMapbox({
                   <MapboxGL.CircleLayer
                     id="gyms-pins"
                     style={{
-                      circleRadius: 7,
+                      circleRadius: 6,
                       circleColor: '#306E6F',
-                      circleStrokeWidth: 2.5,
+                      circleStrokeWidth: 1.2,
                       circleStrokeColor: '#fff',
                     }}
                   />
@@ -1128,17 +1128,17 @@ export default function MapScreenMapbox({
                     id="gyms-labels"
                     style={{
                       textField: ['get', 'name'] as any,
-                      textSize: 12,
+                      textSize: 10,
                       textColor: scheme === 'dark' ? '#E2E8F0' : '#0F172A',
                       textHaloColor:
                         scheme === 'dark' ? 'rgba(11,18,32,0.85)' : 'rgba(255,255,255,0.85)',
                       textHaloWidth: 1.2,
                       textVariableAnchor: ['top', 'bottom', 'left', 'right'],
-                      textRadialOffset: 1.1,
+                      textRadialOffset: 1.4,
                       textJustify: 'auto',
                       textAllowOverlap: false,
                       textIgnorePlacement: false,
-                      textPadding: 4,
+                      textPadding: 8,
                       textMaxWidth: 8,
                       symbolZOrder: 'auto',
                     }}
@@ -1150,9 +1150,9 @@ export default function MapScreenMapbox({
                     <MapboxGL.CircleLayer
                       id="crags-pins"
                       style={{
-                        circleRadius: 7,
+                        circleRadius: 6,
                         circleColor: '#FF9500',
-                        circleStrokeWidth: 2.5,
+                        circleStrokeWidth: 1.2,
                         circleStrokeColor: '#fff',
                       }}
                     />
@@ -1160,17 +1160,17 @@ export default function MapScreenMapbox({
                       id="crags-labels"
                       style={{
                         textField: ['get', 'name'] as any,
-                        textSize: 11,
+                        textSize: 10,
                         textColor: scheme === 'dark' ? '#E2E8F0' : '#0F172A',
                         textHaloColor:
                           scheme === 'dark' ? 'rgba(11,18,32,0.85)' : 'rgba(255,255,255,0.85)',
                         textHaloWidth: 1.2,
                         textAnchor: 'top',
-                        textOffset: [0, 1.3],
+                        textOffset: [0, 1.6],
                         textJustify: 'center',
                         textAllowOverlap: false,
                         textIgnorePlacement: false,
-                        textPadding: 4,
+                        textPadding: 8,
                         textMaxWidth: 10,
                         symbolZOrder: 'auto',
                       }}
