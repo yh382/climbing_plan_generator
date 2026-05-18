@@ -18,7 +18,7 @@
 // The highlighted area floats to index 0 so the user lands on /map with
 // the spot they came from already at the front of the strip.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import {
   Pressable,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
@@ -34,6 +35,9 @@ import { theme } from '../../../lib/theme';
 import type { Area } from '../../outdoor/types';
 import useFavoriteAreasStore from '../../../store/useFavoriteAreasStore';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
+import SaveAreaHelpSheet, {
+  type SaveAreaHelpSheetHandle,
+} from './SaveAreaHelpSheet';
 
 const MAX_SPOTS = 12;
 const AVATAR_SIZE = 72;
@@ -71,7 +75,11 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
     return list.slice(0, MAX_SPOTS);
   }, [areas, highlightAreaId]);
 
-  if (sorted.length === 0) return null;
+  // BK: empty-state placeholder. Tap → opens help sheet explaining how
+  // to save an area. We keep the section visible (instead of returning
+  // null) so the strip is a permanent affordance — discoverable, and
+  // the user always knows where their saved spots will go.
+  const helpRef = useRef<SaveAreaHelpSheetHandle>(null);
 
   return (
     <View style={styles.section}>
@@ -83,16 +91,50 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {sorted.map((area) => (
-          <SavedAreaAvatar
-            key={area.id}
-            area={area}
-            onPress={() => onSelectArea(area)}
+        {sorted.length === 0 ? (
+          <SaveAreaPlaceholder
+            onPress={() => helpRef.current?.present()}
             styles={styles}
+            label={tr('收藏', 'Save')}
           />
-        ))}
+        ) : (
+          sorted.map((area) => (
+            <SavedAreaAvatar
+              key={area.id}
+              area={area}
+              onPress={() => onSelectArea(area)}
+              styles={styles}
+            />
+          ))
+        )}
       </ScrollView>
+      <SaveAreaHelpSheet ref={helpRef} />
     </View>
+  );
+}
+
+function SaveAreaPlaceholder({
+  onPress,
+  styles,
+  label,
+}: {
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  label: string;
+}) {
+  return (
+    <Pressable style={styles.item} onPress={onPress}>
+      <View style={[styles.avatar, styles.placeholderAvatar]}>
+        <Ionicons
+          name="add"
+          size={36}
+          color={styles.placeholderIconColor.color}
+        />
+      </View>
+      <Text style={styles.name} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -157,12 +199,15 @@ function SavedAreaAvatar({
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     section: {
-      paddingTop: 12,
-      paddingBottom: 16,
+      // BK: tightened gap between search bar (paddingBottom: 16) and
+      // the saved spots strip — previously 12 here meant ~28pt of dead
+      // space. 4 brings it visually adjacent without crowding.
+      paddingTop: 4,
+      paddingBottom: 14,
     },
     headerRow: {
       paddingHorizontal: 16,
-      marginBottom: 10,
+      marginBottom: 8,
     },
     title: {
       fontFamily: theme.fonts.bold,
@@ -185,6 +230,17 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       overflow: 'hidden',
       marginBottom: 8,
       backgroundColor: c.backgroundSecondary,
+    },
+    placeholderAvatar: {
+      borderWidth: 1.2,
+      borderStyle: 'dashed',
+      borderColor: c.border,
+      backgroundColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeholderIconColor: {
+      color: c.textSecondary,
     },
     avatarImage: {
       width: '100%',

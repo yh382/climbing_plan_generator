@@ -1356,6 +1356,13 @@ export default function MapScreenMapbox({
         {mode.kind === 'gyms' ? (
           <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
             <GymsSavedSpotsRow onSelectArea={onSelectAreaFromList} />
+            <View style={styles.gymsListSectionHeader}>
+              <Text style={styles.gymsListSectionTitle}>
+                {gymsQuery.trim()
+                  ? tr('搜索结果', 'Search Results')
+                  : tr('附近', 'Nearby')}
+              </Text>
+            </View>
             <GymList
               gyms={filteredGyms}
               areas={filteredAreas}
@@ -1671,7 +1678,7 @@ export default function MapScreenMapbox({
   );
 }
 
-const createStyles = (_c: ReturnType<typeof useThemeColors>) =>
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     root: { flex: 1 },
     mapWrap: { flex: 1 },
@@ -1683,6 +1690,21 @@ const createStyles = (_c: ReturnType<typeof useThemeColors>) =>
     },
     missingTokenText: { color: '#ef4444', fontSize: 16, textAlign: 'center' },
     gymsSheetContent: { flex: 1 },
+    // BK: matches GymsSavedSpotsRow's paddingHorizontal:16 so the
+    // "Nearby" / "Search Results" title aligns with both the saved
+    // spots strip header above AND the gym list rows below (which
+    // also use paddingHorizontal:16 in GymList.listCardContent).
+    gymsListSectionHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      paddingBottom: 6,
+    },
+    gymsListSectionTitle: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 15,
+      color: colors.textPrimary,
+      letterSpacing: -0.2,
+    },
     loadingOverlay: {
       ...StyleSheet.absoluteFillObject,
       alignItems: 'center',
