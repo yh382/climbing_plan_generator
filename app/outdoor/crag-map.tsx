@@ -781,6 +781,12 @@ export default function CragMapPage() {
                   style={styles.headerAreaName}
                   numberOfLines={1}
                   ellipsizeMode="tail"
+                  // Auto-shrink font (iOS): try to fit full name within
+                  // the flex:1 slot first, only fall back to ellipsis when
+                  // shrunk down to minimumFontScale * 20pt = 13pt. Most
+                  // OpenBeta area names fit between 14-20pt.
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
                 >
                   {area?.name ?? areaName ?? tr('攀岩区', 'Area')}
                 </Text>
