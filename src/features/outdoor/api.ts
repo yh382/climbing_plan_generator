@@ -33,9 +33,9 @@ export const outdoorApi = {
     if (_params?.status) qs.set('status', _params.status);
     // BE returns PaginatedAreas { items, total, page, limit } — unwrap
     // here so the public contract stays Area[]. Pagination not yet
-    // surfaced; assume the seed list fits in the default page (limit=20
-    // hits the BE — we ask for 100 to cover near-term growth).
-    qs.set('limit', '100');
+    // surfaced. BL post-ship we have 700+ areas so 2000 cap matches the
+    // BE's new upper bound; beyond that we'd want viewport bbox filter.
+    qs.set('limit', '2000');
     const page = await api.get<{ items: Area[]; total: number }>(`/areas?${qs}`);
     return page.items ?? [];
   },
