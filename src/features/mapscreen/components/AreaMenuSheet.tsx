@@ -162,15 +162,23 @@ const AreaMenuSheet = forwardRef<AreaMenuSheetHandle, AreaMenuSheetProps>((props
           </Pressable>
         ) : null}
 
-        {/* 2. Climb Type segment */}
-        <SectionLabel colors={colors}>{tr('攀爬类型', 'Climb Type')}</SectionLabel>
-        <View style={styles.segmentWrap}>
-          <NativeSegmentedControl
-            options={[tr('绳攀', 'Routes'), tr('抱石', 'Boulder')]}
-            selectedIndex={props.areaModeIndex}
-            onSelect={props.setAreaModeIndex}
-          />
-        </View>
+        {/* 2. Climb Type segment — hidden when the area has only one
+            discipline (no need to expose a toggle the user can't
+            meaningfully switch). */}
+        {props.area
+          && Math.max(0, props.area.route_count - props.area.boulder_count) > 0
+          && props.area.boulder_count > 0 ? (
+          <>
+            <SectionLabel colors={colors}>{tr('攀爬类型', 'Climb Type')}</SectionLabel>
+            <View style={styles.segmentWrap}>
+              <NativeSegmentedControl
+                options={[tr('绳攀', 'Rope'), tr('抱石', 'Boulder')]}
+                selectedIndex={props.areaModeIndex}
+                onSelect={props.setAreaModeIndex}
+              />
+            </View>
+          </>
+        ) : null}
 
         {/* 3. Area Tools */}
         <SectionLabel colors={colors}>{tr('岩场工具', 'Area Tools')}</SectionLabel>

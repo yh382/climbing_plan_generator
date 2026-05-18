@@ -307,7 +307,10 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
       },
       {
         value: ropeCount,
-        label: tr('线路', ropeCount === 1 ? 'Route' : 'Routes'),
+        // BM: relabel "Routes" → "Rope" so users don't confuse this with
+        // boulder problems (which are also "routes" in everyday usage).
+        // "Rope" makes the discipline split explicit.
+        label: tr('绳攀', ropeCount === 1 ? 'Rope' : 'Rope'),
       },
     ];
 
