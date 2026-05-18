@@ -31,8 +31,8 @@ import {
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
-import { outdoorApi } from '../../outdoor/api';
 import type { Area } from '../../outdoor/types';
+import useFavoriteAreasStore from '../../../store/useFavoriteAreasStore';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
 
 const MAX_SPOTS = 12;
@@ -48,21 +48,14 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const highlightAreaId = useMapSavedSpotHighlightStore((s) => s.highlightAreaId);
-  const [areas, setAreas] = useState<Area[]>([]);
+  // BK: subscribe to the shared favorites store so the strip reacts when
+  // the user toggles favorite in AreaInfoSheet.
+  const areas = useFavoriteAreasStore((s) => s.areas);
+  const hydrate = useFavoriteAreasStore((s) => s.hydrate);
 
   useEffect(() => {
-    let cancelled = false;
-    outdoorApi
-      .listAreas()
-      .then((data) => {
-        if (cancelled || !data) return;
-        setAreas(data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void hydrate();
+  }, [hydrate]);
 
   const sorted = useMemo(() => {
     const list = [...areas];
@@ -72,10 +65,7 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
         if (a.id === highlightAreaId && b.id !== highlightAreaId) return -1;
         if (b.id === highlightAreaId && a.id !== highlightAreaId) return 1;
       }
-      // 2. Favorited next
-      const favDelta = (b.is_favorited ? 1 : 0) - (a.is_favorited ? 1 : 0);
-      if (favDelta !== 0) return favDelta;
-      // 3. Alphabetic
+      // 2. Alphabetic
       return a.name.localeCompare(b.name);
     });
     return list.slice(0, MAX_SPOTS);

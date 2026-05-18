@@ -85,6 +85,14 @@ interface AreaInfoSheetProps {
    *  areaData already hands a complete record. */
   seedArea?: AreaInfoSeed | null;
   onPressRouteMap: () => void;
+  /** Fires after TrueSheet finishes its dismiss animation (drag-down,
+   *  swipe, or imperative dismiss()). Parent tracks this so the
+   *  gyms-sheet back button can intercept and close the info sheet
+   *  before navigating away. */
+  onDismiss?: () => void;
+  /** Fires when TrueSheet finishes its present animation. Mirrors
+   *  `onDismiss` so the parent can flip its tracking flag. */
+  onPresented?: () => void;
 }
 
 const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
@@ -146,7 +154,12 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
       if (props.areaId) {
         void loadArea(props.areaId);
       }
-    }, [props.areaId, loadArea]);
+      props.onPresented?.();
+    }, [props.areaId, loadArea, props]);
+
+    const onDismiss = useCallback(() => {
+      props.onDismiss?.();
+    }, [props]);
 
     // Merge seed + fetched so the header can paint while the full
     // record loads on the gyms path.
@@ -219,8 +232,24 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
 
     const handleFavorite = useCallback(() => {
       if (!header.id) return;
-      toggleFavorite(header.id);
-    }, [header.id, toggleFavorite]);
+      // Send the full Area shape (fall back to header projection when
+      // the full record hasn't loaded yet) so the favorites store can
+      // render the saved spot in GymsSavedSpotsRow without a re-fetch.
+      const payload: Area = (area ?? {
+        id: header.id,
+        name: header.name,
+        cover_url: header.cover_url ?? null,
+        region: header.region ?? null,
+        country: header.country ?? 'US',
+        lat: header.lat ?? null,
+        lng: header.lng ?? null,
+        crag_count: header.crag_count,
+        route_count: header.route_count,
+        boulder_count: header.boulder_count,
+        status: 'approved',
+      }) as Area;
+      void toggleFavorite(payload);
+    }, [area, header, toggleFavorite]);
 
     const handleShare = useCallback(async () => {
       if (!header.name) return;
@@ -331,6 +360,7 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
         scrollable
         footer={footer}
         onDidPresent={onPresent}
+        onDidDismiss={onDismiss}
       >
         <TopFadeMaskView topFadeRatio={0.08}>
         <ScrollView

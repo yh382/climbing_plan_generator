@@ -226,6 +226,10 @@ export default function MapScreenMapbox({
   const [areaInfoContext, setAreaInfoContext] = useState<AreaInfoContext>('crag');
   const [areaInfoSeed, setAreaInfoSeed] = useState<AreaInfoSeed | null>(null);
   const [areaInfoId, setAreaInfoId] = useState<string | null>(null);
+  // BK: track AreaInfoSheet presented state so the top-bar back button
+  // dismisses the sheet first (Apple Maps pattern) instead of returning
+  // to the previous tab when an info sheet is on top of the gyms sheet.
+  const [areaInfoOpen, setAreaInfoOpen] = useState(false);
   const areaMenuSheetRef = useRef<AreaMenuSheetHandle>(null);
   const myListSheetRef = useRef<MyListSheetHandle>(null);
   const reportsSheetRef = useRef<ReportsSheetHandle>(null);
@@ -883,6 +887,27 @@ export default function MapScreenMapbox({
     gymsData.fetchNearby(center, useGymsStore.getState().query.trim());
   }, [center, gymsData]);
 
+  // BK: client-side substring filter of the visible gyms + outdoor
+  // areas, applied as the user types in the gyms search bar. Submit
+  // (Enter) still hits the server for a fresh nearby pull, but the
+  // list updates instantly while typing so e.g. "wasatch" hides
+  // everything except the matching area.
+  const filteredGyms = useMemo(() => {
+    const q = gymsQuery.trim().toLowerCase();
+    if (!q) return gyms;
+    return gyms.filter((g) => (g.name ?? '').toLowerCase().includes(q));
+  }, [gyms, gymsQuery]);
+
+  const filteredAreas = useMemo(() => {
+    const q = gymsQuery.trim().toLowerCase();
+    if (!q) return gymsData.areas;
+    return gymsData.areas.filter((a) => {
+      const zh = (a.name ?? '').toLowerCase();
+      const en = (a.name_en ?? '').toLowerCase();
+      return zh.includes(q) || en.includes(q);
+    });
+  }, [gymsData.areas, gymsQuery]);
+
   const onSelectGymFromList = useCallback((gym: GymPlace) => {
     useGymsStore.getState().setSelectedGym(gym);
   }, []);
@@ -992,12 +1017,27 @@ export default function MapScreenMapbox({
     router.navigate(route as any);
   }, [router, sheet]);
 
+  // BK: in gyms mode, when AreaInfoSheet is on top of the gyms sheet,
+  // chevron.down should dismiss the info sheet first (Apple Maps
+  // pattern) rather than navigating away from the map tab.
+  const onLeftButtonPress = useCallback(() => {
+    if (mode.kind === 'area') {
+      onBackToGyms();
+      return;
+    }
+    if (areaInfoOpen) {
+      areaInfoSheetRef.current?.dismiss();
+      return;
+    }
+    goToPreviousTab();
+  }, [mode.kind, areaInfoOpen, onBackToGyms, goToPreviousTab]);
+
   const topBar = (
     <MapTopBar
       unionId="map-pill"
       leftButton={{
         icon: mode.kind === 'area' ? 'chevron.left' : 'chevron.down',
-        onPress: mode.kind === 'area' ? onBackToGyms : goToPreviousTab,
+        onPress: onLeftButtonPress,
       }}
       rightButtons={[
         ...mapViewControlButtons,
@@ -1317,8 +1357,8 @@ export default function MapScreenMapbox({
           <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
             <GymsSavedSpotsRow onSelectArea={onSelectAreaFromList} />
             <GymList
-              gyms={gyms}
-              areas={gymsData.areas}
+              gyms={filteredGyms}
+              areas={filteredAreas}
               areaDistances={gymsData.areaDistances}
               onSelectGym={onSelectGymFromList}
               onSelectArea={onSelectAreaFromList}
@@ -1566,6 +1606,8 @@ export default function MapScreenMapbox({
         areaId={areaInfoId}
         context={areaInfoContext}
         seedArea={areaInfoSeed}
+        onPresented={() => setAreaInfoOpen(true)}
+        onDismiss={() => setAreaInfoOpen(false)}
         onPressRouteMap={() => {
           if (areaInfoContext === 'gyms' && areaInfoSeed) {
             areaInfoSheetRef.current?.dismiss();

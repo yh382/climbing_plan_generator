@@ -1,54 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { outdoorApi } from './api';
+import useFavoriteAreasStore from '../../store/useFavoriteAreasStore';
 
 /**
- * Standalone Area favorite toggle — mirrors useGymFavoriteToggle in
- * src/features/gyms/hooks.ts. Loads the set of favorited area_ids once
- * on mount, then toggles optimistically with rollback on error.
+ * Standalone Area favorite toggle. Thin wrapper over the shared
+ * `useFavoriteAreasStore` zustand state so multiple components
+ * (AreaInfoSheet writer, GymsSavedSpotsRow reader) stay in sync without
+ * each one running its own /areas/favorites fetch.
+ *
+ * Toggle signature accepts the full Area so the saved-spots strip can
+ * render avatar + name immediately when a user favorites a new area
+ * inside the info sheet.
  */
 export function useAreaFavoriteToggle() {
-  const [favSet, setFavSet] = useState<Set<string>>(new Set());
-  const [loaded, setLoaded] = useState(false);
+  const isFavorited = useFavoriteAreasStore((s) => s.isFavorited);
+  const toggle = useFavoriteAreasStore((s) => s.toggle);
+  const loaded = useFavoriteAreasStore((s) => s.loaded);
+  const hydrate = useFavoriteAreasStore((s) => s.hydrate);
 
   useEffect(() => {
-    outdoorApi
-      .listFavoriteAreas()
-      .then((areas) => {
-        setFavSet(new Set(areas.map((a) => a.id)));
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
-  }, []);
-
-  const isFavorited = useCallback(
-    (areaId: string) => favSet.has(areaId),
-    [favSet],
-  );
-
-  const toggle = useCallback(
-    async (areaId: string) => {
-      const wasFav = favSet.has(areaId);
-      setFavSet((prev) => {
-        const next = new Set(prev);
-        if (wasFav) next.delete(areaId);
-        else next.add(areaId);
-        return next;
-      });
-      try {
-        if (wasFav) await outdoorApi.unfavoriteArea(areaId);
-        else await outdoorApi.favoriteArea(areaId);
-      } catch {
-        setFavSet((prev) => {
-          const next = new Set(prev);
-          if (wasFav) next.add(areaId);
-          else next.delete(areaId);
-          return next;
-        });
-      }
-    },
-    [favSet],
-  );
+    void hydrate();
+  }, [hydrate]);
 
   return { isFavorited, toggle, loaded };
 }

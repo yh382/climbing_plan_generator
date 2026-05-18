@@ -119,9 +119,20 @@ export function PlaceSheetFooter({ actions, unionId }: Props) {
         pointerEvents="none"
       />
 
-      {/* Buttons centered horizontally on top of the mist. */}
+      {/* Buttons centered horizontally on top of the mist. BK fix: anchor
+          to the BOTTOM of the dock (with the safe-area inset as
+          paddingBottom) so the glass capsule sits flush with the
+          screen's bottom edge — the prior layout left a visible
+          un-glassed band below the buttons where only mist was
+          rendered. Empty space now lives ABOVE the buttons and is
+          fully covered by the gradient mist. */}
       <View
-        style={[styles.btnSlot, { paddingTop: TOP_PADDING }]}
+        style={[
+          styles.btnSlot,
+          {
+            paddingBottom: Math.max(insets.bottom, MIN_BOTTOM_PADDING),
+          },
+        ]}
         pointerEvents="box-none"
       >
         <Host matchContents>
@@ -163,7 +174,8 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   btnSlot: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
   },
 });
