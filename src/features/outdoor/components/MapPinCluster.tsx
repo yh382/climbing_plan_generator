@@ -10,15 +10,20 @@ import MapboxGL from '@rnmapbox/maps';
 import { useColorScheme } from 'react-native';
 import type { MapPin } from '../types';
 
-/** Zoom thresholds matching ROADMAP_OUTDOOR.md */
+/** Zoom thresholds (BK retuned).
+ *
+ * Blue crag pins cover the wider-area band (8-13); green sector pins
+ * pick up from 13 and stay visible. When the area has truly distinct
+ * per-route coords, red route pins overlay from ZOOM_ROUTE_MIN and the
+ * sector layer caps there to let routes breathe. When the area has no
+ * route pins (OpenBeta boulder = "5 problems on 1 boulder"), the green
+ * sector pin IS the climbing unit and must never disappear — sector
+ * layer has no maxZoomLevel in that case. */
 const ZOOM_CRAG_MIN = 8;
-const ZOOM_CRAG_MAX = 11;
-const ZOOM_SECTOR_MIN = 11;
-const ZOOM_SECTOR_MAX = 13;
+const ZOOM_CRAG_MAX = 13;
+const ZOOM_SECTOR_MIN = 13;
+const ZOOM_SECTOR_MAX_WITH_ROUTES = 15;
 const ZOOM_WALL_MIN = 13;
-/** At very high zoom, overlay individual route pins on top of the wall
- *  pin so climbers can pick a specific route. Walls stay visible too —
- *  Mapbox z-orders the route layer above. */
 const ZOOM_ROUTE_MIN = 15;
 
 const PIN_COLORS = {
@@ -61,11 +66,15 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
   const wallGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'wall')), [pins]);
   const routeGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'route')), [pins]);
 
-  // BK: when BE drops synthetic wall pins (every wall == its parent
-  // sector), the wall zoom band (13-15) would otherwise show no pins at
-  // all. Extend the sector layer right up to the route layer so users
-  // see continuous coverage; the route fan-out picks up at zoom 15.
-  const sectorMaxZoom = wallGeoJSON.features.length > 0 ? ZOOM_SECTOR_MAX : ZOOM_ROUTE_MIN;
+  // BK: when an area has no route pins (OpenBeta boulder = "5 problems
+  // glued to 1 boulder coord"), the green sector pin IS the physical
+  // climbing unit at every zoom level — leave maxZoomLevel undefined
+  // so the layer never hides. When routes ARE emitted (future data
+  // with truly distinct per-route coords), cap sectors at the route
+  // band so red pins can take over visual hierarchy.
+  const sectorMaxZoom = routeGeoJSON.features.length > 0
+    ? ZOOM_SECTOR_MAX_WITH_ROUTES
+    : undefined;
 
   const handleCragPress = useCallback(
     (e: { features: GeoJSON.Feature[] }) => handlePress(e, pins, onPinPress),
