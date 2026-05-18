@@ -1527,7 +1527,30 @@ export default function MapScreenMapbox({
                 </Host>
               </View>
 
-              <View style={{ flex: 1 }} />
+              {/* Title in flex:1 middle slot — naturally constrained
+                  between asymmetric toolbars (88pt left pill vs 44pt
+                  right hamburger). Old absolute-centered layout placed
+                  title at SCREEN midpoint, which is left of the actual
+                  available middle space → long names crashed into the
+                  left pill. adjustsFontSizeToFit shrinks the font from
+                  20pt down to 13pt before falling back to '...' so most
+                  OpenBeta names display in full. */}
+              <TouchableOpacity
+                onPress={openAreaInfo}
+                activeOpacity={0.6}
+                hitSlop={8}
+                style={cragStyles(colors).headerTitleFlex}
+              >
+                <Text
+                  style={cragStyles(colors).headerAreaName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
+                  {areaData.area?.name ?? mode.areaName ?? tr('攀岩区', 'Area')}
+                </Text>
+              </TouchableOpacity>
 
               <View style={{ width: 44, height: 44 }}>
                 <HeaderButton
@@ -1536,19 +1559,6 @@ export default function MapScreenMapbox({
                   size={44}
                   onPress={() => areaMenuSheetRef.current?.present()}
                 />
-              </View>
-
-              <View style={cragStyles(colors).headerTitleAbsolute} pointerEvents="box-none">
-                <TouchableOpacity
-                  onPress={openAreaInfo}
-                  activeOpacity={0.6}
-                  hitSlop={8}
-                  style={cragStyles(colors).headerTitleHit}
-                >
-                  <Text style={cragStyles(colors).headerAreaName} numberOfLines={1}>
-                    {areaData.area?.name ?? mode.areaName ?? tr('攀岩区', 'Area')}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
           ) : null}
@@ -1799,25 +1809,17 @@ const cragStyles = (c: ReturnType<typeof useThemeColors>) =>
       gap: 10,
       zIndex: 10,
     },
-    // Title absolutely positioned across the headerRow. Because the
-    // headerRow's horizontal padding is symmetric (8 + 8 sheetBody =
-    // 16 on each side), the absolute layer's center equals the sheet's
-    // horizontal midline — the title lines up with the grabber bar
-    // above it regardless of the left-pill and right-avatar widths.
-    headerTitleAbsolute: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
+    // Title slot: flex:1 in the middle of headerRow so it sits in the
+    // actual available space between the asymmetric left pill (88pt) and
+    // right hamburger (44pt). The previous absolute-positioned layout
+    // assumed left:0 / right:0 with center alignment ≈ sheet midline,
+    // but toolbars are asymmetric (88 vs 44), so screen center ≠ middle
+    // of available space → long area names crashed into the left pill.
+    headerTitleFlex: {
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    headerTitleHit: {
-      // Reserve margin so a long area name doesn't collide with the
-      // left pill (~88pt wide) or right avatar (44pt + gap). 120 on
-      // each side ~= space beyond both elements on most iPhone widths.
-      maxWidth: '60%',
+      minWidth: 0,  // RN: required so flex child lets Text truncate
     },
     headerAreaName: {
       fontFamily: theme.fonts.bold,
