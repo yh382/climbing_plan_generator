@@ -110,7 +110,7 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
             style={{
               circleRadius: ADAPTIVE_RADIUS,
               circleColor: PIN_COLORS.crag,
-              circleStrokeWidth: 2.5,
+              circleStrokeWidth: 1.2,
               circleStrokeColor: '#fff',
             }}
           />
@@ -139,7 +139,7 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
             style={{
               circleRadius: ADAPTIVE_RADIUS,
               circleColor: PIN_COLORS.sector,
-              circleStrokeWidth: 2.5,
+              circleStrokeWidth: 1.2,
               circleStrokeColor: '#fff',
             }}
           />
@@ -171,7 +171,7 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
             style={{
               circleRadius: ADAPTIVE_RADIUS,
               circleColor: PIN_COLORS.wall,
-              circleStrokeWidth: 2.5,
+              circleStrokeWidth: 1.2,
               circleStrokeColor: '#fff',
             }}
           />
@@ -200,7 +200,7 @@ export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinCl
             style={{
               circleRadius: ROUTE_RADIUS,
               circleColor: PIN_COLORS.route,
-              circleStrokeWidth: 1.5,
+              circleStrokeWidth: 0.8,
               circleStrokeColor: '#fff',
             }}
           />
