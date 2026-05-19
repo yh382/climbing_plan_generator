@@ -40,15 +40,21 @@ export function useGymsData(enabled: boolean): UseGymsDataResult {
     s.setError(null);
     try {
       const raw = await searchGymsNearby(c, 30, q);
+      // Filter and sort by map-center distance (server-provided distance_m relative
+      // to c). Must happen BEFORE the user-location override below, otherwise
+      // gyms in a distant city would carry user→gym distance (thousands of km)
+      // and be dropped by the MAX_DISTANCE_KM filter even though they're
+      // close to the map center the user is actually viewing.
+      const filtered = sortAndFilterGyms(raw, c);
+      // Override distance_m with real user-to-gym distance for list display only.
       const uLoc = s.userLoc;
-      const normalized = uLoc
-        ? raw.map((g) => ({
+      const result = uLoc
+        ? filtered.map((g) => ({
             ...g,
             distance_m: Math.round(distanceKm(uLoc, g.location) * 1000),
           }))
-        : raw;
-      const filtered = sortAndFilterGyms(normalized, c);
-      s.setGyms(filtered);
+        : filtered;
+      s.setGyms(result);
     } catch (e: any) {
       s.setError(e?.message ?? '获取附近岩馆失败');
     } finally {
