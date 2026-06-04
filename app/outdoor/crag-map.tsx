@@ -32,7 +32,9 @@ import { theme } from '../../src/lib/theme';
 import { isCN } from '../../src/lib/region';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import { outdoorListsApi } from '../../src/features/outdoor/listsApi';
-import type { Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
+// BR Track A: top-level outdoor entity is now Region (was Area). Alias kept
+// for caller minimum-diff — Track D will rewrite this whole file.
+import type { Region as Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
 import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 import MapPinCluster from '../../src/features/outdoor/components/MapPinCluster';
 import WallGroup from '../../src/features/outdoor/components/WallGroup';
@@ -163,7 +165,7 @@ export default function CragMapPage() {
       if (!areaId) return;
       setLoading(true);
       Promise.all([
-        outdoorApi.getArea(areaId),
+        outdoorApi.getRegion(areaId),
         outdoorApi.getMapPins(areaId),
       ]).then(([areaData, pinData]) => {
         if (areaData) setArea(areaData);
@@ -219,7 +221,9 @@ export default function CragMapPage() {
       const seen = new Set<string>();
       for (const crag of topPins) {
         try {
-          const sectors = await outdoorApi.getSectors(crag.id);
+          // BR Track A rename: old getSectors(crag_id) → new getCrags(area_id).
+          // Here `crag` (top-level pin) is a new Area; we walk to its child Crags.
+          const sectors = await outdoorApi.getCrags(crag.id);
           for (const sec of sectors) {
             const ws = await outdoorApi.getWalls(sec.id);
             const wsWithRoutes = await Promise.all(
@@ -315,7 +319,7 @@ export default function CragMapPage() {
         setWalls([
           {
             id: wallPin.id,
-            sector_id: '',
+            crag_id: '',
             name: wallPin.name,
             lat: wallPin.lat,
             lng: wallPin.lng,
@@ -332,20 +336,24 @@ export default function CragMapPage() {
       if (pin.level === 'wall') {
         const wallRoutes = await outdoorApi.getRoutes(pin.id);
         setWalls([{
-          id: pin.id, sector_id: '', name: pin.name,
+          id: pin.id, crag_id: '', name: pin.name,
           lat: pin.lat, lng: pin.lng, sort_order: 0, status: 'approved',
           route_count: wallRoutes.length, routes: wallRoutes,
         }]);
-      } else if (pin.level === 'sector') {
-        const sectorWalls = await outdoorApi.getWalls(pin.id);
+      } else if (pin.level === 'crag') {
+        // BR Track A: old "sector" level == new "crag" level. Direct
+        // children of a crag are walls.
+        const cragWalls = await outdoorApi.getWalls(pin.id);
         const wallsWithRoutes = await Promise.all(
-          sectorWalls.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
+          cragWalls.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
         );
         setWalls(wallsWithRoutes);
-      } else if (pin.level === 'crag') {
-        const sectors = await outdoorApi.getSectors(pin.id);
+      } else if (pin.level === 'area') {
+        // BR Track A: old "crag" level == new "area" level. Walk down to
+        // child Crags → Walls → Routes.
+        const childCrags = await outdoorApi.getCrags(pin.id);
         const allWalls: Wall[] = [];
-        for (const sec of sectors) {
+        for (const sec of childCrags) {
           const ws = await outdoorApi.getWalls(sec.id);
           const wsWithRoutes = await Promise.all(
             ws.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
@@ -394,7 +402,7 @@ export default function CragMapPage() {
         setWalls([
           {
             id: picked.id,
-            sector_id: '',
+            crag_id: '',
             name: picked.name,
             lat: picked.lat,
             lng: picked.lng,
@@ -814,7 +822,7 @@ export default function CragMapPage() {
                     style={highlighted ? { borderRadius: 14, backgroundColor: colors.backgroundSecondary } : undefined}
                   >
                     <RouteListCard
-                      route={{ ...it.route, sector_name: it.sector_name, wall_name: it.wall_name }}
+                      route={{ ...it.route, crag_name: it.crag_name, wall_name: it.wall_name }}
                       onPress={() => navigateToRoute(routeId)}
                     />
                   </View>
@@ -870,7 +878,8 @@ export default function CragMapPage() {
                   cover_url: area.cover_url,
                   region: area.region,
                   country: area.country,
-                  crag_count: area.crag_count,
+                  // BR Track A: Region.area_count = top-level children count.
+                  crag_count: area.area_count,
                   route_count: area.route_count,
                   boulder_count: area.boulder_count,
                 }
@@ -898,7 +907,8 @@ export default function CragMapPage() {
             id: area.id,
             name: area.name,
             cover_url: area.cover_url,
-            crag_count: area.crag_count ?? 0,
+            // BR Track A: Region.area_count = top-level children count.
+            crag_count: area.area_count ?? 0,
             route_count: area.route_count ?? 0,
             boulder_count: area.boulder_count ?? 0,
           }}

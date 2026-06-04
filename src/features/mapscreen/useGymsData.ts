@@ -14,11 +14,14 @@ import { useGymsStore } from '../../store/useGymsStore';
 import { distanceKm } from '../gyms/utils/distance';
 import { sortAndFilterGyms } from '../gyms/utils/sortAndFilter';
 import { outdoorApi } from '../outdoor/api';
-import type { Area } from '../outdoor/types';
+// BR Track A: this hook serves the top-level outdoor entity (now Region,
+// was Area). Public field name `areas` kept for caller minimum-diff —
+// Track D will rename to `regions`.
+import type { Region } from '../outdoor/types';
 import type { CragPin } from '../gyms/components/GymMap';
 
 export interface UseGymsDataResult {
-  areas: Area[];
+  areas: Region[];
   cragPins: CragPin[];
   areaDistances: Record<string, number>;
   /** defensive: manually refetch nearby after search submit / map idle. */
@@ -26,7 +29,7 @@ export interface UseGymsDataResult {
 }
 
 export function useGymsData(enabled: boolean): UseGymsDataResult {
-  const [areas, setAreas] = useState<Area[]>([]);
+  const [areas, setAreas] = useState<Region[]>([]);
   const userLoc = useGymsStore((s) => s.userLoc);
 
   // defensive: gyms list distance must reflect user → gym, not center → gym.
@@ -105,7 +108,7 @@ export function useGymsData(enabled: boolean): UseGymsDataResult {
   useEffect(() => {
     if (!enabled) return;
     outdoorApi
-      .listAreas({ status: 'approved' })
+      .listRegions({ status: 'approved' })
       .then((data) => {
         if (data) setAreas(data);
       })

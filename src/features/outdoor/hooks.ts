@@ -1,22 +1,25 @@
 import { useEffect } from 'react';
 
-import useFavoriteAreasStore from '../../store/useFavoriteAreasStore';
+import useFavoriteRegionsStore from '../../store/useFavoriteRegionsStore';
 
 /**
- * Standalone Area favorite toggle. Thin wrapper over the shared
- * `useFavoriteAreasStore` zustand state so multiple components
+ * Standalone Region favorite toggle. Thin wrapper over the shared
+ * `useFavoriteRegionsStore` zustand state so multiple components
  * (AreaInfoSheet writer, GymsSavedSpotsRow reader) stay in sync without
- * each one running its own /areas/favorites fetch.
+ * each one running its own /regions/favorites fetch.
  *
- * Toggle signature accepts the full Area so the saved-spots strip can
- * render avatar + name immediately when a user favorites a new area
+ * Toggle signature accepts the full Region so the saved-spots strip can
+ * render avatar + name immediately when a user favorites a new region
  * inside the info sheet.
+ *
+ * Function name kept as `useAreaFavoriteToggle` for caller minimum-diff;
+ * Track D will rename.
  */
 export function useAreaFavoriteToggle() {
-  const isFavorited = useFavoriteAreasStore((s) => s.isFavorited);
-  const toggle = useFavoriteAreasStore((s) => s.toggle);
-  const loaded = useFavoriteAreasStore((s) => s.loaded);
-  const hydrate = useFavoriteAreasStore((s) => s.hydrate);
+  const isFavorited = useFavoriteRegionsStore((s) => s.isFavorited);
+  const toggle = useFavoriteRegionsStore((s) => s.toggle);
+  const loaded = useFavoriteRegionsStore((s) => s.loaded);
+  const hydrate = useFavoriteRegionsStore((s) => s.hydrate);
 
   useEffect(() => {
     void hydrate();

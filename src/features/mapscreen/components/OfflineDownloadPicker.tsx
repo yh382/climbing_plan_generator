@@ -30,7 +30,8 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import { outdoorApi } from '../../outdoor/api';
-import type { Area } from '../../outdoor/types';
+// BR Track A: top-level outdoor entity is now Region. Alias kept.
+import type { Region as Area } from '../../outdoor/types';
 import {
   createPack,
   deletePack,
@@ -75,7 +76,7 @@ const OfflineDownloadPicker = forwardRef<
     setLoading(true);
     try {
       const [fetchedAreas, packs] = await Promise.all([
-        outdoorApi.listAreas(),
+        outdoorApi.listRegions(),
         listPacks(),
       ]);
       setAreas(fetchedAreas);

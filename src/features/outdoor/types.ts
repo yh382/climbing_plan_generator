@@ -1,5 +1,5 @@
 // src/features/outdoor/types.ts
-// 5-level hierarchy: Area → Crag → Sector → Wall → Route
+// 5-level hierarchy (post BR Track A rename): Region → Area → Crag → Wall → Route
 
 // ---- Shared sub-types ----
 
@@ -26,7 +26,7 @@ export type Accommodation = {
   note?: string;
 };
 
-// ---- Level 1: Area (攀岩大区域, e.g. 阳朔) ----
+// ---- Level 1: Region (攀岩大区域, e.g. Wasatch Range, 阳朔) ----
 
 // GeoJSON LineString feature collection — approach trail overlay.
 // Feature properties are ignored by the renderer (line-only).
@@ -42,7 +42,7 @@ export type TrailFeatureCollection = {
   }>;
 };
 
-export type Area = {
+export type Region = {
   id: string;
   name: string;
   name_en?: string;
@@ -63,9 +63,11 @@ export type Area = {
   emergency_info?: string;
   cover_url?: string;
   photos?: PhotoItem[];
+  /** Legacy column kept on Region post-rename. PLAN §9.1 puts trail data
+   *  on Crag instead; Track D map redesign consumes Crag.trail_geojson. */
   trail_geojson?: TrailFeatureCollection | null;
   status: string;
-  crag_count?: number;
+  area_count?: number;
   /** All routes (rope + boulder) for backward compat. Derive rope-only
    *  count as (route_count - boulder_count). */
   route_count?: number;
@@ -73,11 +75,11 @@ export type Area = {
   is_favorited?: boolean;
 };
 
-// ---- Level 2: Crag (攀岩小区, e.g. 白山地区) ----
+// ---- Level 2: Area (攀岩区, e.g. Central Wasatch, 白山地区) ----
 
-export type Crag = {
+export type Area = {
   id: string;
-  area_id: string;
+  region_id: string;
   name: string;
   name_en?: string;
   lat?: number;
@@ -86,15 +88,16 @@ export type Crag = {
   approach?: string;
   cover_url?: string;
   status: string;
-  sector_count?: number;
+  crag_count?: number;
   route_count?: number;
 };
 
-// ---- Level 3: Sector (山/岩壁群, e.g. 鸡蛋山) ----
+// ---- Level 3: Crag (攀岩点, e.g. Little Cottonwood Canyon, 鸡蛋山) ----
+// Primary user-facing entity per PLAN §3.5.
 
-export type Sector = {
+export type Crag = {
   id: string;
-  crag_id: string;
+  area_id: string;
   name: string;
   name_en?: string;
   lat?: number;
@@ -104,6 +107,9 @@ export type Sector = {
   approach?: string;
   sort_order: number;
   status: string;
+  // BR Track A new optional fields (writers wired in Track C)
+  cover_url?: string | null;
+  trail_geojson?: TrailFeatureCollection | null;
   wall_count?: number;
   route_count?: number;
 };
@@ -112,7 +118,7 @@ export type Sector = {
 
 export type Wall = {
   id: string;
-  sector_id: string;
+  crag_id: string;
   name: string;
   name_en?: string;
   lat?: number;
@@ -149,14 +155,14 @@ export type OutdoorRoute = {
   send_count: number;
   attempt_count: number;
   // Display context (populated by API or joined in frontend).
-  // B2 follow-up: BE now returns the full ancestry chain so the catalog
-  // Send path can pick crag_name as the session label (matches the user's
-  // mental model — "today I climbed in Little Cottonwood", not "today I
-  // climbed on North Face").
+  // BR Track A: ancestry chain renamed sector_name→crag_name, crag_name→area_name,
+  // area_name→region_name. FE prefers area_name as the session label
+  // (matches the user's mental model — "today I climbed in Little Cottonwood",
+  // not "today I climbed on North Face").
   wall_name?: string;
-  sector_name?: string;
   crag_name?: string;
   area_name?: string;
+  region_name?: string;
   wall_topo_url?: string;
 };
 
@@ -200,7 +206,7 @@ export type MapPin = {
   lng: number;
   /** Aggregate count displayed inside the pin (always 1 for route-level). */
   route_count: number;
-  level: 'area' | 'crag' | 'sector' | 'wall' | 'route';
+  level: 'region' | 'area' | 'crag' | 'wall' | 'route';
   /** Only set when `level === 'route'` — id of the parent wall. Used to
    *  reconstruct the wall's route list + metadata when the user taps a
    *  route pin (sheet opens focused on that route). */
@@ -208,7 +214,7 @@ export type MapPin = {
   /** Only set when `level === 'route'` — name of the parent wall. Sent
    *  by BE so the FE can render the sheet title and synthesize a wall
    *  object even when wall pins are not in the list (BK: synthetic
-   *  walls are deduped against their parent Sector). */
+   *  walls are deduped against their parent Crag). */
   parent_name?: string;
 };
 
@@ -238,7 +244,7 @@ export type OutdoorListItem = {
   wall_lat?: number;
   wall_lng?: number;
   wall_name?: string;
-  sector_name?: string;
+  crag_name?: string;
 };
 
 export type OutdoorListDetail = OutdoorList & {

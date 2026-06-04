@@ -46,7 +46,10 @@ import { theme } from '../../../lib/theme';
 import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import { outdoorApi } from '../../outdoor/api';
 import { useAreaFavoriteToggle } from '../../outdoor/hooks';
-import type { Accommodation, Area, Transport } from '../../outdoor/types';
+// BR Track A: this sheet renders the top-level Region (was Area). Type
+// imported from outdoor/types renamed Region; alias kept as `Area` for
+// minimum-diff body — Track D will rename the sheet + props.
+import type { Accommodation, Region as Area, Transport } from '../../outdoor/types';
 import {
   PlaceSheetActions,
   PlaceSheetFooter,
@@ -120,7 +123,7 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
         if (loadedIdRef.current === id && area) return;
         setLoading(true);
         try {
-          const data = await outdoorApi.getArea(id);
+          const data = await outdoorApi.getRegion(id);
           if (data) {
             setArea(data);
             loadedIdRef.current = id;
@@ -173,7 +176,10 @@ const AreaInfoSheet = forwardRef<AreaInfoSheetHandle, AreaInfoSheetProps>(
         country: area?.country ?? seed?.country ?? null,
         lat: area?.lat ?? seed?.lat ?? null,
         lng: area?.lng ?? seed?.lng ?? null,
-        crag_count: area?.crag_count ?? seed?.crag_count ?? 0,
+        // BR Track A: top-level children rename crag_count → area_count.
+        // Seed prop keeps the legacy name for caller minimum-diff; map
+        // through here.
+        crag_count: area?.area_count ?? seed?.crag_count ?? 0,
         route_count: area?.route_count ?? seed?.route_count ?? 0,
         boulder_count: area?.boulder_count ?? seed?.boulder_count ?? 0,
       };

@@ -87,7 +87,7 @@ function adaptToCardShape(r: GymRoute, wallName: string): OutdoorRoute {
     rating_count: r.rating_count,
     send_count: r.send_count,
     status: r.status,
-    sector_name: undefined,
+    crag_name: undefined,
     wall_name: wallName,
     pitches: 1,
   } as unknown as OutdoorRoute;

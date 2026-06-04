@@ -32,8 +32,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
-import type { Area } from '../../outdoor/types';
-import useFavoriteAreasStore from '../../../store/useFavoriteAreasStore';
+// BR Track A: saved spots are Regions (was Areas). Prop names + component
+// name kept for minimum diff; Track D will rename.
+import type { Region } from '../../outdoor/types';
+import useFavoriteRegionsStore from '../../../store/useFavoriteRegionsStore';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
 import SaveAreaHelpSheet, {
   type SaveAreaHelpSheetHandle,
@@ -44,7 +46,7 @@ const AVATAR_SIZE = 72;
 const AVATAR_RADIUS = 18;
 
 interface GymsSavedSpotsRowProps {
-  onSelectArea: (area: Area) => void;
+  onSelectArea: (region: Region) => void;
 }
 
 export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
@@ -52,17 +54,17 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const highlightAreaId = useMapSavedSpotHighlightStore((s) => s.highlightAreaId);
-  // BK: subscribe to the shared favorites store so the strip reacts when
-  // the user toggles favorite in AreaInfoSheet.
-  const areas = useFavoriteAreasStore((s) => s.areas);
-  const hydrate = useFavoriteAreasStore((s) => s.hydrate);
+  // BR Track A: subscribe to the shared favorites store so the strip
+  // reacts when the user toggles favorite in AreaInfoSheet (Region-level).
+  const regions = useFavoriteRegionsStore((s) => s.regions);
+  const hydrate = useFavoriteRegionsStore((s) => s.hydrate);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
   const sorted = useMemo(() => {
-    const list = [...areas];
+    const list = [...regions];
     list.sort((a, b) => {
       // 1. Highlighted spot first
       if (highlightAreaId) {
@@ -73,7 +75,7 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
       return a.name.localeCompare(b.name);
     });
     return list.slice(0, MAX_SPOTS);
-  }, [areas, highlightAreaId]);
+  }, [regions, highlightAreaId]);
 
   // BK: empty-state placeholder. Tap → opens help sheet explaining how
   // to save an area. We keep the section visible (instead of returning
@@ -98,11 +100,11 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
             label={tr('收藏', 'Save')}
           />
         ) : (
-          sorted.map((area) => (
+          sorted.map((region) => (
             <SavedAreaAvatar
-              key={area.id}
-              area={area}
-              onPress={() => onSelectArea(area)}
+              key={region.id}
+              area={region}
+              onPress={() => onSelectArea(region)}
               styles={styles}
             />
           ))
@@ -153,7 +155,7 @@ function SavedAreaAvatar({
   onPress,
   styles,
 }: {
-  area: Area;
+  area: Region;
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {

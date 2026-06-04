@@ -60,8 +60,12 @@ type MapPinClusterProps = {
 export default function MapPinCluster({ pins, styleReady, onPinPress }: MapPinClusterProps) {
   const scheme = useColorScheme();
 
-  const cragGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'crag')), [pins]);
-  const sectorGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'sector')), [pins]);
+  // BR Track A rename: old "crag" level = new "area" level; old "sector"
+  // level = new "crag" level. Variable names kept (cragGeoJSON / sectorGeoJSON)
+  // for caller minimum-diff — Track D will rename when the cluster source
+  // is rewritten to use the new /pins endpoint shape.
+  const cragGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'area')), [pins]);
+  const sectorGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'crag')), [pins]);
   const wallGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'wall')), [pins]);
   const routeGeoJSON = useMemo(() => toGeoJSON(pins.filter((p) => p.level === 'route')), [pins]);
 

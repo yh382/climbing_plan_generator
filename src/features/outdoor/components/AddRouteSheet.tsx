@@ -204,7 +204,7 @@ const AddRouteSheet = forwardRef<AddRouteSheetHandle, AddRouteSheetProps>((props
     setSubmitting(true);
     try {
       await outdoorApi.submitRoute({
-        area_id: props.areaId,
+        region_id: props.areaId,
         style,
         name: name.trim(),
         grade_text: gradeText,

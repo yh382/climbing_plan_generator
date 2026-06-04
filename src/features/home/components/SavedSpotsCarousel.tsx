@@ -5,7 +5,9 @@ import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
 import { outdoorApi } from "@/features/outdoor/api";
-import type { Area } from "@/features/outdoor/types";
+// BR Track A: top-level outdoor entity is now Region (was Area). Alias kept
+// for caller minimum-diff.
+import type { Region as Area } from "@/features/outdoor/types";
 import { mapHref } from "@/features/mapscreen/navigation";
 import useMapSavedSpotHighlightStore from "@/store/useMapSavedSpotHighlightStore";
 
@@ -21,7 +23,7 @@ export function SavedSpotsCarousel() {
   useEffect(() => {
     let cancelled = false;
     outdoorApi
-      .listAreas()
+      .listRegions()
       .then((data) => {
         if (cancelled || !data) return;
         // Until a "recent visited" backend lands, prefer favorited areas

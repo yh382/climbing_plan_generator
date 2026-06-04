@@ -27,7 +27,9 @@ import { GymsSavedSpotsRow } from "../mapscreen/components/GymsSavedSpotsRow";
 import { GymDetailCard } from "./components/GymDetailCard";
 import { AreaDetailCard } from "../outdoor/components/AreaDetailCard";
 import { outdoorApi } from "../outdoor/api";
-import type { Area } from "../outdoor/types";
+// BR Track A: top-level outdoor entity is now Region (was Area). Alias kept
+// for caller minimum-diff — Track D will rename the variable + state.
+import type { Region as Area } from "../outdoor/types";
 
 // Sheet detent constants + state (including auto-present, safeResize, collapseSheet)
 // live in useMapSheetState — see src/features/mapscreen/hooks/useMapSheetState.ts.
@@ -192,7 +194,7 @@ export default function GymsScreen() {
 
   // Fetch outdoor areas for map pins (fire-and-forget, non-blocking)
   useEffect(() => {
-    outdoorApi.listAreas({ country: 'CN', status: 'approved' }).then((data) => {
+    outdoorApi.listRegions({ country: 'CN', status: 'approved' }).then((data) => {
       if (data) setAreas(data);
     }).catch(() => {});
   }, []);

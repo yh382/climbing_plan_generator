@@ -195,7 +195,7 @@ export default function OutdoorRouteDetailPage() {
         sessionGymName:
           route.crag_name ||
           route.area_name ||
-          route.sector_name ||
+          route.region_name ||
           route.wall_name ||
           'Outdoor',
         sessionLocationType: 'outdoor',
@@ -376,7 +376,7 @@ export default function OutdoorRouteDetailPage() {
           sessionGymName:
             route.crag_name ||
             route.area_name ||
-            route.sector_name ||
+            route.region_name ||
             route.wall_name ||
             'Outdoor',
           sessionLocationType: 'outdoor',

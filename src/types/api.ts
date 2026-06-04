@@ -102,6 +102,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/assistant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assistant Conversations
+         * @description All conversations involving the system assistant, sorted by most
+         *     recent activity. Each row counts the unread messages sent by the user
+         *     (i.e. anything not from the assistant + still unread) so admins can
+         *     triage.
+         */
+        get: operations["list_assistant_conversations_admin_assistant_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/assistant/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assistant Messages
+         * @description Messages in an assistant conversation, oldest-first.
+         */
+        get: operations["get_assistant_messages_admin_assistant_conversations__conversation_id__messages_get"];
+        put?: never;
+        /**
+         * Send Assistant Message
+         * @description Admin reply — borrows the assistant identity. Push to the user is
+         *     delivered by ``chat_service.send_message`` (the recipient is the real
+         *     user). Auto-reply is *not* triggered: the auto-reply guard returns
+         *     early when ``last_sender_id == SYSTEM_ASSISTANT_USER_ID``.
+         */
+        post: operations["send_assistant_message_admin_assistant_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/assistant/conversations/{conversation_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Assistant Conversation Read
+         * @description Mark every user-sent (non-assistant) message in this conversation as
+         *     read — admin-cms calls this when opening the detail page so the unread
+         *     badge in the conversation list decrements after triage.
+         */
+        post: operations["mark_assistant_conversation_read_admin_assistant_conversations__conversation_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit": {
         parameters: {
             query?: never;
@@ -865,128 +937,6 @@ export interface paths {
         get: operations["gym_merged_api_gyms__place_id__merged_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Areas */
-        get: operations["list_areas_areas_get"];
-        put?: never;
-        /** Create Area */
-        post: operations["create_area_areas_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Favorite Areas */
-        get: operations["list_favorite_areas_areas_favorites_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas/nearby": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Nearby Areas */
-        get: operations["nearby_areas_areas_nearby_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas/{area_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Area */
-        get: operations["get_area_areas__area_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Area */
-        patch: operations["update_area_areas__area_id__patch"];
-        trace?: never;
-    };
-    "/areas/{area_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve Area */
-        post: operations["approve_area_areas__area_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas/{area_id}/favorite": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Favorite Area */
-        post: operations["favorite_area_areas__area_id__favorite_post"];
-        /** Unfavorite Area */
-        delete: operations["unfavorite_area_areas__area_id__favorite_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/areas/{area_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject Area */
-        post: operations["reject_area_areas__area_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2795,6 +2745,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gyms/nearby-db": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nearby Gyms Db
+         * @description Return nearby gyms from our own DB (BN OSM/MP import).
+         *
+         *     Response shape mirrors /gyms/nearby (Google/Amap) so the FE
+         *     lib/poi/index.ts BackendGymItem adapter works without changes:
+         *       { items: [{ id, name, address, lat, lng, distance_m }] }
+         *
+         *     `id` carries the gym UUID so FE's ensureGym(place_id) resolves
+         *     via the UUID branch in /gyms/ensure.
+         */
+        get: operations["nearby_gyms_db_gyms_nearby_db_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gyms/popular": {
         parameters: {
             query?: never;
@@ -2807,6 +2784,26 @@ export interface paths {
          * @description Get gyms ranked by recent activity (30-day window).
          */
         get: operations["get_popular_gyms_gyms_popular_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gyms/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gym Review Queue
+         * @description Admin: list unverified gyms pending review (BN import queue).
+         */
+        get: operations["gym_review_queue_gyms_review_queue_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2910,6 +2907,26 @@ export interface paths {
         get: operations["get_gym_stats_gyms__gym_id__stats_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gyms/{gym_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Gym
+         * @description Admin: mark a gym as verified.
+         */
+        post: operations["verify_gym_gyms__gym_id__verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3083,6 +3100,112 @@ export interface paths {
         /** Set Share */
         post: operations["set_share_logs__log_id__share_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Media */
+        post: operations["create_media_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Media */
+        get: operations["get_media_media__media_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Media */
+        delete: operations["delete_media_media__media_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Comments */
+        get: operations["list_comments_media__media_id__comments_get"];
+        put?: never;
+        /** Add Comment */
+        post: operations["add_comment_media__media_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Comment */
+        delete: operations["delete_comment_media__media_id__comments__comment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Like Media */
+        post: operations["like_media_media__media_id__like_post"];
+        /** Unlike Media */
+        delete: operations["unlike_media_media__media_id__like_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/{media_id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Media */
+        post: operations["save_media_media__media_id__save_post"];
+        /** Unsave Media */
+        delete: operations["unsave_media_media__media_id__save_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3762,21 +3885,21 @@ export interface paths {
         patch: operations["update_shift_orgs__org_id__scheduling_shifts__shift_id__patch"];
         trace?: never;
     };
-    "/outdoor/areas/{area_id}/beta": {
+    "/outdoor/areas/{area_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Beta For Area */
-        get: operations["list_beta_for_area_outdoor_areas__area_id__beta_get"];
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Area */
+        patch: operations["update_area_outdoor_areas__area_id__patch"];
         trace?: never;
     };
     "/outdoor/areas/{area_id}/crags": {
@@ -3823,10 +3946,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Like Beta */
-        post: operations["like_beta_outdoor_beta__beta_id__like_post"];
-        /** Unlike Beta */
-        delete: operations["unlike_beta_outdoor_beta__beta_id__like_delete"];
+        /**
+         * Like Beta Endpoint
+         * @description BI.1: business logic lives in services/route_beta.like_beta.
+         */
+        post: operations["like_beta_endpoint_outdoor_beta__beta_id__like_post"];
+        /** Unlike Beta Endpoint */
+        delete: operations["unlike_beta_endpoint_outdoor_beta__beta_id__like_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3849,18 +3975,18 @@ export interface paths {
         patch: operations["update_crag_outdoor_crags__crag_id__patch"];
         trace?: never;
     };
-    "/outdoor/crags/{crag_id}/sectors": {
+    "/outdoor/crags/{crag_id}/walls": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Sectors */
-        get: operations["list_sectors_outdoor_crags__crag_id__sectors_get"];
+        /** List Walls */
+        get: operations["list_walls_outdoor_crags__crag_id__walls_get"];
         put?: never;
-        /** Create Sector */
-        post: operations["create_sector_outdoor_crags__crag_id__sectors_post"];
+        /** Create Wall */
+        post: operations["create_wall_outdoor_crags__crag_id__walls_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3992,6 +4118,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/regions/{region_id}/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Areas */
+        get: operations["list_areas_outdoor_regions__region_id__areas_get"];
+        put?: never;
+        /** Create Area */
+        post: operations["create_area_outdoor_regions__region_id__areas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/regions/{region_id}/beta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Beta For Region */
+        get: operations["list_beta_for_region_outdoor_regions__region_id__beta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/regions/{region_id}/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Region Pins */
+        get: operations["get_region_pins_outdoor_regions__region_id__pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/routes/submit": {
         parameters: {
             query?: never;
@@ -4004,7 +4182,7 @@ export interface paths {
         /**
          * Submit Route
          * @description User-facing "Add a Route" submission. Creates a pending route
-         *     attached to the area's system placeholder wall. Coords live on the
+         *     attached to the region's system placeholder wall. Coords live on the
          *     route itself (per-submission), not on the wall, so admin review
          *     sees each pending route's real location. Rate-limited to 20 per
          *     user per 24h.
@@ -4114,41 +4292,6 @@ export interface paths {
         get: operations["search_outdoor_outdoor_search_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/sectors/{sector_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Sector */
-        patch: operations["update_sector_outdoor_sectors__sector_id__patch"];
-        trace?: never;
-    };
-    "/outdoor/sectors/{sector_id}/walls": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Walls */
-        get: operations["list_walls_outdoor_sectors__sector_id__walls_get"];
-        put?: never;
-        /** Create Wall */
-        post: operations["create_wall_outdoor_sectors__sector_id__walls_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4949,6 +5092,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Regions */
+        get: operations["list_regions_regions_get"];
+        put?: never;
+        /** Create Region */
+        post: operations["create_region_regions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Favorite Regions */
+        get: operations["list_favorite_regions_regions_favorites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/nearby": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nearby Regions */
+        get: operations["nearby_regions_regions_nearby_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/{region_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Region */
+        get: operations["get_region_regions__region_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Region */
+        patch: operations["update_region_regions__region_id__patch"];
+        trace?: never;
+    };
+    "/regions/{region_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Region */
+        post: operations["approve_region_regions__region_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/{region_id}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Favorite Region */
+        post: operations["favorite_region_regions__region_id__favorite_post"];
+        /** Unfavorite Region */
+        delete: operations["unfavorite_region_regions__region_id__favorite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/{region_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Region */
+        post: operations["reject_region_regions__region_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports": {
         parameters: {
             query?: never;
@@ -5670,6 +5935,89 @@ export interface components {
              */
             user_id: string;
         };
+        /** AdminAssistantConversationRow */
+        AdminAssistantConversationRow: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Last Message At */
+            last_message_at?: string | null;
+            /** Last Message Preview */
+            last_message_preview?: string | null;
+            /**
+             * Unread From User Count
+             * @default 0
+             */
+            unread_from_user_count: number;
+            /** User Avatar Url */
+            user_avatar_url?: string | null;
+            /** User Display Name */
+            user_display_name?: string | null;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** User Username */
+            user_username?: string | null;
+        };
+        /** AdminAssistantConversationsOut */
+        AdminAssistantConversationsOut: {
+            /** Items */
+            items: components["schemas"]["AdminAssistantConversationRow"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminAssistantMessageOut */
+        AdminAssistantMessageOut: {
+            /** Content */
+            content: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Assistant */
+            is_assistant: boolean;
+            /** Read At */
+            read_at?: string | null;
+            /**
+             * Sender Id
+             * Format: uuid
+             */
+            sender_id: string;
+        };
+        /** AdminAssistantMessagesOut */
+        AdminAssistantMessagesOut: {
+            /** Items */
+            items: components["schemas"]["AdminAssistantMessageOut"][];
+            /** User Avatar Url */
+            user_avatar_url?: string | null;
+            /** User Display Name */
+            user_display_name?: string | null;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** AdminAssistantSendIn */
+        AdminAssistantSendIn: {
+            /** Content */
+            content: string;
+        };
         /** AdminContentItemOut */
         AdminContentItemOut: {
             /**
@@ -5956,27 +6304,10 @@ export interface components {
         };
         /** AreaCreateIn */
         AreaCreateIn: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
             /** Approach */
             approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /**
-             * Country
-             * @default CN
-             */
-            country: string;
             /** Description */
             description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
             /** Lat */
             lat?: number | null;
             /** Lng */
@@ -5985,79 +6316,11 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
-            /** Region */
-            region?: string | null;
-            /** Safety Notes */
-            safety_notes?: string | null;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** AreaListOut */
-        AreaListOut: {
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /** Country */
-            country: string;
-            /** Cover Url */
-            cover_url?: string | null;
-            /**
-             * Crag Count
-             * @default 0
-             */
-            crag_count: number;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Region */
-            region?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Status */
-            status: string;
         };
         /** AreaOut */
         AreaOut: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
             /** Approach */
             approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /** Country */
-            country: string;
             /** Cover Url */
             cover_url?: string | null;
             /**
@@ -6065,15 +6328,8 @@ export interface components {
              * @default 0
              */
             crag_count: number;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
             /** Description */
             description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
             /**
              * Id
              * Format: uuid
@@ -6087,52 +6343,27 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
-            /** Photos */
-            photos?: unknown[] | null;
-            /** Region */
-            region?: string | null;
+            /**
+             * Region Id
+             * Format: uuid
+             */
+            region_id: string;
             /**
              * Route Count
              * @default 0
              */
             route_count: number;
-            /** Safety Notes */
-            safety_notes?: string | null;
             /** Status */
             status: string;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
         };
         /** AreaUpdateIn */
         AreaUpdateIn: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
             /** Approach */
             approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Photos */
-            approach_photos?: unknown[] | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /** Country */
-            country?: string | null;
             /** Cover Url */
             cover_url?: string | null;
             /** Description */
             description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
             /** Lat */
             lat?: number | null;
             /** Lng */
@@ -6141,20 +6372,6 @@ export interface components {
             name?: string | null;
             /** Name En */
             name_en?: string | null;
-            /** Photos */
-            photos?: unknown[] | null;
-            /** Region */
-            region?: string | null;
-            /** Safety Notes */
-            safety_notes?: string | null;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
         };
         /** AuditLogOut */
         AuditLogOut: {
@@ -6265,6 +6482,8 @@ export interface components {
         BetaCreateIn: {
             /** Description */
             description?: string | null;
+            /** Media Id */
+            media_id?: string | null;
             /** Media Url */
             media_url: string;
             /** Thumbnail Url */
@@ -6289,6 +6508,8 @@ export interface components {
             liked_by_me: boolean;
             /** Likes Count */
             likes_count: number;
+            /** Media Id */
+            media_id?: string | null;
             /** Media Url */
             media_url: string;
             route: components["schemas"]["BetaRouteRef"];
@@ -6471,6 +6692,8 @@ export interface components {
              * Format: binary
              */
             file: string;
+            /** Source Raw File */
+            source_raw_file?: string | null;
         };
         /** CSMFullOut */
         CSMFullOut: {
@@ -7246,48 +7469,19 @@ export interface components {
             /** Ts */
             ts: string;
         };
-        /** CommentCreateIn */
-        CommentCreateIn: {
-            /** Content Text */
-            content_text: string;
-            /** Parent Id */
-            parent_id?: string | null;
-        };
-        /** CommentOut */
-        CommentOut: {
-            /** Author Avatar */
-            author_avatar?: string | null;
-            /** Author Name */
-            author_name?: string | null;
-            /** Content Text */
-            content_text: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
+        /** CommentAuthor */
+        CommentAuthor: {
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Display Name */
+            display_name?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
-            /** Parent Id */
-            parent_id?: string | null;
-            /**
-             * Post Id
-             * Format: uuid
-             */
-            post_id: string;
-            /**
-             * Reply Count
-             * @default 0
-             */
-            reply_count: number;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
+            /** Username */
+            username?: string | null;
         };
         /** ContentSearchItem */
         ContentSearchItem: {
@@ -7328,6 +7522,13 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
+            /** Orientation */
+            orientation?: string | null;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
         };
         /** CragOut */
         CragOut: {
@@ -7355,25 +7556,31 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
+            /** Orientation */
+            orientation?: string | null;
             /**
              * Route Count
              * @default 0
              */
             route_count: number;
-            /**
-             * Sector Count
-             * @default 0
-             */
-            sector_count: number;
+            /** Sort Order */
+            sort_order: number;
             /** Status */
             status: string;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Wall Count
+             * @default 0
+             */
+            wall_count: number;
         };
         /** CragUpdateIn */
         CragUpdateIn: {
             /** Approach */
             approach?: string | null;
-            /** Cover Url */
-            cover_url?: string | null;
             /** Description */
             description?: string | null;
             /** Lat */
@@ -7384,6 +7591,10 @@ export interface components {
             name?: string | null;
             /** Name En */
             name_en?: string | null;
+            /** Orientation */
+            orientation?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
         };
         /** DailySummaryOut */
         DailySummaryOut: {
@@ -8513,6 +8724,20 @@ export interface components {
             /** Ids */
             ids: string[];
         };
+        /** MediaCreateIn */
+        MediaCreateIn: {
+            /** Duration Seconds */
+            duration_seconds?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "video" | "image";
+            /** Thumb Url */
+            thumb_url?: string | null;
+            /** Url */
+            url: string;
+        };
         /** MediaItem */
         MediaItem: {
             /** Thumburl */
@@ -8524,6 +8749,65 @@ export interface components {
             type: "image" | "video";
             /** Url */
             url: string;
+        };
+        /** MediaOut */
+        MediaOut: {
+            /**
+             * Comments Count
+             * @default 0
+             */
+            comments_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Duration Seconds */
+            duration_seconds: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Liked By Me
+             * @default false
+             */
+            liked_by_me: boolean;
+            /**
+             * Likes Count
+             * @default 0
+             */
+            likes_count: number;
+            /** Owner Avatar Url */
+            owner_avatar_url?: string | null;
+            /** Owner Display Name */
+            owner_display_name?: string | null;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Owner Username */
+            owner_username?: string | null;
+            /**
+             * Saved By Me
+             * @default false
+             */
+            saved_by_me: boolean;
+            /**
+             * Saves Count
+             * @default 0
+             */
+            saves_count: number;
+            /** Status */
+            status: string;
+            /** Thumb Url */
+            thumb_url: string | null;
+            /** Url */
+            url: string | null;
         };
         /** MemberOut */
         MemberOut: {
@@ -8865,6 +9149,8 @@ export interface components {
              * Format: date-time
              */
             added_at: string;
+            /** Crag Name */
+            crag_name?: string | null;
             /**
              * Id
              * Format: uuid
@@ -8883,8 +9169,6 @@ export interface components {
              * Format: uuid
              */
             route_id: string;
-            /** Sector Name */
-            sector_name?: string | null;
             /** Wall Lat */
             wall_lat?: number | null;
             /** Wall Lng */
@@ -8935,17 +9219,6 @@ export interface components {
             /** Name */
             name?: string | null;
         };
-        /** PaginatedAreas */
-        PaginatedAreas: {
-            /** Items */
-            items: components["schemas"]["AreaListOut"][];
-            /** Limit */
-            limit: number;
-            /** Page */
-            page: number;
-            /** Total */
-            total: number;
-        };
         /** PaginatedAuditLogs */
         PaginatedAuditLogs: {
             /** Has More */
@@ -8978,6 +9251,17 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** PaginatedRegions */
+        PaginatedRegions: {
+            /** Items */
+            items: components["schemas"]["RegionListOut"][];
+            /** Limit */
+            limit: number;
+            /** Page */
+            page: number;
+            /** Total */
+            total: number;
         };
         /** PaginatedUsers */
         PaginatedUsers: {
@@ -9277,6 +9561,11 @@ export interface components {
              */
             body_info_public: boolean;
             /**
+             * Content Public
+             * @default true
+             */
+            content_public: boolean;
+            /**
              * Lists Public
              * @default true
              */
@@ -9305,6 +9594,8 @@ export interface components {
             badges_public?: boolean | null;
             /** Body Info Public */
             body_info_public?: boolean | null;
+            /** Content Public */
+            content_public?: boolean | null;
             /** Lists Public */
             lists_public?: boolean | null;
             /** Logs Public */
@@ -9648,6 +9939,208 @@ export interface components {
              */
             token_type: string;
         };
+        /** RegionCreateIn */
+        RegionCreateIn: {
+            /** Accommodation */
+            accommodation?: unknown[] | null;
+            /** Amenities */
+            amenities?: unknown[] | null;
+            /** Approach */
+            approach?: string | null;
+            /** Approach Difficulty */
+            approach_difficulty?: string | null;
+            /** Approach Time Min */
+            approach_time_min?: number | null;
+            /** Best Seasons */
+            best_seasons?: unknown[] | null;
+            /**
+             * Country
+             * @default CN
+             */
+            country: string;
+            /** Description */
+            description?: string | null;
+            /** Emergency Info */
+            emergency_info?: string | null;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Safety Notes */
+            safety_notes?: string | null;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Transport */
+            transport?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** RegionListOut */
+        RegionListOut: {
+            /**
+             * Area Count
+             * @default 0
+             */
+            area_count: number;
+            /**
+             * Boulder Count
+             * @default 0
+             */
+            boulder_count: number;
+            /** Country */
+            country: string;
+            /** Cover Url */
+            cover_url?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Region */
+            region?: string | null;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
+            /** Status */
+            status: string;
+        };
+        /** RegionOut */
+        RegionOut: {
+            /** Accommodation */
+            accommodation?: unknown[] | null;
+            /** Amenities */
+            amenities?: unknown[] | null;
+            /** Approach */
+            approach?: string | null;
+            /** Approach Difficulty */
+            approach_difficulty?: string | null;
+            /** Approach Time Min */
+            approach_time_min?: number | null;
+            /**
+             * Area Count
+             * @default 0
+             */
+            area_count: number;
+            /** Best Seasons */
+            best_seasons?: unknown[] | null;
+            /**
+             * Boulder Count
+             * @default 0
+             */
+            boulder_count: number;
+            /** Country */
+            country: string;
+            /** Cover Url */
+            cover_url?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description?: string | null;
+            /** Emergency Info */
+            emergency_info?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Photos */
+            photos?: unknown[] | null;
+            /** Region */
+            region?: string | null;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
+            /** Safety Notes */
+            safety_notes?: string | null;
+            /** Status */
+            status: string;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Transport */
+            transport?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** RegionUpdateIn */
+        RegionUpdateIn: {
+            /** Accommodation */
+            accommodation?: unknown[] | null;
+            /** Amenities */
+            amenities?: unknown[] | null;
+            /** Approach */
+            approach?: string | null;
+            /** Approach Difficulty */
+            approach_difficulty?: string | null;
+            /** Approach Photos */
+            approach_photos?: unknown[] | null;
+            /** Approach Time Min */
+            approach_time_min?: number | null;
+            /** Best Seasons */
+            best_seasons?: unknown[] | null;
+            /** Country */
+            country?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Emergency Info */
+            emergency_info?: string | null;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Name En */
+            name_en?: string | null;
+            /** Photos */
+            photos?: unknown[] | null;
+            /** Region */
+            region?: string | null;
+            /** Safety Notes */
+            safety_notes?: string | null;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Transport */
+            transport?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** RegisterIn */
         RegisterIn: {
             /** Email */
@@ -9687,7 +10180,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "user" | "post";
+            target_type: "user" | "post" | "media";
         };
         /** ResetPasswordIn */
         ResetPasswordIn: {
@@ -9888,8 +10381,8 @@ export interface components {
              * @default 0
              */
             rating_count: number;
-            /** Sector Name */
-            sector_name?: string | null;
+            /** Region Name */
+            region_name?: string | null;
             /**
              * Send Count
              * @default 0
@@ -9959,88 +10452,6 @@ export interface components {
             name_en?: string | null;
             /** Type */
             type: string;
-        };
-        /** SectorCreateIn */
-        SectorCreateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /**
-             * Sort Order
-             * @default 0
-             */
-            sort_order: number;
-        };
-        /** SectorOut */
-        SectorOut: {
-            /** Approach */
-            approach?: string | null;
-            /**
-             * Crag Id
-             * Format: uuid
-             */
-            crag_id: string;
-            /** Description */
-            description?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Sort Order */
-            sort_order: number;
-            /** Status */
-            status: string;
-            /**
-             * Wall Count
-             * @default 0
-             */
-            wall_count: number;
-        };
-        /** SectorUpdateIn */
-        SectorUpdateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name?: string | null;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Sort Order */
-            sort_order?: number | null;
         };
         /** SessionBank */
         SessionBank: {
@@ -10414,13 +10825,11 @@ export interface components {
          *     name + grade + coords + at least one photo. Everything else (FA,
          *     description, length, pitches, bolts) is deferred and can be added by
          *     the admin during review, or in a later UI polish pass.
+         *
+         *     Field rename `area_id` → `region_id` in BR Track A (semantic submission
+         *     entry stays at top level; PLAN §3.5 Crag-level shift is Track D scope).
          */
         SubmitRouteIn: {
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
             /**
              * Grade System
              * @enum {string}
@@ -10436,6 +10845,11 @@ export interface components {
             name: string;
             /** Photo Urls */
             photo_urls: string[];
+            /**
+             * Region Id
+             * Format: uuid
+             */
+            region_id: string;
             /**
              * Style
              * @enum {string}
@@ -11043,6 +11457,11 @@ export interface components {
         WallOut: {
             /** Approach */
             approach?: string | null;
+            /**
+             * Crag Id
+             * Format: uuid
+             */
+            crag_id: string;
             /** Description */
             description?: string | null;
             /**
@@ -11065,11 +11484,6 @@ export interface components {
              * @default 0
              */
             route_count: number;
-            /**
-             * Sector Id
-             * Format: uuid
-             */
-            sector_id: string;
             /** Sort Order */
             sort_order: number;
             /** Status */
@@ -11224,6 +11638,74 @@ export interface components {
             start_date?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** CommentCreateIn */
+        schemas__comment__CommentCreateIn: {
+            /** Content Text */
+            content_text: string;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
+        /** CommentOut */
+        schemas__comment__CommentOut: {
+            /** Author Avatar */
+            author_avatar?: string | null;
+            /** Author Name */
+            author_name?: string | null;
+            /** Content Text */
+            content_text: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /**
+             * Post Id
+             * Format: uuid
+             */
+            post_id: string;
+            /**
+             * Reply Count
+             * @default 0
+             */
+            reply_count: number;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** CommentCreateIn */
+        schemas__media__CommentCreateIn: {
+            /** Content Text */
+            content_text: string;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
+        /** CommentOut */
+        schemas__media__CommentOut: {
+            author: components["schemas"]["CommentAuthor"];
+            /** Content Text */
+            content_text: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
         };
         /** PlanCreateIn */
         schemas__plan__PlanCreateIn: {
@@ -11472,6 +11954,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assistant_conversations_admin_assistant_conversations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAssistantConversationsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_assistant_messages_admin_assistant_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAssistantMessagesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_assistant_message_admin_assistant_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminAssistantSendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAssistantMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_assistant_conversation_read_admin_assistant_conversations__conversation_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -13080,318 +13696,6 @@ export interface operations {
             header?: never;
             path: {
                 place_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_areas_areas_get: {
-        parameters: {
-            query?: {
-                country?: string | null;
-                region?: string | null;
-                status?: string;
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedAreas"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_area_areas_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AreaCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_favorite_areas_areas_favorites_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaListOut"][];
-                };
-            };
-        };
-    };
-    nearby_areas_areas_nearby_get: {
-        parameters: {
-            query: {
-                lat: number;
-                lng: number;
-                radius_km?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaListOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_area_areas__area_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_area_areas__area_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AreaUpdateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_area_areas__area_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    favorite_area_areas__area_id__favorite_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unfavorite_area_areas__area_id__favorite_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_area_areas__area_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
             };
             cookie?: never;
         };
@@ -17104,6 +17408,40 @@ export interface operations {
             };
         };
     };
+    nearby_gyms_db_gyms_nearby_db_get: {
+        parameters: {
+            query: {
+                lat: number;
+                lng: number;
+                radius_km?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_popular_gyms_gyms_popular_get: {
         parameters: {
             query?: {
@@ -17122,6 +17460,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PopularGymOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gym_review_queue_gyms_review_queue_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                source?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -17319,6 +17690,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GymStatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_gym_gyms__gym_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gym_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -17691,6 +18093,314 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ShareOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_media_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_media_media__media_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_media_media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_comments_media__media_id__comments_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["schemas__media__CommentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_comment_media__media_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["schemas__media__CommentCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["schemas__media__CommentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_comment_media__media_id__comments__comment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    like_media_media__media_id__like_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlike_media_media__media_id__like_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_media_media__media_id__save_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsave_media_media__media_id__save_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -19321,19 +20031,20 @@ export interface operations {
             };
         };
     };
-    list_beta_for_area_outdoor_areas__area_id__beta_get: {
+    update_area_outdoor_areas__area_id__patch: {
         parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 area_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaUpdateIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -19341,7 +20052,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BetaOut"][];
+                    "application/json": components["schemas"]["AreaOut"];
                 };
             };
             /** @description Validation Error */
@@ -19450,7 +20161,7 @@ export interface operations {
             };
         };
     };
-    like_beta_outdoor_beta__beta_id__like_post: {
+    like_beta_endpoint_outdoor_beta__beta_id__like_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -19479,7 +20190,7 @@ export interface operations {
             };
         };
     };
-    unlike_beta_outdoor_beta__beta_id__like_delete: {
+    unlike_beta_endpoint_outdoor_beta__beta_id__like_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -19543,7 +20254,7 @@ export interface operations {
             };
         };
     };
-    list_sectors_outdoor_crags__crag_id__sectors_get: {
+    list_walls_outdoor_crags__crag_id__walls_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -19560,7 +20271,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectorOut"][];
+                    "application/json": components["schemas"]["WallOut"][];
                 };
             };
             /** @description Validation Error */
@@ -19574,7 +20285,7 @@ export interface operations {
             };
         };
     };
-    create_sector_outdoor_crags__crag_id__sectors_post: {
+    create_wall_outdoor_crags__crag_id__walls_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -19585,7 +20296,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SectorCreateIn"];
+                "application/json": components["schemas"]["WallCreateIn"];
             };
         };
         responses: {
@@ -19595,7 +20306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectorOut"];
+                    "application/json": components["schemas"]["WallOut"];
                 };
             };
             /** @description Validation Error */
@@ -19884,6 +20595,137 @@ export interface operations {
             };
         };
     };
+    list_areas_outdoor_regions__region_id__areas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_area_outdoor_regions__region_id__areas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_beta_for_region_outdoor_regions__region_id__beta_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BetaOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_region_pins_outdoor_regions__region_id__pins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     submit_route_outdoor_routes_submit_post: {
         parameters: {
             query?: never;
@@ -20155,7 +20997,7 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
-                area_id?: string | null;
+                region_id?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -20171,107 +21013,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResult"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_sector_outdoor_sectors__sector_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                sector_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SectorUpdateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SectorOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_walls_outdoor_sectors__sector_id__walls_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                sector_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WallOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_wall_outdoor_sectors__sector_id__walls_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                sector_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WallCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WallOut"];
                 };
             };
             /** @description Validation Error */
@@ -21258,7 +21999,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CommentCreateIn"];
+                "application/json": components["schemas"]["schemas__comment__CommentCreateIn"];
             };
         };
         responses: {
@@ -22038,6 +22779,318 @@ export interface operations {
             };
         };
     };
+    list_regions_regions_get: {
+        parameters: {
+            query?: {
+                country?: string | null;
+                region?: string | null;
+                status?: string;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedRegions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_region_regions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_favorite_regions_regions_favorites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionListOut"][];
+                };
+            };
+        };
+    };
+    nearby_regions_regions_nearby_get: {
+        parameters: {
+            query: {
+                lat: number;
+                lng: number;
+                radius_km?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionListOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_region_regions__region_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_region_regions__region_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_region_regions__region_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    favorite_region_regions__region_id__favorite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unfavorite_region_regions__region_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_region_regions__region_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_report_reports_post: {
         parameters: {
             query?: never;
@@ -22607,7 +23660,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommentOut"][];
+                    "application/json": components["schemas"]["schemas__comment__CommentOut"][];
                 };
             };
             /** @description Validation Error */

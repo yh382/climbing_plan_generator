@@ -34,7 +34,7 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded }
   const gc = gradeColor(route.grade_score);
   const thumb = route.photos?.[0]?.thumb_url ?? route.photos?.[0]?.url;
   const breadcrumb = !hideLocation
-    ? [route.sector_name, route.wall_name].filter(Boolean).join(' · ')
+    ? [route.crag_name, route.wall_name].filter(Boolean).join(' · ')
     : '';
 
   return (

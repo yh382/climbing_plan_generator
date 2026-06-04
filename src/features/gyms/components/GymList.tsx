@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import type { GymPlace } from "../../../../lib/poi/types";
-import type { Area } from "../../outdoor/types";
+// BR Track A: top-level outdoor entity is now Region. Alias kept.
+import type { Region as Area } from "../../outdoor/types";
 import { PAGE_SIZE } from "../constants";
 import { GymListItem } from "./GymListItem";
 import { AreaListItem } from "../../outdoor/components/AreaListItem";

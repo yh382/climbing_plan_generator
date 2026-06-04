@@ -4,7 +4,9 @@
 import React from "react";
 import { Text, Pressable, View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Area } from "../types";
+// BR Track A: this card renders the top-level Region (was Area). Type
+// alias kept for caller minimum-diff — Track D will rename.
+import type { Region as Area } from "../types";
 
 interface AreaListItemProps {
   area: Area;

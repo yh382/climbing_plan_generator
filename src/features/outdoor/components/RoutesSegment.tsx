@@ -83,7 +83,7 @@ export default function RoutesSegment({ areaId }: Props) {
   const sections: SectionData[] = useMemo(() => {
     const buckets = new Map<string, OutdoorRoute[]>();
     for (const r of filtered) {
-      const key = `${r.sector_name ?? tr("未分组", "Unsorted")} · ${r.wall_name ?? ""}`.trim();
+      const key = `${r.crag_name ?? tr("未分组", "Unsorted")} · ${r.wall_name ?? ""}`.trim();
       const arr = buckets.get(key) ?? [];
       arr.push(r);
       buckets.set(key, arr);

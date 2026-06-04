@@ -28,7 +28,8 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import { outdoorApi } from '../../outdoor/api';
-import type { Area } from '../../outdoor/types';
+// BR Track A: top-level outdoor entity is now Region. Alias kept.
+import type { Region as Area } from '../../outdoor/types';
 import {
   deletePack,
   formatBytes,
@@ -71,7 +72,7 @@ const OfflineMapsSheet = forwardRef<
     try {
       const [fetchedPacks, areas] = await Promise.all([
         listPacks(),
-        outdoorApi.listAreas(),
+        outdoorApi.listRegions(),
       ]);
       setPacks(fetchedPacks);
       setAreaMap(new Map(areas.map((a) => [a.id, a])));

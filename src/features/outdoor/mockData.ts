@@ -6,8 +6,10 @@
 // match `climbing_plan_backend/scripts/seed_outdoor_mock.py`. Run that script
 // against the dev DB once to make backend writes (POST /climb-logs,
 // /ascents, /ratings) work against this mock catalog.
+//
+// BR Track A rename: 5-level hierarchy is now Region → Area → Crag → Wall → Route.
 
-import type { Area, Crag, Sector, Wall, OutdoorRoute } from './types';
+import type { Region, Area, Crag, Wall, OutdoorRoute } from './types';
 
 // Slug → UUID5 lookup (mirrors backend `_u(slug)` helper)
 const ID = {
@@ -36,9 +38,9 @@ const ID = {
   r8: '972c13cb-d439-5122-945a-372f830f753d',
 } as const;
 
-// ---- Areas ----
+// ---- Regions (was 'Areas' pre Track A) ----
 
-export const MOCK_AREAS: Area[] = [
+export const MOCK_REGIONS: Region[] = [
   {
     id: ID.wasatch,
     name: 'Wasatch Range',
@@ -51,7 +53,7 @@ export const MOCK_AREAS: Area[] = [
     best_seasons: ['Apr', 'May', 'Jun', 'Sep', 'Oct'],
     status: 'approved',
     route_count: 200,
-    crag_count: 3,
+    area_count: 3,
   },
   {
     id: ID.yangshuo,
@@ -80,48 +82,48 @@ export const MOCK_AREAS: Area[] = [
     emergency_info: '最近医院：阳朔人民医院，约 15km',
     status: 'approved',
     route_count: 1000,
-    crag_count: 13,
+    area_count: 13,
   },
 ];
 
-// ---- Crags (keyed by area_id) ----
+// ---- Areas (was 'Crags' pre Track A — keyed by region_id) ----
 
-export const MOCK_CRAGS: Record<string, Crag[]> = {
+export const MOCK_AREAS: Record<string, Area[]> = {
   [ID.wasatch]: [
-    { id: ID.lcc, area_id: ID.wasatch, name: 'Little Cottonwood Canyon', lat: 40.57, lng: -111.77, status: 'approved', route_count: 85, sector_count: 3 },
-    { id: ID.bcc, area_id: ID.wasatch, name: 'Big Cottonwood Canyon', lat: 40.62, lng: -111.72, status: 'approved', route_count: 60, sector_count: 2 },
-    { id: ID.afc, area_id: ID.wasatch, name: 'American Fork Canyon', lat: 40.41, lng: -111.75, status: 'approved', route_count: 55, sector_count: 2 },
+    { id: ID.lcc, region_id: ID.wasatch, name: 'Little Cottonwood Canyon', lat: 40.57, lng: -111.77, status: 'approved', route_count: 85, crag_count: 3 },
+    { id: ID.bcc, region_id: ID.wasatch, name: 'Big Cottonwood Canyon', lat: 40.62, lng: -111.72, status: 'approved', route_count: 60, crag_count: 2 },
+    { id: ID.afc, region_id: ID.wasatch, name: 'American Fork Canyon', lat: 40.41, lng: -111.75, status: 'approved', route_count: 55, crag_count: 2 },
   ],
   [ID.yangshuo]: [
-    { id: ID.baishan, area_id: ID.yangshuo, name: '白山地区', name_en: 'Baishan Area', lat: 24.72, lng: 110.49, status: 'approved', route_count: 65, sector_count: 6 },
+    { id: ID.baishan, region_id: ID.yangshuo, name: '白山地区', name_en: 'Baishan Area', lat: 24.72, lng: 110.49, status: 'approved', route_count: 65, crag_count: 6 },
   ],
 };
 
-// ---- Sectors (keyed by crag_id) ----
+// ---- Crags (was 'Sectors' pre Track A — keyed by area_id) ----
 
-export const MOCK_SECTORS: Record<string, Sector[]> = {
+export const MOCK_CRAGS: Record<string, Crag[]> = {
   [ID.lcc]: [
-    { id: ID.fin, crag_id: ID.lcc, name: 'The Fin', lat: 40.575, lng: -111.772, sort_order: 1, status: 'approved', route_count: 25, wall_count: 2 },
-    { id: ID.gate, crag_id: ID.lcc, name: 'Gate Buttress', lat: 40.58, lng: -111.76, sort_order: 2, status: 'approved', route_count: 30, wall_count: 2 },
+    { id: ID.fin, area_id: ID.lcc, name: 'The Fin', lat: 40.575, lng: -111.772, sort_order: 1, status: 'approved', route_count: 25, wall_count: 2 },
+    { id: ID.gate, area_id: ID.lcc, name: 'Gate Buttress', lat: 40.58, lng: -111.76, sort_order: 2, status: 'approved', route_count: 30, wall_count: 2 },
   ],
   [ID.baishan]: [
-    { id: ID.jidanshan, crag_id: ID.baishan, name: '鸡蛋山', name_en: 'Egg Mountain', lat: 24.72, lng: 110.49, sort_order: 1, status: 'approved', route_count: 47, wall_count: 4 },
+    { id: ID.jidanshan, area_id: ID.baishan, name: '鸡蛋山', name_en: 'Egg Mountain', lat: 24.72, lng: 110.49, sort_order: 1, status: 'approved', route_count: 47, wall_count: 4 },
   ],
 };
 
-// ---- Walls (keyed by sector_id) ----
+// ---- Walls (keyed by crag_id) ----
 
 export const MOCK_WALLS: Record<string, Wall[]> = {
   [ID.fin]: [
-    { id: ID.finNorth, sector_id: ID.fin, name: 'North Face', lat: 40.576, lng: -111.773, orientation: 'N', sort_order: 1, status: 'approved', route_count: 15 },
-    { id: ID.finSouth, sector_id: ID.fin, name: 'South Face', lat: 40.574, lng: -111.771, orientation: 'S', sort_order: 2, status: 'approved', route_count: 10 },
+    { id: ID.finNorth, crag_id: ID.fin, name: 'North Face', lat: 40.576, lng: -111.773, orientation: 'N', sort_order: 1, status: 'approved', route_count: 15 },
+    { id: ID.finSouth, crag_id: ID.fin, name: 'South Face', lat: 40.574, lng: -111.771, orientation: 'S', sort_order: 2, status: 'approved', route_count: 10 },
   ],
   [ID.gate]: [
-    { id: ID.gateMain, sector_id: ID.gate, name: 'Main Wall', lat: 40.581, lng: -111.761, orientation: 'W', sort_order: 1, status: 'approved', route_count: 18 },
+    { id: ID.gateMain, crag_id: ID.gate, name: 'Main Wall', lat: 40.581, lng: -111.761, orientation: 'W', sort_order: 1, status: 'approved', route_count: 18 },
   ],
   [ID.jidanshan]: [
-    { id: ID.menghuan, sector_id: ID.jidanshan, name: '梦幻墙', name_en: 'Fantasy Wall', lat: 24.721, lng: 110.491, orientation: 'S', sort_order: 1, status: 'approved', route_count: 12 },
-    { id: ID.riluo, sector_id: ID.jidanshan, name: '日落墙', name_en: 'Sunset Wall', lat: 24.722, lng: 110.492, orientation: 'W', sort_order: 2, status: 'approved', route_count: 8 },
+    { id: ID.menghuan, crag_id: ID.jidanshan, name: '梦幻墙', name_en: 'Fantasy Wall', lat: 24.721, lng: 110.491, orientation: 'S', sort_order: 1, status: 'approved', route_count: 12 },
+    { id: ID.riluo, crag_id: ID.jidanshan, name: '日落墙', name_en: 'Sunset Wall', lat: 24.722, lng: 110.492, orientation: 'W', sort_order: 2, status: 'approved', route_count: 8 },
   ],
 };
 
@@ -129,22 +131,22 @@ export const MOCK_WALLS: Record<string, Wall[]> = {
 
 export const MOCK_ROUTES: Record<string, OutdoorRoute[]> = {
   [ID.finNorth]: [
-    { id: ID.r1, wall_id: ID.finNorth, name: 'Lightning Bolt', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 25, pitches: 1, bolts: 8, style: 'sport', stars: 4.0, rating_count: 12, send_count: 45, attempt_count: 89, sector_name: 'The Fin', wall_name: 'North Face' },
-    { id: ID.r2, wall_id: ID.finNorth, name: 'Schoolroom', grade_text: '5.7', grade_system: 'yds', grade_score: 70, length_m: 20, pitches: 1, style: 'trad', stars: 3.5, rating_count: 8, send_count: 120, attempt_count: 150, sector_name: 'The Fin', wall_name: 'North Face' },
-    { id: ID.r3, wall_id: ID.finNorth, name: 'Green Adjective', grade_text: '5.9', grade_system: 'yds', grade_score: 90, length_m: 30, pitches: 1, bolts: 6, style: 'sport', stars: 4.5, rating_count: 20, send_count: 80, attempt_count: 130, sector_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r1, wall_id: ID.finNorth, name: 'Lightning Bolt', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 25, pitches: 1, bolts: 8, style: 'sport', stars: 4.0, rating_count: 12, send_count: 45, attempt_count: 89, crag_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r2, wall_id: ID.finNorth, name: 'Schoolroom', grade_text: '5.7', grade_system: 'yds', grade_score: 70, length_m: 20, pitches: 1, style: 'trad', stars: 3.5, rating_count: 8, send_count: 120, attempt_count: 150, crag_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r3, wall_id: ID.finNorth, name: 'Green Adjective', grade_text: '5.9', grade_system: 'yds', grade_score: 90, length_m: 30, pitches: 1, bolts: 6, style: 'sport', stars: 4.5, rating_count: 20, send_count: 80, attempt_count: 130, crag_name: 'The Fin', wall_name: 'North Face' },
   ],
   [ID.finSouth]: [
-    { id: ID.r4, wall_id: ID.finSouth, name: 'Bong Eater', grade_text: '5.8', grade_system: 'yds', grade_score: 80, length_m: 22, pitches: 1, style: 'trad', stars: 3.0, rating_count: 5, send_count: 30, attempt_count: 45, sector_name: 'The Fin', wall_name: 'South Face' },
-    { id: ID.r5, wall_id: ID.finSouth, name: 'The Coffin', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 28, pitches: 1, bolts: 9, style: 'sport', stars: 4.2, rating_count: 15, send_count: 25, attempt_count: 70, sector_name: 'The Fin', wall_name: 'South Face' },
+    { id: ID.r4, wall_id: ID.finSouth, name: 'Bong Eater', grade_text: '5.8', grade_system: 'yds', grade_score: 80, length_m: 22, pitches: 1, style: 'trad', stars: 3.0, rating_count: 5, send_count: 30, attempt_count: 45, crag_name: 'The Fin', wall_name: 'South Face' },
+    { id: ID.r5, wall_id: ID.finSouth, name: 'The Coffin', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 28, pitches: 1, bolts: 9, style: 'sport', stars: 4.2, rating_count: 15, send_count: 25, attempt_count: 70, crag_name: 'The Fin', wall_name: 'South Face' },
   ],
   [ID.gateMain]: [
-    { id: ID.r10, wall_id: ID.gateMain, name: "Goodro's Wall", grade_text: '5.10b', grade_system: 'yds', grade_score: 102, length_m: 24, pitches: 1, bolts: 7, style: 'sport', stars: 3.8, rating_count: 10, send_count: 40, attempt_count: 65, sector_name: 'Gate Buttress', wall_name: 'Main Wall' },
+    { id: ID.r10, wall_id: ID.gateMain, name: "Goodro's Wall", grade_text: '5.10b', grade_system: 'yds', grade_score: 102, length_m: 24, pitches: 1, bolts: 7, style: 'sport', stars: 3.8, rating_count: 10, send_count: 40, attempt_count: 65, crag_name: 'Gate Buttress', wall_name: 'Main Wall' },
   ],
   [ID.menghuan]: [
-    { id: ID.r6, wall_id: ID.menghuan, name: '鸭子', name_en: 'Duck', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 20, pitches: 1, bolts: 7, style: 'sport', stars: 3.5, rating_count: 8, send_count: 15, attempt_count: 40, sector_name: '鸡蛋山', wall_name: '梦幻墙', description: '技巧型路线，核心在第三把到第五把' },
-    { id: ID.r7, wall_id: ID.menghuan, name: '飞鸟', name_en: 'Flying Bird', grade_text: '5.10c', grade_system: 'yds', grade_score: 103, length_m: 18, pitches: 1, bolts: 6, style: 'sport', stars: 3.0, rating_count: 5, send_count: 22, attempt_count: 35, sector_name: '鸡蛋山', wall_name: '梦幻墙' },
+    { id: ID.r6, wall_id: ID.menghuan, name: '鸭子', name_en: 'Duck', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 20, pitches: 1, bolts: 7, style: 'sport', stars: 3.5, rating_count: 8, send_count: 15, attempt_count: 40, crag_name: '鸡蛋山', wall_name: '梦幻墙', description: '技巧型路线，核心在第三把到第五把' },
+    { id: ID.r7, wall_id: ID.menghuan, name: '飞鸟', name_en: 'Flying Bird', grade_text: '5.10c', grade_system: 'yds', grade_score: 103, length_m: 18, pitches: 1, bolts: 6, style: 'sport', stars: 3.0, rating_count: 5, send_count: 22, attempt_count: 35, crag_name: '鸡蛋山', wall_name: '梦幻墙' },
   ],
   [ID.riluo]: [
-    { id: ID.r8, wall_id: ID.riluo, name: '夕阳红', name_en: 'Sunset Red', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 15, pitches: 1, bolts: 5, style: 'sport', stars: 3.0, rating_count: 3, send_count: 10, attempt_count: 15, sector_name: '鸡蛋山', wall_name: '日落墙' },
+    { id: ID.r8, wall_id: ID.riluo, name: '夕阳红', name_en: 'Sunset Red', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 15, pitches: 1, bolts: 5, style: 'sport', stars: 3.0, rating_count: 3, send_count: 10, attempt_count: 15, crag_name: '鸡蛋山', wall_name: '日落墙' },
   ],
 };

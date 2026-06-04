@@ -8,7 +8,9 @@ import { router } from 'expo-router';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
-import type { Area } from '../types';
+// BR Track A: this card renders the top-level Region (was Area). Type
+// alias kept for caller minimum-diff — Track D will rename.
+import type { Region as Area } from '../types';
 import { mapHref } from '../../mapscreen/navigation';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
 
@@ -64,8 +66,8 @@ export function AreaDetailCard({ area, onClose, onViewRoutes }: AreaDetailCardPr
         </View>
         <View style={styles.stat}>
           <Ionicons name="layers-outline" size={18} color={colors.accent} />
-          <Text style={styles.statValue}>{area.crag_count ?? 0}</Text>
-          <Text style={styles.statLabel}>{tr('攀岩小区', 'Crags')}</Text>
+          <Text style={styles.statValue}>{area.area_count ?? 0}</Text>
+          <Text style={styles.statLabel}>{tr('攀岩区', 'Areas')}</Text>
         </View>
         {area.best_seasons && area.best_seasons.length > 0 && (
           <View style={styles.stat}>

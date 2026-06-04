@@ -1,14 +1,15 @@
 // src/features/outdoor/api.ts
-// API layer for outdoor module — 5-level hierarchy
+// API layer for outdoor module — 5-level hierarchy (post BR Track A rename):
+//   Region → Area → Crag → Wall → Route
 // Mock mode uses external mockData.ts; toggle USE_MOCK to false when backend is ready
 
 import { api } from '../../lib/apiClient';
 import type {
-  Area, Crag, Sector, Wall, OutdoorRoute,
+  Region, Area, Crag, Wall, OutdoorRoute,
   RouteRating, RouteAscent, MapPin,
 } from './types';
 import {
-  MOCK_AREAS, MOCK_CRAGS, MOCK_SECTORS, MOCK_WALLS, MOCK_ROUTES,
+  MOCK_REGIONS, MOCK_AREAS, MOCK_CRAGS, MOCK_WALLS, MOCK_ROUTES,
 } from './mockData';
 
 // BK: flipped off — real OpenBeta data now lives in prod DB. Keeping the
@@ -25,60 +26,60 @@ function allMockRoutes(): OutdoorRoute[] {
 // ---- API ----
 
 export const outdoorApi = {
-  // ---- Areas ----
-  listAreas: async (_params?: { country?: string; status?: string }): Promise<Area[]> => {
-    if (USE_MOCK) return MOCK_AREAS;
+  // ---- Regions (top level) ----
+  listRegions: async (_params?: { country?: string; status?: string }): Promise<Region[]> => {
+    if (USE_MOCK) return MOCK_REGIONS;
     const qs = new URLSearchParams();
     if (_params?.country) qs.set('country', _params.country);
     if (_params?.status) qs.set('status', _params.status);
-    // BE returns PaginatedAreas { items, total, page, limit } — unwrap
-    // here so the public contract stays Area[]. Pagination not yet
-    // surfaced. BL post-ship we have 700+ areas so 2000 cap matches the
+    // BE returns PaginatedRegions { items, total, page, limit } — unwrap
+    // here so the public contract stays Region[]. Pagination not yet
+    // surfaced. BL post-ship we have 700+ regions so 2000 cap matches the
     // BE's new upper bound; beyond that we'd want viewport bbox filter.
     qs.set('limit', '2000');
-    const page = await api.get<{ items: Area[]; total: number }>(`/areas?${qs}`);
+    const page = await api.get<{ items: Region[]; total: number }>(`/regions?${qs}`);
     return page.items ?? [];
   },
 
-  getArea: async (id: string): Promise<Area | null> => {
-    if (USE_MOCK) return MOCK_AREAS.find((a) => a.id === id) ?? null;
-    return api.get<Area>(`/areas/${id}`);
+  getRegion: async (id: string): Promise<Region | null> => {
+    if (USE_MOCK) return MOCK_REGIONS.find((r) => r.id === id) ?? null;
+    return api.get<Region>(`/regions/${id}`);
   },
 
-  nearbyAreas: async (lat: number, lng: number, radiusKm: number): Promise<Area[]> => {
-    if (USE_MOCK) return MOCK_AREAS;
-    return api.get<Area[]>(`/areas/nearby?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`);
+  nearbyRegions: async (lat: number, lng: number, radiusKm: number): Promise<Region[]> => {
+    if (USE_MOCK) return MOCK_REGIONS;
+    return api.get<Region[]>(`/regions/nearby?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`);
   },
 
-  favoriteArea: async (id: string) => {
+  favoriteRegion: async (id: string) => {
     if (USE_MOCK) return { ok: true };
-    return api.post<{ ok: boolean }>(`/areas/${id}/favorite`);
+    return api.post<{ ok: boolean }>(`/regions/${id}/favorite`);
   },
 
-  unfavoriteArea: async (id: string) => {
+  unfavoriteRegion: async (id: string) => {
     if (USE_MOCK) return { ok: true };
-    return api.del<{ ok: boolean }>(`/areas/${id}/favorite`);
+    return api.del<{ ok: boolean }>(`/regions/${id}/favorite`);
   },
 
-  listFavoriteAreas: async (): Promise<Area[]> => {
+  listFavoriteRegions: async (): Promise<Region[]> => {
     if (USE_MOCK) return [];
-    return api.get<Area[]>(`/areas/favorites`);
+    return api.get<Region[]>(`/regions/favorites`);
   },
 
   // ---- Hierarchy ----
+  getAreas: async (regionId: string): Promise<Area[]> => {
+    if (USE_MOCK) return MOCK_AREAS[regionId] ?? [];
+    return api.get<Area[]>(`/outdoor/regions/${regionId}/areas`);
+  },
+
   getCrags: async (areaId: string): Promise<Crag[]> => {
     if (USE_MOCK) return MOCK_CRAGS[areaId] ?? [];
     return api.get<Crag[]>(`/outdoor/areas/${areaId}/crags`);
   },
 
-  getSectors: async (cragId: string): Promise<Sector[]> => {
-    if (USE_MOCK) return MOCK_SECTORS[cragId] ?? [];
-    return api.get<Sector[]>(`/outdoor/crags/${cragId}/sectors`);
-  },
-
-  getWalls: async (sectorId: string): Promise<Wall[]> => {
-    if (USE_MOCK) return MOCK_WALLS[sectorId] ?? [];
-    return api.get<Wall[]>(`/outdoor/sectors/${sectorId}/walls`);
+  getWalls: async (cragId: string): Promise<Wall[]> => {
+    if (USE_MOCK) return MOCK_WALLS[cragId] ?? [];
+    return api.get<Wall[]>(`/outdoor/crags/${cragId}/walls`);
   },
 
   getRoutes: async (wallId: string, _params?: { style?: string; sort?: string }): Promise<OutdoorRoute[]> => {
@@ -112,11 +113,14 @@ export const outdoorApi = {
   // ---- User-submitted route ----
   /** Submit a new route for admin review. Backend creates the record with
    *  `status="pending"` + the submitter's id, and attaches it to a system
-   *  wall under the area. User-provided coords are stored on the route
+   *  wall under the region. User-provided coords are stored on the route
    *  itself (not on the wall), so each pending route keeps its own
-   *  location for admin review. */
+   *  location for admin review.
+   *
+   *  BR Track A: field rename `area_id` → `region_id`. Submission entry
+   *  point stays at top level; Crag-level entry shift is Track D scope. */
   submitRoute: async (payload: {
-    area_id: string;
+    region_id: string;
     style: 'sport' | 'trad' | 'boulder' | 'multi-pitch';
     name: string;
     grade_text: string;
@@ -129,39 +133,39 @@ export const outdoorApi = {
   },
 
   // ---- Search ----
-  search: async (q: string, areaId?: string): Promise<OutdoorRoute[]> => {
+  search: async (q: string, regionId?: string): Promise<OutdoorRoute[]> => {
     if (USE_MOCK) {
       const lower = q.toLowerCase();
       return allMockRoutes().filter(
         (r) =>
           r.name.toLowerCase().includes(lower) ||
           r.grade_text.toLowerCase().includes(lower) ||
-          (r.sector_name ?? '').toLowerCase().includes(lower) ||
+          (r.crag_name ?? '').toLowerCase().includes(lower) ||
           (r.wall_name ?? '').toLowerCase().includes(lower),
       );
     }
     const qs = new URLSearchParams({ q });
-    if (areaId) qs.set('area_id', areaId);
+    if (regionId) qs.set('region_id', regionId);
     return api.get<OutdoorRoute[]>(`/outdoor/search?${qs}`);
   },
 
-  // ---- Map pins (all levels for an area) ----
-  getMapPins: async (areaId: string): Promise<MapPin[]> => {
+  // ---- Map pins (all levels for a region) ----
+  getMapPins: async (regionId: string): Promise<MapPin[]> => {
     if (USE_MOCK) {
-      const crags = MOCK_CRAGS[areaId] ?? [];
-      const cragPins: MapPin[] = crags
-        .filter((c) => c.lat != null && c.lng != null)
-        .map((c) => ({ id: c.id, name: c.name, lat: c.lat!, lng: c.lng!, route_count: c.route_count ?? 0, level: 'crag' as const }));
+      const areas = MOCK_AREAS[regionId] ?? [];
+      const areaPins: MapPin[] = areas
+        .filter((a) => a.lat != null && a.lng != null)
+        .map((a) => ({ id: a.id, name: a.name, lat: a.lat!, lng: a.lng!, route_count: a.route_count ?? 0, level: 'area' as const }));
 
-      const sectorPins: MapPin[] = crags.flatMap((c) =>
-        (MOCK_SECTORS[c.id] ?? [])
-          .filter((s) => s.lat != null && s.lng != null)
-          .map((s) => ({ id: s.id, name: s.name, lat: s.lat!, lng: s.lng!, route_count: s.route_count ?? 0, level: 'sector' as const })),
+      const cragPins: MapPin[] = areas.flatMap((a) =>
+        (MOCK_CRAGS[a.id] ?? [])
+          .filter((c) => c.lat != null && c.lng != null)
+          .map((c) => ({ id: c.id, name: c.name, lat: c.lat!, lng: c.lng!, route_count: c.route_count ?? 0, level: 'crag' as const })),
       );
 
-      const wallPins: MapPin[] = crags.flatMap((c) =>
-        (MOCK_SECTORS[c.id] ?? []).flatMap((s) =>
-          (MOCK_WALLS[s.id] ?? [])
+      const wallPins: MapPin[] = areas.flatMap((a) =>
+        (MOCK_CRAGS[a.id] ?? []).flatMap((c) =>
+          (MOCK_WALLS[c.id] ?? [])
             .filter((w) => w.lat != null && w.lng != null)
             .map((w) => ({ id: w.id, name: w.name, lat: w.lat!, lng: w.lng!, route_count: w.route_count ?? 0, level: 'wall' as const })),
         ),
@@ -174,9 +178,9 @@ export const outdoorApi = {
       // far from the physical wall location. Name = grade_text so the
       // centered pin label reads "5.12a" / "V5".
       const ROUTE_OFFSET_STEP = 0.0001;
-      const routePins: MapPin[] = crags.flatMap((c) =>
-        (MOCK_SECTORS[c.id] ?? []).flatMap((s) =>
-          (MOCK_WALLS[s.id] ?? []).flatMap((w) => {
+      const routePins: MapPin[] = areas.flatMap((a) =>
+        (MOCK_CRAGS[a.id] ?? []).flatMap((c) =>
+          (MOCK_WALLS[c.id] ?? []).flatMap((w) => {
             if (w.lat == null || w.lng == null) return [];
             const routes = MOCK_ROUTES[w.id] ?? [];
             const n = routes.length;
@@ -195,8 +199,8 @@ export const outdoorApi = {
         ),
       );
 
-      return [...cragPins, ...sectorPins, ...wallPins, ...routePins];
+      return [...areaPins, ...cragPins, ...wallPins, ...routePins];
     }
-    return api.get<MapPin[]>(`/outdoor/areas/${areaId}/pins`);
+    return api.get<MapPin[]>(`/outdoor/regions/${regionId}/pins`);
   },
 };

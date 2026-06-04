@@ -80,8 +80,10 @@ import MapPinCluster from '../outdoor/components/MapPinCluster';
 import TrailLayer from '../outdoor/components/TrailLayer';
 import WallGroup from '../outdoor/components/WallGroup';
 import RouteListCard from '../outdoor/components/RouteListCard';
+// BR Track A: top-level outdoor entity is now Region. Alias kept for
+// caller minimum-diff — Track D will rename across this file.
 import type {
-  Area,
+  Region as Area,
   MapPin,
   Wall,
   OutdoorRoute,
@@ -725,7 +727,8 @@ export default function MapScreenMapbox({
         country: area.country,
         lat: area.lat,
         lng: area.lng,
-        crag_count: area.crag_count,
+        // BR Track A: Region.area_count is the top-level children count.
+        crag_count: area.area_count,
         route_count: area.route_count,
         boulder_count: area.boulder_count,
       });
@@ -1435,7 +1438,7 @@ export default function MapScreenMapbox({
                       }
                     >
                       <RouteListCard
-                        route={{ ...it.route, sector_name: it.sector_name, wall_name: it.wall_name }}
+                        route={{ ...it.route, crag_name: it.crag_name, wall_name: it.wall_name }}
                         onPress={() => navigateToRoute(routeId)}
                       />
                     </View>
@@ -1618,7 +1621,11 @@ export default function MapScreenMapbox({
             id: areaData.area.id,
             name: areaData.area.name,
             cover_url: areaData.area.cover_url,
-            crag_count: areaData.area.crag_count ?? 0,
+            // BR Track A: Region.area_count is the top-level children count.
+            // FE component still reads `crag_count` for now; alias the value
+            // through so AreaMenuSheet's prop interface stays unchanged. Track
+            // D will rename AreaMenuSheet to CragMenuSheet + the prop.
+            crag_count: areaData.area.area_count ?? 0,
             route_count: areaData.area.route_count ?? 0,
             boulder_count: areaData.area.boulder_count ?? 0,
           }}
