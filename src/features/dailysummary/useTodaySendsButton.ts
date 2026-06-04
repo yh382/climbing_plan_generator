@@ -1,17 +1,10 @@
 // src/features/dailysummary/useTodaySendsButton.ts
 // KAYA-style "today's sends" counter button — packaged as a MapTopBar
 // `count` button so callers can spread it into `rightButtons` and let
-// SwiftUI fuse it into the same liquid-glass capsule as the icon
-// buttons. Returns null when count <= 0; the caller's array shrinks
-// and SwiftUI auto-morphs the union from 4 → 3 buttons.
-//
-// Replaces the prior RN <TodaySendsButton/> component which mounted as
-// a sibling to the SwiftUI Host hosting the right pill — that sibling
-// silently broke the SwiftUI @Namespace registration for
-// `glassEffectUnion` (binary-bisected in B1; suspected Reanimated
-// worklet init / Pressable hit-test recompute conflict). Living
-// inside the SwiftUI subtree avoids the cross-runtime conflict
-// entirely.
+// the GlassUnionPill native view render it as a tinted-glass member of
+// the same liquid-glass capsule as the icon buttons. Returns null when
+// count <= 0; the caller's array shrinks and SwiftUI auto-morphs the
+// union accordingly.
 
 import { router } from "expo-router";
 

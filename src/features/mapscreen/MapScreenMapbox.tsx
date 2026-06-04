@@ -55,21 +55,18 @@ import OfflineMapsSheet, {
   type OfflineMapsSheetHandle,
 } from './components/OfflineMapsSheet';
 import AddRouteSheet, { type AddRouteSheetHandle } from '../outdoor/components/AddRouteSheet';
-import { Host, Button, HStack, GlassEffectContainer } from '@expo/ui/swift-ui';
+import { Host, Button } from '@expo/ui/swift-ui';
 import {
   buttonStyle,
   controlSize,
   frame,
   tint,
-  labelStyle,
-  font,
-  glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import { HeaderButton } from '../../components/ui/HeaderButton';
 import usePreviousTabStore from '../../store/usePreviousTabStore';
 import {
-  GlassUnionGroup,
-  glassEffectUnion,
+  GlassUnionPill,
+  type GlassUnionPillItem,
 } from '../../../modules/glass-effect-union/src';
 import type { GymPlace, LatLng } from '../../../lib/poi/types';
 
@@ -1484,57 +1481,35 @@ export default function MapScreenMapbox({
               not masked). Mirrors gym/[gymId].tsx pattern. */}
           {mode.kind === 'area' && !searchExpanded ? (
             <View style={cragStyles(colors).pinnedHeaderOverlay} pointerEvents="box-none">
-              <View style={{ width: 88, height: 44 }}>
-                <Host matchContents>
-                  <GlassEffectContainer spacing={0}>
-                    <GlassUnionGroup>
-                      <HStack spacing={0}>
-                        <Button
-                          systemImage={'magnifyingglass' as any}
-                          label=""
-                          onPress={openAreaSearch}
-                          modifiers={[
-                            buttonStyle('plain'),
-                            labelStyle('iconOnly'),
-                            font({ size: 18, weight: 'light' }),
-                            frame({ width: 44, height: 44, alignment: 'center' }),
-                            glassEffect({
-                              glass: { variant: 'regular', interactive: true },
-                              shape: 'capsule',
-                            }),
-                            glassEffectUnion('sheet-left-pill'),
-                          ] as any}
-                        />
-                        <Button
-                          systemImage={'person.2' as any}
-                          label=""
-                          onPress={navigateToCommunity}
-                          modifiers={[
-                            buttonStyle('plain'),
-                            labelStyle('iconOnly'),
-                            font({ size: 18, weight: 'light' }),
-                            frame({ width: 44, height: 44, alignment: 'center' }),
-                            glassEffect({
-                              glass: { variant: 'regular', interactive: true },
-                              shape: 'capsule',
-                            }),
-                            glassEffectUnion('sheet-left-pill'),
-                          ] as any}
-                        />
-                      </HStack>
-                    </GlassUnionGroup>
-                  </GlassEffectContainer>
-                </Host>
-              </View>
+              <GlassUnionPill
+                axis="horizontal"
+                unionId="sheet-left-pill"
+                containerSpacing={0}
+                buttonSize={44}
+                style={{ width: 88, height: 44 }}
+                items={
+                  [
+                    {
+                      key: 'search',
+                      kind: 'icon',
+                      icon: 'magnifyingglass',
+                      fontSize: 18,
+                      onPress: openAreaSearch,
+                    },
+                    {
+                      key: 'community',
+                      kind: 'icon',
+                      icon: 'person.2',
+                      fontSize: 18,
+                      onPress: navigateToCommunity,
+                    },
+                  ] satisfies GlassUnionPillItem[]
+                }
+              />
 
               {/* Title in flex:1 middle slot — naturally constrained
                   between asymmetric toolbars (88pt left pill vs 44pt
-                  right hamburger). Old absolute-centered layout placed
-                  title at SCREEN midpoint, which is left of the actual
-                  available middle space → long names crashed into the
-                  left pill. adjustsFontSizeToFit shrinks the font from
-                  20pt down to 13pt before falling back to '...' so most
-                  OpenBeta names display in full. */}
+                  right hamburger). Auto-shrinks first, then ellipsis. */}
               <TouchableOpacity
                 onPress={openAreaInfo}
                 activeOpacity={0.6}

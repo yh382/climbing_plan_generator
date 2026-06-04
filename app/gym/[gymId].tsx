@@ -16,22 +16,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { Host, Button, VStack, GlassEffectContainer } from '@expo/ui/swift-ui';
 import {
-  buttonStyle,
-  frame,
-  labelStyle,
-  font,
-  glassEffect,
-} from '@expo/ui/swift-ui/modifiers';
-import {
-  GlassUnionGroup,
-  glassEffectUnion,
+  GlassUnionPill,
+  type GlassUnionPillItem,
 } from '../../modules/glass-effect-union/src';
-import {
-  rightPillCountButtonModifiers,
-  rightPillCountLabel,
-} from '../../src/features/mapscreen/components/MapTopBar';
+import { rightPillCountLabel } from '../../src/features/mapscreen/components/MapTopBar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -243,70 +232,49 @@ export default function GymMapScreen() {
             />
           </View>
           <View style={{ flex: 1 }} />
-          <View style={{ width: 44 }}>
-            <Host matchContents>
-              <GlassEffectContainer spacing={20}>
-                <GlassUnionGroup>
-                  <VStack spacing={0}>
-                    <Button
-                      systemImage={'square.and.arrow.up' as any}
-                      label=""
-                      onPress={() => {
-                        /* TODO AS: share gym */
-                      }}
-                      modifiers={
-                        [
-                          buttonStyle('plain'),
-                          labelStyle('iconOnly'),
-                          font({ size: 19, weight: 'light' }),
-                          frame({ width: 44, height: 44, alignment: 'center' }),
-                          glassEffect({
-                            glass: { variant: 'regular', interactive: true },
-                            shape: 'capsule',
-                          }),
-                          glassEffectUnion('gym-floor-right-pill'),
-                        ] as any
-                      }
-                    />
-                    <Button
-                      systemImage={'bookmark' as any}
-                      label=""
-                      onPress={() => {
-                        /* TODO AS: bookmark gym */
-                      }}
-                      modifiers={
-                        [
-                          buttonStyle('plain'),
-                          labelStyle('iconOnly'),
-                          font({ size: 19, weight: 'light' }),
-                          frame({ width: 44, height: 44, alignment: 'center' }),
-                          glassEffect({
-                            glass: { variant: 'regular', interactive: true },
-                            shape: 'capsule',
-                          }),
-                          glassEffectUnion('gym-floor-right-pill'),
-                        ] as any
-                      }
-                    />
-                    {/* B1_FU_SWIFTUI — today's-sends count fuses into
-                        the same glass-union as a 3rd member when count
-                        > 0; pill auto-morphs 2↔3. Living inside the
-                        SwiftUI subtree avoids the prior RN-sibling
-                        @Namespace conflict. */}
-                    {todaySendsBtn?.count != null ? (
-                      <Button
-                        label={rightPillCountLabel(todaySendsBtn.count)}
-                        onPress={todaySendsBtn.onPress ?? (() => {})}
-                        modifiers={
-                          rightPillCountButtonModifiers('gym-floor-right-pill') as any
-                        }
-                      />
-                    ) : null}
-                  </VStack>
-                </GlassUnionGroup>
-              </GlassEffectContainer>
-            </Host>
-          </View>
+          <GlassUnionPill
+            axis="vertical"
+            unionId="gym-floor-right-pill"
+            buttonSize={44}
+            style={{ width: 44, height: todaySendsBtn?.count != null ? 132 : 88 }}
+            items={
+              [
+                {
+                  key: 'share',
+                  kind: 'icon',
+                  icon: 'square.and.arrow.up',
+                  onPress: () => {
+                    /* TODO AS: share gym */
+                  },
+                },
+                {
+                  key: 'bookmark',
+                  kind: 'icon',
+                  icon: 'bookmark',
+                  onPress: () => {
+                    /* TODO AS: bookmark gym */
+                  },
+                },
+                // today's-sends count fuses into the same union as a 3rd
+                // member when count > 0; pill auto-morphs 2↔3.
+                ...(todaySendsBtn?.count != null
+                  ? [
+                      {
+                        key: 'today-sends',
+                        kind: 'count',
+                        label: rightPillCountLabel(todaySendsBtn.count),
+                        tint: '#A8D5D6',
+                        foregroundColor: '#000000',
+                        fontSize: 17,
+                        fontWeight: 'semibold',
+                        numericTransition: true,
+                        onPress: todaySendsBtn.onPress ?? (() => {}),
+                      } as const,
+                    ]
+                  : []),
+              ] satisfies GlassUnionPillItem[]
+            }
+          />
         </Animated.View>
       </View>
 

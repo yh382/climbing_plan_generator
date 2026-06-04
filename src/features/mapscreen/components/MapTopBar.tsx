@@ -1,83 +1,69 @@
 // src/features/mapscreen/components/MapTopBar.tsx
 // Shared floating map top bar with iOS 26 liquid glass.
 // - Optional left button (standalone glass circle, e.g. back)
-// - Vertical pill on the right with 1..N buttons fused by glassEffectUnion
-// - Right buttons support three modes:
-//     * plain onPress — simple tap handler
-//     * menuItems — SwiftUI `Menu` dropdown popover (tap-open)
-//     * morphMenuItems — inline-morph pill: tap grows the pill with extra
-//       buttons stacked inside the same glass union (iOS 26 toolbar feel).
+// - Vertical pill on the right with 1..N buttons fused via the
+//   self-contained `GlassUnionPill` native view (single SwiftUI subtree
+//   owning the @Namespace; robust against RN sibling re-renders).
 
-import React, { useEffect, useRef, useState } from "react";
-import { Animated, Platform, View, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
-import { Host, Button, VStack, GlassEffectContainer, Menu } from "@expo/ui/swift-ui";
+import { Host, Button } from "@expo/ui/swift-ui";
 import {
   buttonStyle,
   labelStyle,
   frame,
   font,
   glassEffect,
-  foregroundStyle,
-  monospacedDigit,
-  contentTransition,
 } from "@expo/ui/swift-ui/modifiers";
 import {
-  GlassUnionGroup,
-  glassEffectUnion,
+  GlassUnionPill,
+  type GlassUnionPillItem,
 } from "../../../../modules/glass-effect-union/src";
 
-export interface MapTopBarMenuItem {
-  title: string;
-  icon?: string;
-  onPress: () => void;
-}
-
 export interface MapTopBarButton {
-  /** SF Symbol name. Required unless `count` is set (count buttons render
-   *  a numeric text label instead of an icon). */
+  /** SF Symbol name. Required unless `count` is set. */
   icon?: string;
-  /** Plain-button tap handler. Ignored if menuItems or morphMenuItems are set. */
+  /** Plain-button tap handler. */
   onPress?: () => void;
-  /** SwiftUI Menu dropdown (tap opens a popover). */
-  menuItems?: MapTopBarMenuItem[];
-  /** Inline-morph: tap grows the pill with these items stacked above the
-   *  trigger. Items share the same glass union so the pill reads as one
-   *  continuous liquid-glass capsule. */
-  morphMenuItems?: MapTopBarMenuItem[];
-  /** Numeric badge button — renders the count as the button label inside
-   *  the same glass-union pill (no SF Symbol). Used by today's-sends
-   *  counter so the 4-button capsule fuses cleanly across runtimes
-   *  instead of mounting a sibling RN component (which silently breaks
-   *  the SwiftUI @Namespace registration). Visual highlight (light-green
-   *  disk + black digit) is fixed inside `rightPillCountButtonModifiers`. */
+  /** Numeric badge button — renders the count as the label inside the
+   *  same glass-union pill (no SF Symbol). Light-teal tinted glass +
+   *  black digit; used by today's-sends counter. */
   count?: number;
-  /** Render condition — if false, button is hidden. */
+  /** Render condition — if false, the item is hidden and the pill
+   *  morphs the membership. */
   visible?: boolean;
   key?: string;
 }
 
 interface MapTopBarProps {
-  /** Left button (standalone glass circle) */
+  /** Left button (standalone glass circle). */
   leftButton?: MapTopBarButton;
-  /** Right button(s) — fused as one vertical pill */
+  /** Right button(s) — fused as one vertical pill. */
   rightButtons: MapTopBarButton[];
-  /** Namespace id for glassEffectUnion — ensures independent top bars don't fuse */
+  /** Namespace id for the union — distinct top bars must use distinct ids. */
   unionId?: string;
-  /** When true, fade the top bar out of view (e.g. when the parent sheet
-   *  expands to a detent that would overlap with the bar). */
+  /** Fade the top bar out (e.g. when the sheet expands to a detent that
+   *  would overlap with the bar). */
   hidden?: boolean;
 }
 
 const BTN_SIZE = 44;
 
-// iOS<26 lacks SwiftUI's `glassEffect` (Liquid Glass landed in iOS 26),
-// so the buttons render as bare icons floating on the map. Apple Maps on
-// iOS 18 uses UIBlurEffect.systemMaterial — we mimic that with expo-blur.
-// On iOS≥26 the SwiftUI Host's own glassEffect modifier draws the
-// material; we just render a transparent passthrough so the two layers
-// don't double up.
+/** Light-teal tint for the count-badge glass — visual focal point inside
+ *  the otherwise neutral pill. */
+const COUNT_BADGE_TINT = "#A8D5D6";
+
+/** Display string for a count badge (clamped to "99+"). Exported so the
+ *  gym detail screen can match the same clamp policy. */
+export function rightPillCountLabel(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
+// iOS<26 lacks SwiftUI's `glassEffect`; the standalone left button still
+// renders inside a SwiftUI Host, but we drop a blur layer under it to
+// mimic Apple Maps' iOS 18 systemMaterial floating button.
 const isIOS = Platform.OS === "ios";
 const iosVersion = isIOS ? parseInt(String(Platform.Version), 10) : 0;
 const NEEDS_BLUR_FALLBACK = isIOS && iosVersion < 26;
@@ -85,18 +71,16 @@ const NEEDS_BLUR_FALLBACK = isIOS && iosVersion < 26;
 function GlassBackdrop({
   children,
   borderRadius,
-  style,
 }: {
   children: React.ReactNode;
   borderRadius: number;
-  style?: any;
 }) {
   if (!NEEDS_BLUR_FALLBACK) return <>{children}</>;
   return (
     <BlurView
       intensity={70}
       tint="systemMaterial"
-      style={[{ borderRadius, overflow: "hidden" }, style]}
+      style={{ borderRadius, overflow: "hidden" }}
     >
       {children}
     </BlurView>
@@ -108,66 +92,6 @@ const GLASS_CIRCLE = glassEffect({
   shape: "circle",
 });
 
-const GLASS_CAPSULE = glassEffect({
-  glass: { variant: "regular", interactive: true },
-  shape: "capsule",
-});
-
-function rightButtonModifiers(unionId: string) {
-  return [
-    buttonStyle("plain"),
-    labelStyle("iconOnly"),
-    font({ size: 19, weight: "light" }),
-    frame({ width: BTN_SIZE, height: BTN_SIZE, alignment: "center" }),
-    GLASS_CAPSULE,
-    glassEffectUnion(unionId),
-  ] as const;
-}
-
-/** Light-teal tint for the count-badge glass material. Picked to (a)
- *  read clearly against black digits (~10:1 contrast) and (b) pop
- *  visually among the surrounding plain-glass pill members so the
- *  today's-sends count is the obvious focal point — while still being
- *  a `regular` glass member that participates in `glassEffectUnion`
- *  morph (`clear` variant disqualifies the button from the fusion;
- *  `regular` + tint keeps it inside the pill as a tinted-glass disc).
- *  Hex literal because this is a visual-spec color for one component,
- *  not a theme-driven token. */
-const COUNT_BADGE_TINT = "#A8D5D6";
-
-/** Modifier chain for a count-badge button that fuses into a right-pill
- *  glass union (e.g. today's-sends counter). Visual: black digit on a
- *  light-teal `regular`-glass capsule that fuses with siblings via the
- *  shared `glassEffectUnion(unionId)` namespace.
- *
- *  Exported so screens that build their own GlassUnionGroup VStack
- *  outside MapTopBar (currently app/gym/[gymId].tsx) share the same
- *  chain. */
-export function rightPillCountButtonModifiers(unionId: string) {
-  return [
-    buttonStyle("plain"),
-    font({ size: 17, weight: "semibold" }),
-    monospacedDigit(),
-    foregroundStyle("#000000"),
-    frame({ width: BTN_SIZE, height: BTN_SIZE, alignment: "center" }),
-    glassEffect({
-      glass: {
-        variant: "regular",
-        interactive: true,
-        tint: COUNT_BADGE_TINT,
-      },
-      shape: "capsule",
-    }),
-    glassEffectUnion(unionId),
-    contentTransition("numericText"),
-  ] as const;
-}
-
-/** Display string for a count badge (clamped to "99+"). */
-export function rightPillCountLabel(count: number): string {
-  return count > 99 ? "99+" : String(count);
-}
-
 const LEFT_BTN = [
   buttonStyle("plain"),
   labelStyle("iconOnly"),
@@ -176,15 +100,41 @@ const LEFT_BTN = [
   GLASS_CIRCLE,
 ] as const;
 
-export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidden }: MapTopBarProps) {
-  const insets = useSafeAreaInsets();
-  const RIGHT_BTN = rightButtonModifiers(unionId);
-  const visibleRight = rightButtons.filter((b) => b.visible !== false);
+function buttonToPillItem(btn: MapTopBarButton, idx: number): GlassUnionPillItem {
+  const key = btn.key ?? `${btn.icon ?? "btn"}-${idx}`;
+  if (typeof btn.count === "number") {
+    return {
+      key,
+      kind: "count",
+      label: rightPillCountLabel(btn.count),
+      tint: COUNT_BADGE_TINT,
+      foregroundColor: "#000000",
+      fontSize: 17,
+      fontWeight: "semibold",
+      numericTransition: true,
+      visible: btn.visible !== false,
+      onPress: btn.onPress,
+    };
+  }
+  return {
+    key,
+    kind: "icon",
+    icon: btn.icon,
+    visible: btn.visible !== false,
+    onPress: btn.onPress,
+  };
+}
 
-  // Tracks which button (by key) currently has its morph menu expanded.
-  // Only one morph menu can be expanded at a time; tapping a different
-  // morph button or tapping outside the pill collapses it.
-  const [expandedMenuKey, setExpandedMenuKey] = useState<string | null>(null);
+export function MapTopBar({
+  leftButton,
+  rightButtons,
+  unionId = "map-pill",
+  hidden,
+}: MapTopBarProps) {
+  const insets = useSafeAreaInsets();
+  const visibleRight = rightButtons.filter((b) => b.visible !== false);
+  const pillItems = visibleRight.map(buttonToPillItem);
+  const pillHeight = visibleRight.length * BTN_SIZE;
 
   // Fade opacity driven by `hidden` prop. Animated so the bar doesn't
   // pop in/out when the parent sheet detent changes.
@@ -195,155 +145,44 @@ export function MapTopBar({ leftButton, rightButtons, unionId = "map-pill", hidd
       duration: 220,
       useNativeDriver: true,
     }).start();
-    // Collapse any open morph menu when fading out so it doesn't flash
-    // back when the bar re-appears.
-    if (hidden) setExpandedMenuKey(null);
   }, [hidden, opacity]);
 
   return (
-    <>
-      {/* Dismissal overlay — full-screen transparent Pressable that catches
-          taps anywhere outside the pill and collapses the morph menu.
-          zIndex 49 sits below the top bar (50) so the pill stays tappable. */}
-      {expandedMenuKey && (
-        <Pressable
-          style={[styles.dismissOverlay, { top: 0 }]}
-          onPress={() => setExpandedMenuKey(null)}
-        />
-      )}
-
-      <Animated.View
-        style={[styles.overlay, { top: insets.top, opacity }]}
-        pointerEvents={hidden ? "none" : "box-none"}
-      >
-        {/* Left button */}
-        <View style={styles.sideWrap}>
-          {leftButton && leftButton.visible !== false && (
-            <GlassBackdrop borderRadius={BTN_SIZE / 2}>
-              <Host matchContents>
-                <Button
-                  systemImage={leftButton.icon as any}
-                  label=""
-                  onPress={leftButton.onPress ?? (() => {})}
-                  modifiers={LEFT_BTN as any}
-                />
-              </Host>
-            </GlassBackdrop>
-          )}
-        </View>
-
-        {/* Center slot — intentionally empty; map filters live in the sheet now. */}
-        <View style={styles.centerWrap} />
-
-        {/* Right vertical pill */}
-        <View style={styles.sideWrap}>
-          {visibleRight.length > 0 && (
-            <GlassBackdrop borderRadius={BTN_SIZE / 2}>
+    <Animated.View
+      style={[styles.overlay, { top: insets.top, opacity }]}
+      pointerEvents={hidden ? "none" : "box-none"}
+    >
+      {/* Left button */}
+      <View style={styles.sideWrap}>
+        {leftButton && leftButton.visible !== false && (
+          <GlassBackdrop borderRadius={BTN_SIZE / 2}>
             <Host matchContents>
-              <GlassEffectContainer spacing={20}>
-                <GlassUnionGroup>
-                  <VStack spacing={0}>
-                    {visibleRight.flatMap((btn, i) => {
-                      const key = btn.key ?? `${btn.icon}-${i}`;
-                      const isExpanded = expandedMenuKey === key;
-
-                      // Inline-morph menu: when expanded, render the morph
-                      // items as extra Buttons ABOVE the trigger so the pill
-                      // grows upward. All buttons share `glassEffectUnion`
-                      // so SwiftUI fuses them into one continuous glass pill.
-                      if (btn.morphMenuItems && btn.morphMenuItems.length > 0) {
-                        // Trigger first (top), menu items render BELOW it when
-                        // expanded. Combined with `alignItems: flex-start` on
-                        // the overlay, the trigger stays anchored at its
-                        // original y-position and the pill grows downward —
-                        // the back button on the left doesn't shift.
-                        const nodes: React.ReactElement[] = [
-                          <Button
-                            key={key}
-                            systemImage={(isExpanded ? "xmark" : btn.icon) as any}
-                            label=""
-                            onPress={() => setExpandedMenuKey(isExpanded ? null : key)}
-                            modifiers={RIGHT_BTN as any}
-                          />,
-                        ];
-                        if (isExpanded) {
-                          btn.morphMenuItems.forEach((m, j) => {
-                            nodes.push(
-                              <Button
-                                key={`${key}-item-${j}`}
-                                systemImage={(m.icon ?? "") as any}
-                                label=""
-                                onPress={() => {
-                                  m.onPress();
-                                  setExpandedMenuKey(null);
-                                }}
-                                modifiers={RIGHT_BTN as any}
-                              />,
-                            );
-                          });
-                        }
-                        return nodes;
-                      }
-
-                      // SwiftUI Menu dropdown
-                      if (btn.menuItems && btn.menuItems.length > 0) {
-                        return [
-                          <Menu
-                            key={key}
-                            label=""
-                            systemImage={btn.icon as any}
-                            modifiers={RIGHT_BTN as any}
-                          >
-                            {btn.menuItems.map((m, j) => (
-                              <Button
-                                key={`${m.title}-${j}`}
-                                systemImage={(m.icon ?? "") as any}
-                                onPress={m.onPress}
-                                label={m.title}
-                              />
-                            ))}
-                          </Menu>,
-                        ];
-                      }
-
-                      // Numeric badge — renders count as the button label
-                      // inside the same glass union. Lives next to icon
-                      // buttons so SwiftUI fuses all members into one
-                      // continuous liquid-glass capsule (vs the prior
-                      // RN-sibling overlay which broke the @Namespace
-                      // registration; binary-bisected in B1).
-                      if (typeof btn.count === "number") {
-                        return [
-                          <Button
-                            key={key}
-                            label={rightPillCountLabel(btn.count)}
-                            onPress={btn.onPress ?? (() => {})}
-                            modifiers={rightPillCountButtonModifiers(unionId) as any}
-                          />,
-                        ];
-                      }
-
-                      // Plain button
-                      return [
-                        <Button
-                          key={key}
-                          systemImage={btn.icon as any}
-                          label=""
-                          onPress={btn.onPress ?? (() => {})}
-                          modifiers={RIGHT_BTN as any}
-                        />,
-                      ];
-                    })}
-                  </VStack>
-                </GlassUnionGroup>
-              </GlassEffectContainer>
+              <Button
+                systemImage={leftButton.icon as any}
+                label=""
+                onPress={leftButton.onPress ?? (() => {})}
+                modifiers={LEFT_BTN as any}
+              />
             </Host>
-            </GlassBackdrop>
-          )}
-        </View>
+          </GlassBackdrop>
+        )}
+      </View>
 
-      </Animated.View>
-    </>
+      {/* Center slot — intentionally empty; map filters live in the sheet. */}
+      <View style={styles.centerWrap} />
+
+      {/* Right vertical pill */}
+      <View style={[styles.sideWrap, { height: pillHeight }]}>
+        {pillItems.length > 0 && (
+          <GlassUnionPill
+            axis="vertical"
+            unionId={unionId}
+            items={pillItems}
+            style={{ width: BTN_SIZE, height: pillHeight }}
+          />
+        )}
+      </View>
+    </Animated.View>
   );
 }
 
@@ -353,14 +192,12 @@ const styles = StyleSheet.create({
     // 16pt + size=44 → button center X ≈ 38pt; matches the system nav-bar
     // button left-edge inset so map mode's back button doesn't read as
     // "lower + further left" when transitioning from a normal stack screen.
-    // top=insets.top puts the 44pt button center at +22 == iOS nav-bar center.
     left: 16,
     right: 16,
     zIndex: 50,
     flexDirection: "row",
     // flex-start: back button (left) stays anchored to the top when the
-    // right-side morph pill grows downward. With `center` the back button
-    // would shift down along with pill height.
+    // right pill is taller than 44pt.
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
@@ -370,13 +207,5 @@ const styles = StyleSheet.create({
   },
   centerWrap: {
     flex: 1,
-  },
-  dismissOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-    zIndex: 49,
   },
 });

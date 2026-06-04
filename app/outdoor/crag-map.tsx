@@ -46,19 +46,16 @@ import AreaInfoSheet, { type AreaInfoSheetHandle } from '../../src/features/maps
 import MyListSheet, { type MyListSheetHandle } from '../../src/features/mapscreen/components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from '../../src/features/mapscreen/components/ReportsSheet';
 import AddRouteSheet, { type AddRouteSheetHandle } from '../../src/features/outdoor/components/AddRouteSheet';
-import { Host, Button, HStack, GlassEffectContainer } from '@expo/ui/swift-ui';
+import { Host, Button } from '@expo/ui/swift-ui';
 import {
   buttonStyle,
   controlSize,
   frame,
   tint,
-  labelStyle,
-  font,
-  glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import {
-  GlassUnionGroup,
-  glassEffectUnion,
+  GlassUnionPill,
+  type GlassUnionPillItem,
 } from '../../modules/glass-effect-union/src';
 
 export default function CragMapPage() {
@@ -714,56 +711,34 @@ export default function CragMapPage() {
               when placed in the pinned header slot, blocking sheet drag. */}
           {mode === 'area' && !searchExpanded ? (
             <View style={styles.headerRow}>
-              {/* Left: fused [search | community] pill — pure RN.
-                  See MapScreenMapbox comment for why we bail on
-                  @expo/ui here (fast-collapse re-measure race). */}
               {/* Left: fused [search | community] pill — iOS 26 liquid
-                  glass with auto-merging via glassEffectUnion. Mirrors
-                  MapTopBar pattern. Wrapped in a fixed-size <View>
-                  (88×44) so TrueSheet's fast-collapse animation can't
-                  shift layout via SwiftUI re-measurement. */}
-              <View style={{ width: 88, height: 44 }}>
-                <Host matchContents>
-                  <GlassEffectContainer spacing={0}>
-                    <GlassUnionGroup>
-                      <HStack spacing={0}>
-                        <Button
-                          systemImage={'magnifyingglass' as any}
-                          label=""
-                          onPress={openSearch}
-                          modifiers={[
-                            buttonStyle('plain'),
-                            labelStyle('iconOnly'),
-                            font({ size: 18, weight: 'light' }),
-                            frame({ width: 44, height: 44, alignment: 'center' }),
-                            glassEffect({
-                              glass: { variant: 'regular', interactive: true },
-                              shape: 'capsule',
-                            }),
-                            glassEffectUnion('sheet-left-pill'),
-                          ] as any}
-                        />
-                        <Button
-                          systemImage={'person.2' as any}
-                          label=""
-                          onPress={navigateToCommunity}
-                          modifiers={[
-                            buttonStyle('plain'),
-                            labelStyle('iconOnly'),
-                            font({ size: 18, weight: 'light' }),
-                            frame({ width: 44, height: 44, alignment: 'center' }),
-                            glassEffect({
-                              glass: { variant: 'regular', interactive: true },
-                              shape: 'capsule',
-                            }),
-                            glassEffectUnion('sheet-left-pill'),
-                          ] as any}
-                        />
-                      </HStack>
-                    </GlassUnionGroup>
-                  </GlassEffectContainer>
-                </Host>
-              </View>
+                  glass via GlassUnionPill (single SwiftUI subtree owning
+                  the @Namespace, robust against RN re-renders). */}
+              <GlassUnionPill
+                axis="horizontal"
+                unionId="sheet-left-pill"
+                containerSpacing={0}
+                buttonSize={44}
+                style={{ width: 88, height: 44 }}
+                items={
+                  [
+                    {
+                      key: 'search',
+                      kind: 'icon',
+                      icon: 'magnifyingglass',
+                      fontSize: 18,
+                      onPress: openSearch,
+                    },
+                    {
+                      key: 'community',
+                      kind: 'icon',
+                      icon: 'person.2',
+                      fontSize: 18,
+                      onPress: navigateToCommunity,
+                    },
+                  ] satisfies GlassUnionPillItem[]
+                }
+              />
 
               {/* Title in flex:1 middle slot — naturally constrained
                   between asymmetric toolbars (88px left pill vs 44px
