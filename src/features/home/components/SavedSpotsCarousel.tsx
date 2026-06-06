@@ -66,7 +66,7 @@ export function SavedSpotsCarousel() {
                 // highlighted at the top of the gyms-sheet row". The
                 // user then taps the highlighted spot inside the sheet
                 // to actually drill into area mode. Single entry path
-                // (always lands in gyms mode) sidesteps NativeTabs
+                // (always lands in explore mode) sidesteps NativeTabs
                 // param-propagation issues and the cross-spot state
                 // sync bug.
                 useMapSavedSpotHighlightStore.getState().setHighlight(area.id);

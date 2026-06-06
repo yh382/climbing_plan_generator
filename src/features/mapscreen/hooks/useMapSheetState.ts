@@ -19,7 +19,7 @@ import { TrueSheet } from "@lodev09/react-native-true-sheet";
  *  wants to see the first route card without expanding the sheet. */
 const DEFAULT_COLLAPSED_FRACTION = 0.25;
 
-/** Legacy collapsed size for gyms mode: 76pt header-only. Translated
+/** Legacy collapsed size for explore mode: 76pt header-only. Translated
  *  to a fraction at mount. Kept small so the map fills the screen. */
 const HEADER_ONLY_COLLAPSED_PT = 76;
 
@@ -99,7 +99,7 @@ export function useMapSheetState(options?: UseMapSheetStateOptions): UseMapSheet
 
   // 3 detents: collapsed / medium (45%) / large (80%). MEDIUM
   // matches Apple Maps' medium detent. Collapsed is variable:
-  // "header-only" for gyms mode (76pt, max map visibility), numeric
+  // "header-only" for explore mode (76pt, max map visibility), numeric
   // for modes that benefit from a content peek (crag area: 0.25).
   const collapsedOpt = options?.collapsedFraction ?? DEFAULT_COLLAPSED_FRACTION;
   const detents = useMemo(() => {

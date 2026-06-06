@@ -60,7 +60,7 @@ import {
   type PlaceSheetFooterAction,
 } from '../../../components/shared/placeSheet';
 
-export type RegionInfoContext = 'gyms' | 'crag' | 'areaMenu';
+export type RegionInfoContext = 'explore' | 'crag' | 'areaMenu';
 
 export type RegionInfoSeed = {
   id: string;
@@ -283,7 +283,7 @@ const RegionInfoSheet = forwardRef<RegionInfoSheetHandle, RegionInfoSheetProps>(
       {
         icon: 'map-outline',
         label:
-          props.context === 'gyms'
+          props.context === 'explore'
             ? tr('进入', 'Enter')
             : tr('路线图', 'Routes'),
         onPress: props.onPressRouteMap,

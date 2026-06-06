@@ -2,7 +2,7 @@
  * CragOverviewCluster — BR Track D Day 7 follow-up tier-1 map source.
  *
  * Replaces the legacy Region-overview + bbox-shifting RoutePinCluster in
- * gyms mode (PLAN §3.2 redesign per 2026-06-06 dogfood feedback). Loads
+ * explore mode (PLAN §3.2 redesign per 2026-06-06 dogfood feedback). Loads
  * ~15k Crags **once** via `useCragsOverview` hook; Mapbox `cluster:true`
  * handles zoom-level aggregation client-side. Source is stable across
  * pan/zoom so cluster positions don't shift — matches Apple Maps /

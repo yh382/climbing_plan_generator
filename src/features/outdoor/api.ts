@@ -174,8 +174,8 @@ export const outdoorApi = {
   //
   // Lightweight per-crag projection (lat/lng + counts + region ref)
   // for the client-side `cluster:true` ShapeSource that replaces the
-  // legacy Region-overview + bbox shifting source in gyms mode (PLAN §3.2).
-  // Load once on gyms-mode mount.
+  // legacy Region-overview + bbox shifting source in explore mode (PLAN §3.2).
+  // Load once on explore-mode mount.
   listCragsOverview: async (params?: {
     status?: string;
     min_routes?: number;

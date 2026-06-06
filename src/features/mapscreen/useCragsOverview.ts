@@ -8,7 +8,7 @@
 //
 // PLAN §3.2 redesign rationale (from 2026-06-06 dogfood feedback):
 //   - Region-level (911 dots) had low climber recognition
-//   - Bbox-driven RoutePinCluster in gyms mode had jankiness — clusters
+//   - Bbox-driven RoutePinCluster in explore mode had jankiness — clusters
 //     shifting on every pan because source data changed each refetch
 //   - Industry standard (Apple Maps, Strava, AllTrails) = stable
 //     pre-loaded source + `cluster:true` for visual aggregation

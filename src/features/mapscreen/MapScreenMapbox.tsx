@@ -180,7 +180,7 @@ export default function MapScreenMapbox({
   // ---- Mode ----
   // Area mode is ALWAYS entered internally (via gyms-sheet Saved Spots
   // row → `onSelectAreaFromList`). Home Saved Spots / AreaDetailCard
-  // navigate to gyms mode + highlight; the user then taps the spot in
+  // navigate to explore mode + highlight; the user then taps the spot in
   // the sheet to drill in. This removes the cross-tab param-propagation
   // bug entirely — `mode` only changes via in-component callbacks.
   //
@@ -189,9 +189,9 @@ export default function MapScreenMapbox({
   // cross-list switching flow.
   const initialMode: MapMode = initialListId
     ? { kind: 'list', listId: initialListId }
-    : { kind: 'gyms' };
+    : { kind: 'explore' };
   const modeState = useMapMode(initialMode);
-  const { mode, prevCamera, observeCamera, enterArea, enterList, backToGyms } = modeState;
+  const { mode, prevCamera, observeCamera, enterArea, enterList, backToExplore } = modeState;
 
   // ---- Refs ----
   const mapRef = useRef<MapboxGL.MapView>(null);
@@ -231,16 +231,16 @@ export default function MapScreenMapbox({
   // dereferences the ref at call time.
   const manualOpenHandlerRef = useRef<(() => void) | null>(null);
   const sheet = useMapSheetState({
-    // Gyms mode keeps the classic header-only collapsed look (max
+    // Explore mode keeps the classic header-only collapsed look (max
     // map); area/list mode widens to 25% so the first route card
     // peeks out at COLLAPSED. The memo in useMapSheetState picks up
     // this change dynamically as the user transitions modes.
-    collapsedFraction: mode.kind === 'gyms' ? 'header-only' : 0.25,
-    // Gyms mode lands the user directly at MEDIUM so the list is
+    collapsedFraction: mode.kind === 'explore' ? 'header-only' : 0.25,
+    // Explore mode lands the user directly at MEDIUM so the list is
     // visible on first frame (Apple Maps default). Area/list mode
     // keeps COLLAPSED (peek) since the map is the primary focus
     // there until the user decides to browse.
-    initialDetent: initialMode.kind === 'gyms' ? DETENT_MEDIUM : DETENT_COLLAPSED,
+    initialDetent: initialMode.kind === 'explore' ? DETENT_MEDIUM : DETENT_COLLAPSED,
     onManualOpen: useCallback(() => {
       manualOpenHandlerRef.current?.();
     }, []),
@@ -344,7 +344,7 @@ export default function MapScreenMapbox({
     return {};
   }, [mapFilter]);
   const viewportPins = useViewportPins(bbox, {
-    enabled: (mode.kind === 'gyms' || mode.kind === 'area') && styleReady,
+    enabled: (mode.kind === 'explore' || mode.kind === 'area') && styleReady,
     style: mapFilterParams.style,
     discipline: mapFilterParams.discipline,
   });
@@ -388,7 +388,7 @@ export default function MapScreenMapbox({
   }, []);
 
   // ---- Data hooks ----
-  const gymsEnabled = mode.kind === 'gyms';
+  const gymsEnabled = mode.kind === 'explore';
   const gymsData = useGymsData(gymsEnabled);
   // BR Track D Day 7 follow-up — tier-1 Crag overview source (~15k crags,
   // loaded once + cached at module level). Drives the gyms-mode
@@ -533,7 +533,7 @@ export default function MapScreenMapbox({
   // lands the user on the empty "Tap a pin on the map" state until they
   // pick a wall — an explicit UX trade per PLAN §3.2.
 
-  // ---- Map is centered on user? (for gyms mode location button) ----
+  // ---- Map is centered on user? (for explore mode location button) ----
   const isAtUser = useMemo(() => {
     if (!userLoc || !center) return false;
     const rad = Math.PI / 180;
@@ -545,7 +545,7 @@ export default function MapScreenMapbox({
 
   // ---- Camera choreography on mode change ----
   // On entering area mode via deep link (mount) or via in-screen transition,
-  // fit to area pins once data loads. On backToGyms, fly to prevCamera.
+  // fit to area pins once data loads. On backToExplore, fly to prevCamera.
   useEffect(() => {
     if (!styleReady || !mapReady || !camRef.current) return;
     if (mode.kind === 'area') {
@@ -591,13 +591,13 @@ export default function MapScreenMapbox({
         } catch {}
       }
     }
-    // gyms mode on mount: the location-permission flow in useGymsData
+    // explore mode on mount: the location-permission flow in useGymsData
     // drives the initial camera via store.userLoc. We handle the explicit
-    // "back to gyms" fly-to separately in onBackToGyms.
+    // "back to gyms" fly-to separately in onBackToExplore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode.kind, areaId, listId, areaData.area, listData.pins, styleReady, mapReady]);
 
-  // gyms mode: when user location first arrives, snap the camera to it.
+  // explore mode: when user location first arrives, snap the camera to it.
   // Map + style must both be ready — otherwise setCamera can be eaten by
   // the native view before the first frame, and we'd never retry because
   // the done-flag is already set. animationDuration: 0 avoids a visible
@@ -605,7 +605,7 @@ export default function MapScreenMapbox({
   // State (not ref) so the loading overlay below can react to it.
   const [initialGymsCenterDone, setInitialGymsCenterDone] = useState(false);
   useEffect(() => {
-    if (mode.kind !== 'gyms' || !userLoc || !camRef.current) return;
+    if (mode.kind !== 'explore' || !userLoc || !camRef.current) return;
     if (!styleReady || !mapReady) return;
     if (initialGymsCenterDone) return;
     markProgrammaticMove(100);
@@ -620,8 +620,8 @@ export default function MapScreenMapbox({
   }, [mode.kind, userLoc, styleReady, mapReady, initialGymsCenterDone, markProgrammaticMove]);
 
   // ---- Back to gyms: fly to prevCamera or default ----
-  const onBackToGyms = useCallback(() => {
-    backToGyms();
+  const onBackToExplore = useCallback(() => {
+    backToExplore();
     // Close any stacked sheets
     detailSheetRef.current?.dismiss().catch(() => {});
     areaInfoSheetRef.current?.dismiss();
@@ -640,7 +640,7 @@ export default function MapScreenMapbox({
         });
       } catch {}
     }
-  }, [backToGyms, prevCamera, userLoc, markProgrammaticMove]);
+  }, [backToExplore, prevCamera, userLoc, markProgrammaticMove]);
 
   // ---- Map events ----
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -661,9 +661,9 @@ export default function MapScreenMapbox({
       const next: LatLng = { lat, lng };
       // Always track the center so `isAtUser` computes correctly across all
       // modes (needed for the location-recenter button in the area/list
-      // top-bar). The debounced gyms fetchNearby stays gated to gyms mode.
+      // top-bar). The debounced gyms fetchNearby stays gated to explore mode.
       useGymsStore.getState().setCenter(next);
-      if (mode.kind === 'gyms') {
+      if (mode.kind === 'explore') {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (suppressNextFetchRef.current) {
           suppressNextFetchRef.current = false;
@@ -705,7 +705,7 @@ export default function MapScreenMapbox({
 
   // Wall pin tap handler — fires when the user taps a single Wall pin
   // (zoom ≥15 in the bbox cluster source). PLAN §3.2:
-  //   - gyms mode → enter the wall's parent Region first, then focus the
+  //   - explore mode → enter the wall's parent Region first, then focus the
   //     wall once area mode is active. We set focusedWall up-front so the
   //     area-mode mount effect (autoLoadedAreaRef guard) can short-circuit
   //     to a single-wall load instead of fanning the entire region.
@@ -751,7 +751,7 @@ export default function MapScreenMapbox({
 
   const onWallPinPress = useCallback(
     (ctx: WallPinContext) => {
-      if (mode.kind === 'gyms') {
+      if (mode.kind === 'explore') {
         // Transition into area mode first; the area-mode mount effect picks
         // up `focusedWall` to short-circuit the all-pins fan-out. We set
         // focusedWall BEFORE enterArea so the autoLoadedAreaRef branch sees
@@ -773,7 +773,7 @@ export default function MapScreenMapbox({
     [mode.kind, enterArea, focusOnWall],
   );
 
-  // BR Track D Day 7 follow-up — tier-1 Crag pin tap (gyms mode only).
+  // BR Track D Day 7 follow-up — tier-1 Crag pin tap (explore mode only).
   // Presents CragInfoSheet stacked with seed payload from the cluster
   // context (so first paint is instant before the sheet's own
   // /outdoor/crags/{id} detail fetch lands). PLAN §3.2 redesign.
@@ -874,7 +874,7 @@ export default function MapScreenMapbox({
   // When a gym is selected, fly camera +
   // present detail sheet (stacked on the gyms list sheet).
   useEffect(() => {
-    if (mode.kind !== 'gyms') return;
+    if (mode.kind !== 'explore') return;
     if (selectedGym) {
       setDetailGym(selectedGym);
       markProgrammaticMove(600);
@@ -1238,12 +1238,12 @@ export default function MapScreenMapbox({
     router.navigate(route as any);
   }, [router, sheet]);
 
-  // BK: in gyms mode, when AreaInfoSheet is on top of the gyms sheet,
+  // BK: in explore mode, when AreaInfoSheet is on top of the gyms sheet,
   // chevron.down should dismiss the info sheet first (Apple Maps
   // pattern) rather than navigating away from the map tab.
   const onLeftButtonPress = useCallback(() => {
     if (mode.kind === 'area') {
-      onBackToGyms();
+      onBackToExplore();
       return;
     }
     if (areaInfoOpen) {
@@ -1251,7 +1251,7 @@ export default function MapScreenMapbox({
       return;
     }
     goToPreviousTab();
-  }, [mode.kind, areaInfoOpen, onBackToGyms, goToPreviousTab]);
+  }, [mode.kind, areaInfoOpen, onBackToExplore, goToPreviousTab]);
 
   const topBar = (
     <MapTopBar
@@ -1270,7 +1270,7 @@ export default function MapScreenMapbox({
 
   // ---- Sheet content (header + body) ----
   const sheetHeader = (() => {
-    if (mode.kind === 'gyms') {
+    if (mode.kind === 'explore') {
       return (
         <MapSearchBar
           query={gymsQuery}
@@ -1303,7 +1303,7 @@ export default function MapScreenMapbox({
     // the pinned header slot, blocking TrueSheet's sheet pan. Inside
     // the scroll body, TrueSheet's `prefersScrollingExpandsWhenScrolledToEdge`
     // links scroll drag to sheet detent, so up-drag anywhere in the
-    // content reliably expands the sheet — same way gyms mode works.
+    // content reliably expands the sheet — same way explore mode works.
     if (searchExpanded) {
       return (
         <MapSearchBar
@@ -1391,8 +1391,8 @@ export default function MapScreenMapbox({
               <MapboxGL.UserLocation animated={false} visible showsUserHeadingIndicator />
             )}
 
-            {/* Gyms mode: inline gym + crag shape sources */}
-            {styleLoaded && mode.kind === 'gyms' && (
+            {/* Explore mode: inline gym + crag shape sources */}
+            {styleLoaded && mode.kind === 'explore' && (
               <>
                 {/* BR Track D Day 7 follow-up — gym ShapeSource is now
                     `cluster:true` with accumulated-set source data,
@@ -1481,12 +1481,12 @@ export default function MapScreenMapbox({
 
             {/* BR Track D Day 7 follow-up tier-1 — Crag overview cluster.
                 Replaces the legacy Region overview + bbox-shifting source
-                in gyms mode (PLAN §3.2 redesign). Stable pre-loaded ~15k
+                in explore mode (PLAN §3.2 redesign). Stable pre-loaded ~15k
                 Crag dataset with Mapbox `cluster:true` for visual
                 aggregation. Cluster bubble label = sum of route_count
                 across child crags. Tap single Crag pin → CragInfoSheet
                 stacked. */}
-            {mode.kind === 'gyms' && (
+            {mode.kind === 'explore' && (
               <CragOverviewCluster
                 crags={cragsOverview.crags}
                 styleReady={styleReady}
@@ -1497,7 +1497,7 @@ export default function MapScreenMapbox({
 
             {/* BR Track D Day 5d/5e — bbox-scoped wall pin cluster for
                 tier-2 (area mode only). User reaches this by tapping a
-                Crag pin in gyms mode → CragInfoSheet → "View on Map" →
+                Crag pin in explore mode → CragInfoSheet → "View on Map" →
                 enterArea, or directly via GymsSavedSpotsRow / search
                 hit. Once inside area mode the bbox follows the camera
                 so users can pan within the focused Region. */}
@@ -1585,7 +1585,7 @@ export default function MapScreenMapbox({
             two every time the user enters /map. The shared loadingOverlay
             above is 10% opacity (meant for pin-loading on top of pins),
             which is why it didn't actually hide the null-island flash. */}
-        {mode.kind === 'gyms' && !initialGymsCenterDone && !gymsError ? (
+        {mode.kind === 'explore' && !initialGymsCenterDone && !gymsError ? (
           <View style={[styles.initialMapCover, { backgroundColor: colors.background }]}>
             <ActivityIndicator size="large" color={colors.accent} />
           </View>
@@ -1660,7 +1660,7 @@ export default function MapScreenMapbox({
         ref={sheet.sheetRef}
         name="map-primary-sheet"
         detents={[...sheet.detents]}
-        initialDetentIndex={initialMode.kind === 'gyms' ? DETENT_MEDIUM : DETENT_COLLAPSED}
+        initialDetentIndex={initialMode.kind === 'explore' ? DETENT_MEDIUM : DETENT_COLLAPSED}
         initialDetentAnimated
         dimmed={false}
         dismissible={false}
@@ -1673,7 +1673,7 @@ export default function MapScreenMapbox({
         onDidDismiss={sheet.onDidDismiss}
         onDetentChange={sheet.onDetentChange}
       >
-        {mode.kind === 'gyms' ? (
+        {mode.kind === 'explore' ? (
           <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
             <GymsSavedSpotsRow
               onSelectArea={onSelectAreaFromList}
@@ -1681,7 +1681,7 @@ export default function MapScreenMapbox({
                 // Day 6 — Area-typed saved spot tap → AreaInfoSheet stacked.
                 // Use a minimum-fields Area stub; AreaInfoSheet's child-crag
                 // loader only reads `area.id`.
-                if (mode.kind !== 'gyms') return;
+                if (mode.kind !== 'explore') return;
                 setAreaInfoFromSpotsArea({
                   id: spot.target_id,
                   region_id: '',
@@ -1691,7 +1691,7 @@ export default function MapScreenMapbox({
                 areaInfoFromSpotsSheetRef.current?.present();
               }}
               onSelectCrag={(spot) => {
-                if (mode.kind !== 'gyms') return;
+                if (mode.kind !== 'explore') return;
                 setCragInfoCragId(spot.target_id);
                 setCragInfoSeed({
                   id: spot.target_id,
@@ -1806,7 +1806,7 @@ export default function MapScreenMapbox({
         )}
       </TrueSheet>
 
-      {/* Detail sheet — gyms mode POI card (gym or area). */}
+      {/* Detail sheet — explore mode POI card (gym or area). */}
       <TrueSheet
         ref={detailSheetRef}
         name="map-detail-sheet"
@@ -1868,7 +1868,7 @@ export default function MapScreenMapbox({
         onPresented={() => setAreaInfoOpen(true)}
         onDismiss={() => setAreaInfoOpen(false)}
         onPressRouteMap={() => {
-          if (areaInfoContext === 'gyms' && areaInfoSeed) {
+          if (areaInfoContext === 'explore' && areaInfoSeed) {
             areaInfoSheetRef.current?.dismiss();
             enterArea(areaInfoSeed.id, areaInfoSeed.name);
           }

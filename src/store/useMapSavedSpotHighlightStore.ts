@@ -3,7 +3,7 @@
 // `GymsSavedSpotsRow` highlight first?
 //
 // Flow: home `SavedSpotsCarousel` tap writes `highlightAreaId` here and
-// then `router.navigate('/map')` to enter gyms mode. The gyms sheet row
+// then `router.navigate('/map')` to enter explore mode. The gyms sheet row
 // reads this value and sorts the matching area to the front of its
 // horizontal list, so the user lands in /map with the spot they just
 // tapped already at index 0 (Apple-Maps-style "recent" cue) — single
