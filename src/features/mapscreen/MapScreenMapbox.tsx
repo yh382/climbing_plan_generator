@@ -92,6 +92,7 @@ import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 import { useCragsOverview } from './useCragsOverview';
 import TrailLayer from '../outdoor/components/TrailLayer';
+import { getDevTrailFallback } from '../outdoor/devTrailFixture';
 import { FilterChipsBar } from './components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../store/useOutdoorMapFiltersStore';
 import { MapSearchResultsList } from './components/MapSearchResultsList';
@@ -1524,9 +1525,36 @@ export default function MapScreenMapbox({
                 Only renders when a Wall is focused (so we know which
                 Crag's trail to show); without focus, no trail. List
                 mode skips entirely — a list may span multiple crags. */}
-            {mode.kind === 'area' && styleLoaded && (
-              <TrailLayer trailGeoJSON={focusedCragDetail?.trail_geojson} />
-            )}
+            {mode.kind === 'area' && styleLoaded && (() => {
+              // BS Track B (2026-06-06) — dev-only fallback: when real
+              // trail data is missing (prod ~100% null until OSM
+              // Overpass backfill runs), inject a fixture trail
+              // generated around the focused crag's lat/lng. Use
+              // focusedWall's lat/lng as the anchor since BE's
+              // CragDetailOut may return null lat/lng (column-level
+              // null in prod) while focusedWall always has it (it's
+              // populated by the pin tap context). Toggles 'osm' vs
+              // 'user' by crag name length parity. Strict __DEV__
+              // guard → prod never reaches fixture path.
+              const devFallback =
+                __DEV__ && !focusedCragDetail?.trail_geojson && focusedWall
+                  ? getDevTrailFallback({
+                      name: focusedCragDetail?.name ?? focusedWall.crag_name,
+                      lat: focusedCragDetail?.lat ?? focusedWall.lat,
+                      lng: focusedCragDetail?.lng ?? focusedWall.lng,
+                    })
+                  : null;
+              return (
+                <TrailLayer
+                  trailGeoJSON={
+                    focusedCragDetail?.trail_geojson ?? devFallback?.geojson ?? null
+                  }
+                  trailSource={
+                    focusedCragDetail?.trail_source ?? devFallback?.source ?? null
+                  }
+                />
+              );
+            })()}
 
             {/* Hide built-in clutter layers (POI + secondary roads). */}
             {styleLoaded &&

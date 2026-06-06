@@ -347,6 +347,44 @@ const CragInfoSheet = forwardRef<CragInfoSheetHandle, CragInfoSheetProps>(
             <PlaceSheetActions actions={actions} />
             <PlaceSheetStats stats={stats} />
 
+            {/* BS Track B (2026-06-06) — OSM trail safety/trust banner.
+                When trail_geojson came from auto-fetched OSM Overpass
+                (vs admin/user curated), surface a clear "not a verified
+                approach" notice. Without this, the dashed trail line
+                visually reads as "recommended approach", which is
+                dangerous when OSM data may be any hiker/bike/closed
+                path. Banner only renders when trail is actually shown
+                AND source is 'osm'. Dev fallback: when real trail_source
+                is null (prod ~100% case before OSM backfill), mirror
+                the MapScreenMapbox TrailLayer toggle (even-length crag
+                name → OSM) so visual verify is possible without OSM
+                data. Strict __DEV__ guard → prod never triggers fallback. */}
+            {(() => {
+              const realIsOSM =
+                !!(detail?.trail_geojson && detail?.trail_source === 'osm');
+              const devToggle =
+                __DEV__ &&
+                !!detail &&
+                !detail.trail_source &&
+                ((detail.name?.length ?? 0) % 2 === 0);
+              return realIsOSM || devToggle;
+            })() ? (
+              <View style={styles.osmTrailBanner}>
+                <Ionicons
+                  name="warning-outline"
+                  size={18}
+                  color="#F97316"
+                  style={styles.osmTrailBannerIcon}
+                />
+                <Text style={styles.osmTrailBannerText}>
+                  {tr(
+                    '显示附近参考小径。非已验证进场路线。',
+                    'Showing nearby reference trails. Not a verified approach.',
+                  )}
+                </Text>
+              </View>
+            ) : null}
+
             {showSkeleton ? (
               <View style={[styles.contentCard, styles.skeleton]}>
                 <ActivityIndicator color={colors.accent} />
@@ -622,5 +660,26 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     skeleton: {
       alignItems: 'center',
       paddingVertical: 40,
+    },
+    osmTrailBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(249, 115, 22, 0.08)',
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginHorizontal: theme.spacing.screenPadding,
+      marginTop: 12,
+    },
+    osmTrailBannerIcon: {
+      marginTop: 1,
+    },
+    osmTrailBannerText: {
+      flex: 1,
+      fontFamily: theme.fonts.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.textPrimary,
     },
   });

@@ -293,9 +293,20 @@ export type CragCommunitySummary = {
   last_activity_at: string | null;
 };
 
+/** Trail data provenance (BR Track C audit column).
+ *  - `osm` — auto-fetched OSM Overpass nearby trails (reference only,
+ *    NOT a verified approach). Rendered subtly (gray + low opacity).
+ *  - `admin` / `user` — curated trail submitted by admin or user
+ *    (verified approach). Rendered prominently (accent + dashed).
+ *  - `mixed` — combination of admin/user + OSM. Treated as verified
+ *    (conservative: if any human curated input, treat as approach).
+ *  - `null` — no trail data. */
+export type TrailSource = 'osm' | 'admin' | 'user' | 'mixed';
+
 export type CragDetail = Crag & {
-  /** BR Track C audit columns — null when no OSM Overpass sync yet. */
-  trail_source?: string | null;
+  /** BR Track C audit columns — null when no OSM Overpass sync yet.
+   *  Narrowed to TrailSource union in BS Track B (visual split). */
+  trail_source?: TrailSource | null;
   osm_synced_at?: string | null;
   walls: Wall[];
   community: CragCommunitySummary;
