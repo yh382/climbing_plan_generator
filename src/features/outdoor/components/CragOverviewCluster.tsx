@@ -18,8 +18,14 @@
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
-import { theme } from '../../../lib/theme';
 import type { CragOverview } from '../types';
+
+// BS Track A 2026-06-06 — outdoor cluster orange, visually distinct
+// from the teal accent (#306E6F) used by gym cluster. User explicitly
+// required "orange like the fruit". Hard-coded for now; should migrate
+// to a `theme.colors.outdoorMarker` token in a BS follow-up so dark
+// mode can pick a brighter variant if needed.
+const OUTDOOR_MARKER_ORANGE = '#F97316';
 
 /** Per-crag context attached to features so a tap surfaces full info
  *  without a second fetch. */
@@ -55,15 +61,18 @@ const CLUSTER_RADIUS = 50;
 
 /** Adaptive cluster bubble size — denser climbing regions render bigger
  *  so visual weight tracks route density at a glance. Driven by total
- *  `route_count_sum` aggregated across the cluster's child crags. */
+ *  `route_count_sum` aggregated across the cluster's child crags.
+ *  Scale aligned with gym cluster (max 26) — keeps bubbles legible at
+ *  continental zoom without occluding underlying geography. Outdoor
+ *  numbers span 10k+ so max step is slightly larger than gym. */
 const CLUSTER_RADIUS_EXPRESSION = [
   'step',
   ['get', 'route_count_sum'],
-  16,    // <100 routes
-  100, 22,    // ≥100
-  500, 28,    // ≥500
-  2000, 34,   // ≥2000
-  10000, 42,  // ≥10000
+  8,     // <100 routes
+  100, 12,    // ≥100
+  500, 16,    // ≥500
+  2000, 20,   // ≥2000
+  10000, 24,  // ≥10000
 ] as const;
 
 const SINGLE_PIN_RADIUS = 7;
@@ -150,8 +159,19 @@ export default function CragOverviewCluster({
       clusterRadius={CLUSTER_RADIUS}
       // Mapbox aggregate: sum of child crag.route_count per cluster.
       // Bubble label below reads this property.
+      // BS Track A fix 2026-06-06: @rnmapbox/maps clusterProperties
+      // strictly requires length-2 array [operator, mapExpression] —
+      // length-3 form (with explicit ['accumulated']) fails source
+      // addToMap with "must be an array with length of 2". Also the
+      // map expression must read a property that exists on base
+      // features — child crag features emit `route_count`, never
+      // `route_count_sum` (that's the aggregated output name, not an
+      // input). Previous expression `['+', ['accumulated'], ['get',
+      // 'route_count_sum']]` had both bugs; this was the real Track A
+      // root cause (broken source → every layer's find_source nil →
+      // outdoor cluster + pins entirely invisible).
       clusterProperties={{
-        route_count_sum: ['+', ['accumulated'], ['get', 'route_count_sum']],
+        route_count_sum: ['+', ['get', 'route_count']],
       }}
       onPress={handlePress}
       maxZoomLevel={maxZoom}
@@ -161,7 +181,7 @@ export default function CragOverviewCluster({
         id="crag-overview-cluster-circles"
         filter={['has', 'point_count']}
         style={{
-          circleColor: theme.colors.accent,
+          circleColor: OUTDOOR_MARKER_ORANGE,
           circleRadius: CLUSTER_RADIUS_EXPRESSION,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.6,
@@ -191,32 +211,33 @@ export default function CragOverviewCluster({
         id="crag-overview-single-pins"
         filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: theme.colors.accent,
+          circleColor: OUTDOOR_MARKER_ORANGE,
           circleRadius: SINGLE_PIN_RADIUS,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.4,
         }}
       />
-      {/* Single Crag name label — appears at zoom 11+ when single pins
-          visible. Matches the working gym-labels style verbatim
-          (textVariableAnchor + textRadialOffset) since `textAnchor +
-          textOffset` combination caused makeLayer to return nil. */}
+      {/* Single Crag name label — always visible alongside the single
+          pin (no separate minZoom; tied to same filter as single-pins
+          so it appears the moment the cluster dissolves). Forced
+          textAllowOverlap + textIgnorePlacement so every visible pin
+          shows its name, even in dense areas (Yosemite-style). User
+          requirement 2026-06-06 — "label should follow the pin, not
+          appear at a special zoom". */}
       <MapboxGL.SymbolLayer
         id="crag-overview-single-labels"
         filter={['!', ['has', 'point_count']]}
-        minZoomLevel={11}
         style={{
           textField: ['get', 'crag_name'] as any,
           textSize: 11,
           textColor: '#0F172A',
           textHaloColor: 'rgba(255,255,255,0.92)',
           textHaloWidth: 1.4,
-          textVariableAnchor: ['top', 'bottom', 'left', 'right'],
-          textRadialOffset: 1.0,
-          textJustify: 'auto',
-          textAllowOverlap: false,
-          textIgnorePlacement: false,
-          textPadding: 6,
+          textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          textAnchor: 'top',
+          textOffset: [0, 0.8],
+          textAllowOverlap: true,
+          textIgnorePlacement: true,
           textMaxWidth: 10,
           symbolZOrder: 'auto',
         }}
