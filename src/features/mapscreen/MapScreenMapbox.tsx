@@ -15,6 +15,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
+  type AppStateStatus,
   View,
   Text,
   StyleSheet,
@@ -200,6 +202,10 @@ export default function MapScreenMapbox({
   // without triggering re-renders. The manual-drag refocus handler reads
   // it to figure out which wall the user is looking at.
   const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  // Latest full camera snapshot (center + zoom). Used to restore camera
+  // position after MapView key-bump remount on AppState background→
+  // active recovery (otherwise Mapbox resets to [0,0] default).
+  const lastCameraSnapshotRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   // rnmapbox only lets the touch-start event bubble to RN (onTouchMove /
   // onTouchEnd are swallowed by Mapbox's UIGestureRecognizer — see
   // rnmapbox issues #3019, #1667). We work around the missing onTouchMove
@@ -356,6 +362,29 @@ export default function MapScreenMapbox({
     setStyleReady(false);
     setLoadedStyleURL(null);
   }, [mapStyleURL]);
+
+  // 2026-06-06 fix — when iOS releases the Mapbox GL context under
+  // memory pressure during backgrounding, returning to foreground
+  // silently leaves the map empty: tiles + style come back but our
+  // JS-side ShapeSource/Layer children never re-add to the recovered
+  // style. Just resetting styleReady doesn't help because Mapbox does
+  // not re-fire onDidFinishLoadingStyle for a recovered style. The
+  // bulletproof fix is to force MapboxGL.MapView to remount entirely
+  // via a key bump, which tears down and rebuilds the native view +
+  // all child sources/layers from JSX. Brief flash on return is
+  // acceptable; previously the alternative was permanently empty map.
+  // Independent of BS Track A/B; surfaced during real-device dogfood.
+  const [mapMountKey, setMapMountKey] = useState(0);
+  useEffect(() => {
+    let prev: AppStateStatus = AppState.currentState;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (prev !== 'active' && next === 'active') {
+        setMapMountKey((k) => k + 1);
+      }
+      prev = next;
+    });
+    return () => sub.remove();
+  }, []);
 
   // ---- Data hooks ----
   const gymsEnabled = mode.kind === 'gyms';
@@ -798,6 +827,7 @@ export default function MapScreenMapbox({
       const currentLat = Number(c[1]);
       const currentLng = Number(c[0]);
       mapCenterRef.current = { lat: currentLat, lng: currentLng };
+      lastCameraSnapshotRef.current = { center: [currentLng, currentLat], zoom };
       observeCamera({ center: [currentLng, currentLat], zoom });
 
       // Programmatic flyTo — don't let it poison the lat-delta tracking.
@@ -1321,6 +1351,7 @@ export default function MapScreenMapbox({
       >
         {MAPBOX_TOKEN ? (
           <MapboxGL.MapView
+            key={mapMountKey}
             ref={mapRef}
             styleURL={mapStyleURL}
             style={StyleSheet.absoluteFillObject}
@@ -1335,7 +1366,25 @@ export default function MapScreenMapbox({
             }}
             onDidFinishLoadingMap={() => setMapReady(true)}
           >
-            <MapboxGL.Camera ref={camRef} pitch={is3D ? 55 : 0} heading={0} />
+            <MapboxGL.Camera
+              ref={camRef}
+              pitch={is3D ? 55 : 0}
+              heading={0}
+              // Restore last known camera on MapView remount (AppState
+              // background→active recovery). defaultSettings only
+              // applies on first mount of Camera, which is exactly what
+              // we want for the key-bumped MapView remount. On initial
+              // app launch the ref is null → Mapbox uses its own
+              // default + the existing UserLocation follow logic.
+              defaultSettings={
+                lastCameraSnapshotRef.current
+                  ? {
+                      centerCoordinate: lastCameraSnapshotRef.current.center,
+                      zoomLevel: lastCameraSnapshotRef.current.zoom,
+                    }
+                  : undefined
+              }
+            />
 
             {styleLoaded && (
               <MapboxGL.UserLocation animated={false} visible showsUserHeadingIndicator />
