@@ -168,24 +168,20 @@ export default function CragOverviewCluster({
           circleOpacity: 0.92,
         }}
       />
-      {/* Cluster bubble label — route_count_sum aggregate */}
+      {/* Cluster bubble label — total route count across the cluster's
+          child crags (more informative for climbers than crag-count).
+          Uses `to-string` on the aggregated `route_count_sum` clusterProperty
+          — kept simple to avoid the layer-makeLayer-nil failure that
+          nested case/concat expressions caused on this @rnmapbox/maps
+          version. No `textFont` (defaults work; DIN Pro Bold caused
+          font-lookup failures on the loaded outdoor-v12 style). */}
       <MapboxGL.SymbolLayer
         id="crag-overview-cluster-labels"
         filter={['has', 'point_count']}
         style={{
-          textField: [
-            'case',
-            ['>=', ['get', 'route_count_sum'], 10000], '10k+',
-            ['>=', ['get', 'route_count_sum'], 1000], [
-              'concat',
-              ['to-string', ['/', ['round', ['get', 'route_count_sum']], 1000]],
-              'k',
-            ],
-            ['to-string', ['get', 'route_count_sum']],
-          ] as any,
+          textField: ['to-string', ['get', 'route_count_sum']] as any,
           textSize: 12,
           textColor: '#FFFFFF',
-          textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
           textAllowOverlap: true,
           textIgnorePlacement: true,
         }}
@@ -201,7 +197,10 @@ export default function CragOverviewCluster({
           circleStrokeWidth: 1.4,
         }}
       />
-      {/* Single Crag name label — appears at zoom 11+ when single pins visible */}
+      {/* Single Crag name label — appears at zoom 11+ when single pins
+          visible. Matches the working gym-labels style verbatim
+          (textVariableAnchor + textRadialOffset) since `textAnchor +
+          textOffset` combination caused makeLayer to return nil. */}
       <MapboxGL.SymbolLayer
         id="crag-overview-single-labels"
         filter={['!', ['has', 'point_count']]}
@@ -212,12 +211,12 @@ export default function CragOverviewCluster({
           textColor: '#0F172A',
           textHaloColor: 'rgba(255,255,255,0.92)',
           textHaloWidth: 1.4,
-          textAnchor: 'top',
-          textOffset: [0, 0.9],
-          textJustify: 'center',
+          textVariableAnchor: ['top', 'bottom', 'left', 'right'],
+          textRadialOffset: 1.0,
+          textJustify: 'auto',
           textAllowOverlap: false,
           textIgnorePlacement: false,
-          textPadding: 4,
+          textPadding: 6,
           textMaxWidth: 10,
           symbolZOrder: 'auto',
         }}
