@@ -250,6 +250,63 @@ function RootStack() {
           ),
         }}
       />
+      {/* TR4b — Template Builder action picker. Variant 2 handoff via
+          useExercisePickerHandoffStore (caller writes request slot, route
+          writes result slot on tap row). Standard formSheet chrome:
+          native UIKit nav bar with X close button on the left; route
+          itself adds the native UISearchBar via
+          `navigation.setOptions({ headerSearchBarOptions })` so iOS
+          handles the layout + inset correctly. */}
+      {/* TR4b-3 — Template Builder tags picker. Same formSheet
+          conventions as exercise-picker. */}
+      <Stack.Screen
+        name="tags-picker"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.99],
+          sheetGrabberVisible: true,
+          title: "Add Tags",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      {/* TR4b-4 — Generic numeric value picker (rest / reps / time /
+          load), replaces the per-feature RestPickerSheet TrueSheet. */}
+      <Stack.Screen
+        name="value-picker"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.55, 0.7],
+          sheetGrabberVisible: true,
+          title: "Pick",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="exercise-picker"
+        options={{
+          presentation: "formSheet",
+          // Single full detent — multiple detents (e.g. [0.7, 0.9])
+          // make UIKit treat an upward scroll near a row as a detent
+          // transition, fighting the FlatList's own scroll. Picking an
+          // exercise needs the full list to be reachable, so we lock
+          // the sheet at the maximum height. (expo-router's type only
+          // accepts numbers, not the iOS "large" string literal —
+          // 0.99 is the convention for "effectively full".)
+          sheetAllowedDetents: [0.99],
+          sheetGrabberVisible: true,
+          title: "Exercise Library",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
     </Stack>
   );
 }

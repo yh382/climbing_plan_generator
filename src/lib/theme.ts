@@ -1,10 +1,23 @@
 export const theme = {
   colors: {
     accent: '#306E6F',
-    background: '#FFFFFF',
+    // Light-mode palette — minimally warm pearl page bg + pure white
+    // cards / inputs / tags.
+    //
+    // Iterations:
+    //   v1: bg #F4F2EC  (R-B=8)  — too yellow per dogfood
+    //   v2: bg #F4F3EF  (R-B=5)  — still warm-leaning
+    //   v3:   bg #F4F3F1 (R-B=3) — still picked up by eye
+    //   v4 (now): bg #F4F3F2 (R-B=2) — ambient warmth at the edge
+    //   of perception; reads as "near-neutral" with a faint paper
+    //   feel rather than tinted.
+    //
+    // backgroundSecondary keeps the same R-B=2 ratio so in-card cell
+    // pills don't pick up extra yellow against the bg.
+    background: '#F4F3F2',
     sheetBackground: '#FFFFFF',
-    sheetCardBackground: '#F7F7F7',
-    backgroundSecondary: '#F7F7F7',
+    sheetCardBackground: '#FFFFFF',
+    backgroundSecondary: '#ECEBEA',
     cardDark: '#1C1C1E',
     cardDarkImage: '#272727',
     textPrimary: '#000000',
@@ -12,26 +25,26 @@ export const theme = {
     textTertiary: '#BBBBBB',
     border: 'rgba(0,0,0,0.08)',
     // Dark-mode-aware tokens (Phase 3)
-    cardBackground: '#F7F7F7',
-    cardBorder: '#E5E7EB',
+    cardBackground: '#FFFFFF',
+    cardBorder: '#E5E2D8',
     toggleBackground: '#FFFFFF',
     toggleActiveBackground: '#1C1C1E',
     toggleActiveText: '#FFFFFF',
     toggleInactiveText: '#888888',
-    gridLine: '#E5E7EB',
+    gridLine: '#E5E2D8',
     chartLabel: '#64748B',
     chartTitle: '#000000',
     chartValue: '#374151',
     divider: 'rgba(0,0,0,0.08)',
-    inputBackground: '#F7F7F7',
+    inputBackground: '#FFFFFF',
     bubbleAI: '#FFFFFF',
     bubbleAIBorder: '#E5E7EB',
     bubbleAIText: '#111827',
-    progressTrack: '#F3F4F6',
+    progressTrack: '#ECEBEA',
     pillBackground: '#1C1C1E',
     pillText: '#FFFFFF',
-    emptyBarColor: '#E5E7EB',
-    borderTertiary: '#E5E7EB',
+    emptyBarColor: '#E5E2D8',
+    borderTertiary: '#E5E2D8',
     trail: '#A08060',
     // Window DAILY_GROUP — "Attempted" badge tint (no send yet on a route).
     attempt: '#D97706',

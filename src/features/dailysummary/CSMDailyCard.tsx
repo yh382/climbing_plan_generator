@@ -103,8 +103,8 @@ export default function CSMDailyCard() {
       style={styles.card}
       activeOpacity={0.8}
       onPress={() => {
-        setSegment("analysis");
-        router.push("/(drawer)/(tabs)/activity" as any);
+        // TR7 — Analysis lives at the full-screen route now.
+        router.push("/analysis" as any);
       }}
     >
       <View style={styles.headerRow}>

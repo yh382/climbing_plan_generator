@@ -21,6 +21,7 @@ import type { PlanV3SessionItem } from "../../src/types/plan";
 import useActiveWorkoutStore from "../../src/store/useActiveWorkoutStore";
 import useSessionSheetHandoffStore from "../../src/store/useSessionSheetHandoffStore";
 import { exercisesApi } from "../../src/features/exercises/api";
+import type { ProtocolVariant } from "../../src/features/exercises/types";
 
 export default function ExerciseTrainingScreen() {
   const router = useRouter();
@@ -44,28 +45,63 @@ export default function ExerciseTrainingScreen() {
     return null;
   }, [params.sessionItem]);
 
+  // TR1: variantId may arrive on the route (exercise-detail piped it via
+  // the Start CTA). When set we resolve protocol_variants[variantId]
+  // against the fetched ExerciseDetail and let that override the base
+  // sessionItem fields (sets/reps/seconds/rest).
+  const variantId = Array.isArray(params.variantId)
+    ? params.variantId[0]
+    : params.variantId;
+
   // LogWorkout moved to formSheet route — sheet-container-audit A1.
   const workoutLoggedAt = useSessionSheetHandoffStore((s) => s.workoutLoggedAt);
   const lastSeenLogAtRef = React.useRef(workoutLoggedAt);
   const [showInfo, setShowInfo] = useState(false);
   const [allDone, setAllDone] = useState(false);
   const [enrichedImage, setEnrichedImage] = useState<string | null>(null);
+  // TR5: store both the variant resolved from BE + the interval_mode hint
+  // (Phase 3 — derive from exercise tags until BE adds a real flag).
+  const [activeVariant, setActiveVariant] = useState<ProtocolVariant | null>(null);
+  const [intervalMode, setIntervalMode] = useState(false);
 
-  // Fetch backend image if missing
+  // Fetch backend image + resolve variant + derive interval_mode hint.
   useEffect(() => {
-    if (exerciseId && sessionItem && !sessionItem.media?.image && !(sessionItem.media as any)?.thumbnail_url) {
-      exercisesApi.getExerciseDetail(exerciseId).then(detail => {
+    if (!exerciseId) return;
+    let alive = true;
+    exercisesApi.getExerciseDetail(exerciseId).then((detail) => {
+      if (!alive) return;
+      // Image fallback for plan-driven flows where the sessionItem media
+      // is empty.
+      if (sessionItem && !sessionItem.media?.image && !(sessionItem.media as any)?.thumbnail_url) {
         const media = detail.media as any;
         const img = media?.thumbnail_url || media?.image_url || media?.image || null;
         if (img) setEnrichedImage(img);
-      }).catch(() => {});
-    }
-  }, [exerciseId, sessionItem]);
+      }
+      // Variant resolution (TR1).
+      const variants = detail.protocol_variants ?? [];
+      if (variantId) {
+        setActiveVariant(variants.find((v) => v.id === variantId) ?? null);
+      }
+      // TR5 Phase 3 — until BE adds Exercise.interval_mode, derive from
+      // action_id / block_tags. Hangboard repeaters and campus intervals
+      // benefit from auto-advance through their micro-rest windows.
+      // Word-boundary on the id regex avoids false positives like
+      // "training-board-mobility" or "shoulder-hanger-warmup" which would
+      // otherwise silently skip user-controlled rest.
+      const tagsSay = Array.isArray(detail.block_tags)
+        && detail.block_tags.some((t) => /\b(?:repeater|interval|hangboard)\b/i.test(t));
+      const idSays = /\b(?:hangboard|repeater|campus[_-]?board|fingerboard)\b/i.test(detail.id);
+      setIntervalMode(tagsSay || idSays);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [exerciseId, sessionItem, variantId]);
 
-  const totalSets = sessionItem?.sets || 1;
-  const totalReps = sessionItem?.reps || 1;
-  const workSeconds = sessionItem?.seconds || 0;
-  const restSec = sessionItem?.rest_sec || 60;
+  // Variant fields override sessionItem fields per the TR1 contract:
+  // `variants[selected]?.X ?? sessionItem.X ?? defaults`.
+  const totalSets = activeVariant?.sets ?? sessionItem?.sets ?? 1;
+  const totalReps = activeVariant?.reps ?? sessionItem?.reps ?? 1;
+  const workSeconds = activeVariant?.seconds ?? sessionItem?.seconds ?? 0;
+  const restSec = activeVariant?.rest_sec ?? sessionItem?.rest_sec ?? 60;
   const exerciseName = tt(sessionItem?.name_override) || exerciseId || "";
   const imageUrl = sessionItem?.media?.image || (sessionItem?.media as any)?.thumbnail_url || enrichedImage;
 
@@ -136,6 +172,7 @@ export default function ExerciseTrainingScreen() {
           reps={totalReps}
           seconds={workSeconds}
           restSec={restSec}
+          intervalMode={intervalMode}
           onAllComplete={handleAllComplete}
           isZH={isZH}
         />

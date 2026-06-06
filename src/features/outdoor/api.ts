@@ -6,11 +6,32 @@
 import { api } from '../../lib/apiClient';
 import type {
   Region, Area, Crag, Wall, OutdoorRoute,
-  RouteRating, RouteAscent, MapPin,
+  RouteRating, RouteAscent,
+  RoutePinsResponse, CragDetail, SearchResult,
 } from './types';
 import {
   MOCK_REGIONS, MOCK_AREAS, MOCK_CRAGS, MOCK_WALLS, MOCK_ROUTES,
 } from './mockData';
+
+/** BR Track D — bbox + filter params for /outdoor/pins. */
+export type ListPinsParams = {
+  bbox: { south: number; west: number; north: number; east: number };
+  /** csv of OutdoorRoute.style values (FE normalizes case to match BE). */
+  style?: string;
+  discipline?: 'boulder' | 'rope' | 'other';
+  /** Default 5000 BE-side; raise only for full-NA exports. */
+  limit?: number;
+};
+
+/** BR Track D — cross-level search params. */
+export type SearchOutdoorParams = {
+  q: string;
+  /** Default = all 5 levels. */
+  types?: Array<'region' | 'area' | 'crag' | 'wall' | 'route'>;
+  /** Scope to a single region (used by InfoSheet search). */
+  region_id?: string;
+  limit?: number;
+};
 
 // BK: flipped off — real OpenBeta data now lives in prod DB. Keeping the
 // `if (USE_MOCK)` branches as escape hatch if we ever need to demo
@@ -149,58 +170,47 @@ export const outdoorApi = {
     return api.get<OutdoorRoute[]>(`/outdoor/search?${qs}`);
   },
 
-  // ---- Map pins (all levels for a region) ----
-  getMapPins: async (regionId: string): Promise<MapPin[]> => {
-    if (USE_MOCK) {
-      const areas = MOCK_AREAS[regionId] ?? [];
-      const areaPins: MapPin[] = areas
-        .filter((a) => a.lat != null && a.lng != null)
-        .map((a) => ({ id: a.id, name: a.name, lat: a.lat!, lng: a.lng!, route_count: a.route_count ?? 0, level: 'area' as const }));
-
-      const cragPins: MapPin[] = areas.flatMap((a) =>
-        (MOCK_CRAGS[a.id] ?? [])
-          .filter((c) => c.lat != null && c.lng != null)
-          .map((c) => ({ id: c.id, name: c.name, lat: c.lat!, lng: c.lng!, route_count: c.route_count ?? 0, level: 'crag' as const })),
-      );
-
-      const wallPins: MapPin[] = areas.flatMap((a) =>
-        (MOCK_CRAGS[a.id] ?? []).flatMap((c) =>
-          (MOCK_WALLS[c.id] ?? [])
-            .filter((w) => w.lat != null && w.lng != null)
-            .map((w) => ({ id: w.id, name: w.name, lat: w.lat!, lng: w.lng!, route_count: w.route_count ?? 0, level: 'wall' as const })),
-        ),
-      );
-
-      // Route-level pins — one per route. Since mock data has no per-route
-      // GPS, we synthesize positions by fanning routes horizontally around
-      // the parent wall's coord. ~11m spacing (0.0001° longitude at 40°N)
-      // so routes are visually separable at zoom ≥15 without drifting too
-      // far from the physical wall location. Name = grade_text so the
-      // centered pin label reads "5.12a" / "V5".
-      const ROUTE_OFFSET_STEP = 0.0001;
-      const routePins: MapPin[] = areas.flatMap((a) =>
-        (MOCK_CRAGS[a.id] ?? []).flatMap((c) =>
-          (MOCK_WALLS[c.id] ?? []).flatMap((w) => {
-            if (w.lat == null || w.lng == null) return [];
-            const routes = MOCK_ROUTES[w.id] ?? [];
-            const n = routes.length;
-            // Center the fan on the wall: offsets symmetric around 0.
-            const startOffset = -((n - 1) / 2) * ROUTE_OFFSET_STEP;
-            return routes.map((r, i) => ({
-              id: r.id,
-              name: r.grade_text,
-              lat: w.lat!,
-              lng: w.lng! + startOffset + i * ROUTE_OFFSET_STEP,
-              route_count: 1,
-              level: 'route' as const,
-              parent_id: w.id,
-            }));
-          }),
-        ),
-      );
-
-      return [...areaPins, ...cragPins, ...wallPins, ...routePins];
-    }
-    return api.get<MapPin[]>(`/outdoor/regions/${regionId}/pins`);
+  // ---- BR Track D — Crag detail (CragInfoSheet source) ----
+  //
+  // Replaces per-level cobbled fetches (getCrag + getWalls + community
+  // stub). Single round-trip returns Crag + walls[] + community summary.
+  getCragDetail: async (cragId: string): Promise<CragDetail> => {
+    return api.get<CragDetail>(`/outdoor/crags/${encodeURIComponent(cragId)}`);
   },
+
+  // ---- BR Track D — Cross-level search (replaces region-scoped `search`) ----
+  //
+  // Returns mixed regions / areas / crags / walls / routes ordered with
+  // routes first (most common). Use `getSearchHitMetaLabel` from `hooks.ts`
+  // for per-row subtitle.
+  searchOutdoor: async (params: SearchOutdoorParams): Promise<SearchResult[]> => {
+    const qs = new URLSearchParams({ q: params.q });
+    if (params.types?.length) qs.set('types', params.types.join(','));
+    if (params.region_id) qs.set('region_id', params.region_id);
+    if (params.limit) qs.set('limit', String(params.limit));
+    return api.get<SearchResult[]>(`/outdoor/search?${qs}`);
+  },
+
+  // ---- BR Track D — Bbox climb-coord cluster source (PLAN §2.1) ----
+  //
+  // Returns flat per-route pins (no aggregation) inside the bbox.
+  // Mapbox `ShapeSource cluster:true` consumes the array directly.
+  // FE deduplicates by `wall_id` client-side at zoom ≥15 to preserve the
+  // "single Wall pin" invariant from PLAN §2.2.
+  listPins: async (params: ListPinsParams): Promise<RoutePinsResponse> => {
+    const { south, west, north, east } = params.bbox;
+    const qs = new URLSearchParams({
+      bbox: `${south},${west},${north},${east}`,
+    });
+    if (params.style) qs.set('style', params.style);
+    if (params.discipline) qs.set('discipline', params.discipline);
+    if (params.limit) qs.set('limit', String(params.limit));
+    return api.get<RoutePinsResponse>(`/outdoor/pins?${qs}`);
+  },
+
+  // ---- BR Track D Day 5e: `getMapPins` REMOVED ----
+  //
+  // The legacy multi-level pre-aggregated pin source `/outdoor/regions/{id}/pins`
+  // is gone. New flow: `listPins` (bbox) drives RoutePinCluster, and Wall pin
+  // tap → caller-local `focusOnWall` fetches that wall's routes via `getRoutes`.
 };

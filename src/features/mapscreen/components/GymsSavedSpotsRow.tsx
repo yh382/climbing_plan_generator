@@ -1,22 +1,22 @@
 // src/features/mapscreen/components/GymsSavedSpotsRow.tsx
 // Apple-Maps-style "saved spots" strip rendered at the top of the gyms
 // sheet content (both overseas MapScreenMapbox and CN GymsScreen). Each
-// item = rounded-square cover avatar + area name below (single line).
-// Tap → `onSelectArea(area)` which is the screen's existing area-entry
-// callback:
-//   - overseas: `enterArea(area.id, area.name)` swaps `mode` in place
-//     on the same MapView (single React tree, no cross-tab handoff)
-//   - CN: `router.push('/outdoor/crag-map?areaId=…')` (legacy full-page,
-//     Amap adapter for the unified screen isn't ready)
-// Both shapes eliminate the cross-Saved-Spot switching bug we had with
-// URL-params propagation through NativeTabs — the row hands the area
-// straight to a screen-local callback rather than relying on the route
-// layer to push a new param set.
+// item = rounded-square cover avatar + name below (single line).
+//
+// BR Track D Day 6 (PLAN §11 + BR-FU-saved-spots-混合 merge):
+//   The strip is now polymorphic. Item types in display order:
+//     1. Gym favorites (`useFavoriteGyms`)
+//     2. Region favorites (`useFavoriteRegionsStore` — legacy, still
+//        backed by `/regions/{id}/favorite` until BR-Track-D-FU-cleanup)
+//     3. Outdoor saved spots — area + crag + route (`useSavedSpots`,
+//        polymorphic `/outdoor/saved-spots`; we filter out Region entries
+//        to avoid duplicates with the legacy region source above)
+//   Each tile carries a small icon discriminator so the user can tell
+//   gym vs region vs area vs crag vs route at a glance.
+//   Tap dispatches per type via callbacks owned by the parent screen.
 //
 // Sort priority: `highlightAreaId` (from `useMapSavedSpotHighlightStore`,
 // set by the home `SavedSpotsCarousel` tap) → favorited → alphabetic.
-// The highlighted area floats to index 0 so the user lands on /map with
-// the spot they came from already at the front of the strip.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -32,80 +32,142 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
-// BR Track A: saved spots are Regions (was Areas). Prop names + component
-// name kept for minimum diff; Track D will rename.
-import type { Region } from '../../outdoor/types';
+import type { Region, SavedSpot } from '../../outdoor/types';
 import useFavoriteRegionsStore from '../../../store/useFavoriteRegionsStore';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
+import { useFavoriteGyms } from '../../gyms/hooks';
+import { useSavedSpots } from '../../outdoor/useSavedSpots';
+import type { GymSummary } from '../../gyms/api';
 import SaveAreaHelpSheet, {
   type SaveAreaHelpSheetHandle,
 } from './SaveAreaHelpSheet';
 
-const MAX_SPOTS = 12;
+const MAX_SPOTS = 16;
 const AVATAR_SIZE = 72;
 const AVATAR_RADIUS = 18;
 
+/** Unified tile shape for the strip. */
+type SpotItem =
+  | { kind: 'gym'; gym: GymSummary }
+  | { kind: 'region'; region: Region }
+  | { kind: 'area' | 'crag' | 'route'; spot: SavedSpot };
+
 interface GymsSavedSpotsRowProps {
+  /** Legacy Region-typed callback (kept for backward compat with the
+   *  Day 5d API). Fires when the user taps a Region tile. */
   onSelectArea: (region: Region) => void;
+  /** Day 6 — tap an Area-typed saved spot. Caller presents AreaInfoSheet. */
+  onSelectArea4?: (spot: SavedSpot) => void;
+  /** Day 6 — tap a Crag-typed saved spot. Caller presents CragInfoSheet. */
+  onSelectCrag?: (spot: SavedSpot) => void;
+  /** Day 6 — tap a Route-typed saved spot. Caller navigates to route detail. */
+  onSelectRoute?: (spot: SavedSpot) => void;
+  /** Day 6 — tap a favorited gym tile. */
+  onSelectGym?: (gymId: string, gymName: string) => void;
 }
 
-export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
+export function GymsSavedSpotsRow({
+  onSelectArea,
+  onSelectArea4,
+  onSelectCrag,
+  onSelectRoute,
+  onSelectGym,
+}: GymsSavedSpotsRowProps) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const highlightAreaId = useMapSavedSpotHighlightStore((s) => s.highlightAreaId);
-  // BR Track A: subscribe to the shared favorites store so the strip
-  // reacts when the user toggles favorite in AreaInfoSheet (Region-level).
+  // Region source: legacy `/regions/favorites` — kept until the BE
+  // dual-write to `/outdoor/saved-spots` lands.
   const regions = useFavoriteRegionsStore((s) => s.regions);
-  const hydrate = useFavoriteRegionsStore((s) => s.hydrate);
+  const hydrateRegions = useFavoriteRegionsStore((s) => s.hydrate);
+  // Polymorphic source: outdoor_list_items polymorphic table.
+  const { items: spotsRaw } = useSavedSpots();
+  // Gym source: legacy `/gyms/favorites` — gyms aren't in the polymorphic
+  // saved_spots table.
+  const { favorites: gymFavorites } = useFavoriteGyms();
 
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    void hydrateRegions();
+  }, [hydrateRegions]);
 
-  const sorted = useMemo(() => {
-    const list = [...regions];
-    list.sort((a, b) => {
-      // 1. Highlighted spot first
+  // Combined + sorted strip items.
+  const items = useMemo<SpotItem[]>(() => {
+    const tiles: SpotItem[] = [];
+    for (const g of gymFavorites) {
+      tiles.push({ kind: 'gym', gym: g });
+    }
+    for (const r of regions) {
+      tiles.push({ kind: 'region', region: r });
+    }
+    // Filter polymorphic source to non-region rows so we don't double-list
+    // Regions that landed via the legacy /regions/favorite endpoint
+    // (still the active write path on RegionInfoSheet — see hook docstring).
+    for (const s of spotsRaw) {
+      if (s.target_type === 'region') continue;
+      tiles.push({ kind: s.target_type, spot: s });
+    }
+    // Stable sort: highlighted regions float first, otherwise alpha.
+    tiles.sort((a, b) => {
+      const aName = labelOf(a);
+      const bName = labelOf(b);
       if (highlightAreaId) {
-        if (a.id === highlightAreaId && b.id !== highlightAreaId) return -1;
-        if (b.id === highlightAreaId && a.id !== highlightAreaId) return 1;
+        const aHi = a.kind === 'region' && a.region.id === highlightAreaId;
+        const bHi = b.kind === 'region' && b.region.id === highlightAreaId;
+        if (aHi && !bHi) return -1;
+        if (bHi && !aHi) return 1;
       }
-      // 2. Alphabetic
-      return a.name.localeCompare(b.name);
+      return aName.localeCompare(bName);
     });
-    return list.slice(0, MAX_SPOTS);
-  }, [regions, highlightAreaId]);
+    return tiles.slice(0, MAX_SPOTS);
+  }, [gymFavorites, regions, spotsRaw, highlightAreaId]);
 
-  // BK: empty-state placeholder. Tap → opens help sheet explaining how
-  // to save an area. We keep the section visible (instead of returning
-  // null) so the strip is a permanent affordance — discoverable, and
-  // the user always knows where their saved spots will go.
   const helpRef = useRef<SaveAreaHelpSheetHandle>(null);
+
+  const handlePress = (item: SpotItem) => {
+    switch (item.kind) {
+      case 'gym':
+        onSelectGym?.(item.gym.gym_id, item.gym.name);
+        break;
+      case 'region':
+        onSelectArea(item.region);
+        break;
+      case 'area':
+        onSelectArea4?.(item.spot);
+        break;
+      case 'crag':
+        onSelectCrag?.(item.spot);
+        break;
+      case 'route':
+        onSelectRoute?.(item.spot);
+        break;
+    }
+  };
 
   return (
     <View style={styles.section}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{tr('收藏区域', 'Saved Areas')}</Text>
+        <Text style={styles.title}>{tr('收藏', 'Saved')}</Text>
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {sorted.length === 0 ? (
+        {items.length === 0 ? (
           <SaveAreaPlaceholder
             onPress={() => helpRef.current?.present()}
             styles={styles}
             label={tr('收藏', 'Save')}
           />
         ) : (
-          sorted.map((region) => (
-            <SavedAreaAvatar
-              key={region.id}
-              area={region}
-              onPress={() => onSelectArea(region)}
+          items.map((item) => (
+            <SpotAvatar
+              key={tileKey(item)}
+              item={item}
+              onPress={() => handlePress(item)}
               styles={styles}
+              colors={colors}
             />
           ))
         )}
@@ -113,6 +175,25 @@ export function GymsSavedSpotsRow({ onSelectArea }: GymsSavedSpotsRowProps) {
       <SaveAreaHelpSheet ref={helpRef} />
     </View>
   );
+}
+
+function tileKey(item: SpotItem): string {
+  switch (item.kind) {
+    case 'gym': return `gym:${item.gym.gym_id}`;
+    case 'region': return `region:${item.region.id}`;
+    case 'area':
+    case 'crag':
+    case 'route':
+      return `${item.kind}:${item.spot.target_id}`;
+  }
+}
+
+function labelOf(item: SpotItem): string {
+  switch (item.kind) {
+    case 'gym': return item.gym.name ?? '';
+    case 'region': return item.region.name ?? '';
+    default: return item.spot.target_name ?? '';
+  }
 }
 
 function SaveAreaPlaceholder({
@@ -140,40 +221,51 @@ function SaveAreaPlaceholder({
   );
 }
 
-// Same bundled placeholder PlaceSheetHero uses — keeps the avatar
-// visually consistent with the AreaInfo sheet hero when an area has no
-// remote cover_url. Mock data (e.g. Wasatch Range) commonly omits
-// cover_url, so falling back to a bundled image avoids showing a bare
-// initial-letter chip for half the catalog.
 const FALLBACK_COVER = require('../../../../assets/images/placeholders/hero-default.jpg');
 
-// Individual avatar item. Owns its own image-load state so a 404 on
-// `cover_url` cleanly downgrades to the bundled placeholder, and if
-// THAT somehow fails too, to the initial-letter chip as last resort.
-function SavedAreaAvatar({
-  area,
+/** Type discriminator: icon shown in the bottom-right corner of the
+ *  avatar. Region uses the existing "map" iconography; non-region
+ *  outdoor types pick the same Ionicons set used by CragMenuSheet's
+ *  Browse Up rows so the visual language is consistent. */
+function iconForKind(kind: SpotItem['kind']): keyof typeof Ionicons.glyphMap {
+  switch (kind) {
+    case 'gym': return 'business';
+    case 'region': return 'map-outline';
+    case 'area': return 'folder-open-outline';
+    case 'crag': return 'location-outline';
+    case 'route': return 'flag-outline';
+  }
+}
+
+function SpotAvatar({
+  item,
   onPress,
   styles,
+  colors,
 }: {
-  area: Region;
+  item: SpotItem;
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
+  colors: ReturnType<typeof useThemeColors>;
 }) {
   const [remoteFailed, setRemoteFailed] = useState(false);
   const [bundledFailed, setBundledFailed] = useState(false);
 
-  // Source priority mirrors PlaceSheetHero: remote URL > bundled
-  // placeholder > Ionicons / initial-letter backstop.
-  const useRemote = !remoteFailed && !!area.cover_url;
+  // Pick a remote cover when one exists; the Gym/SavedSpot types
+  // don't carry a cover_url yet, so they always fall through to the
+  // bundled placeholder. Region is the only kind with `cover_url` today.
+  const coverUrl = item.kind === 'region' ? item.region.cover_url : undefined;
+  const useRemote = !remoteFailed && !!coverUrl;
   const useBundled = !useRemote && !bundledFailed;
-  const initial = area.name?.[0] ?? '?';
+  const name = labelOf(item);
+  const initial = name?.[0] ?? '?';
 
   return (
     <Pressable style={styles.item} onPress={onPress}>
       <View style={styles.avatar}>
         {useRemote ? (
           <Image
-            source={{ uri: area.cover_url! }}
+            source={{ uri: coverUrl! }}
             style={styles.avatarImage}
             resizeMode="cover"
             onError={() => setRemoteFailed(true)}
@@ -190,9 +282,16 @@ function SavedAreaAvatar({
             <Text style={styles.avatarInitial}>{initial}</Text>
           </View>
         )}
+        <View style={styles.kindBadge}>
+          <Ionicons
+            name={iconForKind(item.kind)}
+            size={12}
+            color={colors.textPrimary}
+          />
+        </View>
       </View>
       <Text style={styles.name} numberOfLines={1}>
-        {area.name}
+        {name}
       </Text>
     </Pressable>
   );
@@ -201,9 +300,6 @@ function SavedAreaAvatar({
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     section: {
-      // BK: tightened gap between search bar (paddingBottom: 16) and
-      // the saved spots strip — previously 12 here meant ~28pt of dead
-      // space. 4 brings it visually adjacent without crowding.
       paddingTop: 4,
       paddingBottom: 14,
     },
@@ -232,6 +328,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       overflow: 'hidden',
       marginBottom: 8,
       backgroundColor: c.backgroundSecondary,
+      position: 'relative',
     },
     placeholderAvatar: {
       borderWidth: 1.2,
@@ -257,6 +354,20 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.bold,
       fontSize: 28,
       color: c.textSecondary,
+    },
+    // Day 6 — small type discriminator badge in the bottom-right corner
+    // of the avatar. Subtle background so it reads on both light and
+    // dark covers without a hard outline.
+    kindBadge: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: c.background,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     name: {
       fontFamily: theme.fonts.medium,

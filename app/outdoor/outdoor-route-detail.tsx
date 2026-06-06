@@ -6,11 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Dimensions,
   FlatList, TouchableOpacity, Pressable, ActivityIndicator,
-  Alert, Share,
+  Alert, Share, ActionSheetIOS, Linking, Platform,
 } from 'react-native';
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import MapboxGL from '@rnmapbox/maps';
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,6 +23,17 @@ import { theme } from '../../src/lib/theme';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
+import RegionInfoSheet, {
+  type RegionInfoSheetHandle,
+  type RegionInfoSeed,
+} from '../../src/features/mapscreen/components/RegionInfoSheet';
+import AreaInfoSheet, {
+  type AreaInfoSheetHandle,
+} from '../../src/features/mapscreen/components/AreaInfoSheet';
+import CragInfoSheet, {
+  type CragInfoSheetHandle,
+  type CragInfoSeed,
+} from '../../src/features/mapscreen/components/CragInfoSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
@@ -113,6 +125,22 @@ export default function OutdoorRouteDetailPage() {
   // Add-to-list sheet
   const [addToListOpen, setAddToListOpen] = useState(false);
 
+  // BR Track D Day 7 — breadcrumb-tap InfoSheet refs (PLAN §5).
+  // Each segment of the RouteBreadcrumb spawns the matching info sheet
+  // stacked on top of the route detail. Seed state mirrors the
+  // MapScreenMapbox pattern so first paint is instant before the
+  // sheet's own load fires.
+  const regionInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
+  const [regionInfoId, setRegionInfoId] = useState<string | null>(null);
+  const [regionInfoSeed, setRegionInfoSeed] = useState<RegionInfoSeed | null>(null);
+  const areaInfoSheetRef = useRef<AreaInfoSheetHandle>(null);
+  const [areaInfoArea, setAreaInfoArea] = useState<
+    import('../../src/features/outdoor/types').Area | null
+  >(null);
+  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
+  const [cragInfoCragId, setCragInfoCragId] = useState<string | null>(null);
+  const [cragInfoSeed, setCragInfoSeed] = useState<CragInfoSeed | null>(null);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -172,6 +200,21 @@ export default function OutdoorRouteDetailPage() {
         feel: (a.feel ?? null) as SendLog['feel'],
       }));
   }, [ascents]);
+
+  // BR Track D Day 7 — shared Crag-info presenter. Crag breadcrumb tap
+  // and Wall breadcrumb tap both end here (Wall has no standalone sheet;
+  // PLAN §5 explicit defer of wall-focused RoutesListSheet to
+  // BR-Track-D-FU-wall-search-deep-link).
+  const presentCragSheet = useCallback(() => {
+    if (!route?.crag_id) return;
+    setCragInfoCragId(route.crag_id);
+    setCragInfoSeed({
+      id: route.crag_id,
+      name: route.crag_name ?? '',
+      area_name: route.area_name ?? null,
+    });
+    cragInfoSheetRef.current?.present();
+  }, [route?.crag_id, route?.crag_name, route?.area_name]);
 
   // Attempt: +1 locally, persist to backend (B2 first-time wiring), haptic.
   // The auto-startSession path inside enqueueRouteAttemptLog opens an outdoor
@@ -614,6 +657,42 @@ export default function OutdoorRouteDetailPage() {
         </View>
 
         <View style={styles.body}>
+          {/* BR Track D Day 6/7 — breadcrumb (PLAN §5). Day 6 shipped
+              the display; Day 7 wired per-segment tap once BE
+              `RouteOut` started returning region_id / area_id /
+              crag_id alongside the legacy *_name fields. wall_id is
+              already on the base row. Wall tap → CragInfoSheet for
+              the parent Crag (PLAN §5 explicitly defers deep-link to
+              focused RoutesListSheet — BR-Track-D-FU). */}
+          <RouteBreadcrumb
+            route={route}
+            colors={colors}
+            onPressRegion={() => {
+              if (!route.region_id) return;
+              setRegionInfoId(route.region_id);
+              setRegionInfoSeed({
+                id: route.region_id,
+                name: route.region_name ?? '',
+              });
+              regionInfoSheetRef.current?.present();
+            }}
+            onPressArea={() => {
+              if (!route.area_id || !route.region_id) return;
+              setAreaInfoArea({
+                id: route.area_id,
+                region_id: route.region_id,
+                name: route.area_name ?? '',
+                status: 'approved',
+              });
+              areaInfoSheetRef.current?.present();
+            }}
+            onPressCrag={presentCragSheet}
+            // PLAN §5: Wall tap falls back to parent Crag's info sheet
+            // until BR-Track-D-FU-wall-search-deep-link wires a real
+            // wall-focused RoutesListSheet hand-off path.
+            onPressWall={presentCragSheet}
+          />
+
           {/* Name + grade + stars */}
           <Text style={styles.routeName}>{route.name}</Text>
           <Text style={styles.routeInfo}>
@@ -691,6 +770,19 @@ export default function OutdoorRouteDetailPage() {
 
           <RouteTopoCard topoUrl={route.wall_topo_url} />
 
+          {/* BR Track D Day 6 — mini-map + Navigate (PLAN §5). Only
+              mounts when both lat + lng are present on the route detail.
+              Routes without GPS (legacy imports) silently skip. */}
+          {route.lat != null && route.lng != null ? (
+            <RouteLocationCard
+              lat={route.lat}
+              lng={route.lng}
+              routeName={route.name}
+              colors={colors}
+              tr={tr}
+            />
+          ) : null}
+
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{tr('路线描述', 'Description')}</Text>
             <RouteDescriptionCard description={route.description} />
@@ -732,11 +824,255 @@ export default function OutdoorRouteDetailPage() {
         routeName={route.name}
       />
 
+      {/* BR Track D Day 7 — breadcrumb-tap InfoSheets stacked on top of
+          the route detail. Each load effect short-circuits on null id /
+          null area, so the unconditional mount is safe. */}
+      <RegionInfoSheet
+        ref={regionInfoSheetRef}
+        regionId={regionInfoId}
+        context="crag"
+        seedRegion={regionInfoSeed}
+        onPressRouteMap={() => {
+          regionInfoSheetRef.current?.dismiss();
+        }}
+      />
+      <AreaInfoSheet
+        ref={areaInfoSheetRef}
+        area={areaInfoArea}
+        context="pinTap"
+      />
+      <CragInfoSheet
+        ref={cragInfoSheetRef}
+        cragId={cragInfoCragId}
+        context="pinTap"
+        seedCrag={cragInfoSeed}
+      />
+
       {/* Pure share-beta flow now lives at app/outdoor-beta-share.tsx
           (sheet-container-audit A1). */}
     </>
   );
 }
+
+// ---- BR Track D Day 6/7 — Breadcrumb (tappable when ancestor IDs known) ----
+// Shows the route's ancestry chain (Region › Area › Crag › Wall) at the
+// top of the body. Each segment is a Pressable that fires the matching
+// callback when the BE has returned the corresponding ancestor UUID
+// (Day 7 added these to `RouteOut`). Legacy fixtures without IDs render
+// as plain text (no press affordance, no underline).
+function RouteBreadcrumb({
+  route,
+  colors,
+  onPressRegion,
+  onPressArea,
+  onPressCrag,
+  onPressWall,
+}: {
+  route: OutdoorRoute;
+  colors: ReturnType<typeof useThemeColors>;
+  onPressRegion: () => void;
+  onPressArea: () => void;
+  onPressCrag: () => void;
+  onPressWall: () => void;
+}) {
+  const segments: { label: string; onPress: () => void; tappable: boolean }[] = [];
+  if (route.region_name) {
+    segments.push({
+      label: route.region_name,
+      onPress: onPressRegion,
+      tappable: !!route.region_id,
+    });
+  }
+  if (route.area_name) {
+    segments.push({
+      label: route.area_name,
+      onPress: onPressArea,
+      tappable: !!route.area_id,
+    });
+  }
+  if (route.crag_name) {
+    segments.push({
+      label: route.crag_name,
+      onPress: onPressCrag,
+      tappable: !!route.crag_id,
+    });
+  }
+  if (route.wall_name) {
+    segments.push({
+      label: route.wall_name,
+      onPress: onPressWall,
+      // wall_id is always present on OutdoorRoute (FK on the base row),
+      // but Wall tap requires the parent crag_id to seed CragInfoSheet
+      // — see breadcrumb caller. Hide affordance if crag_id missing.
+      tappable: !!route.crag_id,
+    });
+  }
+  if (segments.length === 0) return null;
+  return (
+    <View style={breadcrumbStyles.row}>
+      {segments.map((seg, i) => {
+        const SegmentWrap = seg.tappable ? Pressable : View;
+        return (
+          <View key={`${i}-${seg.label}`} style={breadcrumbStyles.segment}>
+            <SegmentWrap onPress={seg.tappable ? seg.onPress : undefined} hitSlop={6}>
+              <Text
+                style={[
+                  breadcrumbStyles.text,
+                  { color: seg.tappable ? colors.accent : colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {seg.label}
+              </Text>
+            </SegmentWrap>
+            {i < segments.length - 1 ? (
+              <Ionicons
+                name="chevron-forward"
+                size={11}
+                color={colors.textTertiary}
+                style={breadcrumbStyles.chevron}
+              />
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const breadcrumbStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  segment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  text: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  chevron: {
+    marginHorizontal: 4,
+  },
+});
+
+// ---- BR Track D Day 6 — Route location card (mini-map + Navigate) ----
+// Embeds a non-interactive Mapbox view centered on the route + an
+// ActionSheetIOS-driven Navigate pill. Pan/zoom/rotate all locked so
+// the embedded view doesn't fight the parent ScrollView gestures.
+function RouteLocationCard({
+  lat,
+  lng,
+  routeName,
+  colors,
+  tr,
+}: {
+  lat: number;
+  lng: number;
+  routeName: string;
+  colors: ReturnType<typeof useThemeColors>;
+  tr: (zh: string, en: string) => string;
+}) {
+  const openNavigate = useCallback(() => {
+    const label = encodeURIComponent(routeName);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [
+            tr('苹果地图', 'Apple Maps'),
+            tr('Google 地图', 'Google Maps'),
+            tr('取消', 'Cancel'),
+          ],
+          cancelButtonIndex: 2,
+        },
+        (i) => {
+          if (i === 0) {
+            Linking.openURL(`http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`).catch(() => {});
+          } else if (i === 1) {
+            Linking.openURL(
+              `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+            ).catch(() => {});
+          }
+        },
+      );
+    } else {
+      Linking.openURL(
+        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+      ).catch(() => {});
+    }
+  }, [lat, lng, routeName, tr]);
+
+  return (
+    <View style={[locationCardStyles.card, { backgroundColor: colors.cardBackground }]}>
+      <MapboxGL.MapView
+        style={locationCardStyles.miniMap}
+        styleURL={'mapbox://styles/mapbox/outdoors-v12'}
+        // Lock all gestures so swipe/zoom never fight ScrollView.
+        pitchEnabled={false}
+        rotateEnabled={false}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        logoEnabled={false}
+        attributionEnabled={false}
+        scaleBarEnabled={false}
+        compassEnabled={false}
+      >
+        <MapboxGL.Camera centerCoordinate={[lng, lat]} zoomLevel={14} animationMode="none" />
+        <MapboxGL.PointAnnotation id="route-pin" coordinate={[lng, lat]}>
+          <View style={[locationCardStyles.pin, { backgroundColor: colors.accent }]} />
+        </MapboxGL.PointAnnotation>
+      </MapboxGL.MapView>
+      <TouchableOpacity
+        onPress={openNavigate}
+        activeOpacity={0.7}
+        style={[locationCardStyles.navigateBtn, { backgroundColor: colors.accent }]}
+      >
+        <Ionicons name="navigate" size={16} color="#FFFFFF" />
+        <Text style={locationCardStyles.navigateText}>{tr('导航', 'Directions')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const locationCardStyles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    borderRadius: theme.borderRadius.card,
+    overflow: 'hidden',
+  },
+  miniMap: {
+    width: '100%',
+    height: 180,
+  },
+  pin: {
+    // backgroundColor injected from theme.accent at the call site so the
+    // pin tracks brand color across light/dark mode. White border is
+    // intentional regardless of theme — it's the contrast ring against
+    // the basemap (Mapbox outdoors-v12 in light, dark-v11 in dark).
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  navigateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  navigateText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+});
 
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({

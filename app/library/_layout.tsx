@@ -29,6 +29,23 @@ export default function LibraryLayout() {
         }}
       />
       <Stack.Screen name="plan-builder" options={{ headerTransparent: HEADER_TRANSPARENT, scrollEdgeEffects: { top: 'soft' } }} />
+      <Stack.Screen
+        name="template-builder"
+        options={{
+          ...withHeaderTheme(colors),
+          headerTransparent: HEADER_TRANSPARENT,
+          scrollEdgeEffects: { top: 'soft' },
+        }}
+      />
+      <Stack.Screen
+        name="my-templates"
+        options={{
+          ...NATIVE_HEADER_LARGE,
+          ...withHeaderTheme(colors),
+          headerTransparent: HEADER_TRANSPARENT,
+          scrollEdgeEffects: { top: 'soft' },
+        }}
+      />
       <Stack.Screen name="plan-detail" />
       <Stack.Screen name="plan-history" />
       <Stack.Screen name="plan-overview" />

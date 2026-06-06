@@ -32,7 +32,21 @@ class CalendarDayRingView: ExpoView {
     @objc var outsideTextColor: String = "#D1D5DB"      { didSet { updateView() } }
     @objc var planDotColorComplete: String = "#A08060"  { didSet { updateView() } }
     @objc var planDotColorInProgress: String = "#306E6F" { didSet { updateView() } }
+    // TR6 Phase 2 — 4-state dot extension. `Pending` covers a planned day
+    // that hasn't been touched yet (today or future); `Missed` covers a
+    // past planned day that was never executed. Both default to neutral
+    // values so callers that haven't migrated stay visually safe.
+    @objc var planDotColorPending: String = "#9CA3AF"   { didSet { updateView() } }
+    @objc var planDotColorMissed: String = "#F97316"    { didSet { updateView() } }
     @objc var todayDotColor: String = "#306E6F"         { didSet { updateView() } }
+
+    // TR6 Phase 2 — explicit flags driven by FE plan_status derivation
+    // (services/stats/monthRingComputer.ts). Swift used to infer status
+    // purely from `planProgress` numeric thresholds; the new "pending"
+    // and "missed" states aren't expressible numerically so we pass
+    // them in.
+    @objc var isPending: Bool = false                   { didSet { updateView() } }
+    @objc var isMissed: Bool = false                    { didSet { updateView() } }
 
     public required init(appContext: AppContext? = nil) {
         hostingController = UIHostingController(rootView: AnyView(EmptyView()))
@@ -63,7 +77,11 @@ class CalendarDayRingView: ExpoView {
                 outsideTextColor: Color(hex: outsideTextColor),
                 planDotComplete: Color(hex: planDotColorComplete),
                 planDotInProgress: Color(hex: planDotColorInProgress),
+                planDotPending: Color(hex: planDotColorPending),
+                planDotMissed: Color(hex: planDotColorMissed),
                 todayDotColor: Color(hex: todayDotColor),
+                isPending: isPending,
+                isMissed: isMissed,
                 onPress: { [weak self] in self?.onTap() }
             )
         )
@@ -97,7 +115,11 @@ struct CalendarDayRingSwiftUI: View {
     let outsideTextColor: Color
     let planDotComplete: Color
     let planDotInProgress: Color
+    let planDotPending: Color
+    let planDotMissed: Color
     let todayDotColor: Color
+    let isPending: Bool
+    let isMissed: Bool
     let onPress: () -> Void
 
     private static let SIZE: CGFloat = 42
@@ -168,10 +190,19 @@ struct CalendarDayRingSwiftUI: View {
 
     @ViewBuilder
     private var dotView: some View {
+        // TR6 Phase 2 — 4-state precedence: complete > in_progress >
+        // missed > pending > today > none. Missed comes before pending
+        // because a missed day still occupies a planned slot but
+        // visually demands attention. Selected state collapses every
+        // color into white per the existing convention.
         if planProgress >= 100 {
             Circle().fill(isSelected ? .white : planDotComplete)
         } else if planProgress > 0 {
             Circle().fill(isSelected ? .white : planDotInProgress)
+        } else if isMissed {
+            Circle().fill(isSelected ? .white : planDotMissed)
+        } else if isPending {
+            Circle().fill(isSelected ? .white : planDotPending)
         } else if isToday {
             Circle().fill(isSelected ? .white : todayDotColor)
         } else {

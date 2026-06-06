@@ -1,155 +1,287 @@
 // src/features/session/components/ExerciseTimer.tsx
+//
+// TR5 V2 — Hevy/Crimpd hybrid rewrite of the per-exercise timer.
+//
+// State machine: IDLE → WORK → REST → REST_READY → WORK → … → COMPLETE
+//
+// Key behavior changes vs V1:
+//   - PREPARE 3s countdown removed (tap Start = WORK now).
+//   - Rest is *manual-advance* by default (Hevy/Strong pattern): when REST
+//     hits 0 we enter REST_READY + haptic, but the user must tap
+//     "Start Next Set" to leave it. Avoids the "being pushed" feel of V1's
+//     auto-flip.
+//   - `intervalMode` opt-in (Crimpd hangboard repeater pattern): REST hits 0
+//     auto-flips back to WORK with no manual gate. Caller decides per
+//     exercise (Phase 3 will add `Exercise.interval_mode` flag in BE; for
+//     MVP the caller can hard-wire by action_id / tag).
+//   - REST_REP intermediate state removed — rep is incremented when WORK
+//     finishes without leaving WORK. Per-rep micro-rest fits "interval"
+//     better than "manual strength" so we treat it under intervalMode.
+//   - Warm-up vs working set toggle at the top: warm-up halves the rest
+//     window so a warm-up set doesn't burn 3 minutes of rest.
+//   - Manual overrides on the rest screen: skip, ±15s.
+//   - Theme-aware StyleSheet (createStyles(colors)) to fix V1's hardcoded
+//     greys breaking dark mode.
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-type TimerPhase = "IDLE" | "PREPARE" | "WORK" | "REST_REP" | "REST_SET" | "COMPLETE";
+import { theme } from "../../../lib/theme";
+import { useThemeColors } from "../../../lib/useThemeColors";
+
+// ── Types ──────────────────────────────────────────────────────────────
+
+export type TimerPhase = "IDLE" | "WORK" | "REST" | "REST_READY" | "COMPLETE";
+export type SetMode = "warmup" | "working";
 
 interface Props {
+  /** Total sets for this exercise (≥1). */
   sets: number;
+  /** Reps per set. 0/1 = no rep counter (pure time). */
   reps: number;
-  seconds: number;       // work duration per rep (0 = count mode)
-  restSec: number;       // rest between sets
+  /** Work duration per rep, in seconds. 0 = count mode (user taps Done Set). */
+  seconds: number;
+  /** Base rest between sets, in seconds. Warm-up mode halves it. */
+  restSec: number;
+  /** Hangboard/interval-style auto-advance from REST to next WORK. */
+  intervalMode?: boolean;
+  /** Per-set completion side-effect (e.g. badge progress). */
   onSetComplete?: (setNum: number) => void;
+  /** Fires when the last set's REST_READY is dismissed (or auto on COMPLETE). */
   onAllComplete?: () => void;
+  /** Mirror legacy V1 prop so existing call sites keep working. Internal
+   *  copy uses a local `t(zh, en)` helper, no useSettings dependency. */
   isZH: boolean;
 }
+
+// ── Component ──────────────────────────────────────────────────────────
 
 export default function ExerciseTimer({
   sets = 1,
   reps = 1,
   seconds = 0,
   restSec = 60,
+  intervalMode = false,
   onSetComplete,
   onAllComplete,
   isZH,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const t = useCallback((zh: string, en: string) => (isZH ? zh : en), [isZH]);
+
+  // Locked at component mount — caller can re-mount to switch. Rep counter
+  // only renders if there's more than one rep.
+  const isTimedMode = seconds > 0;
+  const hasReps = reps > 1;
+
   const [phase, setPhase] = useState<TimerPhase>("IDLE");
+  const [setMode, setSetMode] = useState<SetMode>("working");
   const [timeLeft, setTimeLeft] = useState(0);
-  const [elapsed, setElapsed] = useState(0); // for count mode
+  /** Count up while WORK runs in count mode (no fixed work duration). */
+  const [elapsed, setElapsed] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
   const [currentRep, setCurrentRep] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
 
-  const isTimedMode = seconds > 0;
-  const restRepDuration = reps > 1 ? 3 : 0;
-  const restSetDuration = restSec || 60;
-
+  // Stable refs for use inside the tick interval (avoid React 18 strict-
+  // mode double-firing tied to closure captures).
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  const currentSetRef = useRef(currentSet);
-  currentSetRef.current = currentSet;
-  const currentRepRef = useRef(currentRep);
-  currentRepRef.current = currentRep;
 
-  const hapticFeedback = useCallback(() => {
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const haptic = useCallback(
+    (kind: "tap" | "ready" | "done" = "tap") => {
+      if (Platform.OS === "web") return;
+      const map = {
+        tap: Haptics.ImpactFeedbackStyle.Medium,
+        ready: Haptics.NotificationFeedbackType.Success,
+        done: Haptics.NotificationFeedbackType.Success,
+      } as const;
+      if (kind === "tap") {
+        Haptics.impactAsync(map.tap);
+      } else {
+        Haptics.notificationAsync(map[kind]);
+      }
+    },
+    [],
+  );
+
+  // Warm-up halves the configured rest. Working uses it as-is.
+  const restForCurrentMode = useCallback(
+    () => Math.max(0, Math.round(restSec * (setMode === "warmup" ? 0.5 : 1))),
+    [restSec, setMode],
+  );
+
+  // ── Transitions ───────────────────────────────────────────────────────
+
+  /** WORK finished — either fixed time elapsed OR user tapped Done Set in
+   *  count mode. Advance rep / set / state. Defensively gated on phase
+   *  because we may be invoked via `queueMicrotask` after a tick during
+   *  strict-mode double-invocation; re-entry from a non-WORK state would
+   *  fire haptics + onSetComplete twice. */
+  const completeWorkInterval = useCallback(() => {
+    if (phaseRef.current !== "WORK") return;
+    haptic("done");
+    if (hasReps && currentRep < reps) {
+      // Multi-rep: roll forward without leaving WORK. Per-rep micro-rest
+      // is left to intervalMode workouts (already short by design).
+      setCurrentRep((r) => r + 1);
+      if (isTimedMode) setTimeLeft(seconds);
+      else setElapsed(0);
+      return;
     }
-  }, []);
-
-  // Phase transition logic
-  const handlePhaseTransition = useCallback(() => {
-    const p = phaseRef.current;
-    const cSet = currentSetRef.current;
-    const cRep = currentRepRef.current;
-
-    switch (p) {
-      case "PREPARE":
-        setPhase("WORK");
-        if (isTimedMode) setTimeLeft(seconds);
-        else setElapsed(0);
-        break;
-
-      case "WORK":
-        hapticFeedback();
-        if (cRep < reps && restRepDuration > 0) {
-          setPhase("REST_REP");
-          setTimeLeft(restRepDuration);
-        } else if (cRep < reps) {
-          setCurrentRep(r => r + 1);
-          if (isTimedMode) setTimeLeft(seconds);
-          else setElapsed(0);
-        } else if (cSet < sets) {
-          onSetComplete?.(cSet);
-          setPhase("REST_SET");
-          setTimeLeft(restSetDuration);
-        } else {
-          onSetComplete?.(cSet);
-          setPhase("COMPLETE");
-          setTimeLeft(0);
-          onAllComplete?.();
-        }
-        break;
-
-      case "REST_REP":
-        setCurrentRep(r => r + 1);
-        setPhase("WORK");
-        if (isTimedMode) setTimeLeft(seconds);
-        else setElapsed(0);
-        break;
-
-      case "REST_SET":
-        hapticFeedback();
-        setCurrentSet(s => s + 1);
-        setCurrentRep(1);
-        setPhase("WORK");
-        if (isTimedMode) setTimeLeft(seconds);
-        else setElapsed(0);
-        break;
+    // Last rep of the set is done.
+    onSetComplete?.(currentSet);
+    if (currentSet >= sets) {
+      // Final set — done.
+      setPhase("COMPLETE");
+      setTimeLeft(0);
+      onAllComplete?.();
+      return;
     }
-  }, [isTimedMode, seconds, reps, sets, restRepDuration, restSetDuration, hapticFeedback, onSetComplete, onAllComplete]);
+    // Enter REST.
+    setPhase("REST");
+    setTimeLeft(restForCurrentMode());
+  }, [
+    haptic,
+    hasReps,
+    currentRep,
+    reps,
+    isTimedMode,
+    seconds,
+    onSetComplete,
+    currentSet,
+    sets,
+    onAllComplete,
+    restForCurrentMode,
+  ]);
 
-  // Timer tick
+  /** REST window hit zero. Same defensive phase guard as
+   *  `completeWorkInterval` — protect against strict-mode double-invocation
+   *  of the tick updater queuing this microtask twice. */
+  const handleRestExpiry = useCallback(() => {
+    if (phaseRef.current !== "REST") return;
+    if (intervalMode) {
+      // Hangboard / interval style — flip straight back to WORK.
+      haptic("done");
+      setCurrentSet((s) => s + 1);
+      setCurrentRep(1);
+      setPhase("WORK");
+      if (isTimedMode) setTimeLeft(seconds);
+      else setElapsed(0);
+      return;
+    }
+    // Manual mode — sit in READY waiting for user.
+    haptic("ready");
+    setPhase("REST_READY");
+    setTimeLeft(0);
+  }, [intervalMode, haptic, isTimedMode, seconds]);
+
+  // ── Tick ──────────────────────────────────────────────────────────────
+
   useEffect(() => {
-    if (phase === "IDLE" || phase === "COMPLETE" || isPaused) return;
+    if (
+      phase === "IDLE"
+      || phase === "COMPLETE"
+      || phase === "REST_READY"
+      || isPaused
+    ) return;
 
     const interval = setInterval(() => {
-      if (phase === "WORK" && !isTimedMode) {
-        setElapsed(prev => prev + 1);
-      } else {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            handlePhaseTransition();
+      const p = phaseRef.current;
+      if (p === "WORK" && !isTimedMode) {
+        // Count up — user taps Done Set to end.
+        setElapsed((e) => e + 1);
+        return;
+      }
+      if (p === "WORK" && isTimedMode) {
+        setTimeLeft((tl) => {
+          if (tl <= 1) {
+            // Defer phase transition to the next tick — avoids running
+            // setState side effects inside another setState updater.
+            queueMicrotask(completeWorkInterval);
             return 0;
           }
-          return prev - 1;
+          return tl - 1;
+        });
+        return;
+      }
+      if (p === "REST") {
+        setTimeLeft((tl) => {
+          if (tl <= 1) {
+            queueMicrotask(handleRestExpiry);
+            return 0;
+          }
+          return tl - 1;
         });
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [phase, isPaused, isTimedMode, handlePhaseTransition]);
+  }, [phase, isPaused, isTimedMode, completeWorkInterval, handleRestExpiry]);
 
-  const start = () => {
-    if (phase === "IDLE" || phase === "COMPLETE") {
-      setCurrentSet(1);
-      setCurrentRep(1);
-      setPhase("PREPARE");
-      setTimeLeft(3);
-      setElapsed(0);
-      setIsPaused(false);
-    } else {
-      setIsPaused(false);
-    }
+  // ── User actions ──────────────────────────────────────────────────────
+
+  const startWorkout = () => {
+    haptic("tap");
+    setCurrentSet(1);
+    setCurrentRep(1);
+    setIsPaused(false);
+    setElapsed(0);
+    setTimeLeft(isTimedMode ? seconds : 0);
+    setPhase("WORK");
   };
 
-  const pause = () => setIsPaused(true);
-
-  const skip = () => {
-    if (phase === "REST_REP" || phase === "REST_SET" || phase === "PREPARE") {
-      handlePhaseTransition();
-    }
+  const tapDoneSet = () => {
+    if (phase !== "WORK") return;
+    haptic("tap");
+    completeWorkInterval();
   };
 
-  const completeCurrentSet = () => {
-    if (phase !== "WORK" || isTimedMode) return;
-    handlePhaseTransition();
+  const tapStartNextSet = () => {
+    if (phase !== "REST_READY") return;
+    haptic("tap");
+    setCurrentSet((s) => s + 1);
+    setCurrentRep(1);
+    setPhase("WORK");
+    if (isTimedMode) setTimeLeft(seconds);
+    else setElapsed(0);
   };
 
-  const reset = () => {
+  const tapSkipRest = () => {
+    if (phase !== "REST") return;
+    haptic("tap");
+    handleRestExpiry();
+  };
+
+  const adjustRest = (deltaSec: number) => {
+    if (phase !== "REST") return;
+    haptic("tap");
+    setTimeLeft((tl) => Math.max(0, tl + deltaSec));
+  };
+
+  const togglePause = () => {
+    if (phase === "IDLE" || phase === "COMPLETE" || phase === "REST_READY") return;
+    haptic("tap");
+    setIsPaused((p) => !p);
+  };
+
+  const endExercise = () => {
+    haptic("done");
+    setPhase("COMPLETE");
+    setTimeLeft(0);
+    onAllComplete?.();
+  };
+
+  const restart = () => {
     setPhase("IDLE");
     setTimeLeft(0);
     setElapsed(0);
@@ -158,299 +290,329 @@ export default function ExerciseTimer({
     setIsPaused(false);
   };
 
-  // --- Navigation helpers ---
-  const jumpTo = (newSet: number, newRep: number) => {
-    setCurrentSet(newSet);
-    setCurrentRep(newRep);
-    setPhase("WORK");
-    setIsPaused(true);
-    if (isTimedMode) setTimeLeft(seconds);
-    else setElapsed(0);
-    hapticFeedback();
-  };
-
-  const prevSet = () => {
-    if (currentSet > 1) jumpTo(currentSet - 1, 1);
-  };
-  const nextSet = () => {
-    if (currentSet < sets) jumpTo(currentSet + 1, 1);
-  };
-  const prevRep = () => {
-    if (currentRep > 1) jumpTo(currentSet, currentRep - 1);
-  };
-  const nextRep = () => {
-    if (currentRep < reps) jumpTo(currentSet, currentRep + 1);
-  };
+  // ── Display ───────────────────────────────────────────────────────────
 
   const formatTime = (s: number) => {
-    const min = Math.floor(s / 60).toString().padStart(2, "0");
-    const sec = (s % 60).toString().padStart(2, "0");
-    return `${min}:${sec}`;
+    const sign = s < 0 ? "-" : "";
+    const abs = Math.abs(s);
+    const min = Math.floor(abs / 60).toString().padStart(2, "0");
+    const sec = (abs % 60).toString().padStart(2, "0");
+    return `${sign}${min}:${sec}`;
   };
 
-  const getPhaseColor = () => {
+  const displayTime =
+    phase === "WORK" && !isTimedMode
+      ? formatTime(elapsed)
+      : phase === "IDLE"
+        ? formatTime(isTimedMode ? seconds : 0)
+        : formatTime(timeLeft);
+
+  const phaseLabel = (() => {
     switch (phase) {
-      case "PREPARE": return "#888888";
-      case "WORK": return "#1C1C1E";
-      case "REST_REP": return "#888888";
-      case "REST_SET": return "#888888";
-      case "COMPLETE": return "#306E6F";
-      default: return "#BBBBBB";
+      case "IDLE":       return t("准备开始", "Ready");
+      case "WORK":       return t("发力", "WORK");
+      case "REST":       return t("休息", "REST");
+      case "REST_READY": return t("下一组准备就绪", "Next set ready");
+      case "COMPLETE":   return t("完成", "DONE");
+      default:           return "";
     }
-  };
+  })();
 
-  const getPhaseLabel = () => {
-    switch (phase) {
-      case "IDLE": return isZH ? "准备开始" : "Ready";
-      case "PREPARE": return isZH ? "准备!" : "Get Ready!";
-      case "WORK": return isZH ? "发力!" : "WORK!";
-      case "REST_REP": return isZH ? "小休" : "Rest (Rep)";
-      case "REST_SET": return isZH ? "组间休息" : "Set Rest";
-      case "COMPLETE": return isZH ? "完成!" : "Done!";
-      default: return "";
-    }
-  };
-
-  const displayTime = phase === "WORK" && !isTimedMode
-    ? formatTime(elapsed)
-    : formatTime(phase === "IDLE" ? seconds : timeLeft);
-
-  const isActive = phase !== "IDLE" && phase !== "COMPLETE";
+  const phaseAccent =
+    phase === "WORK"       ? colors.textPrimary
+    : phase === "COMPLETE" ? colors.accent
+    : colors.textSecondary;
 
   return (
     <View style={styles.container}>
-      {/* Phase label */}
-      <Text style={[styles.phaseLabel, { color: getPhaseColor() }]}>
-        {getPhaseLabel()}
-      </Text>
+      {/* Warm-up / working toggle (locked in IDLE) */}
+      <View style={styles.modeRow}>
+        {(["warmup", "working"] as SetMode[]).map((m) => {
+          const active = setMode === m;
+          const disabled = phase !== "IDLE";
+          return (
+            <TouchableOpacity
+              key={m}
+              onPress={() => !disabled && setSetMode(m)}
+              style={[
+                styles.modePill,
+                active
+                  ? { backgroundColor: colors.cardDark, borderColor: colors.cardDark }
+                  : { borderColor: colors.border },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active, disabled }}
+              accessibilityLabel={
+                m === "warmup" ? t("热身组", "Warm-up set") : t("正式组", "Working set")
+              }
+              disabled={disabled}
+            >
+              <Text
+                style={[
+                  styles.modePillText,
+                  { color: active ? "#FFF" : colors.textPrimary, opacity: disabled ? 0.5 : 1 },
+                ]}
+              >
+                {m === "warmup" ? t("热身", "Warm-up") : t("正式", "Working")}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {/* Timer display (large) */}
+      {/* Phase label */}
+      <Text style={[styles.phaseLabel, { color: phaseAccent }]}>{phaseLabel}</Text>
+
+      {/* Big timer */}
       <Text style={styles.timerDisplay}>{displayTime}</Text>
 
-      {/* Set/Rep progress (large) */}
+      {/* Set / rep progress */}
       <View style={styles.progressRow}>
-        <View style={styles.progressItem}>
-          <Text style={styles.progressLabel}>SET</Text>
-          <Text style={styles.progressValue}>
-            {currentSet}<Text style={styles.progressTotal}>/{sets}</Text>
+        <ProgressCell
+          label={t("组", "SET")}
+          current={currentSet}
+          total={sets}
+          styles={styles}
+        />
+        {hasReps ? (
+          <ProgressCell
+            label={t("次", "REP")}
+            current={currentRep}
+            total={reps}
+            styles={styles}
+          />
+        ) : null}
+      </View>
+
+      {/* Controls */}
+      {phase === "IDLE" || phase === "COMPLETE" ? (
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={phase === "COMPLETE" ? restart : startWorkout}
+          accessibilityRole="button"
+          accessibilityLabel={phase === "COMPLETE" ? t("重来", "Restart") : t("开始", "Start")}
+        >
+          <Ionicons name="play" size={22} color="#FFF" />
+          <Text style={styles.primaryBtnText}>
+            {phase === "COMPLETE" ? t("重来", "Restart") : t("开始", "Start")}
           </Text>
-        </View>
-        {reps > 1 && (
-          <View style={styles.progressItem}>
-            <Text style={styles.progressLabel}>REP</Text>
-            <Text style={styles.progressValue}>
-              {currentRep}<Text style={styles.progressTotal}>/{reps}</Text>
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Main control */}
-      <View style={styles.controls}>
-        {phase === "IDLE" || phase === "COMPLETE" ? (
-          <TouchableOpacity style={[styles.mainBtn, { backgroundColor: "#1C1C1E" }]} onPress={start}>
-            <Ionicons name="play" size={28} color="#FFF" />
-            <Text style={styles.mainBtnText}>
-              {phase === "COMPLETE" ? (isZH ? "重来" : "Restart") : (isZH ? "开始" : "Start")}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={[styles.controlBtn, { backgroundColor: isPaused ? "#1C1C1E" : "#1C1C1E" }]}
-              onPress={isPaused ? start : pause}
-            >
-              <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#FFF" />
-            </TouchableOpacity>
-
-            {(phase === "REST_REP" || phase === "REST_SET" || phase === "PREPARE") && (
-              <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#888888" }]} onPress={skip}>
-                <Ionicons name="play-skip-forward" size={22} color="#FFF" />
-              </TouchableOpacity>
-            )}
-
-            {phase === "WORK" && !isTimedMode && (
-              <TouchableOpacity style={styles.completeSetBtn} onPress={completeCurrentSet}>
-                <Ionicons name="checkmark-circle" size={22} color="#FFF" />
-                <Text style={styles.completeSetText}>
-                  {isZH ? "完成本组" : "Complete Set"}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={[styles.controlBtn, { backgroundColor: "#F7F7F7" }]} onPress={reset}>
-              <Ionicons name="refresh" size={22} color="#888888" />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      {/* Navigation row: prev set / prev rep / next rep / next set */}
-        <View style={styles.navRow}>
+        </TouchableOpacity>
+      ) : phase === "WORK" ? (
+        <View style={styles.controlsRow}>
           <TouchableOpacity
-            style={[styles.navBtn, currentSet <= 1 && styles.navBtnDisabled]}
-            onPress={prevSet}
-            disabled={currentSet <= 1}
+            style={styles.primaryBtn}
+            onPress={tapDoneSet}
+            accessibilityRole="button"
+            accessibilityLabel={t("完成本组", "Done set")}
           >
-            <Ionicons name="play-back" size={14} color={currentSet <= 1 ? "#D1D5DB" : "#374151"} />
-            <Text style={[styles.navText, currentSet <= 1 && styles.navTextDisabled]}>
-              {isZH ? "上一组" : "Prev Set"}
-            </Text>
+            <Ionicons name="checkmark-circle" size={22} color="#FFF" />
+            <Text style={styles.primaryBtnText}>{t("完成本组", "Done Set")}</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.navBtn, currentRep <= 1 && styles.navBtnDisabled]}
-            onPress={prevRep}
-            disabled={currentRep <= 1}
+            style={styles.iconBtn}
+            onPress={togglePause}
+            accessibilityRole="button"
+            accessibilityLabel={isPaused ? t("继续", "Resume") : t("暂停", "Pause")}
           >
-            <Ionicons name="caret-back" size={14} color={currentRep <= 1 ? "#D1D5DB" : "#374151"} />
-            <Text style={[styles.navText, currentRep <= 1 && styles.navTextDisabled]}>
-              {isZH ? "上一次" : "Prev Rep"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navBtn, currentRep >= reps && styles.navBtnDisabled]}
-            onPress={nextRep}
-            disabled={currentRep >= reps}
-          >
-            <Text style={[styles.navText, currentRep >= reps && styles.navTextDisabled]}>
-              {isZH ? "下一次" : "Next Rep"}
-            </Text>
-            <Ionicons name="caret-forward" size={14} color={currentRep >= reps ? "#D1D5DB" : "#374151"} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navBtn, currentSet >= sets && styles.navBtnDisabled]}
-            onPress={nextSet}
-            disabled={currentSet >= sets}
-          >
-            <Text style={[styles.navText, currentSet >= sets && styles.navTextDisabled]}>
-              {isZH ? "下一组" : "Next Set"}
-            </Text>
-            <Ionicons name="play-forward" size={14} color={currentSet >= sets ? "#D1D5DB" : "#374151"} />
+            <Ionicons
+              name={isPaused ? "play" : "pause"}
+              size={20}
+              color={colors.textPrimary}
+            />
           </TouchableOpacity>
         </View>
+      ) : phase === "REST" ? (
+        <View style={styles.controlsRow}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => adjustRest(-15)}
+            accessibilityRole="button"
+            accessibilityLabel={t("减 15 秒", "Subtract 15 seconds")}
+          >
+            <Text style={[styles.iconBtnText, { color: colors.textPrimary }]}>-15s</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={tapSkipRest}
+            accessibilityRole="button"
+            accessibilityLabel={t("跳过休息", "Skip rest")}
+          >
+            <Ionicons name="play-skip-forward" size={20} color="#FFF" />
+            <Text style={styles.primaryBtnText}>{t("跳过休息", "Skip Rest")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => adjustRest(15)}
+            accessibilityRole="button"
+            accessibilityLabel={t("加 15 秒", "Add 15 seconds")}
+          >
+            <Text style={[styles.iconBtnText, { color: colors.textPrimary }]}>+15s</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // REST_READY
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={tapStartNextSet}
+          accessibilityRole="button"
+          accessibilityLabel={t("开始下一组", "Start next set")}
+        >
+          <Ionicons name="play" size={22} color="#FFF" />
+          <Text style={styles.primaryBtnText}>{t("开始下一组", "Start Next Set")}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Secondary actions — end the exercise mid-way without going through
+          all sets. Hidden in IDLE / COMPLETE; small text-only affordance. */}
+      {phase !== "IDLE" && phase !== "COMPLETE" ? (
+        <TouchableOpacity
+          style={styles.endRow}
+          onPress={endExercise}
+          accessibilityRole="button"
+          accessibilityLabel={t("结束训练", "End exercise")}
+        >
+          <Text style={[styles.endText, { color: colors.textTertiary }]}>
+            {t("结束训练", "End Exercise")}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#F7F7F7",
-    borderRadius: 16,
-    borderWidth: 0,
-    padding: 24,
-    alignItems: "center",
-  },
-  phaseLabel: {
-    fontSize: 11,
-    fontFamily: "DMSans_700Bold",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  timerDisplay: {
-    fontSize: 64,
-    fontFamily: "DMSans_900Black",
-    color: "#000000",
-    fontVariant: ["tabular-nums"],
-    lineHeight: 76,
-    marginBottom: 12,
-  },
-  progressRow: {
-    flexDirection: "row",
-    gap: 32,
-    marginBottom: 20,
-  },
-  progressItem: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 6,
-  },
-  progressLabel: {
-    fontSize: 11,
-    color: "#888888",
-    fontFamily: "DMSans_700Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  progressValue: {
-    fontSize: 28,
-    color: "#000000",
-    fontFamily: "DMMono_500Medium",
-  },
-  progressTotal: {
-    fontSize: 18,
-    color: "#BBBBBB",
-    fontFamily: "DMMono_400Regular",
-  },
-  controls: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  mainBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 32,
-  },
-  mainBtnText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontFamily: "DMSans_700Bold",
-  },
-  controlBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  completeSetBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#1C1C1E",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 25,
-  },
-  completeSetText: {
-    color: "#FFF",
-    fontSize: 15,
-    fontFamily: "DMSans_700Bold",
-  },
-  // Navigation row
-  navRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 12,
-  },
-  navBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-  },
-  navBtnDisabled: {
-    opacity: 0.4,
-  },
-  navText: {
-    fontSize: 11,
-    fontFamily: "DMSans_500Medium",
-    color: "#000000",
-  },
-  navTextDisabled: {
-    color: "#BBBBBB",
-  },
-});
+// ── Subcomponents ──────────────────────────────────────────────────────
+
+function ProgressCell({
+  label,
+  current,
+  total,
+  styles,
+}: {
+  label: string;
+  current: number;
+  total: number;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.progressItem}>
+      <Text style={styles.progressLabel}>{label}</Text>
+      <Text style={styles.progressValue}>
+        {current}
+        <Text style={styles.progressTotal}>/{total}</Text>
+      </Text>
+    </View>
+  );
+}
+
+// ── Styles ─────────────────────────────────────────────────────────────
+
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 16,
+      padding: 24,
+      alignItems: "center",
+    },
+    modeRow: {
+      flexDirection: "row",
+      gap: 8,
+      marginBottom: 14,
+    },
+    modePill: {
+      borderWidth: 1,
+      borderRadius: theme.borderRadius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+    },
+    modePillText: {
+      fontSize: 12,
+      fontFamily: theme.fonts.medium,
+      fontWeight: "700",
+    },
+    phaseLabel: {
+      fontSize: 11,
+      fontFamily: theme.fonts.bold,
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
+      marginBottom: 4,
+    },
+    timerDisplay: {
+      fontSize: 64,
+      fontFamily: theme.fonts.black,
+      color: colors.textPrimary,
+      fontVariant: ["tabular-nums"],
+      lineHeight: 76,
+      marginBottom: 12,
+    },
+    progressRow: {
+      flexDirection: "row",
+      gap: 32,
+      marginBottom: 20,
+    },
+    progressItem: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 6,
+    },
+    progressLabel: {
+      fontSize: 11,
+      color: colors.textTertiary,
+      fontFamily: theme.fonts.bold,
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+    },
+    progressValue: {
+      fontSize: 28,
+      color: colors.textPrimary,
+      fontFamily: theme.fonts.monoMedium,
+    },
+    progressTotal: {
+      fontSize: 18,
+      color: colors.textTertiary,
+      fontFamily: theme.fonts.monoMedium,
+    },
+    controlsRow: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "center",
+    },
+    primaryBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.cardDark,
+      paddingHorizontal: 24,
+      paddingVertical: 14,
+      borderRadius: theme.borderRadius.pill,
+    },
+    primaryBtnText: {
+      color: "#FFF",
+      fontFamily: theme.fonts.bold,
+      fontWeight: "800",
+      fontSize: 16,
+    },
+    iconBtn: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    iconBtnText: {
+      fontSize: 13,
+      fontFamily: theme.fonts.bold,
+      fontWeight: "700",
+    },
+    endRow: {
+      marginTop: 16,
+      paddingVertical: 4,
+    },
+    endText: {
+      fontSize: 12,
+      fontFamily: theme.fonts.medium,
+      letterSpacing: 0.4,
+    },
+  });

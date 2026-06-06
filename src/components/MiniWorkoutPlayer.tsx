@@ -1,33 +1,44 @@
 // src/components/MiniWorkoutPlayer.tsx
+//
+// Floating "active workout" pill — appears bottom-right while a session
+// is in progress and minimized. Tapping it re-opens the PlanView so the
+// user can resume their timer.
+//
+// TR4: dark-mode pass + title from store.
+// - Read `sessionTitle` from useActiveWorkoutStore so template flows
+//   show the template name (was hardcoded "Active Workout").
+// - Moved StyleSheet behind `createStyles(colors)` so dark theme stops
+//   forcing a white pill on a dark background.
 
-import React, { useEffect } from 'react'; // 引入 useEffect
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useActiveWorkoutStore from '../store/useActiveWorkoutStore';
+import { theme } from '../lib/theme';
+import { useThemeColors } from '../lib/useThemeColors';
 
 export default function MiniWorkoutPlayer() {
   const router = useRouter();
-  
-  // [新增] 引入 tick 方法
-  const { isActive, isMinimized, isPaused, seconds, tick, maximizeWorkout } = useActiveWorkoutStore();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  // [核心修复] 当悬浮窗显示时，由它来负责“心跳”
+  const { isActive, isMinimized, isPaused, seconds, sessionTitle, tick, maximizeWorkout } = useActiveWorkoutStore();
+
+  // Heartbeat while the mini-player owns the timer (avoids dueling
+  // intervals with PlanView, which only renders when not minimized).
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    // 只有在 (训练中 + 已最小化 + 未暂停) 时才计时
-    // 这样避免和 PlanView 里的计时器冲突（因为 PlanView 显示时 isMinimized 为 false，这里组件会 return null，effect 也会清除）
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isActive && isMinimized && !isPaused) {
       interval = setInterval(() => {
         tick();
       }, 1000);
     }
-    
-    return () => clearInterval(interval);
-  }, [isActive, isMinimized, isPaused]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, isMinimized, isPaused, tick]);
 
-  // 只有在 "训练中" 且 "已最小化" 时才显示
   if (!isActive || !isMinimized) return null;
 
   const formatTime = (s: number) => {
@@ -38,35 +49,66 @@ export default function MiniWorkoutPlayer() {
 
   const handlePress = () => {
     maximizeWorkout();
-    router.push("/library/plan-view"); 
+    router.push('/library/plan-view');
   };
 
   return (
     <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.9}>
       <View style={styles.iconBox}>
-         <Ionicons name="barbell" size={20} color="#FFF" />
+        <Ionicons name="barbell" size={20} color="#FFF" />
       </View>
       <View style={styles.content}>
-         <Text style={styles.label}>Active Workout</Text>
-         <Text style={styles.timer}>{formatTime(seconds)}</Text>
+        <Text style={styles.label} numberOfLines={1}>
+          {sessionTitle || 'Active Workout'}
+        </Text>
+        <Text style={styles.timer}>{formatTime(seconds)}</Text>
       </View>
       <View style={styles.arrow}>
-         <Ionicons name="chevron-up" size={20} color="#6B7280" />
+        <Ionicons name="chevron-up" size={20} color={colors.textTertiary} />
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute', bottom: 100, right: 20, 
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFF', borderRadius: 30, padding: 8, paddingRight: 16,
-    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: {width:0, height:4}, elevation: 10
-  },
-  iconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  content: { marginRight: 10 },
-  label: { fontSize: 10, color: '#6B7280', fontWeight: '700', textTransform: 'uppercase' },
-  timer: { fontSize: 16, color: '#111', fontWeight: '800', fontVariant: ['tabular-nums'] },
-  arrow: { opacity: 0.5 }
-});
+const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: {
+      position: 'absolute',
+      bottom: 100,
+      right: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 30,
+      padding: 8,
+      paddingRight: 16,
+    },
+    iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.cardDark,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    content: {
+      marginRight: 10,
+      maxWidth: 160, // keeps long template titles from pushing chevron off
+    },
+    label: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontFamily: theme.fonts.medium,
+      fontWeight: '600',
+    },
+    timer: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    arrow: { opacity: 0.7 },
+  });

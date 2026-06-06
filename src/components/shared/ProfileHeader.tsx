@@ -34,6 +34,11 @@ const PROFILE_COVER_H = PROFILE_COVER_VISIBLE + COVER_OVERLAP;
 const ID_BLOCK_BOTTOM = 22 + COVER_OVERLAP;
 const ACTION_FAB_BOTTOM = 22 + COVER_OVERLAP;
 
+// Exported so the sticky tab bar spacer (in profile screens) can replicate
+// the cover's bottom slice — see ProfileCoverArt below.
+export const PROFILE_COVER_HEIGHT_FULL = PROFILE_COVER_H;
+export const PROFILE_COVER_OVERLAP_PT = COVER_OVERLAP;
+
 // Default cover gradients when no cover image set.
 const DEFAULT_GRADIENT_LIGHT: [string, string, string] = [
   "#7A9E8E",
@@ -45,6 +50,46 @@ const DEFAULT_GRADIENT_DARK: [string, string, string] = [
   "#1C1C1E",
   "#000000",
 ];
+
+/**
+ * Standalone cover background renderer — Image + gradient overlay when
+ * `coverUrl` is provided, default diagonal gradient otherwise. Fills its
+ * parent via `StyleSheet.absoluteFill`, so the caller controls the box.
+ *
+ * Used in two places: (1) the parallax-transformed cover inside this
+ * component; (2) a 35pt-tall "fake cover slice" rendered inside the
+ * sticky-tab-bar spacer in profile screens, so the spacer's overlap
+ * area visually matches the real cover even when the absolute-overlay
+ * bar lags against native scroll.
+ */
+export function ProfileCoverArt({ coverUrl }: { coverUrl: string | null }) {
+  const isDark = useColorScheme() === "dark";
+  const defaultGradient = isDark ? DEFAULT_GRADIENT_DARK : DEFAULT_GRADIENT_LIGHT;
+  if (coverUrl) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <Image
+          source={{ uri: coverUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+        />
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]}
+          locations={[0.3, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    );
+  }
+  return (
+    <LinearGradient
+      colors={defaultGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={StyleSheet.absoluteFill}
+    />
+  );
+}
 
 export type ProfileHeaderViewMode = "self" | "other";
 
@@ -101,8 +146,6 @@ export default function ProfileHeader({
   onKPIPress,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
-  const isDark = useColorScheme() === "dark";
-  const defaultGradient = isDark ? DEFAULT_GRADIENT_DARK : DEFAULT_GRADIENT_LIGHT;
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
@@ -138,34 +181,6 @@ export default function ProfileHeader({
     : `@${username}`;
   const showBio = bioText.length > 0;
 
-  const renderBackground = () => {
-    if (coverUrl) {
-      return (
-        <View style={StyleSheet.absoluteFill}>
-          <Image
-            source={{ uri: coverUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-          />
-          {/* Gradient bottom-up overlay so id-block + FAB stay legible. */}
-          <LinearGradient
-            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]}
-            locations={[0.3, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      );
-    }
-    return (
-      <LinearGradient
-        colors={defaultGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-    );
-  };
-
   return (
     <View
       style={[
@@ -177,7 +192,7 @@ export default function ProfileHeader({
       ]}
     >
       <Animated.View style={[StyleSheet.absoluteFill, bgParallaxStyle, { overflow: "hidden" }]}>
-        {renderBackground()}
+        <ProfileCoverArt coverUrl={coverUrl} />
       </Animated.View>
 
       {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}

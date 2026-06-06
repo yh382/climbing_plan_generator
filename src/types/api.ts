@@ -3965,7 +3965,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Crag Detail */
+        get: operations["get_crag_detail_outdoor_crags__crag_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4093,8 +4094,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Route To List */
-        post: operations["add_route_to_list_outdoor_lists__list_id__items_post"];
+        /** Add Item To List */
+        post: operations["add_item_to_list_outdoor_lists__list_id__items_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4113,6 +4114,23 @@ export interface paths {
         post?: never;
         /** Remove Route From List */
         delete: operations["remove_route_from_list_outdoor_lists__list_id__items__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Route Pins */
+        get: operations["list_route_pins_outdoor_pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4281,6 +4299,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/saved-spots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Spots
+         * @description All saved spots for the current user, mixed across target_types.
+         */
+        get: operations["list_saved_spots_outdoor_saved_spots_get"];
+        put?: never;
+        /**
+         * Save Spot
+         * @description Save a Region/Area/Crag/Route to the user's saved spots. Idempotent —
+         *     409 if already saved.
+         */
+        post: operations["save_spot_outdoor_saved_spots_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/saved-spots/{target_type}/{target_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unsave Spot
+         * @description Idempotent — 204 even when already absent.
+         */
+        delete: operations["unsave_spot_outdoor_saved_spots__target_type___target_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/search": {
         parameters: {
             query?: never;
@@ -4399,6 +4462,29 @@ export interface paths {
          * @description Get the user's currently active plan (with planJson).
          */
         get: operations["get_active_plan_plans_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/active/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Active Plans Endpoint
+         * @description TR3: return all of the user's active plans (multi-active support).
+         *
+         *     `/plans/active` (legacy) returns a single plan. New FE consumes this
+         *     endpoint and picks one via `activePlanId` locally.
+         */
+        get: operations["list_active_plans_endpoint_plans_active_list_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4596,6 +4682,59 @@ export interface paths {
          * @description Update a single progress entry (mark completed/skipped/partial).
          */
         patch: operations["update_plan_progress_plans__plan_id__progress__progress_id__patch"];
+        trace?: never;
+    };
+    "/plans/{plan_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Plan Monthly Schedule
+         * @description V4: return the plan's weekly_schedule expanded to dates for a month.
+         *
+         *     Powers TR6 calendar dot rendering ('planned' state). Cross-user 404.
+         *     `month` format `YYYY-MM`; invalid format → 422.
+         */
+        get: operations["get_plan_monthly_schedule_plans__plan_id__schedule_get"];
+        put?: never;
+        /**
+         * Assign Template To Plan Day
+         * @description V4: append a template_id into plan.weekly_schedule[week][day].
+         *
+         *     Idempotent (re-assigning the same template = no-op). Returns the
+         *     full updated plan detail so the FE can re-render the schedule grid.
+         *     Cross-user → 404 (don't leak existence). Per-day cap → 422.
+         */
+        post: operations["assign_template_to_plan_day_plans__plan_id__schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{plan_id}/schedule/{week_index}/{day}/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Template From Plan Day
+         * @description V4: remove template_id from a day slot. Idempotent: missing slot/id
+         *     returns the unchanged plan rather than 404 (matches FE drag-out UX
+         *     where the slot may already be empty after another tab's delete).
+         */
+        delete: operations["remove_template_from_plan_day_plans__plan_id__schedule__week_index___day___template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/plans/{plan_id}/status": {
@@ -5733,6 +5872,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workout-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Workout Templates
+         * @description List templates by source.
+         *
+         *     - source=official → all curated templates (visible to everyone)
+         *     - source=mine → current user's custom templates only
+         */
+        get: operations["list_workout_templates_workout_templates_get"];
+        put?: never;
+        /**
+         * Create Workout Template
+         * @description Create a custom template owned by the current user.
+         */
+        post: operations["create_workout_template_workout_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workout-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workout Template
+         * @description Fetch one template. Official is visible to any logged-in user;
+         *     custom requires ownership.
+         */
+        get: operations["get_workout_template_workout_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Workout Template
+         * @description Owner-only soft delete. Official → 403, other user → 404.
+         */
+        delete: operations["delete_workout_template_workout_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Workout Template
+         * @description Owner-only partial update. Official → 403, other user → 404.
+         */
+        patch: operations["update_workout_template_workout_templates__template_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6535,6 +6730,19 @@ export interface components {
             /** Style */
             style: string;
         };
+        /**
+         * Block
+         * @description One block (warmup / main / etc) of a workout template.
+         */
+        Block: {
+            /**
+             * Block Type
+             * @enum {string}
+             */
+            block_type: "warmup" | "main" | "accessory" | "cooldown";
+            /** Items */
+            items?: components["schemas"]["BlockItem"][];
+        };
         /** BlockInventorySummary */
         BlockInventorySummary: {
             /** Action Count */
@@ -6557,6 +6765,26 @@ export interface components {
                 string,
                 number
             ][];
+        };
+        /**
+         * BlockItem
+         * @description One exercise prescription inside a block.
+         */
+        BlockItem: {
+            /** Action Id */
+            action_id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Reps */
+            reps?: number | null;
+            /** Rest Sec */
+            rest_sec?: number | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Sets */
+            sets?: number | null;
+            /** Variant Id */
+            variant_id?: string | null;
         };
         /** BlockListing */
         BlockListing: {
@@ -7226,7 +7454,7 @@ export interface components {
              * Visibility
              * @default public
              */
-            visibility: ("public" | "private") | null;
+            visibility: ("private" | "public") | null;
             /**
              * Wall Type
              * @enum {string}
@@ -7508,6 +7736,27 @@ export interface components {
             /** View Count */
             view_count: number;
         };
+        /**
+         * CragCommunitySummary
+         * @description Crag-level activity rollup over the last 30 days.
+         *
+         *     Beta stub: activity = climb-log entries against routes under this crag.
+         *     Future: extends to include posts / partner-finds / events (PLAN §3.3).
+         */
+        CragCommunitySummary: {
+            /** Last Activity At */
+            last_activity_at?: string | null;
+            /**
+             * Recent Ascent Count
+             * @default 0
+             */
+            recent_ascent_count: number;
+            /**
+             * Recent Post Count
+             * @default 0
+             */
+            recent_post_count: number;
+        };
         /** CragCreateIn */
         CragCreateIn: {
             /** Approach */
@@ -7529,6 +7778,66 @@ export interface components {
              * @default 0
              */
             sort_order: number;
+        };
+        /**
+         * CragDetailOut
+         * @description Enriched Crag with wall list + community summary for CragInfoSheet.
+         */
+        CragDetailOut: {
+            /** Approach */
+            approach?: string | null;
+            /**
+             * Area Id
+             * Format: uuid
+             */
+            area_id: string;
+            community?: components["schemas"]["CragCommunitySummary"];
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Orientation */
+            orientation?: string | null;
+            /** Osm Synced At */
+            osm_synced_at?: string | null;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
+            /** Sort Order */
+            sort_order: number;
+            /** Status */
+            status: string;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trail Source */
+            trail_source?: string | null;
+            /**
+             * Wall Count
+             * @default 0
+             */
+            wall_count: number;
+            /**
+             * Walls
+             * @default []
+             */
+            walls: components["schemas"]["WallOut"][];
         };
         /** CragOut */
         CragOut: {
@@ -7558,6 +7867,8 @@ export interface components {
             name_en?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Osm Synced At */
+            osm_synced_at?: string | null;
             /**
              * Route Count
              * @default 0
@@ -7571,6 +7882,8 @@ export interface components {
             trail_geojson?: {
                 [key: string]: unknown;
             } | null;
+            /** Trail Source */
+            trail_source?: string | null;
             /**
              * Wall Count
              * @default 0
@@ -7581,6 +7894,8 @@ export interface components {
         CragUpdateIn: {
             /** Approach */
             approach?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
             /** Description */
             description?: string | null;
             /** Lat */
@@ -7593,8 +7908,16 @@ export interface components {
             name_en?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Osm Synced At */
+            osm_synced_at?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trail Source */
+            trail_source?: string | null;
         };
         /** DailySummaryOut */
         DailySummaryOut: {
@@ -7878,9 +8201,7 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /** Protocol Variants */
-            protocol_variants?: {
-                [key: string]: unknown;
-            } | null;
+            protocol_variants?: components["schemas"]["ProtocolVariant"][] | null;
             /** Rpe Range */
             rpe_range?: number[] | null;
             /**
@@ -7967,9 +8288,7 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /** Protocol Variants */
-            protocol_variants: {
-                [key: string]: unknown;
-            } | null;
+            protocol_variants?: components["schemas"]["ProtocolVariant"][] | null;
             /** Rpe Range */
             rpe_range: number[] | null;
             /** Scene Tags */
@@ -8025,9 +8344,7 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /** Protocol Variants */
-            protocol_variants?: {
-                [key: string]: unknown;
-            } | null;
+            protocol_variants?: components["schemas"]["ProtocolVariant"][] | null;
             /** Rpe Range */
             rpe_range?: number[] | null;
             /** Scene Tags */
@@ -9132,15 +9449,24 @@ export interface components {
              */
             user_id: string;
         };
-        /** OutdoorListItemCreateIn */
+        /**
+         * OutdoorListItemCreateIn
+         * @description Add an item to a user list — polymorphic per BR Track C.
+         *
+         *     Two equivalent payload shapes accepted during the compat window:
+         *       - Legacy: `{route_id, note}` — auto-coerced to target_type='route'.
+         *       - New:    `{target_type, target_id, note}` for region/area/crag/route.
+         *     Mixing both is rejected (422 via validator).
+         */
         OutdoorListItemCreateIn: {
             /** Note */
             note?: string | null;
-            /**
-             * Route Id
-             * Format: uuid
-             */
-            route_id: string;
+            /** Route Id */
+            route_id?: string | null;
+            /** Target Id */
+            target_id?: string | null;
+            /** Target Type */
+            target_type?: ("route" | "region" | "area" | "crag") | null;
         };
         /** OutdoorListItemOut */
         OutdoorListItemOut: {
@@ -9164,11 +9490,20 @@ export interface components {
             /** Note */
             note?: string | null;
             route?: components["schemas"]["RouteOut"] | null;
+            /** Route Id */
+            route_id?: string | null;
             /**
-             * Route Id
+             * Target Id
              * Format: uuid
              */
-            route_id: string;
+            target_id: string;
+            /** Target Name */
+            target_name?: string | null;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "route" | "region" | "area" | "crag";
             /** Wall Lat */
             wall_lat?: number | null;
             /** Wall Lng */
@@ -9367,10 +9702,7 @@ export interface components {
         };
         /** PlanMeta */
         PlanMeta: {
-            /**
-             * Cycle Weeks
-             * @default 4
-             */
+            /** Cycle Weeks */
             cycle_weeks: number;
             /**
              * Locale
@@ -9651,6 +9983,38 @@ export interface components {
              * @default 0
              */
             week_index: number;
+        };
+        /**
+         * ProtocolVariant
+         * @description TR0: one row in Exercise.protocol_variants — same action at different
+         *     intensity/load. Example: Hangboard 7/3 Repeater @ 40% Max vs @ 60% Max.
+         *     UI shows a horizontal pill row of variants on exercise-detail (TR1).
+         *
+         *     All fields beyond id+labels are optional so a variant can override only
+         *     the dimensions that differ (e.g. just sets+rest while reps stay the same
+         *     as the base protocol).
+         */
+        ProtocolVariant: {
+            /** Id */
+            id: string;
+            /** Label En */
+            label_en: string;
+            /** Label Zh */
+            label_zh: string;
+            /** Load Label */
+            load_label?: string | null;
+            /** Load Pct */
+            load_pct?: number | null;
+            /** Reps */
+            reps?: number | null;
+            /** Rest Sec */
+            rest_sec?: number | null;
+            /** Rpe */
+            rpe?: number | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Sets */
+            sets?: number | null;
         };
         /** PublicDailyOut */
         PublicDailyOut: {
@@ -10335,6 +10699,8 @@ export interface components {
         };
         /** RouteOut */
         RouteOut: {
+            /** Area Id */
+            area_id?: string | null;
             /** Area Name */
             area_name?: string | null;
             /**
@@ -10344,6 +10710,8 @@ export interface components {
             attempt_count: number;
             /** Bolts */
             bolts?: number | null;
+            /** Crag Id */
+            crag_id?: string | null;
             /** Crag Name */
             crag_name?: string | null;
             /**
@@ -10366,8 +10734,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Lat */
+            lat?: number | null;
             /** Length M */
             length_m?: number | null;
+            /** Lng */
+            lng?: number | null;
             /** Name */
             name: string;
             /** Name En */
@@ -10381,6 +10753,8 @@ export interface components {
              * @default 0
              */
             rating_count: number;
+            /** Region Id */
+            region_id?: string | null;
             /** Region Name */
             region_name?: string | null;
             /**
@@ -10401,6 +10775,76 @@ export interface components {
             wall_id: string;
             /** Wall Name */
             wall_name?: string | null;
+        };
+        /**
+         * RoutePin
+         * @description Single climb pin for the bbox map cluster source.
+         *
+         *     Named `RoutePin` (not `MapPin`) to avoid clash with FE's existing `MapPin`
+         *     type for legacy `/regions/{id}/pins`. Track D consumes this directly.
+         *
+         *     Track D D-1: ancestor UUIDs added so FE can client-side group pins by
+         *     `wall_id` (single-Wall-pin invariant at zoom 15+) and route taps from
+         *     cluster expansion can open the correct InfoSheet without a second
+         *     lookup.
+         */
+        RoutePin: {
+            /**
+             * Area Id
+             * Format: uuid
+             */
+            area_id: string;
+            /** Area Name */
+            area_name: string;
+            /**
+             * Crag Id
+             * Format: uuid
+             */
+            crag_id: string;
+            /** Crag Name */
+            crag_name: string;
+            /**
+             * Discipline
+             * @enum {string}
+             */
+            discipline: "boulder" | "rope" | "other";
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /**
+             * Region Id
+             * Format: uuid
+             */
+            region_id: string;
+            /** Region Name */
+            region_name: string;
+            /**
+             * Route Id
+             * Format: uuid
+             */
+            route_id: string;
+            /** Style */
+            style: string;
+            /**
+             * Wall Id
+             * Format: uuid
+             */
+            wall_id: string;
+            /** Wall Name */
+            wall_name: string;
+        };
+        /** RoutePinsOut */
+        RoutePinsOut: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["RoutePin"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
         };
         /** RouteUpdateIn */
         RouteUpdateIn: {
@@ -10427,6 +10871,59 @@ export interface components {
             /** Style */
             style?: string | null;
         };
+        /**
+         * SavedSpotCreateIn
+         * @description Polymorphic saved-spot payload — wraps the polymorphic outdoor_list_items
+         *     pattern shipped in BR Track C, hiding the implementation detail that
+         *     saves go into a per-user auto-provisioned default list.
+         */
+        SavedSpotCreateIn: {
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "region" | "area" | "crag" | "route";
+        };
+        /**
+         * SavedSpotOut
+         * @description Single saved spot — surfaces enough context for FE map row to render
+         *     a tappable entity card without a follow-up fetch (per PLAN §7).
+         */
+        SavedSpotOut: {
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /** Target Name */
+            target_name: string;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "region" | "area" | "crag" | "route";
+        };
+        /** SavedSpotsListOut */
+        SavedSpotsListOut: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["SavedSpotOut"][];
+        };
         /** ScheduleIn */
         ScheduleIn: {
             /**
@@ -10435,12 +10932,25 @@ export interface components {
              */
             scheduled_publish_at: string;
         };
-        /** SearchResult */
+        /**
+         * SearchResult
+         * @description Cross-level outdoor search result.
+         *
+         *     Track C: top-level discriminator fields added so FE can render icon hints
+         *     (📁/📂/📍/🧗/⚡). `extra` kept and dual-populated during compat window —
+         *     drop after Track D consumers migrate.
+         */
         SearchResult: {
+            /** Area Name */
+            area_name?: string | null;
+            /** Crag Name */
+            crag_name?: string | null;
             /** Extra */
             extra?: {
                 [key: string]: unknown;
             } | null;
+            /** Grade Text */
+            grade_text?: string | null;
             /**
              * Id
              * Format: uuid
@@ -10450,8 +10960,17 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
-            /** Type */
-            type: string;
+            /** Region Name */
+            region_name?: string | null;
+            /** Route Count */
+            route_count?: number | null;
+            /** Style */
+            style?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "region" | "area" | "crag" | "wall" | "route";
         };
         /** SessionBank */
         SessionBank: {
@@ -10520,6 +11039,8 @@ export interface components {
             plan_session_id?: string | null;
             /** Start Time */
             start_time?: string | null;
+            /** Template Id */
+            template_id?: string | null;
         };
         /** SessionDef */
         SessionDef: {
@@ -10580,6 +11101,12 @@ export interface components {
             /** Plan Session Id */
             plan_session_id?: string | null;
             /**
+             * Session Type
+             * @default climb
+             * @enum {string}
+             */
+            session_type: "climb" | "train" | "mixed";
+            /**
              * Start Time
              * Format: date-time
              */
@@ -10590,6 +11117,8 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             } | null;
+            /** Template Id */
+            template_id?: string | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -10631,6 +11160,12 @@ export interface components {
             /** Plan Session Id */
             plan_session_id?: string | null;
             /**
+             * Session Type
+             * @default climb
+             * @enum {string}
+             */
+            session_type: "climb" | "train" | "mixed";
+            /**
              * Start Time
              * Format: date-time
              */
@@ -10641,6 +11176,8 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             } | null;
+            /** Template Id */
+            template_id?: string | null;
             /**
              * User Id
              * Format: uuid
@@ -11605,6 +12142,164 @@ export interface components {
              */
             train_target: number;
         };
+        /**
+         * WeeklyScheduleAssignIn
+         * @description POST /plans/{id}/schedule — add a template to a (week, day) slot.
+         */
+        WeeklyScheduleAssignIn: {
+            /**
+             * Day
+             * @enum {string}
+             */
+            day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /** Week Index */
+            week_index: number;
+        };
+        /**
+         * WorkoutTemplateIn
+         * @description POST /workout-templates — create a custom template.
+         *
+         *     source / owner_id derived server-side (custom + current_user).
+         */
+        WorkoutTemplateIn: {
+            /** Blocks */
+            blocks?: components["schemas"]["Block"][];
+            /** Cover Image Url */
+            cover_image_url?: string | null;
+            /** Equipment */
+            equipment?: string[];
+            /** Goal Tags */
+            goal_tags?: string[];
+            /** Short Desc En */
+            short_desc_en?: string | null;
+            /** Short Desc Zh */
+            short_desc_zh?: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "public";
+        };
+        /**
+         * WorkoutTemplateOut
+         * @description GET /workout-templates/{id} — full detail.
+         */
+        WorkoutTemplateOut: {
+            /** Author Name */
+            author_name: string | null;
+            /** Blocks */
+            blocks: components["schemas"]["Block"][];
+            /** Cover Image Url */
+            cover_image_url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Equipment */
+            equipment: string[];
+            /** Est Duration Min */
+            est_duration_min: number | null;
+            /** Goal Tags */
+            goal_tags: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Short Desc En */
+            short_desc_en: string | null;
+            /** Short Desc Zh */
+            short_desc_zh: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "official" | "custom";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "public";
+        };
+        /**
+         * WorkoutTemplateSummary
+         * @description GET /workout-templates list row — minimal fields for grid/list.
+         */
+        WorkoutTemplateSummary: {
+            /** Author Name */
+            author_name: string | null;
+            /** Cover Image Url */
+            cover_image_url: string | null;
+            /** Equipment */
+            equipment: string[];
+            /** Est Duration Min */
+            est_duration_min: number | null;
+            /** Goal Tags */
+            goal_tags: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Short Desc En */
+            short_desc_en: string | null;
+            /** Short Desc Zh */
+            short_desc_zh: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "official" | "custom";
+            /** Title */
+            title: string;
+        };
+        /**
+         * WorkoutTemplateUpdateIn
+         * @description PATCH /workout-templates/{id} — partial update (owner only).
+         */
+        WorkoutTemplateUpdateIn: {
+            /** Blocks */
+            blocks?: components["schemas"]["Block"][] | null;
+            /** Cover Image Url */
+            cover_image_url?: string | null;
+            /** Equipment */
+            equipment?: string[] | null;
+            /** Goal Tags */
+            goal_tags?: string[] | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Short Desc En */
+            short_desc_en?: string | null;
+            /** Short Desc Zh */
+            short_desc_zh?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Visibility */
+            visibility?: ("private" | "public") | null;
+        };
         /** PlanCreateIn */
         routers__org_route_setting__PlanCreateIn: {
             /** Description */
@@ -11707,7 +12402,13 @@ export interface components {
             /** Parent Id */
             parent_id: string | null;
         };
-        /** PlanCreateIn */
+        /**
+         * PlanCreateIn
+         * @description Create a plan. `plan_json` is intentionally `dict[str, Any]` to
+         *     tolerate both the new TR3 V4 shape ({duration_weeks, weekly_schedule})
+         *     and the legacy PlanV3 shape coach_service still emits. New FE clients
+         *     should POST the V4 shape.
+         */
         schemas__plan__PlanCreateIn: {
             /** Author Name */
             author_name?: string | null;
@@ -11764,7 +12465,7 @@ export interface components {
             /** Training Type */
             training_type?: string | null;
             /** Visibility */
-            visibility?: ("public" | "private") | null;
+            visibility?: ("private" | "public") | null;
         };
     };
     responses: never;
@@ -20219,6 +20920,37 @@ export interface operations {
             };
         };
     };
+    get_crag_detail_outdoor_crags__crag_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                crag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CragDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_crag_outdoor_crags__crag_id__patch: {
         parameters: {
             query?: never;
@@ -20530,7 +21262,7 @@ export interface operations {
             };
         };
     };
-    add_route_to_list_outdoor_lists__list_id__items_post: {
+    add_item_to_list_outdoor_lists__list_id__items_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -20583,6 +21315,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_route_pins_outdoor_pins_get: {
+        parameters: {
+            query: {
+                /** @description south,west,north,east */
+                bbox: string;
+                /** @description csv of OutdoorRoute.style values */
+                style?: string | null;
+                discipline?: ("boulder" | "rope" | "other") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutePinsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -20993,10 +21761,95 @@ export interface operations {
             };
         };
     };
+    list_saved_spots_outdoor_saved_spots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSpotsListOut"];
+                };
+            };
+        };
+    };
+    save_spot_outdoor_saved_spots_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSpotCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSpotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsave_spot_outdoor_saved_spots__target_type___target_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_type: "region" | "area" | "crag" | "route";
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_outdoor_outdoor_search_get: {
         parameters: {
             query: {
                 q: string;
+                /** @description csv of region,area,crag,wall,route */
+                types?: string | null;
                 region_id?: string | null;
                 limit?: number;
             };
@@ -21248,6 +22101,28 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     } | null;
+                };
+            };
+        };
+    };
+    list_active_plans_endpoint_plans_active_list_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };
@@ -21598,6 +22473,115 @@ export interface operations {
                 "application/json": components["schemas"]["PlanProgressUpdateIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plan_monthly_schedule_plans__plan_id__schedule_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_template_to_plan_day_plans__plan_id__schedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyScheduleAssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_template_from_plan_day_plans__plan_id__schedule__week_index___day___template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+                week_index: number;
+                day: string;
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -24011,6 +24995,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicDailyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_workout_templates_workout_templates_get: {
+        parameters: {
+            query?: {
+                source?: "official" | "mine";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTemplateSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_workout_template_workout_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workout_template_workout_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_workout_template_workout_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_workout_template_workout_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutTemplateUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTemplateOut"];
                 };
             };
             /** @description Validation Error */

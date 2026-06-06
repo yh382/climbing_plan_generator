@@ -26,6 +26,14 @@ type Options = {
   from?: Date;
   /** Cap the result to the N most-recent dates. */
   limit?: number;
+  /** TR6 Phase 5 — restrict to sessions matching the given activity type.
+   *  - "all" / undefined → no filter
+   *  - "climb"           → session_type ∈ {"climb", "mixed"}
+   *  - "train"           → session_type ∈ {"train", "mixed"}
+   *  "mixed" sessions surface under both filters intentionally (per
+   *  ROADMAP §6.1 P2-16). Sessions synced before TR0 have no
+   *  session_type field and default to "climb". */
+  activityType?: "all" | "climb" | "train";
 };
 
 function parseDurationToMin(dur: string): number {
@@ -72,14 +80,26 @@ function bestOf(a: string, b: string): string {
 
 export function useDailyGroupSummaries(opts: Options = {}): DailyGroupSummary[] {
   const sessions = useLogsStore((s) => s.sessions);
-  const { from, limit } = opts;
+  const { from, limit, activityType = "all" } = opts;
 
   return useMemo(() => {
     if (!sessions || sessions.length === 0) return [];
 
+    // TR6 Phase 5 — activity type filter. "mixed" sessions surface
+    // under both "climb" and "train" so they don't disappear from
+    // either tab (per ROADMAP §6.1 P2-16).
+    const typeFiltered = activityType === "all"
+      ? sessions
+      : sessions.filter((s) => {
+          const t = s.sessionType ?? "climb";
+          if (activityType === "climb") return t === "climb" || t === "mixed";
+          if (activityType === "train") return t === "train" || t === "mixed";
+          return true;
+        });
+
     const filtered = from
-      ? sessions.filter((s) => parseISO(s.date) >= from)
-      : sessions;
+      ? typeFiltered.filter((s) => parseISO(s.date) >= from)
+      : typeFiltered;
 
     const byDate = new Map<string, DailyGroupSummary>();
     for (const s of filtered) {
@@ -111,5 +131,5 @@ export function useDailyGroupSummaries(opts: Options = {}): DailyGroupSummary[] 
       b.date.localeCompare(a.date),
     );
     return typeof limit === "number" ? out.slice(0, limit) : out;
-  }, [sessions, from, limit]);
+  }, [sessions, from, limit, activityType]);
 }

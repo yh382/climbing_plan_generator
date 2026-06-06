@@ -27,7 +27,7 @@ import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 import { useSettings } from "../../src/contexts/SettingsContext";
 import { exercisesApi } from "../../src/features/exercises/api";
-import type { ExerciseDetail } from "../../src/features/exercises/types";
+import type { ExerciseDetail, ProtocolVariant } from "../../src/features/exercises/types";
 import { parseExerciseName } from "../../src/lib/exerciseUtils";
 import { useFavoriteIds } from "../../src/features/home/exercises/favoritesApi";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
@@ -133,6 +133,11 @@ export default function ExerciseDetailScreen() {
   const [reps, setReps] = useState(0);
   const [restSec, setRestSec] = useState(0);
 
+  // TR1: selected variant. Defaults to the first variant when an exercise
+  // has 2+ variants — `null` means "use base protocol" (single-variant or
+  // pure simple action). UI picker only renders when there are 2+.
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+
   // Scroll + parallax
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((event) => {
@@ -179,6 +184,15 @@ export default function ExerciseDetailScreen() {
           setReps(p.reps_per_set ?? p.reps ?? 0);
           setRestSec(p.rest_between_sets_sec ?? 0);
         }
+
+        // TR1: pre-select first variant when 2+ variants exist; single or
+        // none keeps `null` (base protocol only). Picker UI mirrors this.
+        const variants = data.protocol_variants;
+        if (variants && variants.length > 1) {
+          setSelectedVariantId(variants[0].id);
+        } else {
+          setSelectedVariantId(null);
+        }
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message || "Failed to load exercise");
@@ -195,6 +209,10 @@ export default function ExerciseDetailScreen() {
       pathname: "/training/exercise",
       params: {
         exerciseId,
+        // TR1: when a variant is selected, pipe its id forward so the
+        // timer + log can resolve `Exercise.protocol_variants[variantId]`
+        // for actual sets/reps/rest. Empty string when on base protocol.
+        variantId: selectedVariantId ?? "",
         exerciseIndex: params.exerciseIndex ?? "-1",
         sessionItem: params.sessionItem ?? "",
       },
@@ -203,11 +221,19 @@ export default function ExerciseDetailScreen() {
 
   const handleAddToPlan = () => {
     router.back();
+    // TR1: snapshot the variant-resolved values so a plan that includes
+    // this exercise pins the load the user picked at add-time. Variant
+    // id is also stored so downstream consumers can look up the variant
+    // when the underlying Exercise definition evolves.
+    const eSets = activeVariant?.sets ?? sets;
+    const eReps = activeVariant?.reps ?? reps;
+    const eRest = activeVariant?.rest_sec ?? restSec;
     const payload = JSON.stringify({
       action_id: exerciseId,
-      sets: sets || undefined,
-      reps: reps || undefined,
-      rest_sec: restSec || undefined,
+      variant_id: selectedVariantId ?? undefined,
+      sets: eSets || undefined,
+      reps: eReps || undefined,
+      rest_sec: eRest || undefined,
       name_override: exercise
         ? { zh: exercise.name_zh, en: exercise.name_en }
         : undefined,
@@ -227,6 +253,57 @@ export default function ExerciseDetailScreen() {
         <View style={s.fieldPill}>
           <Text style={[s.fieldValue, !field.mono && s.fieldValueText]}>{field.value}</Text>
         </View>
+      </View>
+    );
+  }
+
+  function VariantPicker({
+    variants,
+    selected,
+    onSelect,
+    locale,
+  }: {
+    variants: ProtocolVariant[];
+    selected: string | null;
+    onSelect: (id: string) => void;
+    locale: "zh" | "en";
+  }) {
+    // `colors` / `s` closed over from parent scope — same pattern as
+    // FieldPillItem / ProtocolCard below.
+    return (
+      <View style={s.variantRow}>
+        {variants.map((v) => {
+          const isActive = v.id === selected;
+          // Defensive fallback: BE marks label_zh/label_en as required
+          // non-empty strings, but harden against empty/whitespace.
+          const label =
+            (locale === "zh" ? v.label_zh : v.label_en) ||
+            v.label_en ||
+            v.label_zh ||
+            v.id;
+          return (
+            <TouchableOpacity
+              key={v.id}
+              onPress={() => onSelect(v.id)}
+              style={[
+                s.variantPill,
+                isActive
+                  ? { backgroundColor: colors.cardDark, borderColor: colors.cardDark }
+                  : { borderColor: colors.border },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[
+                s.variantPillText,
+                { color: isActive ? "#FFF" : colors.textPrimary },
+              ]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   }
@@ -305,6 +382,15 @@ export default function ExerciseDetailScreen() {
   const restPerRep = protocol?.rest_between_reps_sec ?? 0;
   const subExercises = protocol?.sub_exercises as SubExercise[] | undefined;
   const isCompound = subExercises && subExercises.length > 0;
+
+  // TR1: variant resolution. variants[selected] overrides base protocol
+  // fields one-by-one (any field left null on the variant inherits from
+  // base). For the compound `subExercises` branch we don't apply variants
+  // — sub-exercises have their own per-row params.
+  const variants: ProtocolVariant[] = exercise.protocol_variants ?? [];
+  const activeVariant: ProtocolVariant | null =
+    variants.find((v) => v.id === selectedVariantId) ?? null;
+  const showVariantPicker = variants.length > 1;
 
   const goalLabel = (GOAL_LABEL as any)?.[locale]?.[exercise.goal] ?? exercise.goal;
   const levelLabel = (LEVEL_LABEL as any)?.[locale]?.[exercise.level] ?? exercise.level;
@@ -398,6 +484,7 @@ export default function ExerciseDetailScreen() {
           let eSets = sets;
           let eReps = reps;
           let eRest = restSec;
+          let eDuration = repDuration;
           if (context === "execution") {
             let si: any = null;
             try { si = params.sessionItem ? JSON.parse(params.sessionItem) : null; } catch {}
@@ -405,16 +492,42 @@ export default function ExerciseDetailScreen() {
             eReps = si?.reps || reps;
             eRest = si?.rest_sec || restSec;
           }
-          const hasProtocol = eSets > 0 || eReps > 0 || eRest > 0 || repDuration > 0 || restPerRep > 0 || protocol?.target || protocol?.resistance || protocol?.format;
+          // TR1: variant overrides any base / session-item values for the
+          // dimensions it declares. null fields fall through to base.
+          if (activeVariant) {
+            if (activeVariant.sets != null) eSets = activeVariant.sets;
+            if (activeVariant.reps != null) eReps = activeVariant.reps;
+            if (activeVariant.rest_sec != null) eRest = activeVariant.rest_sec;
+            if (activeVariant.seconds != null) eDuration = activeVariant.seconds;
+          }
+          const hasProtocol = eSets > 0 || eReps > 0 || eRest > 0 || eDuration > 0 || restPerRep > 0 || protocol?.target || protocol?.resistance || protocol?.format || !!activeVariant;
           if (!hasProtocol) return null;
 
           const cardTitle = detailName || goalLabel;
+          // Surface variant load (% or label) and rpe alongside the
+          // existing target/resistance extras so the user sees what
+          // they're committing to.
+          const variantResistance = activeVariant?.load_label
+            ?? (activeVariant?.load_pct != null
+              ? `${activeVariant.load_pct}%`
+              : protocol?.resistance);
+          const variantTarget = activeVariant?.rpe != null
+            ? tr(`目标 RPE ${activeVariant.rpe}`, `Target RPE ${activeVariant.rpe}`)
+            : protocol?.target;
 
           return (
             <View style={s.section}>
               <Text style={s.sectionTitle}>
                 {tr("训练内容", "Exercises")}
               </Text>
+              {showVariantPicker ? (
+                <VariantPicker
+                  variants={variants}
+                  selected={selectedVariantId}
+                  onSelect={setSelectedVariantId}
+                  locale={locale}
+                />
+              ) : null}
               <View style={s.exerciseCard}>
                 <View style={s.exerciseCardHeader}>
                   <Text style={s.exerciseCardTitle} numberOfLines={2}>{cardTitle}</Text>
@@ -423,11 +536,11 @@ export default function ExerciseDetailScreen() {
                 <ProtocolCard fields={buildProtocolFields({
                   sets: eSets,
                   reps: eReps,
-                  duration: repDuration,
+                  duration: eDuration,
                   restPerRep,
                   restPerSet: eRest,
-                  resistance: protocol?.resistance,
-                  target: protocol?.target,
+                  resistance: variantResistance,
+                  target: variantTarget,
                   format: protocol?.format,
                 }, tr)} />
               </View>
@@ -557,6 +670,27 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
   // Section
   sectionTitle: { fontSize: 16, fontFamily: theme.fonts.bold, color: colors.textPrimary, marginBottom: 12 },
+
+  // TR1: variant picker — pills above the exercise card so the user
+  // toggles intensity (e.g. 40%/60%/80%) before reading the resolved
+  // sets/reps. Pill style mirrors the dark-pill action button family.
+  variantRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  variantPill: {
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  variantPillText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.medium,
+    fontWeight: "700",
+  },
 
   // Exercise card
   exerciseCard: {

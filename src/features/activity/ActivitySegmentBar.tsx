@@ -12,7 +12,9 @@ import { useSettings } from "../../contexts/SettingsContext";
 import { NativeSegmentedControl } from "../../components/ui";
 import useSettingsStore, { type ActivitySegment } from "../../store/useSettingsStore";
 
-const SEGMENT_ORDER: ActivitySegment[] = ["sessions", "training", "analysis"];
+// TR7 — "analysis" dropped from the SegmentedControl. Full-screen analysis
+// lives at app/analysis.tsx, reached via QuickInsightsRibbon cards.
+const SEGMENT_ORDER: ActivitySegment[] = ["sessions", "training"];
 
 export default function ActivitySegmentBar() {
   const colors = useThemeColors();
@@ -23,11 +25,7 @@ export default function ActivitySegmentBar() {
   const setSegment = useSettingsStore((s) => s.setActivitySegment);
 
   const options = useMemo(
-    () => [
-      tr("Sessions", "Sessions"),
-      tr("Training", "Training"),
-      tr("Analysis", "Analysis"),
-    ],
+    () => [tr("Sessions", "Sessions"), tr("Training", "Training")],
     [tr]
   );
 

@@ -131,14 +131,14 @@ export default function StickyProfileTabBar({
     }
 
     const rawTop = naturalTop < headerHeight ? headerHeight : naturalTop;
-    // Floor + 1pt overdraw upward to mask sub-pixel gaps between the
-    // bar's top and the spacer's top. The 1pt overlap into the area
-    // above is harmless: at rest the spacer is transparent and the
-    // overlap renders over the cover (or its corner-cutaway when the
-    // radius is non-zero); at pin the overlap sits 1pt into the nav
-    // bar zone, where CollapsingHeaderBg's opaque background covers
-    // any visible artifact.
-    const top = Math.floor(rawTop) - 1;
+    // Keep sub-pixel precision (no Math.floor) so the bar tracks the
+    // spacer at the native scroll's full resolution — integer pixel
+    // snapping at 60Hz on a 120Hz ProMotion display visibly lagged
+    // the bar behind the underlying scroll content, exposing the
+    // cover image through the transparent spacer above the bar's
+    // top. The 1pt overdraw upward still masks any sub-pixel hairline
+    // between the bar's top and the spacer's top.
+    const top = rawTop - 1;
 
     // Radius animates from REST_RADIUS → 0 as the bar approaches pin.
     // At rest the rounded corners reveal the cover image beneath the

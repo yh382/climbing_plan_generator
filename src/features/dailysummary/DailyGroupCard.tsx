@@ -22,6 +22,12 @@ const MAX_INLINE_SESSIONS = 3;
 type Props = {
   summary: DailyGroupSummary;
   onPress: () => void;
+  /** Which feed this card is rendering in. Drives the session-row icon
+   *  semantics for "mixed" sessions — in the Sessions feed a mixed day
+   *  also-was-training (dumbbell); in the Training feed a mixed day
+   *  also-was-climbing (climb mark). Defaults to "sessions" so existing
+   *  callers stay visually identical. */
+  displayContext?: "sessions" | "training";
 };
 
 function formatMinutes(min: number): string {
@@ -33,7 +39,11 @@ function formatMinutes(min: number): string {
   return `${mm}m`;
 }
 
-export default function DailyGroupCard({ summary, onPress }: Props) {
+export default function DailyGroupCard({
+  summary,
+  onPress,
+  displayContext = "sessions",
+}: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -84,10 +94,41 @@ export default function DailyGroupCard({ summary, onPress }: Props) {
             {visibleSessions.map((s, idx) => {
               const start = format(parseISO(s.startTime), "HH:mm");
               const end = format(parseISO(s.endTime), "HH:mm");
+              // Session-level type icon — context-aware so the user
+              // sees the *other* side of a mixed session at a glance.
+              // Defaults to "climb" when missing (sessions synced
+              // pre-TR0).
+              //   sessions feed:
+              //     climb → climb (no surprise)
+              //     mixed → barbell ("also trained this day")
+              //     train → barbell (rare here but safe)
+              //   training feed:
+              //     train → barbell (no surprise)
+              //     mixed → climb mark ("also climbed this day")
+              //     climb → climb (rare here but safe)
+              const stype = s.sessionType ?? "climb";
+              const iconName =
+                displayContext === "training"
+                  ? stype === "mixed"
+                    ? "trending-up-outline" // climbing mark in Training feed
+                    : "barbell-outline"
+                  : stype === "mixed"
+                    ? "barbell-outline"     // training mark in Sessions feed
+                    : stype === "train"
+                      ? "barbell-outline"
+                      : "trending-up-outline";
               return (
-                <Text key={s.id} style={styles.sessionRow} numberOfLines={1}>
-                  {tr(`第 ${idx + 1} 次`, `Session ${idx + 1}`)} · {start}–{end} · {s.duration}
-                </Text>
+                <View key={s.id} style={styles.sessionRowWrap}>
+                  <Ionicons
+                    name={iconName as any}
+                    size={13}
+                    color={colors.textTertiary}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.sessionRow} numberOfLines={1}>
+                    {tr(`第 ${idx + 1} 次`, `Session ${idx + 1}`)} · {start}–{end} · {s.duration}
+                  </Text>
+                </View>
               );
             })}
             {hiddenCount > 0 && (
@@ -146,11 +187,16 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       marginTop: 12,
     },
     sessionList: { marginTop: 8, gap: 2 },
+    sessionRowWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
     sessionRow: {
       fontSize: 11,
       fontFamily: theme.fonts.medium,
       color: colors.textSecondary,
       letterSpacing: 0.2,
+      flexShrink: 1,
     },
     sessionRowMuted: {
       fontSize: 11,

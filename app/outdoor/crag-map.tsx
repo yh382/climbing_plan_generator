@@ -37,14 +37,27 @@ import { outdoorListsApi } from '../../src/features/outdoor/listsApi';
 import type { Region as Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
 import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 import MapPinCluster from '../../src/features/outdoor/components/MapPinCluster';
+import RoutePinCluster, {
+  type WallPinContext,
+} from '../../src/features/outdoor/components/RoutePinCluster';
+import {
+  useViewportPins,
+  type ViewportBbox,
+} from '../../src/features/outdoor/useViewportPins';
 import WallGroup from '../../src/features/outdoor/components/WallGroup';
 import RouteListCard from '../../src/features/outdoor/components/RouteListCard';
 import { MapTopBar } from '../../src/features/mapscreen/components/MapTopBar';
 import { MapSearchBar } from '../../src/features/mapscreen/components/MapSearchBar';
 import { useMapSheetState, DETENT_COLLAPSED, DETENT_MEDIUM, DETENT_LARGE } from '../../src/features/mapscreen/hooks/useMapSheetState';
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
-import AreaMenuSheet, { type AreaMenuSheetHandle } from '../../src/features/mapscreen/components/AreaMenuSheet';
-import AreaInfoSheet, { type AreaInfoSheetHandle } from '../../src/features/mapscreen/components/AreaInfoSheet';
+import CragMenuSheet, { type CragMenuSheetHandle } from '../../src/features/mapscreen/components/CragMenuSheet';
+import RegionInfoSheet, { type RegionInfoSheetHandle } from '../../src/features/mapscreen/components/RegionInfoSheet';
+import CragInfoSheet, {
+  type CragInfoSheetHandle,
+  type CragInfoSeed,
+} from '../../src/features/mapscreen/components/CragInfoSheet';
+import { FilterChipsBar } from '../../src/features/mapscreen/components/FilterChipsBar';
+import useOutdoorMapFiltersStore from '../../src/store/useOutdoorMapFiltersStore';
 import MyListSheet, { type MyListSheetHandle } from '../../src/features/mapscreen/components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from '../../src/features/mapscreen/components/ReportsSheet';
 import AddRouteSheet, { type AddRouteSheetHandle } from '../../src/features/outdoor/components/AddRouteSheet';
@@ -121,7 +134,7 @@ export default function CragMapPage() {
   });
 
   // Profile / My List sheet refs — stacked on top of the primary sheet.
-  const areaMenuSheetRef = useRef<AreaMenuSheetHandle>(null);
+  const areaMenuSheetRef = useRef<CragMenuSheetHandle>(null);
   const myListSheetRef = useRef<MyListSheetHandle>(null);
   const reportsSheetRef = useRef<ReportsSheetHandle>(null);
   const addRouteSheetRef = useRef<AddRouteSheetHandle>(null);
@@ -130,6 +143,10 @@ export default function CragMapPage() {
 
   // Data state
   const [area, setArea] = useState<Area | null>(null);
+  // BR Track D Day 5e — `pins` is now list-mode-only. Area mode uses
+  // `viewportPins` (bbox-driven RoutePin source) + `focusedWall`.
+  // useListData mirror keeps the list-mode synth (one MapPin per listItem
+  // with `wall_lat/wall_lng`) so list-mode MapPinCluster still works.
   const [pins, setPins] = useState<MapPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [listDetail, setListDetail] = useState<OutdoorListDetail | null>(null);
@@ -138,6 +155,14 @@ export default function CragMapPage() {
   // to WallGroup so the tapped route's card gets reordered to the top of
   // its wall's list.
   const [highlightedRouteId, setHighlightedRouteId] = useState<string | null>(null);
+  // BR Track D Day 5e — focused Wall context. When set, sheet header flips
+  // to 2-row mode (Crag subtitle + Wall title, PLAN §3.2) and `walls`
+  // contains only the focused wall. Cleared on areaId change.
+  const [focusedWall, setFocusedWall] = useState<WallPinContext | null>(null);
+  // BR Track D Day 5e — CragInfoSheet seed/id state.
+  const [cragInfoCragId, setCragInfoCragId] = useState<string | null>(null);
+  const [cragInfoSeed, setCragInfoSeed] = useState<CragInfoSeed | null>(null);
+  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
 
   // Sheet content
   const [sheetTitle, setSheetTitle] = useState('');
@@ -149,27 +174,95 @@ export default function CragMapPage() {
   // Map + UI state
   const [styleReady, setStyleReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+
+  // BR Track D Day 5c lock-step (mirrors MapScreenMapbox Day 5b):
+  // bbox-scoped outdoor route pin cluster. Updated in onCameraChanged
+  // via mapRef.getVisibleBounds(). useViewportPins debounces 300ms.
+  const [bbox, setBbox] = useState<ViewportBbox | null>(null);
+  // BR Track D Day 6 lock-step — FilterChipsBar wiring (PLAN §8).
+  const mapFilter = useOutdoorMapFiltersStore((s) => s.selected);
+  const mapFilterParams = useMemo(() => {
+    if (mapFilter === 'sport') return { style: 'sport' as const };
+    if (mapFilter === 'trad') return { style: 'trad' as const };
+    if (mapFilter === 'boulder') return { discipline: 'boulder' as const };
+    return {};
+  }, [mapFilter]);
+  const viewportPins = useViewportPins(bbox, {
+    enabled: styleReady,
+    style: mapFilterParams.style,
+    discipline: mapFilterParams.discipline,
+  });
+
+  // Wall pin tap — BR Track D Day 5e. Forwards to `focusOnWall` (declared
+  // below this hook block, called via closure). CN mirror only handles
+  // the area-mode case (the gyms→area transition path lives in the
+  // unified MapScreenMapbox.tsx for overseas users).
+  const focusOnWallRef = useRef<((ctx: WallPinContext) => void) | null>(null);
+  const onWallPinPress = useCallback((ctx: WallPinContext) => {
+    focusOnWallRef.current?.(ctx);
+  }, []);
+
+  const onClusterBubblePress = useCallback(
+    async (coords: [number, number]) => {
+      try {
+        const currentZoom = (await mapRef.current?.getZoom()) ?? 12;
+        const nextZoom = Math.min(16, currentZoom + 2);
+        camRef.current?.setCamera({
+          centerCoordinate: coords,
+          zoomLevel: nextZoom,
+          animationDuration: 350,
+        });
+      } catch {}
+    },
+    [],
+  );
   const [modeIndex, setModeIndex] = useState(0); // 0=Routes, 1=Boulder
   const [searchExpanded, setSearchExpanded] = useState(false);
   // Area info is presented as a stacked TrueSheet (Apple Maps POI pattern),
   // not an inline accordion in the list header — lets the user pan/scroll
   // through full area detail without losing the map context.
-  const areaInfoSheetRef = useRef<AreaInfoSheetHandle>(null);
-  const openAreaInfo = useCallback(() => {
+  const areaInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
+  const openRegionInfo = useCallback(() => {
     areaInfoSheetRef.current?.present();
   }, []);
+  // BR Track D Day 5e — title-tap routing (PLAN §3.2):
+  //   focusedWall set → present CragInfoSheet (subtitle is Crag name)
+  //   focusedWall unset → present RegionInfoSheet (legacy "info" tap)
+  const openCragOrAreaInfo = useCallback(() => {
+    if (focusedWall) {
+      setCragInfoCragId(focusedWall.crag_id);
+      setCragInfoSeed({
+        id: focusedWall.crag_id,
+        name: focusedWall.crag_name,
+        area_name: focusedWall.area_name,
+        lat: focusedWall.lat,
+        lng: focusedWall.lng,
+      });
+      cragInfoSheetRef.current?.present();
+      return;
+    }
+    openRegionInfo();
+  }, [focusedWall, openRegionInfo]);
 
-  // Load data: area-mode uses area+pins; list-mode uses list detail.
+  // Load data: area-mode loads the Region only (no pin fan-out — that
+  // was the legacy `getMapPins` flow, removed in Day 5e). Pin discovery
+  // now goes through `viewportPins` (bbox cluster) + Wall pin tap →
+  // focusOnWall. List-mode keeps the per-item synth pin source.
   useEffect(() => {
     if (mode === 'area') {
+      // Reset wall/sheet scratch state on areaId change so a fresh
+      // entry starts clean. focusedWall is cleared up-front; the user
+      // refocuses by tapping a Wall pin once the cluster lands.
+      setFocusedWall(null);
+      setWalls([]);
+      setSheetTitle('');
+      setSearchResults(null);
+      setSearchQuery('');
+      setSearchExpanded(false);
       if (!areaId) return;
       setLoading(true);
-      Promise.all([
-        outdoorApi.getRegion(areaId),
-        outdoorApi.getMapPins(areaId),
-      ]).then(([areaData, pinData]) => {
+      outdoorApi.getRegion(areaId).then((areaData) => {
         if (areaData) setArea(areaData);
-        setPins(pinData ?? []);
         setLoading(false);
       });
     } else {
@@ -196,63 +289,19 @@ export default function CragMapPage() {
     }
   }, [mode, areaId, listId]);
 
-  // Auto-load walls for the area on first entry, so the sheet shows the
-  // route list by default instead of the empty "tap a pin" state. Walks
-  // sectors → walls → routes for every crag-level pin, deduped by wall id.
-  // Guarded by a ref keyed on areaId so we run at most once per area.
-  const autoLoadedAreaRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (mode !== 'area') {
-      autoLoadedAreaRef.current = null;
-      return;
-    }
-    if (!areaId) return;
-    if (loading) return;
-    if (pins.length === 0) return;
-    if (autoLoadedAreaRef.current === areaId) return;
-    autoLoadedAreaRef.current = areaId;
+  // BR Track D Day 5e — legacy autoLoadedAreaRef effect REMOVED. It used
+  // `pins.filter('crag')` to fan out wall loads on first area-mode entry,
+  // which depended on the deleted `getMapPins` source. The new flow is
+  // tap-driven: enter area mode → camera flies to Region center → user
+  // taps a Wall pin in the cluster → focusOnWall populates the sheet.
 
-    const topPins = pins.filter((p) => p.level === 'crag');
-    if (topPins.length === 0) return;
-
-    setLoadingSheet(true);
-    (async () => {
-      const allWalls: Wall[] = [];
-      const seen = new Set<string>();
-      for (const crag of topPins) {
-        try {
-          // BR Track A rename: old getSectors(crag_id) → new getCrags(area_id).
-          // Here `crag` (top-level pin) is a new Area; we walk to its child Crags.
-          const sectors = await outdoorApi.getCrags(crag.id);
-          for (const sec of sectors) {
-            const ws = await outdoorApi.getWalls(sec.id);
-            const wsWithRoutes = await Promise.all(
-              ws.map(async (w) => ({
-                ...w,
-                routes: await outdoorApi.getRoutes(w.id),
-              })),
-            );
-            for (const w of wsWithRoutes) {
-              if (!seen.has(w.id)) {
-                seen.add(w.id);
-                allWalls.push(w);
-              }
-            }
-          }
-        } catch {
-          // Swallow — user can still tap a pin to load a specific wall.
-        }
-      }
-      setWalls(allWalls);
-    })().finally(() => setLoadingSheet(false));
-  }, [mode, areaId, loading, pins]);
-
-  // Camera: fitBounds to pins. Area mode fits to crag pins; list mode fits to all route pins.
+  // Camera: fitBounds to list pins. Area mode just centers on the Region
+  // (no per-pin fit since `getMapPins` is gone in Day 5e).
   useEffect(() => {
     if (!styleReady || !mapReady) return;
     if (!camRef.current) return;
 
-    const sourcePins = mode === 'list' ? pins : pins.filter((p) => p.level === 'crag');
+    const sourcePins = mode === 'list' ? pins : [];
     if (sourcePins.length >= 2) {
       const lats = sourcePins.map((p) => p.lat);
       const lngs = sourcePins.map((p) => p.lng);
@@ -284,138 +333,75 @@ export default function CragMapPage() {
     }
   }, [area, pins, styleReady, mapReady, mode]);
 
-  // Pin press → load walls for that sector/crag, or in list mode scroll to the matching item.
+  // BR Track D Day 5e — list-mode pin tap. Scrolls the sheet list to the
+  // matching list item and re-centers the camera. Area mode no longer
+  // goes through this handler (RoutePinCluster owns Wall-pin taps via
+  // `focusOnWall`).
   const onPinPress = useCallback(async (pin: MapPin) => {
-    if (mode === 'list') {
-      // Route-level pins don't appear in list mode; only list-item pins.
-      setFocusedItemId(pin.id);
-      const offset = itemOffsetsRef.current[pin.id];
-      if (offset != null) {
-        sheetScrollRef.current?.scrollTo({ y: Math.max(0, offset - 8), animated: true });
-      }
-      try {
-        camRef.current?.setCamera({ centerCoordinate: [pin.lng, pin.lat], zoomLevel: 14, animationDuration: 400 });
-      } catch {}
-      sheet.safeResize(DETENT_MEDIUM);
-      return;
+    if (mode !== 'list') return;
+    setFocusedItemId(pin.id);
+    const offset = itemOffsetsRef.current[pin.id];
+    if (offset != null) {
+      sheetScrollRef.current?.scrollTo({ y: Math.max(0, offset - 8), animated: true });
     }
-    setLoadingSheet(true);
-    setSearchResults(null);
-
-    // Highlight only for route pins — wall/sector/crag clear the highlight
-    // so WallGroup renders in natural order.
-    setHighlightedRouteId(pin.level === 'route' ? pin.id : null);
-
-    if (pin.level === 'route') {
-      // Route pin: find the parent wall in the map-pins cache, load the
-      // wall's routes, present the wall as the single sheet entry.
-      const parentId = pin.parent_id;
-      const wallPin = parentId
-        ? pins.find((p) => p.level === 'wall' && p.id === parentId)
-        : undefined;
-      setSheetTitle(wallPin?.name ?? '');
-      if (wallPin && parentId) {
-        const wallRoutes = await outdoorApi.getRoutes(parentId);
-        setWalls([
-          {
-            id: wallPin.id,
-            crag_id: '',
-            name: wallPin.name,
-            lat: wallPin.lat,
-            lng: wallPin.lng,
-            sort_order: 0,
-            status: 'approved',
-            route_count: wallRoutes.length,
-            routes: wallRoutes,
-          },
-        ]);
-      }
-    } else {
-      setSheetTitle(pin.name);
-
-      if (pin.level === 'wall') {
-        const wallRoutes = await outdoorApi.getRoutes(pin.id);
-        setWalls([{
-          id: pin.id, crag_id: '', name: pin.name,
-          lat: pin.lat, lng: pin.lng, sort_order: 0, status: 'approved',
-          route_count: wallRoutes.length, routes: wallRoutes,
-        }]);
-      } else if (pin.level === 'crag') {
-        // BR Track A: old "sector" level == new "crag" level. Direct
-        // children of a crag are walls.
-        const cragWalls = await outdoorApi.getWalls(pin.id);
-        const wallsWithRoutes = await Promise.all(
-          cragWalls.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
-        );
-        setWalls(wallsWithRoutes);
-      } else if (pin.level === 'area') {
-        // BR Track A: old "crag" level == new "area" level. Walk down to
-        // child Crags → Walls → Routes.
-        const childCrags = await outdoorApi.getCrags(pin.id);
-        const allWalls: Wall[] = [];
-        for (const sec of childCrags) {
-          const ws = await outdoorApi.getWalls(sec.id);
-          const wsWithRoutes = await Promise.all(
-            ws.map(async (w) => ({ ...w, routes: await outdoorApi.getRoutes(w.id) })),
-          );
-          allWalls.push(...wsWithRoutes);
-        }
-        setWalls(allWalls);
-      }
-    }
-    setLoadingSheet(false);
-    // Reset scroll to top so the highlighted route (reordered first in
-    // its wall's list by WallGroup) lands at the top of the visible area.
-    sheetScrollRef.current?.scrollTo({ y: 0, animated: false });
+    try {
+      camRef.current?.setCamera({
+        centerCoordinate: [pin.lng, pin.lat],
+        zoomLevel: 14,
+        animationDuration: 400,
+      });
+    } catch {}
     sheet.safeResize(DETENT_MEDIUM);
-  }, [sheet, mode, pins]);
+  }, [sheet, mode]);
 
-  // Manual drag-up from COLLAPSED → refresh sheet to the wall nearest to
-  // the current map center. Mirrors the pin-tap refresh path minus the
-  // resize (the drag is already moving the sheet) and highlight.
-  manualOpenHandlerRef.current = () => {
-    if (mode !== 'area') return;
-    const center = mapCenterRef.current;
-    if (!center) return;
-    const wallPins = pins.filter((p) => p.level === 'wall');
-    if (wallPins.length === 0) return;
-    let nearest: MapPin | null = null;
-    let minDist = Infinity;
-    for (const p of wallPins) {
-      const dLat = p.lat - center.lat;
-      const dLng = p.lng - center.lng;
-      const d = dLat * dLat + dLng * dLng;
-      if (d < minDist) {
-        minDist = d;
-        nearest = p;
-      }
-    }
-    if (!nearest) return;
-    const picked = nearest;
+  // BR Track D Day 5e — Wall-pin focus (PLAN §3.2). Mirrors
+  // MapScreenMapbox.focusOnWall: fetch the wall's routes, synthesize a
+  // single Wall in `walls`, fly the camera in, resize sheet to MEDIUM,
+  // and flip the sheet header into 2-row mode via `focusedWall`.
+  const focusOnWall = useCallback(async (ctx: WallPinContext) => {
+    setFocusedWall(ctx);
     setHighlightedRouteId(null);
-    setSheetTitle(picked.name);
     setSearchResults(null);
+    setSheetTitle('');
     setLoadingSheet(true);
-    outdoorApi
-      .getRoutes(picked.id)
-      .then((wallRoutes) => {
-        setWalls([
-          {
-            id: picked.id,
-            crag_id: '',
-            name: picked.name,
-            lat: picked.lat,
-            lng: picked.lng,
-            sort_order: 0,
-            status: 'approved',
-            route_count: wallRoutes.length,
-            routes: wallRoutes,
-          },
-        ]);
-      })
-      .finally(() => setLoadingSheet(false));
+    try {
+      const wallRoutes = await outdoorApi.getRoutes(ctx.wall_id);
+      const wall: Wall = {
+        id: ctx.wall_id,
+        crag_id: ctx.crag_id,
+        name: ctx.wall_name,
+        lat: ctx.lat,
+        lng: ctx.lng,
+        sort_order: 0,
+        status: 'approved',
+        route_count: wallRoutes.length,
+        routes: wallRoutes,
+      };
+      setWalls([wall]);
+    } finally {
+      setLoadingSheet(false);
+    }
+    try {
+      camRef.current?.setCamera({
+        centerCoordinate: [ctx.lng, ctx.lat],
+        zoomLevel: 16,
+        animationDuration: 500,
+      });
+    } catch {}
+    sheet.safeResize(DETENT_MEDIUM);
     sheetScrollRef.current?.scrollTo({ y: 0, animated: false });
-  };
+  }, [sheet]);
+
+  // Wire focusOnWall behind the ref so `onWallPinPress` (declared earlier)
+  // can call it without a circular useCallback dep cycle.
+  focusOnWallRef.current = focusOnWall;
+
+  // BR Track D Day 5e — manual drag-up handler is now a no-op for area
+  // mode. The Day 4 legacy was "find nearest wall pin to map center +
+  // load its routes," which required the deleted `pins.filter('wall')`
+  // source. New UX is tap-driven (PLAN §3.2): the user taps a Wall pin
+  // to focus, not drag the sheet up.
+  manualOpenHandlerRef.current = () => {};
 
   // Search
   const handleSearch = useCallback(async () => {
@@ -498,17 +484,22 @@ export default function CragMapPage() {
     }
   }, [tr]);
 
-  // Filter walls by mode (boulder vs routes)
+  // Filter walls by mode (boulder vs routes) + Day 6 FilterChipsBar style chip
   const filteredWalls = useMemo(() => {
-    if (modeIndex === 0) {
-      return walls
-        .map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style !== 'boulder') }))
-        .filter((w) => (w.routes?.length ?? 0) > 0);
-    }
-    return walls
-      .map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style === 'boulder') }))
-      .filter((w) => (w.routes?.length ?? 0) > 0);
-  }, [walls, modeIndex]);
+    const byDiscipline = modeIndex === 0
+      ? walls.map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style !== 'boulder') }))
+      : walls.map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style === 'boulder') }));
+    const byChip = byDiscipline.map((w) => {
+      const filtered = (() => {
+        if (mapFilter === 'sport') return (w.routes ?? []).filter((r) => r.style === 'sport');
+        if (mapFilter === 'trad') return (w.routes ?? []).filter((r) => r.style === 'trad');
+        if (mapFilter === 'boulder') return (w.routes ?? []).filter((r) => r.style === 'boulder');
+        return w.routes ?? [];
+      })();
+      return { ...w, routes: filtered };
+    });
+    return byChip.filter((w) => (w.routes?.length ?? 0) > 0);
+  }, [walls, modeIndex, mapFilter]);
 
   const mapStyleURL = useMemo(
     () => (scheme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/outdoors-v12'),
@@ -552,6 +543,24 @@ export default function CragMapPage() {
             const currentLng = Number(c[0]);
             mapCenterRef.current = { lat: currentLat, lng: currentLng };
 
+            // Day 5c — refresh bbox for useViewportPins. getVisibleBounds
+            // returns [[ne_lng, ne_lat], [sw_lng, sw_lat]]; useViewportPins
+            // internally debounces 300ms so we don't gate this further.
+            mapRef.current
+              ?.getVisibleBounds()
+              .then((bounds) => {
+                if (!bounds || bounds.length !== 2) return;
+                const [ne, sw] = bounds;
+                if (!ne || ne.length < 2 || !sw || sw.length < 2) return;
+                setBbox({
+                  south: Number(sw[1]),
+                  west: Number(sw[0]),
+                  north: Number(ne[1]),
+                  east: Number(ne[0]),
+                });
+              })
+              .catch(() => {});
+
             const touchY = touchStartYRef.current;
             if (touchY == null) return;
 
@@ -577,11 +586,28 @@ export default function CragMapPage() {
           {styleReady && (
             <MapboxGL.UserLocation animated={false} visible showsUserHeadingIndicator />
           )}
-          <MapPinCluster
-            pins={pins}
-            styleReady={styleReady}
-            onPinPress={onPinPress}
-          />
+          {/* List mode keeps MapPinCluster — list source is cherry-picked
+              items (not a contiguous bbox), so the legacy per-item pin
+              layer still fits. */}
+          {mode === 'list' && (
+            <MapPinCluster
+              pins={pins}
+              styleReady={styleReady}
+              onPinPress={onPinPress}
+            />
+          )}
+          {/* BR Track D Day 5e — area-mode pin source is now bbox-driven
+              `RoutePinCluster` only. The legacy `MapPinCluster` for area
+              mode is gone (Day 5d shipped on overseas; CN catches up
+              here). Wall pin tap → `onWallPinPress` → `focusOnWall`. */}
+          {mode === 'area' && (
+            <RoutePinCluster
+              pins={viewportPins.pins}
+              styleReady={styleReady}
+              onWallPress={onWallPinPress}
+              onClusterPress={onClusterBubblePress}
+            />
+          )}
         </MapboxGL.MapView>
 
         {loading && (
@@ -755,24 +781,45 @@ export default function CragMapPage() {
                   available middle space → long names crashed into the
                   left pill. */}
               <TouchableOpacity
-                onPress={openAreaInfo}
+                onPress={openCragOrAreaInfo}
                 activeOpacity={0.6}
                 hitSlop={8}
                 style={styles.headerTitleFlex}
               >
-                <Text
-                  style={styles.headerAreaName}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  // Auto-shrink font (iOS): try to fit full name within
-                  // the flex:1 slot first, only fall back to ellipsis when
-                  // shrunk down to minimumFontScale * 20pt = 13pt. Most
-                  // OpenBeta area names fit between 14-20pt.
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {area?.name ?? areaName ?? tr('攀岩区', 'Area')}
-                </Text>
+                {/* PLAN §3.2 2-row pattern:
+                 *   row 1 (small) — Crag subtitle when wall focused
+                 *   row 2 (large) — Wall title
+                 * focusedWall unset → legacy single-row Region name. */}
+                {focusedWall ? (
+                  <>
+                    <Text style={styles.headerSubtitleSmall} numberOfLines={1}>
+                      {focusedWall.crag_name}
+                    </Text>
+                    <Text
+                      style={styles.headerTitleLarge}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.65}
+                    >
+                      {focusedWall.wall_name}
+                    </Text>
+                  </>
+                ) : (
+                  <Text
+                    style={styles.headerAreaName}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    // Auto-shrink font (iOS): try to fit full name within
+                    // the flex:1 slot first, only fall back to ellipsis when
+                    // shrunk down to minimumFontScale * 20pt = 13pt. Most
+                    // OpenBeta area names fit between 14-20pt.
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.65}
+                  >
+                    {area?.name ?? areaName ?? tr('攀岩区', 'Area')}
+                  </Text>
+                )}
               </TouchableOpacity>
 
               {/* Right: hamburger button — glass circle. Opens the area
@@ -786,6 +833,15 @@ export default function CragMapPage() {
                   onPress={() => areaMenuSheetRef.current?.present()}
                 />
               </View>
+            </View>
+          ) : null}
+
+          {/* BR Track D Day 6 — FilterChipsBar (PLAN §8). Area mode only.
+              Sits between the title row and the sheet sub-title. List
+              mode shows pre-selected saved routes, no chip filter. */}
+          {mode === 'area' && !searchExpanded ? (
+            <View style={styles.filterChipsRow}>
+              <FilterChipsBar />
             </View>
           ) : null}
 
@@ -866,11 +922,11 @@ export default function CragMapPage() {
           (no mapbox adapter) so the Offline shortcut surfaces a
           coming-soon alert. */}
       {areaId ? (
-        <AreaInfoSheet
+        <RegionInfoSheet
           ref={areaInfoSheetRef}
-          areaId={areaId}
+          regionId={areaId}
           context="crag"
-          seedArea={
+          seedRegion={
             area
               ? {
                   id: area.id,
@@ -895,22 +951,45 @@ export default function CragMapPage() {
         />
       ) : null}
 
-      {/* Area menu sheet (stacked) — spawned from the sheet-header
-          hamburger tap. Hosts area header card + climb-type segment +
-          Area Tools + User Tools. CN version has no offline maps
-          (no mapbox adapter), so that menu row falls back to "Coming
-          soon" via the sheet's internal logic. */}
-      {mode === 'area' && area ? (
-        <AreaMenuSheet
+      {/* BR Track D Day 5e — CragInfoSheet (Crag L5 detail) mounted at
+          root, presented from the RoutesListSheet 2-row Crag subtitle
+          tap when a Wall is focused. */}
+      <CragInfoSheet
+        ref={cragInfoSheetRef}
+        cragId={cragInfoCragId}
+        context="pinTap"
+        seedCrag={cragInfoSeed}
+      />
+
+      {/* Crag menu sheet (stacked) — BR Track D Day 5e: now properly
+          gated on `focusedWall`. PLAN §3.5 — the menu is Crag-scoped, so
+          it only makes sense when the user has focused a Wall (which
+          carries the parent Crag context). Browse Up + Share sections
+          surface the parent Area + Region. */}
+      {mode === 'area' && focusedWall ? (
+        <CragMenuSheet
           ref={areaMenuSheetRef}
-          area={{
-            id: area.id,
-            name: area.name,
-            cover_url: area.cover_url,
-            // BR Track A: Region.area_count = top-level children count.
-            crag_count: area.area_count ?? 0,
-            route_count: area.route_count ?? 0,
-            boulder_count: area.boulder_count ?? 0,
+          crag={{
+            id: focusedWall.crag_id,
+            name: focusedWall.crag_name,
+            cover_url: null,
+            area_id: focusedWall.area_id,
+            area_name: focusedWall.area_name,
+            region_id: focusedWall.region_id,
+            region_name: focusedWall.region_name,
+            lat: focusedWall.lat,
+            lng: focusedWall.lng,
+            // Seed wall_count at 1 (the focused wall); CragInfoSheet's
+            // own detail fetch hydrates the precise count later.
+            wall_count: 1,
+            route_count: focusedWall.route_count,
+            boulder_count: 0,
+          }}
+          parentArea={{
+            id: focusedWall.area_id,
+            region_id: focusedWall.region_id,
+            name: focusedWall.area_name,
+            status: 'approved',
           }}
           areaModeIndex={modeIndex}
           setAreaModeIndex={setModeIndex}
@@ -1027,6 +1106,20 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       color: c.textPrimary,
       flexShrink: 1,
     },
+    // PLAN §3.2 2-row pattern — Crag subtitle + Wall large title when
+    // focusedWall is set. Mirrors RoutesListSheet equivalent styles.
+    headerSubtitleSmall: {
+      fontFamily: theme.fonts.medium,
+      fontSize: 12,
+      color: c.textSecondary,
+      flexShrink: 1,
+    },
+    headerTitleLarge: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 18,
+      color: c.textPrimary,
+      flexShrink: 1,
+    },
     headerAvatar: {
       width: 44,
       height: 44,
@@ -1054,6 +1147,13 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     // Segment row — own row below the icons row, full width.
     segmentRow: {
       paddingHorizontal: theme.spacing.screenPadding,
+      paddingTop: 4,
+      paddingBottom: 8,
+    },
+    // Day 6 FilterChipsBar row — full-width below the header pill row,
+    // matches RoutesListSheet equivalent inset.
+    filterChipsRow: {
+      paddingHorizontal: 16,
       paddingTop: 4,
       paddingBottom: 8,
     },

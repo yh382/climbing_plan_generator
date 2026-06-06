@@ -35,12 +35,30 @@ type CSMDiscipline = "boulder" | "rope";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_CARD_HEIGHT = 440;
 
+/** TR7 — focus key map. Ribbon cards push `/analysis?focus=<key>` and
+ *  this screen scrolls to the matching anchor on mount. Keys cover the
+ *  3 climb-side sections + 5 training-side sub-components (training-*
+ *  variants resolve to the same anchor for now; TR7-FU adds per-subsection
+ *  scroll targets when TrainingInsightsSection lands). */
+export type AnalysisFocusKey =
+  | "csm"
+  | "pyramid"
+  | "volume"
+  | "training-insights"
+  | "training-goal-cat"
+  | "training-volume"
+  | "training-adherence"
+  | "training-body-area"
+  | "training-variant";
+
 type Props = {
   /** When true, renders without a wrapping ScrollView so the parent can scroll. */
   embedded?: boolean;
+  /** TR7 — scroll target. Causes `scrollViewRef.current.scrollTo` post-mount. */
+  focus?: AnalysisFocusKey;
 };
 
-export default function AnalysisScreen({ embedded = false }: Props) {
+export default function AnalysisScreen({ embedded = false, focus }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const router = useRouter();
@@ -51,6 +69,31 @@ export default function AnalysisScreen({ embedded = false }: Props) {
 
   const [chartPage, setChartPage] = useState(0);
   const chartScrollRef = useRef<ScrollView>(null);
+
+  // TR7 — scroll anchor refs keyed by AnalysisFocusKey. We measure
+  // y-offset onLayout and replay it via scrollViewRef in a post-mount
+  // effect.
+  const outerScrollRef = useRef<ScrollView>(null);
+  const sectionOffsetsRef = useRef<Partial<Record<AnalysisFocusKey, number>>>({});
+
+  // Single onLayout handler factory keeps the per-section setup tidy.
+  const sectionOnLayout = (key: AnalysisFocusKey) => (e: any) => {
+    sectionOffsetsRef.current[key] = e.nativeEvent.layout.y;
+  };
+
+  useEffect(() => {
+    if (!focus || embedded) return;
+    // Allow layouts to settle; a single rAF + 80ms is usually enough on
+    // device. Fallback no-op if the section never measured (silent so
+    // ribbon taps still feel responsive).
+    const handle = setTimeout(() => {
+      const y = sectionOffsetsRef.current[focus];
+      if (typeof y === "number") {
+        outerScrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      }
+    }, 120);
+    return () => clearTimeout(handle);
+  }, [focus, embedded]);
 
   const [csmDiscipline, setCsmDiscipline] = useState<CSMDiscipline>("boulder");
   const [csmBoulder, setCsmBoulder] = useState<CSMState | null>(null);
@@ -130,8 +173,16 @@ export default function AnalysisScreen({ embedded = false }: Props) {
         </View>
       </View>
 
-      {/* Charts carousel */}
-      <View style={styles.dotRow}>
+      {/* Charts carousel — both pyramid + volume live here; we register the
+          same onLayout for both keys since the carousel is a single
+          horizontal scroller. */}
+      <View
+        style={styles.dotRow}
+        onLayout={(e) => {
+          sectionOnLayout("pyramid")(e);
+          sectionOnLayout("volume")(e);
+        }}
+      >
         {chartCards.map((_, i) => (
           <View key={i} style={[styles.dot, chartPage === i && styles.dotActive]} />
         ))}
@@ -160,7 +211,7 @@ export default function AnalysisScreen({ embedded = false }: Props) {
       </View>
 
       {/* CSM section */}
-      <View style={styles.csmSectionHeader}>
+      <View style={styles.csmSectionHeader} onLayout={sectionOnLayout("csm")}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={styles.csmSectionTitle}>{tr("攀爬状态模型", "Climb State Model")}</Text>
           <TouchableOpacity onPress={() => router.push("/csm-help")} hitSlop={8}>
@@ -225,6 +276,7 @@ export default function AnalysisScreen({ embedded = false }: Props) {
 
   return (
     <ScrollView
+      ref={outerScrollRef}
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}

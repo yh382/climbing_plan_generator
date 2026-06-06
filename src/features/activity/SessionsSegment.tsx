@@ -26,6 +26,8 @@ import { useI18N } from "../../../lib/i18n";
 import { useSettings } from "../../contexts/SettingsContext";
 import useLogsStore, { type LogType } from "../../store/useLogsStore";
 import { gymCommunityApi } from "../gyms/api";
+import QuickInsightsRibbon from "./QuickInsightsRibbon";
+import { useQuickInsights } from "./useQuickInsights";
 export default function SessionsSegment() {
   const router = useRouter();
   const { isZH } = useI18N();
@@ -41,6 +43,12 @@ export default function SessionsSegment() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
+  // Sessions is the climbing journal. Pure training sessions live on
+  // the Training segment. Mixed sessions (template-driven climbing —
+  // 4x4, ARC, limit boulder) surface in both feeds so the user doesn't
+  // lose them. BE finalize_session promotes climbing-equipment templates
+  // to "mixed" automatically (services/sessions.py).
+  const ACTIVITY_TYPE_FOR_SESSIONS = "climb" as const;
 
   const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -92,7 +100,15 @@ export default function SessionsSegment() {
     }
   }, [timeFilter]);
 
-  const dayGroups = useDailyGroupSummaries({ from: filterDate });
+  const dayGroups = useDailyGroupSummaries({
+    from: filterDate,
+    activityType: ACTIVITY_TYPE_FOR_SESSIONS,
+  });
+
+  // TR7 — ribbon cards. Lives inside the segment ScrollView, above the
+  // filter row, so first content the user sees is the strategic CSM cell
+  // + top grade + volume. Cards push to /analysis?focus=... on tap.
+  const insightCards = useQuickInsights({ isZH, segment: "sessions" });
 
   const filterOptions: { key: TimeFilter; label: string }[] = [
     { key: "week", label: isZH ? "本周" : "This Week" },
@@ -112,9 +128,14 @@ export default function SessionsSegment() {
       contentContainerStyle={{ paddingBottom: 120 }}
     >
       <ActivitySubtitle />
+      {/* TR4: MonthCalendar above SegmentBar — consistent with
+          TrainingSegment so segment switching never feels like it would
+          shuffle the shared calendar. */}
+      <MonthCalendar onDateSelect={handleDateSelect} activeDate={null} />
       <ActivitySegmentBar />
       <StatusBar style="auto" />
-      <MonthCalendar onDateSelect={handleDateSelect} activeDate={null} />
+
+      <QuickInsightsRibbon cards={insightCards} />
 
       <View style={styles.logSectionHeader}>
         <TouchableOpacity
@@ -149,6 +170,7 @@ export default function SessionsSegment() {
           ))}
         </View>
       )}
+
 
       {dayGroups.length > 0 ? (
         <View style={{ gap: 0 }}>

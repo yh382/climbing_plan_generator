@@ -68,6 +68,11 @@ export type LogEntry = {
   count: number; // 聚合：sends（不是 items 数）
 };
 
+// TR0: matches BE `SessionType = Literal["climb", "train", "mixed"]`. Default
+// "climb" for legacy compat — TR4 Phase 1 will derive train/mixed when
+// startFromTemplate finalizes a training session.
+export type SessionType = "climb" | "train" | "mixed";
+
 export type SessionEntry = {
   id: string;
   date: string; // YYYY-MM-DD
@@ -87,6 +92,14 @@ export type SessionEntry = {
   serverId: string | null;
   isPublic: boolean;
   synced: boolean;
+
+  // TR0: session category — passes through BE → FE for activity tab chip
+  // filter (Sessions/Training segments) and TR7 BodyAreaBalance routing.
+  // Optional to tolerate sessions synced before TR0 migration.
+  sessionType?: SessionType;
+  // TR0: links a training session to the WorkoutTemplate it executed (NULL
+  // for ad-hoc / pure climb). TR7 compute_body_area_balance JOIN anchor.
+  templateId?: string | null;
 };
 
 export type GradeCount = { grade: string; count: number };
@@ -621,6 +634,11 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
               serverId: String(s.id),
               isPublic: false,
               synced: true,
+              // TR0: pass through new BE fields. Older sessions synced before
+              // the TR0 migration may not have these — schema treats them as
+              // optional + consumer code uses `?? 'climb'` fallback.
+              sessionType: (s.session_type as SessionType | undefined) ?? "climb",
+              templateId: s.template_id ?? null,
             });
 
             // (sessionServerIdMap already populated for ALL backend sessions

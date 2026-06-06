@@ -164,6 +164,21 @@ export type OutdoorRoute = {
   area_name?: string;
   region_name?: string;
   wall_topo_url?: string;
+  // BR Track D Day 6 — optional GPS surfaced by BE on detail. Used by the
+  // route-detail mini-map (PLAN §5). Falls back to no-map render when
+  // either is missing (e.g. legacy import without per-route coords).
+  lat?: number;
+  lng?: number;
+  // BR Track D Day 7 — full ancestor UUID chain (PLAN §5). BE
+  // `RouteOut` returns these via JOIN projection in get_route. FE
+  // OutdoorRouteDetailPage breadcrumb segments use them to seed the
+  // RegionInfoSheet / AreaInfoSheet / CragInfoSheet on tap. wall_id is
+  // already a required field on the base type (route belongs to a
+  // wall); the other 3 are nullable since only the detail endpoint
+  // populates them.
+  region_id?: string;
+  area_id?: string;
+  crag_id?: string;
 };
 
 // ---- Route-level social data ----
@@ -199,6 +214,10 @@ export type RouteAscent = {
 
 // ---- Map pin types (lightweight, for map layers) ----
 
+/** Legacy pin shape returned by `/outdoor/regions/{id}/pins` aggregator.
+ *  Pre-aggregated per-level (region / area / crag / wall / route).
+ *  Track D deletes this on Day 6 once the lock-step crag-map.tsx mirror
+ *  + MapScreenMapbox have both migrated to `RoutePin` + Mapbox cluster. */
 export type MapPin = {
   id: string;
   name: string;
@@ -207,15 +226,101 @@ export type MapPin = {
   /** Aggregate count displayed inside the pin (always 1 for route-level). */
   route_count: number;
   level: 'region' | 'area' | 'crag' | 'wall' | 'route';
-  /** Only set when `level === 'route'` — id of the parent wall. Used to
-   *  reconstruct the wall's route list + metadata when the user taps a
-   *  route pin (sheet opens focused on that route). */
   parent_id?: string;
-  /** Only set when `level === 'route'` — name of the parent wall. Sent
-   *  by BE so the FE can render the sheet title and synthesize a wall
-   *  object even when wall pins are not in the list (BK: synthetic
-   *  walls are deduped against their parent Crag). */
   parent_name?: string;
+};
+
+/** BR Track D — flat per-route pin returned by `/outdoor/pins?bbox=...`.
+ *  Track C D-1 added the 4 ancestor IDs so FE can client-side group by
+ *  `wall_id` (single Wall pin invariant at zoom 15+) and tap-routing
+ *  works without a second lookup. Matches BE Pydantic `RoutePin` in
+ *  `climbing_plan_backend/schemas/outdoor.py::RoutePin` exactly. */
+export type RoutePin = {
+  route_id: string;
+  lat: number;
+  lng: number;
+  wall_id: string;
+  wall_name: string;
+  crag_id: string;
+  crag_name: string;
+  area_id: string;
+  area_name: string;
+  region_id: string;
+  region_name: string;
+  /** BE includes 'other' for routes that don't cleanly classify (e.g.
+   *  via ferrata, aid). FE filter chips only cover boulder/rope; other
+   *  pins show under [All] but no dedicated chip. */
+  discipline: 'boulder' | 'rope' | 'other';
+  /** Free-form per BE (Track B import may produce mixed-case / commas).
+   *  FE normalizes via toLowerCase + split(',') before chip matching. */
+  style: string;
+};
+
+export type RoutePinsResponse = {
+  items: RoutePin[];
+  count: number;
+  /** True when the response hit the bbox query's `limit` cap. FE renders
+   *  a "zoom in for more" hint. */
+  truncated: boolean;
+};
+
+// ---- BR Track D — Crag detail (CragInfoSheet source) ----
+
+/** Crag-level activity rollup over the last 30 days. Counts-only per
+ *  PLAN §3.3 / Phase 1 D-2 decision — full post list is a follow-up
+ *  (BR-Track-D-FU-community-posts). */
+export type CragCommunitySummary = {
+  recent_post_count: number;
+  recent_ascent_count: number;
+  last_activity_at: string | null;
+};
+
+export type CragDetail = Crag & {
+  /** BR Track C audit columns — null when no OSM Overpass sync yet. */
+  trail_source?: string | null;
+  osm_synced_at?: string | null;
+  walls: Wall[];
+  community: CragCommunitySummary;
+};
+
+// ---- BR Track D — Cross-level search ----
+
+/** Single result shape — `type` discriminator + nullable context fields
+ *  per BE `SearchResult`. Use `getSearchHitMetaLabel(hit)` (in `hooks.ts`)
+ *  to derive the per-row UI subtitle without hand-narrowing the union. */
+export type SearchResult = {
+  type: 'region' | 'area' | 'crag' | 'wall' | 'route';
+  id: string;
+  name: string;
+  name_en?: string | null;
+  crag_name?: string | null;
+  area_name?: string | null;
+  region_name?: string | null;
+  grade_text?: string | null;
+  style?: string | null;
+  route_count?: number | null;
+  /** @deprecated Track C dual-write — drops after Track D consumers
+   *  migrate to top-level fields. */
+  extra?: Record<string, unknown> | null;
+};
+
+// ---- BR Track D — Polymorphic Saved Spots ----
+
+/** Region / Area / Crag / Route — all savable into the user's spots set. */
+export type SavedSpotTargetType = 'region' | 'area' | 'crag' | 'route';
+
+export type SavedSpot = {
+  target_type: SavedSpotTargetType;
+  target_id: string;
+  target_name: string;
+  lat?: number | null;
+  lng?: number | null;
+  added_at: string;
+};
+
+export type SavedSpotsResponse = {
+  items: SavedSpot[];
+  count: number;
 };
 
 // ---- User Lists (Window U) ----
@@ -236,15 +341,25 @@ export type OutdoorList = {
 export type OutdoorListItem = {
   id: string;
   list_id: string;
-  route_id: string;
+  /** BR Track C polymorphic — target_type discriminates which entity
+   *  this row points at. Legacy `route_id` is still populated when
+   *  target_type === 'route' during the compat window. */
+  target_type: SavedSpotTargetType;
+  target_id: string;
+  /** @deprecated populated only when target_type === 'route'. Drop
+   *  after Track D consumers migrate. */
+  route_id?: string | null;
   note?: string;
   added_at: string;
+  /** Hydrated by BE batch JOIN — populated only for route-type items. */
   route?: OutdoorRoute;
   // Denormalized on list detail responses (see backend /outdoor/lists/{id})
   wall_lat?: number;
   wall_lng?: number;
   wall_name?: string;
   crag_name?: string;
+  /** For non-route targets, the saved entity's display name. */
+  target_name?: string | null;
 };
 
 export type OutdoorListDetail = OutdoorList & {

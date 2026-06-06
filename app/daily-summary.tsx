@@ -231,8 +231,8 @@ export default function DailySummaryScreen() {
           style={styles.viewAllBtn}
           activeOpacity={0.85}
           onPress={() => {
-            setSegment("analysis");
-            router.push("/(drawer)/(tabs)/activity" as any);
+            // TR7 — Analysis lives at the full-screen route now.
+            router.push("/analysis" as any);
           }}
         >
           <Text style={styles.viewAllText}>{tr("查看完整分析 →", "View full analysis →")}</Text>

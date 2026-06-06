@@ -125,7 +125,17 @@ export type CalendarDayRingProps = {
   outsideTextColor: string;
   planDotColorComplete: string;
   planDotColorInProgress: string;
+  /** TR6 Phase 2 — pending = planned but no progress yet (today or future). */
+  planDotColorPending?: string;
+  /** TR6 Phase 2 — missed = past planned day, never executed. */
+  planDotColorMissed?: string;
   todayDotColor: string;
+
+  /** TR6 Phase 2 — explicit "planned but untouched" flag fed by
+   *  monthRingComputer.plan_status === "pending". */
+  isPending?: boolean;
+  /** TR6 Phase 2 — past planned day flag, plan_status === "missed". */
+  isMissed?: boolean;
 
   onPress?: () => void;
   size?: number;                  // default 50 (native ring is 42; 8px headroom for dot row)
@@ -154,7 +164,11 @@ export function CalendarDayRing(props: CalendarDayRingProps) {
       outsideTextColor={props.outsideTextColor}
       planDotColorComplete={props.planDotColorComplete}
       planDotColorInProgress={props.planDotColorInProgress}
+      planDotColorPending={props.planDotColorPending ?? "#9CA3AF"}
+      planDotColorMissed={props.planDotColorMissed ?? "#F97316"}
       todayDotColor={props.todayDotColor}
+      isPending={props.isPending ?? false}
+      isMissed={props.isMissed ?? false}
       onTap={(_evt: GestureResponderEvent) => props.onPress?.()}
       style={{ width: size, height: size }}
     />

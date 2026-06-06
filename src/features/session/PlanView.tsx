@@ -146,7 +146,11 @@ export default function PlanView(props: Props) {
   const handleNavigate = useCallback((index: number) => {
     const item = sessionData[index];
     if (item?.raw) {
-      onExerciseNavigate(item.raw, index);
+      // PlanView only ever launches from PlanV3 sessions today, so
+      // raw is shape-compatible with PlanV3SessionItem at runtime even
+      // though TR4 typed the store as Record<string, unknown> to make
+      // room for new template-driven flows.
+      onExerciseNavigate(item.raw as unknown as PlanV3SessionItem, index);
     }
   }, [sessionData, onExerciseNavigate]);
 

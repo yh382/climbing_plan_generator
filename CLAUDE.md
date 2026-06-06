@@ -18,8 +18,9 @@
 
 - 用 `NATIVE_HEADER_BASE` / `NATIVE_HEADER_LARGE` from `src/lib/nativeHeaderOptions.ts` + `HeaderButton`（SF Symbols）
 - 用 `TrueSheet`（`@lodev09/react-native-true-sheet`）— **不用** `Modal + PanResponder`
-- 用 `ActionSheetIOS` — **不用** `SmartBottomSheet` (menu mode)
-- 用 `NativeSegmentedControl`（`@react-native-segmented-control/segmented-control`）
+- 用 `NativeSegmentedControl`（`@react-native-segmented-control/segmented-control`）— 但只在「切换显示什么内容」(view tabs) 场景；「设属性」走 `MenuPill`（见下）
+- **Inline option menus** — 用 `MenuPill`（`src/components/ui/MenuPill.tsx`，包装 `@expo/ui/swift-ui Menu`，跟 `Stack.Toolbar.Menu` 同一 UIMenu API，只是 inline 用）。规约：内容区一切「tap 弹一组选项让用户选 1」（block type ▾ / load unit ▾ / 3-dot 更多 / 列表卡片操作菜单 …）**默认走 MenuPill**，而非 `ActionSheetIOS`：UIMenu 在 trigger 处弹 popover、感觉轻，ActionSheet 从底部滑入像 modal、心智重；ActionSheet 仅保留给真正破坏性 + 多步 / 全局动作（sign out / 删整张 plan 这种）。Working example: [app/library/template-builder.tsx](app/library/template-builder.tsx) (block type / load unit / 3-dot 三处都是 MenuPill)。两 variant：`dots`（3 点 icon）/ `labeled`（"Main ⌄" 文字 + chevron）。两者都 native iOS UIMenu，免去任何手画 popover / sheet 容器。
+- `ActionSheetIOS` — **仅在** 上述例外（破坏性多步 / 全局动作）使用，OR 当 trigger 不是固定 button（页面点击屏幕空白处弹起 sheet 等）；其余场景一律 MenuPill。
 - **FormSheet route** — focused task / picker / info sheet 走 expo-router `Stack.Screen presentation:"formSheet"` + `sheetAllowedDetents` + `sheetGrabberVisible: true`；**三约束**：(a) route 文件必须 `app/` root（不在 nested directory 含 `_layout.tsx` 下），(b) Stack.Screen 注册必须根 `app/_layout.tsx`，(c) **禁用 in-screen `<Stack.Screen options>`** — 实测它是 REPLACE 不是 merge，会冲掉 `presentation:"formSheet"` + 其他 sheet config，formSheet 退化到普通 push。不满足任一 → fallback 到普通 push 动画。UIKit 容器自动 nav bar / Liquid Glass / grabber / detents / cornerRadius。Working pattern: [app/recent-climbs.tsx](app/recent-climbs.tsx) / [app/body-info.tsx](app/body-info.tsx) / [app/csm-help.tsx](app/csm-help.tsx)。i18n title 走 `useNavigation().setOptions({ title })`（这个 API merge 正确）；_layout 提供 English fallback title 兜底首帧。
 
 #### FormSheet Handoff Pattern（sheet-container-audit A1 标准化 2026-05-10）

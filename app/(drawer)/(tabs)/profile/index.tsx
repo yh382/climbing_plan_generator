@@ -26,7 +26,11 @@ import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import useLogsStore from "../../../../src/store/useLogsStore";
 import { calculateKPIs } from "../../../../src/services/stats";
 
-import ProfileHeader from "../../../../src/components/shared/ProfileHeader";
+import ProfileHeader, {
+  ProfileCoverArt,
+  PROFILE_COVER_HEIGHT_FULL,
+  PROFILE_COVER_OVERLAP_PT,
+} from "../../../../src/components/shared/ProfileHeader";
 import { PROFILE_TABS, PROFILE_TAB_BAR_HEIGHT } from "../../../../src/components/shared/ProfileTabBar";
 import StickyProfileTabBar from "../../../../src/components/shared/StickyProfileTabBar";
 
@@ -389,7 +393,7 @@ export default function ProfileScreen() {
       <Animated.ScrollView
         ref={scrollRef}
         onScroll={scrollHandler}
-        scrollEventThrottle={16}
+        scrollEventThrottle={1}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
@@ -423,19 +427,65 @@ export default function ProfileScreen() {
             position. The actual bar is rendered as an absolute overlay
             sibling of the ScrollView (below) and reads this spacer's
             screen position via `measure(spacerRef)`.
-            v5.3 — `marginTop: -35` migrated here from the now-removed
-            `contentShell`. It overlaps the spacer 35pt up into the
-            cover image area (matching original mockup intent) so the
-            bar's animated rounded top corners reveal cover behind the
-            carve. The spacer itself is transparent. */}
+            v5.3 — `marginTop: -PROFILE_COVER_OVERLAP_PT` overlaps the
+            spacer up into the cover image area so the bar's rounded
+            corners can "carve into" the cover at rest.
+            v5.5 — spacer's top portion (the overlap) renders a *fake
+            cover slice* via ProfileCoverArt sized to the full cover
+            and shifted up so only its bottom 35pt shows. Because the
+            slice lives inside the ScrollView, it scrolls in lockstep
+            with the real cover above it — when the absolute-overlay
+            bar lags against native scroll (worklet 60Hz vs ProMotion
+            120Hz), the gap above the bar exposes THIS slice (visually
+            identical to the cover) instead of the real cover image. At
+            rest the bar's rounded-corner cutouts reveal the slice =>
+            carve effect preserved. The bottom 11pt of the spacer
+            (below the cover area) stays opaque `colors.background` so
+            nothing leaks above the PagerView. */}
         <Animated.View
           ref={spacerRef}
           onLayout={onSpacerLayout}
           style={{
             height: PROFILE_TAB_BAR_HEIGHT,
-            marginTop: -35,
+            marginTop: -PROFILE_COVER_OVERLAP_PT,
+            overflow: "hidden",
           }}
-        />
+        >
+          {/* Top overlap: fake cover slice */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: PROFILE_COVER_OVERLAP_PT,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                top: -(PROFILE_COVER_HEIGHT_FULL - PROFILE_COVER_OVERLAP_PT),
+                left: 0,
+                right: 0,
+                height: PROFILE_COVER_HEIGHT_FULL,
+              }}
+            >
+              <ProfileCoverArt coverUrl={me?.cover_url ?? null} />
+            </View>
+          </View>
+          {/* Below the cover overlap: opaque bg so PagerView area never leaks */}
+          <View
+            style={{
+              position: "absolute",
+              top: PROFILE_COVER_OVERLAP_PT,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.background,
+            }}
+          />
+        </Animated.View>
 
         <PagerView
           ref={pagerRef}
