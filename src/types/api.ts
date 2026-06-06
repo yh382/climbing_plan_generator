@@ -3958,6 +3958,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/crags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Crags Overview
+         * @description Tier-1 map overview source — lightweight Crag list for client-side
+         *     `cluster:true` ShapeSource (PLAN §3.2 redesign).
+         *
+         *     Returns approved crags with lat/lng populated, plus aggregate
+         *     route_count / boulder_count computed in one GROUP BY (no N+1).
+         *     Default `min_routes=1` filters out empty Crags so the map shows
+         *     actual climbing density. ~15k rows in NA prod, ~3MB JSON.
+         *
+         *     Anonymous OK (`get_optional_user`) — map overview is public.
+         */
+        get: operations["list_crags_overview_outdoor_crags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/crags/{crag_id}": {
         parameters: {
             query?: never;
@@ -6730,19 +6758,6 @@ export interface components {
             /** Style */
             style: string;
         };
-        /**
-         * Block
-         * @description One block (warmup / main / etc) of a workout template.
-         */
-        Block: {
-            /**
-             * Block Type
-             * @enum {string}
-             */
-            block_type: "warmup" | "main" | "accessory" | "cooldown";
-            /** Items */
-            items?: components["schemas"]["BlockItem"][];
-        };
         /** BlockInventorySummary */
         BlockInventorySummary: {
             /** Action Count */
@@ -6765,26 +6780,6 @@ export interface components {
                 string,
                 number
             ][];
-        };
-        /**
-         * BlockItem
-         * @description One exercise prescription inside a block.
-         */
-        BlockItem: {
-            /** Action Id */
-            action_id: string;
-            /** Notes */
-            notes?: string | null;
-            /** Reps */
-            reps?: number | null;
-            /** Rest Sec */
-            rest_sec?: number | null;
-            /** Seconds */
-            seconds?: number | null;
-            /** Sets */
-            sets?: number | null;
-            /** Variant Id */
-            variant_id?: string | null;
         };
         /** BlockListing */
         BlockListing: {
@@ -7889,6 +7884,49 @@ export interface components {
              * @default 0
              */
             wall_count: number;
+        };
+        /**
+         * CragOverviewOut
+         * @description Lightweight Crag projection for map tier-1 overview rendering
+         *     (PLAN §3.2 redesign — climber-recognizable Crag-level pins replace
+         *     Region-level overview).
+         *
+         *     Optimized for bulk delivery: ~15k crags in one response. Skips
+         *     description / approach / cover_url / trail_geojson — those load on
+         *     demand via CragDetailOut. Aggregate counts populated by a single
+         *     GROUP BY query, not N+1.
+         */
+        CragOverviewOut: {
+            /**
+             * Boulder Count
+             * @default 0
+             */
+            boulder_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /**
+             * Region Id
+             * Format: uuid
+             */
+            region_id: string;
+            /** Region Name */
+            region_name: string;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
         };
         /** CragUpdateIn */
         CragUpdateIn: {
@@ -12161,20 +12199,55 @@ export interface components {
             week_index: number;
         };
         /**
+         * WorkoutItem
+         * @description One exercise prescription inside a workout template.
+         *
+         *     Carries its own `phase` so the FE can flat-render + group visually
+         *     without needing an outer Block container.
+         */
+        WorkoutItem: {
+            /** Action Id */
+            action_id: string;
+            /** Load */
+            load?: number | null;
+            /** Load Unit */
+            load_unit?: ("lb" | "kg" | "pct") | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Phase
+             * @default main
+             * @enum {string}
+             */
+            phase: "warmup" | "main" | "cooldown";
+            /** Reps */
+            reps?: number | null;
+            /** Rest Per Rep Sec */
+            rest_per_rep_sec?: number | null;
+            /** Rest Sec */
+            rest_sec?: number | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Sets */
+            sets?: number | null;
+            /** Variant Id */
+            variant_id?: string | null;
+        };
+        /**
          * WorkoutTemplateIn
          * @description POST /workout-templates — create a custom template.
          *
          *     source / owner_id derived server-side (custom + current_user).
          */
         WorkoutTemplateIn: {
-            /** Blocks */
-            blocks?: components["schemas"]["Block"][];
             /** Cover Image Url */
             cover_image_url?: string | null;
             /** Equipment */
             equipment?: string[];
             /** Goal Tags */
             goal_tags?: string[];
+            /** Items */
+            items?: components["schemas"]["WorkoutItem"][];
             /** Short Desc En */
             short_desc_en?: string | null;
             /** Short Desc Zh */
@@ -12195,8 +12268,6 @@ export interface components {
         WorkoutTemplateOut: {
             /** Author Name */
             author_name: string | null;
-            /** Blocks */
-            blocks: components["schemas"]["Block"][];
             /** Cover Image Url */
             cover_image_url: string | null;
             /**
@@ -12217,6 +12288,8 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Items */
+            items: components["schemas"]["WorkoutItem"][];
             /**
              * Owner Id
              * Format: uuid
@@ -12281,8 +12354,6 @@ export interface components {
          * @description PATCH /workout-templates/{id} — partial update (owner only).
          */
         WorkoutTemplateUpdateIn: {
-            /** Blocks */
-            blocks?: components["schemas"]["Block"][] | null;
             /** Cover Image Url */
             cover_image_url?: string | null;
             /** Equipment */
@@ -12291,6 +12362,8 @@ export interface components {
             goal_tags?: string[] | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Items */
+            items?: components["schemas"]["WorkoutItem"][] | null;
             /** Short Desc En */
             short_desc_en?: string | null;
             /** Short Desc Zh */
@@ -20908,6 +20981,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_crags_overview_outdoor_crags_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                min_routes?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CragOverviewOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -83,8 +83,12 @@ import MapPinCluster from '../outdoor/components/MapPinCluster';
 import RoutePinCluster, {
   type WallPinContext,
 } from '../outdoor/components/RoutePinCluster';
+import CragOverviewCluster, {
+  type CragPinContext,
+} from '../outdoor/components/CragOverviewCluster';
 import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
+import { useCragsOverview } from './useCragsOverview';
 import TrailLayer from '../outdoor/components/TrailLayer';
 import { FilterChipsBar } from './components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../store/useOutdoorMapFiltersStore';
@@ -356,6 +360,10 @@ export default function MapScreenMapbox({
   // ---- Data hooks ----
   const gymsEnabled = mode.kind === 'gyms';
   const gymsData = useGymsData(gymsEnabled);
+  // BR Track D Day 7 follow-up — tier-1 Crag overview source (~15k crags,
+  // loaded once + cached at module level). Drives the gyms-mode
+  // `CragOverviewCluster` ShapeSource. PLAN §3.2 redesign.
+  const cragsOverview = useCragsOverview(gymsEnabled);
   const areaId = mode.kind === 'area' ? mode.areaId : undefined;
   const areaData = useAreaData(areaId);
   const listId = mode.kind === 'list' ? mode.listId : undefined;
@@ -363,6 +371,10 @@ export default function MapScreenMapbox({
 
   // ---- Gyms store bindings ----
   const gyms = useGymsStore((s) => s.gyms);
+  // BR Track D Day 7 follow-up — accumulated gyms across the session
+  // drive the map ShapeSource so cluster positions stay stable as the
+  // user pans. PLAN §3.2 redesign.
+  const accumulatedGyms = useGymsStore((s) => s.accumulatedGyms);
   const gymsLoading = useGymsStore((s) => s.loading);
   const gymsError = useGymsStore((s) => s.error);
   const selectedGym = useGymsStore((s) => s.selectedGym);
@@ -731,6 +743,30 @@ export default function MapScreenMapbox({
     [mode.kind, enterArea, focusOnWall],
   );
 
+  // BR Track D Day 7 follow-up — tier-1 Crag pin tap (gyms mode only).
+  // Presents CragInfoSheet stacked with seed payload from the cluster
+  // context (so first paint is instant before the sheet's own
+  // /outdoor/crags/{id} detail fetch lands). PLAN §3.2 redesign.
+  const onCragOverviewPress = useCallback(
+    (ctx: CragPinContext) => {
+      setCragInfoCragId(ctx.crag_id);
+      setCragInfoSeed({
+        id: ctx.crag_id,
+        name: ctx.crag_name,
+        lat: ctx.lat,
+        lng: ctx.lng,
+        route_count: ctx.route_count,
+        // CragInfoSeed's `area_name` is the *parent* Area; tier-1
+        // overview projects Region only, so we surface the Region name
+        // as a fallback subtitle. CragInfoSheet's detail fetch will
+        // refine on present().
+        area_name: ctx.region_name,
+      });
+      cragInfoSheetRef.current?.present();
+    },
+    [],
+  );
+
   const onClusterBubblePress = useCallback(
     async (coords: [number, number]) => {
       // Fly camera into the cluster centroid. We bump zoom by a
@@ -824,79 +860,55 @@ export default function MapScreenMapbox({
     }
   }, [mode.kind, selectedGym, markProgrammaticMove]);
 
-  // Gyms-mode shape sources
+  // BR Track D Day 7 follow-up — gym ShapeSource feeds from the
+  // accumulated set (not the per-fetch `gyms`) so cluster positions
+  // stay stable as the user pans across the world. PLAN §3.2 redesign.
   const gymsGeoJSON = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
-      features: gyms.map((g) => ({
+      features: Object.values(accumulatedGyms).map((g) => ({
         type: 'Feature' as const,
         id: g.place_id,
         properties: { name: g.name, place_id: g.place_id },
         geometry: { type: 'Point' as const, coordinates: [g.location.lng, g.location.lat] },
       })),
     }),
-    [gyms],
+    [accumulatedGyms],
   );
-  const cragsGeoJSON = useMemo(
-    () => ({
-      type: 'FeatureCollection' as const,
-      features: gymsData.cragPins.map((c) => ({
-        type: 'Feature' as const,
-        id: c.id,
-        properties: { name: c.name, crag_id: c.id, route_count: c.route_count ?? 0 },
-        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
-      })),
-    }),
-    [gymsData.cragPins],
-  );
-
   const onGymPinPress = useCallback(
     (e: { features: GeoJSON.Feature[] }) => {
-      const placeId = e.features?.[0]?.properties?.place_id;
+      const feature = e.features?.[0];
+      if (!feature) return;
+      // BR Track D Day 7 follow-up — gyms-src now uses cluster:true,
+      // so cluster bubble taps land here too. Fly camera into the
+      // cluster centroid to break it apart (same +2 zoom step the
+      // Crag cluster uses).
+      if (feature.properties?.cluster) {
+        const geom = feature.geometry;
+        if (geom?.type === 'Point') {
+          void onClusterBubblePress(geom.coordinates as [number, number]);
+        }
+        return;
+      }
+      const placeId = feature.properties?.place_id;
       if (!placeId) return;
-      const gym = gyms.find((g) => g.place_id === placeId);
+      // Use the accumulated set so a gym fetched in a previous pan
+      // still resolves even if the latest fetchNearby dropped it from
+      // the active list.
+      const gym = accumulatedGyms[placeId];
       if (gym) useGymsStore.getState().setSelectedGym(gym);
     },
-    [gyms],
+    [accumulatedGyms, onClusterBubblePress],
   );
 
-  const onCragPinPress = useCallback(
-    (e: { features: GeoJSON.Feature[] }) => {
-      const cragId = e.features?.[0]?.properties?.crag_id;
-      if (!cragId) return;
-      const area = gymsData.areas.find((a) => a.id === cragId);
-      if (!area) return;
-      useGymsStore.getState().setSelectedGym(null);
-      setDetailGym(null);
-      markProgrammaticMove(600);
-      suppressNextFetchRef.current = true;
-      try {
-        camRef.current?.setCamera({
-          centerCoordinate: [area.lng!, area.lat!],
-          zoomLevel: 14,
-          animationDuration: 600,
-          padding: pinFocusPadding,
-        });
-      } catch {}
-      setAreaInfoContext('gyms');
-      setAreaInfoSeed({
-        id: area.id,
-        name: area.name,
-        cover_url: area.cover_url,
-        region: area.region,
-        country: area.country,
-        lat: area.lat,
-        lng: area.lng,
-        // BR Track A: Region.area_count is the top-level children count.
-        crag_count: area.area_count,
-        route_count: area.route_count,
-        boulder_count: area.boulder_count,
-      });
-      setAreaInfoId(area.id);
-      areaInfoSheetRef.current?.present();
-    },
-    [gymsData.areas, markProgrammaticMove, pinFocusPadding],
-  );
+  // BR Track D Day 7 dogfood fix — legacy Region-overview orange pin
+  // layer (`crags-src` ShapeSource + `onCragPinPress` callback +
+  // `cragsGeoJSON` memo) deleted. It rendered 911 region dots at low
+  // zoom which visually competed with the new bbox `RoutePinCluster`
+  // wall pins; tap fell through to the legacy `RegionInfoSheet` instead
+  // of the Day 5d focusedWall path (PLAN §3.2). Region browsing now
+  // goes through (a) gyms sheet `GymsSavedSpotsRow` + `GymList`'s
+  // outdoor rows, or (b) cross-level `MapSearchResultsList`.
 
   // ---- List-mode pin press ----
   // BR Track D Day 5e — area mode no longer reaches this handler
@@ -1332,9 +1344,54 @@ export default function MapScreenMapbox({
             {/* Gyms mode: inline gym + crag shape sources */}
             {styleLoaded && mode.kind === 'gyms' && (
               <>
-                <MapboxGL.ShapeSource id="gyms-src" shape={gymsGeoJSON} onPress={onGymPinPress}>
+                {/* BR Track D Day 7 follow-up — gym ShapeSource is now
+                    `cluster:true` with accumulated-set source data,
+                    matching the tier-1 Crag overview pattern. PLAN §3.2
+                    redesign: industry-standard stable cluster source
+                    (Apple Maps / Strava). */}
+                <MapboxGL.ShapeSource
+                  id="gyms-src"
+                  shape={gymsGeoJSON}
+                  cluster
+                  clusterMaxZoomLevel={12}
+                  clusterRadius={50}
+                  onPress={onGymPinPress}
+                >
+                  {/* Cluster bubble — teal circle, label = count */}
+                  <MapboxGL.CircleLayer
+                    id="gyms-clusters"
+                    filter={['has', 'point_count']}
+                    style={{
+                      circleRadius: [
+                        'step',
+                        ['get', 'point_count'],
+                        14,
+                        10, 18,
+                        50, 22,
+                        200, 26,
+                      ] as any,
+                      circleColor: '#306E6F',
+                      circleStrokeWidth: 1.4,
+                      circleStrokeColor: '#fff',
+                      circleOpacity: 0.92,
+                    }}
+                  />
+                  <MapboxGL.SymbolLayer
+                    id="gyms-cluster-labels"
+                    filter={['has', 'point_count']}
+                    style={{
+                      textField: ['get', 'point_count_abbreviated'] as any,
+                      textSize: 12,
+                      textColor: '#fff',
+                      textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                      textAllowOverlap: true,
+                      textIgnorePlacement: true,
+                    }}
+                  />
+                  {/* Single gym pin — visible at zoom > clusterMaxZoom */}
                   <MapboxGL.CircleLayer
                     id="gyms-pins"
+                    filter={['!', ['has', 'point_count']]}
                     style={{
                       circleRadius: 6,
                       circleColor: '#306E6F',
@@ -1344,6 +1401,8 @@ export default function MapScreenMapbox({
                   />
                   <MapboxGL.SymbolLayer
                     id="gyms-labels"
+                    filter={['!', ['has', 'point_count']]}
+                    minZoomLevel={11}
                     style={{
                       textField: ['get', 'name'] as any,
                       textSize: 10,
@@ -1363,49 +1422,36 @@ export default function MapScreenMapbox({
                   />
                 </MapboxGL.ShapeSource>
 
-                {cragsGeoJSON.features.length > 0 && (
-                  <MapboxGL.ShapeSource id="crags-src" shape={cragsGeoJSON} onPress={onCragPinPress}>
-                    <MapboxGL.CircleLayer
-                      id="crags-pins"
-                      style={{
-                        circleRadius: 6,
-                        circleColor: '#FF9500',
-                        circleStrokeWidth: 1.2,
-                        circleStrokeColor: '#fff',
-                      }}
-                    />
-                    <MapboxGL.SymbolLayer
-                      id="crags-labels"
-                      style={{
-                        textField: ['get', 'name'] as any,
-                        textSize: 10,
-                        textColor: scheme === 'dark' ? '#E2E8F0' : '#0F172A',
-                        textHaloColor:
-                          scheme === 'dark' ? 'rgba(11,18,32,0.85)' : 'rgba(255,255,255,0.85)',
-                        textHaloWidth: 1.2,
-                        textAnchor: 'top',
-                        textOffset: [0, 1.6],
-                        textJustify: 'center',
-                        textAllowOverlap: false,
-                        textIgnorePlacement: false,
-                        textPadding: 8,
-                        textMaxWidth: 10,
-                        symbolZOrder: 'auto',
-                      }}
-                    />
-                  </MapboxGL.ShapeSource>
-                )}
+                {/* BR Track D Day 7 dogfood fix — legacy `crags-src`
+                    Region-overview ShapeSource removed. New
+                    `RoutePinCluster` below (gyms + area mode) is the
+                    sole orange-pin source. */}
               </>
             )}
 
-            {/* BR Track D Day 5b/5d — bbox-scoped outdoor route cluster
-                source. Drives gyms AND area modes; the gyms→area hand-off
-                is wall-pin-tap, and inside area mode the cluster keeps
-                tracking the viewport (instead of statically rendering the
-                region's full pin set). List mode keeps the legacy
-                MapPinCluster below since a saved list spans cherry-picked
-                items, not a contiguous bbox. */}
-            {(mode.kind === 'gyms' || mode.kind === 'area') && (
+            {/* BR Track D Day 7 follow-up tier-1 — Crag overview cluster.
+                Replaces the legacy Region overview + bbox-shifting source
+                in gyms mode (PLAN §3.2 redesign). Stable pre-loaded ~15k
+                Crag dataset with Mapbox `cluster:true` for visual
+                aggregation. Cluster bubble label = sum of route_count
+                across child crags. Tap single Crag pin → CragInfoSheet
+                stacked. */}
+            {mode.kind === 'gyms' && (
+              <CragOverviewCluster
+                crags={cragsOverview.crags}
+                styleReady={styleReady}
+                onCragPress={onCragOverviewPress}
+                onClusterPress={onClusterBubblePress}
+              />
+            )}
+
+            {/* BR Track D Day 5d/5e — bbox-scoped wall pin cluster for
+                tier-2 (area mode only). User reaches this by tapping a
+                Crag pin in gyms mode → CragInfoSheet → "View on Map" →
+                enterArea, or directly via GymsSavedSpotsRow / search
+                hit. Once inside area mode the bbox follows the camera
+                so users can pan within the focused Region. */}
+            {mode.kind === 'area' && (
               <RoutePinCluster
                 pins={viewportPins.pins}
                 styleReady={styleReady}

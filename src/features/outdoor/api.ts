@@ -7,7 +7,7 @@ import { api } from '../../lib/apiClient';
 import type {
   Region, Area, Crag, Wall, OutdoorRoute,
   RouteRating, RouteAscent,
-  RoutePinsResponse, CragDetail, SearchResult,
+  RoutePinsResponse, CragDetail, CragOverview, SearchResult,
 } from './types';
 import {
   MOCK_REGIONS, MOCK_AREAS, MOCK_CRAGS, MOCK_WALLS, MOCK_ROUTES,
@@ -168,6 +168,25 @@ export const outdoorApi = {
     const qs = new URLSearchParams({ q });
     if (regionId) qs.set('region_id', regionId);
     return api.get<OutdoorRoute[]>(`/outdoor/search?${qs}`);
+  },
+
+  // ---- BR Track D Day 7 follow-up — tier-1 Crag overview ----
+  //
+  // Lightweight per-crag projection (lat/lng + counts + region ref)
+  // for the client-side `cluster:true` ShapeSource that replaces the
+  // legacy Region-overview + bbox shifting source in gyms mode (PLAN §3.2).
+  // Load once on gyms-mode mount.
+  listCragsOverview: async (params?: {
+    status?: string;
+    min_routes?: number;
+    limit?: number;
+  }): Promise<CragOverview[]> => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.min_routes != null) qs.set('min_routes', String(params.min_routes));
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    const q = qs.toString();
+    return api.get<CragOverview[]>(`/outdoor/crags${q ? `?${q}` : ''}`);
   },
 
   // ---- BR Track D — Crag detail (CragInfoSheet source) ----

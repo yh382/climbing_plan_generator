@@ -264,6 +264,24 @@ export type RoutePinsResponse = {
   truncated: boolean;
 };
 
+// ---- BR Track D Day 7 follow-up — Crag overview (tier-1 map source) ----
+
+/** Lightweight Crag projection for client-side `cluster:true` ShapeSource.
+ *  PLAN §3.2 redesign — climber-recognizable Crag-level pins replace the
+ *  legacy Region-overview source. Loaded once on gyms-mode mount (~15k
+ *  rows NA prod). Aggregate counts computed BE-side in one GROUP BY. */
+export type CragOverview = {
+  id: string;
+  name: string;
+  name_en?: string | null;
+  lat: number;
+  lng: number;
+  route_count: number;
+  boulder_count: number;
+  region_id: string;
+  region_name: string;
+};
+
 // ---- BR Track D — Crag detail (CragInfoSheet source) ----
 
 /** Crag-level activity rollup over the last 30 days. Counts-only per
