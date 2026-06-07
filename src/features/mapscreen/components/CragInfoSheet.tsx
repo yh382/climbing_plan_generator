@@ -298,7 +298,7 @@ const CragInfoSheet = forwardRef<CragInfoSheetHandle, CragInfoSheetProps>(
         key: 'info',
         icon: 'info.circle',
         onPress: handleInfo,
-        disabled: !detail?.description && !detail?.approach,
+        disabled: !detail?.description && !detail?.approach && !detail?.location_description,
       },
       {
         key: 'share',
@@ -418,9 +418,14 @@ const CragInfoSheet = forwardRef<CragInfoSheetHandle, CragInfoSheetProps>(
                 <Section title={tr('描述', 'Description')} colors={colors} first>
                   <Text style={styles.paragraph}>{detail.description}</Text>
                 </Section>
-                {detail.approach ? (
+                {detail.approach || detail.location_description ? (
                   <Section title={tr('接近路线', 'Approach')} colors={colors}>
-                    <Text style={styles.paragraph}>{detail.approach}</Text>
+                    {/* BV — admin-curated `approach` takes precedence; falls
+                        back to OpenBeta's `content.location` text imported as
+                        `location_description`. Both can be set independently. */}
+                    <Text style={styles.paragraph}>
+                      {detail.approach || detail.location_description}
+                    </Text>
                   </Section>
                 ) : null}
               </View>

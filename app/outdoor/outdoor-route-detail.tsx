@@ -702,6 +702,27 @@ export default function OutdoorRouteDetailPage() {
             {route.pitches > 1 ? ` · ${route.pitches}p` : ''}
           </Text>
           {route.first_ascent ? <Text style={styles.faText}>FA: {route.first_ascent}</Text> : null}
+          {/* BV — safety grade badge. Only render the warnings (PG-13/R/X);
+              G and PG are skipped since they're the default-safe norm and
+              would noise every route. Colors mirror climbing-guidebook
+              convention. */}
+          {route.safety && ['PG-13', 'PG13', 'R', 'X'].includes(route.safety.toUpperCase()) ? (
+            <View
+              style={[
+                styles.safetyBadge,
+                {
+                  backgroundColor:
+                    route.safety.toUpperCase() === 'X'
+                      ? '#B00020'
+                      : route.safety.toUpperCase() === 'R'
+                      ? '#D4541C'
+                      : '#E8A317',
+                },
+              ]}
+            >
+              <Text style={styles.safetyBadgeText}>{route.safety}</Text>
+            </View>
+          ) : null}
           {route.stars != null && (
             <View style={styles.starsRow}>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -1109,6 +1130,22 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     routeName: { fontFamily: theme.fonts.black, fontSize: 24, color: c.textPrimary, marginBottom: 4 },
     routeInfo: { fontFamily: theme.fonts.regular, fontSize: 14, color: c.textSecondary, marginBottom: 2 },
     faText: { fontFamily: theme.fonts.regular, fontSize: 12, color: c.textTertiary, marginBottom: 4 },
+    // BV — safety badge (PG-13 / R / X warnings only). Inline rounded pill
+    // sized to the grade text. Background color set per-render based on
+    // severity (see render site for the mapping).
+    safetyBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      marginBottom: 8,
+    },
+    safetyBadgeText: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 11,
+      color: '#FFFFFF',
+      letterSpacing: 0.5,
+    },
     starsRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 20 },
     starsText: { fontFamily: theme.fonts.regular, fontSize: 12, color: c.textSecondary, marginLeft: 4 },
 
