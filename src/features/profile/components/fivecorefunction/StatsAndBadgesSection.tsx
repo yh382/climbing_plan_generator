@@ -21,10 +21,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
+import type { ProfileChromePageHandle } from "@/features/profile/components/ProfileChromeRoot.types";
 
 import useLogsStore from "@/store/useLogsStore";
 import { calculateMonthlyKPIs } from "@/services/stats";
@@ -42,9 +44,11 @@ interface Props {
   /** Parent screen styles (passed through to BasicInfoSection / BadgesSection /
    *  AbilityRadar — they read class names like `analysisCard` / `radarCard`). */
   parentStyles: any;
+  /** Window BX — own-scroller handle when mounted inside ProfileChromeRoot. */
+  pageHandle?: ProfileChromePageHandle;
 }
 
-export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
+export default function StatsAndBadgesSection({ user, parentStyles, pageHandle }: Props) {
   const colors = useThemeColors();
   const { tr, lang } = useSettings();
   const router = useRouter();
@@ -91,7 +95,7 @@ export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
   // pyramid covers all-time logs so the user sees their full climbing range.
   const [pyramidType, setPyramidType] = useState<LogType>("boulder");
 
-  return (
+  const inner = (
     <View style={styles.container}>
       {/* 1) Stats card — tap whole card opens RecentClimbs sheet */}
       <View style={styles.section}>
@@ -201,10 +205,31 @@ export default function StatsAndBadgesSection({ user, parentStyles }: Props) {
 
     </View>
   );
+
+  if (pageHandle) {
+    return (
+      <Animated.ScrollView
+        ref={pageHandle.scrollRef}
+        onScroll={pageHandle.scrollHandler}
+        scrollEventThrottle={1}
+        showsVerticalScrollIndicator={false}
+        style={styles.scroller}
+        contentContainerStyle={{
+          paddingTop: pageHandle.contentInsetTop,
+          paddingBottom: pageHandle.contentInsetBottom,
+        }}
+      >
+        {inner}
+      </Animated.ScrollView>
+    );
+  }
+
+  return inner;
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
+    scroller: { flex: 1, backgroundColor: colors.background },
     container: {
       paddingHorizontal: 16,
       paddingTop: 16,

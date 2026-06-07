@@ -1,40 +1,41 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
-import { View, StyleSheet, Share, useWindowDimensions, Platform } from "react-native";
+import React, { useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { View, StyleSheet, Share, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
 import CollapsingHeaderBg from "@/features/profile/components/CollapsingHeaderBg";
 import CollapsingHeaderTitle from "@/features/profile/components/CollapsingHeaderTitle";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  useAnimatedRef,
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
-import PagerView from "react-native-pager-view";
+import { useSharedValue } from "react-native-reanimated";
 import * as Clipboard from 'expo-clipboard';
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-// Native tab bar height constant (UITabBarController default)
-const NATIVE_TAB_BAR_HEIGHT = 49;
 import { api } from "../../../../src/lib/apiClient";
 
 import ActivityFeedSection from "../../../../src/features/profile/components/fivecorefunction/ActivityFeedSection";
 import StatsAndBadgesSection from "../../../../src/features/profile/components/fivecorefunction/StatsAndBadgesSection";
-import ListsSection from "../../../../src/features/outdoor/components/ListsSection";
+import ProfileListsWrapper from "../../../../src/features/profile/components/ProfileListsWrapper";
+import ProfileChromeRoot from "../../../../src/features/profile/components/ProfileChromeRoot";
+import type {
+  ProfileChromeTab,
+  ProfileTabKey,
+} from "../../../../src/features/profile/components/ProfileChromeRoot.types";
 import { useProfileStore } from "@/features/profile/store/useProfileStore";
 import useLogsStore from "../../../../src/store/useLogsStore";
 import { calculateKPIs } from "../../../../src/services/stats";
 
 import ProfileHeader, {
-  ProfileCoverArt,
   PROFILE_COVER_HEIGHT_FULL,
   PROFILE_COVER_OVERLAP_PT,
 } from "../../../../src/components/shared/ProfileHeader";
-import { PROFILE_TABS, PROFILE_TAB_BAR_HEIGHT } from "../../../../src/components/shared/ProfileTabBar";
-import StickyProfileTabBar from "../../../../src/components/shared/StickyProfileTabBar";
 
-const TABS: readonly ["activity", "stats", "lists"] = ["activity", "stats", "lists"];
+// Self profile shows all 3 tabs. Visible cover height (full box minus the
+// legacy carve overlap) is the hero height ProfileChromeRoot collapses.
+const SELF_TABS: readonly ProfileChromeTab[] = [
+  { key: "activity", label: "Activity" },
+  { key: "stats", label: "Stats & Badges" },
+  { key: "lists", label: "Lists" },
+];
+const HERO_HEIGHT = PROFILE_COVER_HEIGHT_FULL - PROFILE_COVER_OVERLAP_PT;
 
 // iOS 26+ runs the SF Symbols inside a Liquid Glass capsule that adapts
 // to the underlying material — light mode wants a dark symbol, dark mode
@@ -121,10 +122,6 @@ export default function ProfileScreen() {
   const profile = useProfileStore((s) => s.profile);
   const headerVM = useProfileStore((s) => s.headerVM);
   const fetchMeProfile = useProfileStore((s) => s.fetchMe);
-
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = NATIVE_TAB_BAR_HEIGHT;
-  const scrollBottomPadding = Math.max(insets.bottom, 0) + tabBarHeight + 12;
 
   const [me, setMe] = useState<UserMe | null>(null);
   const didInitialLoad = useRef(false);
@@ -252,65 +249,19 @@ export default function ProfileScreen() {
     };
   }, [me, profile, kpis]);
 
-  const [activeTab, setActiveTab] = useState<string>("activity");
-
-  // React to navigation params
-  useEffect(() => {
-    // Legacy "badges" deep-links collapse onto the stats segment; lists
-    // gets its own segment now. BG: legacy "sends" deep-links now route
-    // to the renamed "activity" tab so prod links don't break.
-    let target: (typeof TABS)[number] | null = null;
-    if (params.initialTab === "lists") target = "lists";
-    else if (params.initialTab === "stats" || params.initialTab === "badges")
-      target = "stats";
-    else if (params.initialTab === "activity" || params.initialTab === "sends")
-      target = "activity";
-    if (target) {
-      setActiveTab(target);
-      const idx = TABS.indexOf(target);
-      pagerRef.current?.setPage(idx);
-    }
+  // Deep-link → initial tab. Legacy "badges" collapses onto stats; "sends"
+  // onto the renamed "activity" so prod links don't break.
+  const initialTabKey: ProfileTabKey = useMemo(() => {
+    if (params.initialTab === "lists") return "lists";
+    if (params.initialTab === "stats" || params.initialTab === "badges")
+      return "stats";
+    return "activity";
   }, [params.initialTab]);
 
-  const scrollRef = useRef<Animated.ScrollView>(null);
-  const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler((e) => {
-    scrollY.value = e.contentOffset.y;
-  });
-
-  // BG fix v5 — `StickyProfileTabBar` now lives OUTSIDE the ScrollView
-  // as an absolute overlay (Fallback B), so PagerView's native layer
-  // can't draw over the bar mid-scroll. The spacer below reserves the
-  // bar's vertical slot inside the scroll content; the bar uses
-  // `measure(spacerRef)` to mirror that screen position frame-by-frame.
-  const spacerRef = useAnimatedRef<Animated.View>();
-  // 0 = bar at rest position (CollapsingHeader chrome invisible) → 1 =
-  // bar fully pinned (chrome fully opaque). Driven from the bar's
-  // worklet via spacer distance to headerHeight.
+  // 0 = chrome at rest (CollapsingHeader nav chrome invisible) → 1 = fully
+  // pinned (chrome opaque). ProfileChromeRoot writes this from the active
+  // tab's synchronized scrollY; we feed it to the nav bar via setOptions.
   const pinFadeProgress = useSharedValue<number>(0);
-  // Bumped by the spacer's onLayout — bar reads this in its worklet
-  // so the worklet re-runs after first layout and `measure()` returns
-  // a valid frame (without this, bar stays at -9999 until the user
-  // scrolls, visible on cold open of other-user profile).
-  //
-  // BG-FU v2: schedule extra rAF re-runs after onLayout because iOS
-  // `contentInsetAdjustmentBehavior: "automatic"` settles the inset
-  // ASYNCHRONOUSLY after layout (especially on Stack-push routes like
-  // community/u/[id]). Without these retries, measure() returns a
-  // pre-inset pageY value, the worklet computes `distanceToPin <= 0`,
-  // and the bar incorrectly pins at the top of the viewport for the
-  // first frame. The retries cover ~83ms (5 frames @ 60fps).
-  const spacerLayoutVersion = useSharedValue<number>(0);
-  const onSpacerLayout = useCallback(() => {
-    spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
-    let frame = 0;
-    const tick = () => {
-      spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
-      frame++;
-      if (frame < 5) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [spacerLayoutVersion]);
 
   // Window BG — Collapsing nav: nav-bar background fades from transparent
   // to opaque colors.background as the user scrolls past the cover (scrollY
@@ -338,208 +289,60 @@ export default function ProfileScreen() {
     });
   }, [navigation, pinFadeProgress, user.avatar, user.name]);
 
-  // --------------------- pager (swipe tabs) ---------------------
-  const pagerRef = useRef<PagerView>(null);
-  const { height: screenHeight } = useWindowDimensions();
-
-  // Shared value driven by PagerView onPageScroll for smooth tab indicator animation
-  const tabScrollPosition = useSharedValue(
-    Math.max(0, TABS.indexOf("activity" as (typeof TABS)[number])),
-  );
-
-  // Track content height per tab page so PagerView grows to fit
-  const [pageHeights, setPageHeights] = useState<Record<number, number>>({});
-  const activePageIndex = TABS.indexOf(activeTab as (typeof TABS)[number]);
-  const pagerHeight = Math.max(
-    pageHeights[activePageIndex] ?? 0,
-    screenHeight * 0.6
-  );
-
-  const handlePageLayout = useCallback((pageIndex: number) => (e: { nativeEvent: { layout: { height: number } } }) => {
-    const h = e.nativeEvent.layout.height;
-    setPageHeights((prev) => {
-      if (Math.abs((prev[pageIndex] ?? 0) - h) < 2) return prev;
-      return { ...prev, [pageIndex]: h };
-    });
-  }, []);
-
-  const handleTabPress = useCallback((tab: string) => {
-    const idx = TABS.indexOf(tab as (typeof TABS)[number]);
-    if (idx >= 0) pagerRef.current?.setPage(idx);
-  }, []);
-
-  const onPageScroll = useCallback((e: { nativeEvent: { position: number; offset: number } }) => {
-    tabScrollPosition.value = e.nativeEvent.position + e.nativeEvent.offset;
-  }, []);
-
-  // Buffer the selected page index — only commit to activeTab when pager is fully idle
-  const pendingPageRef = useRef<number | null>(null);
-
-  const onPageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
-    pendingPageRef.current = e.nativeEvent.position;
-  }, []);
-
-  const onPageScrollStateChanged = useCallback((e: { nativeEvent: { pageScrollState: string } }) => {
-    if (e.nativeEvent.pageScrollState === "idle" && pendingPageRef.current !== null) {
-      const tab = TABS[pendingPageRef.current];
-      if (tab) setActiveTab(tab);
-      pendingPageRef.current = null;
-    }
-  }, []);
-
   // --------------------- render ---------------------
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Animated.ScrollView
-        ref={scrollRef}
-        onScroll={scrollHandler}
-        scrollEventThrottle={1}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{
-          paddingBottom: scrollBottomPadding,
-        }}
-      >
-        {/* [0] Cover/gradient + header — scrolls with content */}
-        <ProfileHeader
-          name={user.name}
-          username={user.username}
-          avatarUrl={user.avatar}
-          coverUrl={me?.cover_url ?? null}
-          bio={user.bio || null}
-          homeGym={user.homeGym || null}
-          followersCount={followCounts.followers}
-          followingCount={followCounts.following}
-          viewMode={isOwnProfile ? "self" : "other"}
-          onEditPress={() => router.push("/profile/edit")}
-          onFollowersPress={() => router.push("/profile/followers" as any)}
-          onFollowingPress={() => router.push("/profile/following" as any)}
-          scrollY={scrollY}
-          gradeText={`${user.stats.boulderGrade}/${user.stats.routeGrade}`}
-          totalSends={user.stats.totalSends}
-          onKPIPress={() => {
-            if (me?.id) router.push(`/users/${me.id}/ascents` as any);
-          }}
-        />
-
-        {/* Tab bar spacer — reserves the bar's slot in the scroll
-            content so PagerView lands beneath the bar's natural
-            position. The actual bar is rendered as an absolute overlay
-            sibling of the ScrollView (below) and reads this spacer's
-            screen position via `measure(spacerRef)`.
-            v5.3 — `marginTop: -PROFILE_COVER_OVERLAP_PT` overlaps the
-            spacer up into the cover image area so the bar's rounded
-            corners can "carve into" the cover at rest.
-            v5.5 — spacer's top portion (the overlap) renders a *fake
-            cover slice* via ProfileCoverArt sized to the full cover
-            and shifted up so only its bottom 35pt shows. Because the
-            slice lives inside the ScrollView, it scrolls in lockstep
-            with the real cover above it — when the absolute-overlay
-            bar lags against native scroll (worklet 60Hz vs ProMotion
-            120Hz), the gap above the bar exposes THIS slice (visually
-            identical to the cover) instead of the real cover image. At
-            rest the bar's rounded-corner cutouts reveal the slice =>
-            carve effect preserved. The bottom 11pt of the spacer
-            (below the cover area) stays opaque `colors.background` so
-            nothing leaks above the PagerView. */}
-        <Animated.View
-          ref={spacerRef}
-          onLayout={onSpacerLayout}
-          style={{
-            height: PROFILE_TAB_BAR_HEIGHT,
-            marginTop: -PROFILE_COVER_OVERLAP_PT,
-            overflow: "hidden",
-          }}
-        >
-          {/* Top overlap: fake cover slice */}
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: PROFILE_COVER_OVERLAP_PT,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                position: "absolute",
-                top: -(PROFILE_COVER_HEIGHT_FULL - PROFILE_COVER_OVERLAP_PT),
-                left: 0,
-                right: 0,
-                height: PROFILE_COVER_HEIGHT_FULL,
-              }}
-            >
-              <ProfileCoverArt coverUrl={me?.cover_url ?? null} />
-            </View>
-          </View>
-          {/* Below the cover overlap: opaque bg so PagerView area never leaks */}
-          <View
-            style={{
-              position: "absolute",
-              top: PROFILE_COVER_OVERLAP_PT,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: colors.background,
+      <ProfileChromeRoot
+        viewMode="self"
+        tabs={SELF_TABS}
+        heroHeight={HERO_HEIGHT}
+        pinFadeProgress={pinFadeProgress}
+        initialTabKey={initialTabKey}
+        renderHero={(activeScrollY) => (
+          <ProfileHeader
+            name={user.name}
+            username={user.username}
+            avatarUrl={user.avatar}
+            coverUrl={me?.cover_url ?? null}
+            bio={user.bio || null}
+            homeGym={user.homeGym || null}
+            followersCount={followCounts.followers}
+            followingCount={followCounts.following}
+            viewMode={isOwnProfile ? "self" : "other"}
+            onEditPress={() => router.push("/profile/edit")}
+            onFollowersPress={() => router.push("/profile/followers" as any)}
+            onFollowingPress={() => router.push("/profile/following" as any)}
+            scrollY={activeScrollY}
+            bleedUnderHeader={false}
+            gradeText={`${user.stats.boulderGrade}/${user.stats.routeGrade}`}
+            totalSends={user.stats.totalSends}
+            onKPIPress={() => {
+              if (me?.id) router.push(`/users/${me.id}/ascents` as any);
             }}
           />
-        </Animated.View>
-
-        <PagerView
-          ref={pagerRef}
-          style={{ height: pagerHeight }}
-          initialPage={Math.max(
-            0,
-            TABS.indexOf(
-              ((params.initialTab === "activity" || params.initialTab === "sends")
-                ? "activity"
-                : params.initialTab === "stats" || params.initialTab === "lists"
-                  ? params.initialTab
-                  : "activity") as (typeof TABS)[number],
-            ),
-          )}
-          onPageScroll={onPageScroll}
-          onPageSelected={onPageSelected}
-          onPageScrollStateChanged={onPageScrollStateChanged}
-          overdrag
-        >
-          <View key="activity" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(0)}>
-              {me?.id ? <ActivityFeedSection userId={me.id} viewMode="self" /> : null}
-            </View>
-          </View>
-          <View key="stats" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(1)} style={{ minHeight: screenHeight * 0.6 }}>
-              {headerVM ? (
-                <StatsAndBadgesSection user={headerVM} parentStyles={styles} />
-              ) : null}
-            </View>
-          </View>
-          <View key="lists" style={styles.contentArea}>
-            <View onLayout={handlePageLayout(2)} style={{ minHeight: screenHeight * 0.6 }}>
-              <ListsSection
-                showCreate
-                contentPaddingHorizontal={16}
-                inScrollView
-              />
-            </View>
-          </View>
-        </PagerView>
-      </Animated.ScrollView>
-
-      {/* BG fix v5 (Fallback B) — absolute-overlay sticky tab bar,
-          rendered as a sibling of the ScrollView so PagerView's native
-          layer cannot draw above it during the pin transition. */}
-      <StickyProfileTabBar
-        scrollY={scrollY}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-        scrollPosition={tabScrollPosition}
-        spacerRef={spacerRef}
-        layoutVersion={spacerLayoutVersion}
-        pinFadeProgress={pinFadeProgress}
+        )}
+        renderPage={(handle) => {
+          switch (handle.key) {
+            case "activity":
+              return me?.id ? (
+                <ActivityFeedSection userId={me.id} viewMode="self" pageHandle={handle} />
+              ) : null;
+            case "stats":
+              return headerVM ? (
+                <StatsAndBadgesSection user={headerVM} parentStyles={styles} pageHandle={handle} />
+              ) : null;
+            case "lists":
+              return (
+                <ProfileListsWrapper
+                  pageHandle={handle}
+                  showCreate
+                  contentPaddingHorizontal={16}
+                />
+              );
+            default:
+              return null;
+          }
+        }}
       />
 
       {/* Native toolbar: settings + share menu.
@@ -588,8 +391,6 @@ export default function ProfileScreen() {
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  contentArea: { minHeight: 300, backgroundColor: colors.background },
-
   basicInfoContainer: { padding: 16, backgroundColor: colors.background },
   analysisCard: {
     flexDirection: "row",

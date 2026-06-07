@@ -4,11 +4,11 @@
 // navigation.setOptions({ headerBackground }) on both profile/index.tsx
 // and community/u/[id].tsx.
 //
-// BG real-device retest v5 (2026-05-13) — fade is driven directly by
-// the `pinFadeProgress` shared value StickyProfileTabBar publishes
-// from its measure() worklet. Progress goes 0 → 1 as the bar's spacer
-// approaches headerHeight, so the nav reaches full opacity exactly as
-// the bar clamps. All scroll arithmetic lives in the bar component.
+// BX (2026-06-07) — fade is driven by the `pinFadeProgress` shared value
+// ProfileChromeRoot publishes from the active tab's synchronized scrollY
+// (useAnimatedReaction). Progress goes 0 → 1 as the hero approaches the pin,
+// so the nav reaches full opacity exactly as the tab bar pins. No measure() —
+// all scroll arithmetic lives in ProfileChromeRoot.
 
 import React from "react";
 import { StyleSheet } from "react-native";

@@ -15,39 +15,52 @@ import Animated, {
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 
-export const PROFILE_TABS = [
+// Default self tab set. Other-user also renders 3 tabs (its "stats" tab is
+// the PUBLIC stats). Callers pass their own `tabs` prop (Window BX); this
+// const is only the internal default, hence no longer exported.
+const PROFILE_TABS = [
   { key: "activity", label: "Activity" },
   { key: "stats", label: "Stats & Badges" },
   { key: "lists", label: "Lists" },
 ] as const;
 
-const TAB_COUNT = PROFILE_TABS.length;
+export type ProfileTabBarItem = { key: string; label: string };
+
 const UNDERLINE_WIDTH_RATIO = 0.4; // mockup: left:30%/right:30% → 40% wide
 
 // Public for the floating-bar layout in profile screens — they need the
-// exact bar height to reserve a spacer in the ScrollView content so the
-// PagerView lands beneath the bar's natural resting position.
+// exact bar height to position the absolute chrome tab bar so the
+// PagerView content lands beneath the bar's resting position.
 export const PROFILE_TAB_BAR_HEIGHT = 46;
 
 export interface ProfileTabBarProps {
   activeTab: string;
   onTabPress: (key: string) => void;
   scrollPosition?: SharedValue<number>;
+  /**
+   * Window BX — tab set is now caller-driven so the same underline bar
+   * serves self and other-user (both 3 tabs; other-user's "stats" tab shows
+   * public stats). Defaults to the canonical 3-tab self set.
+   */
+  tabs?: readonly ProfileTabBarItem[];
 }
 
 export default function ProfileTabBar({
   activeTab,
   onTabPress,
   scrollPosition: scrollPositionProp,
+  tabs = PROFILE_TABS,
 }: ProfileTabBarProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const tabCount = tabs.length;
+
   const fallbackPosition = useSharedValue(
-    Math.max(0, PROFILE_TABS.findIndex((t) => t.key === activeTab)),
+    Math.max(0, tabs.findIndex((t) => t.key === activeTab)),
   );
   if (!scrollPositionProp) {
-    const idx = Math.max(0, PROFILE_TABS.findIndex((t) => t.key === activeTab));
+    const idx = Math.max(0, tabs.findIndex((t) => t.key === activeTab));
     fallbackPosition.value = withTiming(idx, { duration: 250 });
   }
   const scrollPosition = scrollPositionProp ?? fallbackPosition;
@@ -57,14 +70,14 @@ export default function ProfileTabBar({
     setBarWidth(e.nativeEvent.layout.width);
   }, []);
 
-  const tabWidth = barWidth / TAB_COUNT;
+  const tabWidth = barWidth / tabCount;
   const underlineWidth = tabWidth * UNDERLINE_WIDTH_RATIO;
 
   // Pre-compute on JS thread — Array.prototype.map can't run inside a worklet.
-  const indices = useMemo(() => PROFILE_TABS.map((_, i) => i), []);
+  const indices = useMemo(() => tabs.map((_, i) => i), [tabs]);
   const offsets = useMemo(
-    () => PROFILE_TABS.map((_, i) => tabWidth * i + (tabWidth - underlineWidth) / 2),
-    [tabWidth, underlineWidth],
+    () => tabs.map((_, i) => tabWidth * i + (tabWidth - underlineWidth) / 2),
+    [tabs, tabWidth, underlineWidth],
   );
 
   const underlineStyle = useAnimatedStyle(() => {
@@ -76,7 +89,7 @@ export default function ProfileTabBar({
   return (
     <View style={styles.stickyWrap}>
       <View style={styles.bar} onLayout={onBarLayout}>
-        {PROFILE_TABS.map((t) => {
+        {tabs.map((t) => {
           const isActive = t.key === activeTab;
           return (
             <TouchableOpacity

@@ -3,9 +3,9 @@
 // in over the nav bar as the user scrolls. Mirrors Twitter / Instagram
 // profile collapse. Plugged via navigation.setOptions({ headerTitle }).
 //
-// BG real-device retest v5 (2026-05-13) — driven by `pinFadeProgress`
-// shared value published from StickyProfileTabBar's worklet (0 → 1 as
-// bar approaches pin). All scroll arithmetic lives in the bar.
+// BX (2026-06-07) — driven by `pinFadeProgress` shared value published from
+// ProfileChromeRoot's useAnimatedReaction (0 → 1 as the hero approaches pin).
+// All scroll arithmetic lives in ProfileChromeRoot (no measure()).
 
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";

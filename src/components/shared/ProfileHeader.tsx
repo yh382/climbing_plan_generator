@@ -120,6 +120,14 @@ export interface ProfileHeaderProps {
   totalSends?: number;
   /** Window BG — tap callback for the entire KPI pill row. */
   onKPIPress?: () => void;
+  /**
+   * Window BX — when true (default, legacy ScrollView-child usage) the cover
+   * pulls itself up by headerHeight to cancel the ScrollView's automatic
+   * content inset and the parallax baseline is offset by headerHeight. When
+   * false (mounted inside ProfileChromeRoot's absolute hero overlay, which
+   * already sits at screen top with no content inset) neither offset applies.
+   */
+  bleedUnderHeader?: boolean;
 }
 
 export default function ProfileHeader({
@@ -144,6 +152,7 @@ export default function ProfileHeader({
   gradeText,
   totalSends,
   onKPIPress,
+  bleedUnderHeader = true,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -154,6 +163,9 @@ export default function ProfileHeader({
   // behind the status bar / nav bar (mockup shows status bar overlaying cover).
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight() || (insets.top + 44);
+  // BX — inside ProfileChromeRoot's hero overlay there is no automatic
+  // content inset, so the parallax rest position is 0 (not -headerHeight).
+  const parallaxOffset = bleedUnderHeader ? headerHeight : 0;
 
   // Parallax: scroll up enlarges + translates the cover background.
   // scrollY is reported relative to the ScrollView's content origin; with
@@ -163,7 +175,7 @@ export default function ProfileHeader({
   // visible as "放大裁切").
   const bgParallaxStyle = useAnimatedStyle(() => {
     if (!scrollY) return {};
-    const adjusted = scrollY.value + headerHeight;
+    const adjusted = scrollY.value + parallaxOffset;
     if (adjusted >= 0) return {};
     const absScroll = -adjusted;
     return {
@@ -183,15 +195,24 @@ export default function ProfileHeader({
 
   return (
     <View
+      // BX — as an absolute hero overlay (ProfileChromeRoot) the cover sits
+      // OVER the page scroller. box-none lets vertical drags fall through to
+      // the scroll view (so you can scroll by dragging the cover) while the
+      // Edit / Follow / KPI buttons below still receive taps.
+      pointerEvents="box-none"
       style={[
         styles.cover,
         // Lift cover under nav bar + status bar so background bleeds to top
         // edge. Total cover height stays PROFILE_COVER_H — id-block / FAB at
         // bottom: 22 are anchored to visible bottom (not far off the screen).
-        { marginTop: -headerHeight },
+        // BX — skipped when rendered inside the hero overlay (already at top).
+        bleedUnderHeader ? { marginTop: -headerHeight } : null,
       ]}
     >
-      <Animated.View style={[StyleSheet.absoluteFill, bgParallaxStyle, { overflow: "hidden" }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, bgParallaxStyle, { overflow: "hidden" }]}
+      >
         <ProfileCoverArt coverUrl={coverUrl} />
       </Animated.View>
 

@@ -1,6 +1,6 @@
 // app/community/u/[id].tsx
 
-import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -16,25 +16,26 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import PagerView from "react-native-pager-view";
 import { useI18N } from "../../../lib/i18n";
 import { HeaderButton } from "../../../src/components/ui/HeaderButton";
 import { useThemeColors } from "../../../src/lib/useThemeColors";
 
-import Animated, {
-  useAnimatedRef,
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
+import Animated, { useSharedValue } from "react-native-reanimated";
 
-import ProfileHeader from "../../../src/components/shared/ProfileHeader";
-import { PROFILE_TAB_BAR_HEIGHT } from "../../../src/components/shared/ProfileTabBar";
-import StickyProfileTabBar from "../../../src/components/shared/StickyProfileTabBar";
+import ProfileHeader, {
+  PROFILE_COVER_HEIGHT_FULL,
+  PROFILE_COVER_OVERLAP_PT,
+} from "../../../src/components/shared/ProfileHeader";
 import ActivityFeedSection from "../../../src/features/profile/components/fivecorefunction/ActivityFeedSection";
 import CollapsingHeaderBg from "../../../src/features/profile/components/CollapsingHeaderBg";
 import CollapsingHeaderTitle from "../../../src/features/profile/components/CollapsingHeaderTitle";
 import PublicStatsSection from "../../../src/features/profile/components/PublicStatsSection";
-import ListsSection from "../../../src/features/outdoor/components/ListsSection";
+import ProfileListsWrapper from "../../../src/features/profile/components/ProfileListsWrapper";
+import ProfileChromeRoot from "../../../src/features/profile/components/ProfileChromeRoot";
+import type {
+  ProfileChromeTab,
+  ProfileChromePageHandle,
+} from "../../../src/features/profile/components/ProfileChromeRoot.types";
 import BadgeCard from "../../../src/features/profile/components/badgessection/BadgeCard";
 import type { Badge, BadgeSectionKey, BadgeTier } from "../../../src/features/profile/components/badgessection/types";
 import { usePublicProfile, PublicBadge } from "../../../src/features/community/hooks";
@@ -75,6 +76,16 @@ const BADGE_GROUPS: { key: string; title: string; filter: (b: Badge) => boolean;
   { key: "lifetime", title: "Lifetime", filter: (b) => b.section === "lifetime" },
   { key: "monthly", title: "Monthly", filter: (b) => b.section === "monthly" },
 ];
+
+// Other-user profile keeps all 3 tabs. Stats tab here is the PUBLIC stats
+// (PublicStatsSection + badges), not the self-only StatsAndBadgesSection —
+// preserved as a "pure chrome rewrite" (functionality unchanged).
+const OTHER_TABS: readonly ProfileChromeTab[] = [
+  { key: "activity", label: "Activity" },
+  { key: "stats", label: "Stats & Badges" },
+  { key: "lists", label: "Lists" },
+];
+const HERO_HEIGHT = PROFILE_COVER_HEIGHT_FULL - PROFILE_COVER_OVERLAP_PT;
 
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -212,79 +223,10 @@ export default function PublicProfileScreen() {
     }).catch(() => {});
   }, [profile]);
 
-  // Tabs (BG — renamed sends → activity to mirror /profile self view)
-  const TABS = ["activity", "stats", "lists"] as const;
-  const [activeTab, setActiveTab] = useState("activity");
-  const pagerRef = useRef<PagerView>(null);
-  const tabScrollPosition = useSharedValue(0);
-  const { height: screenHeight } = useWindowDimensions();
-
-  const [pageHeights, setPageHeights] = useState<Record<number, number>>({});
-  const activePageIndex = TABS.indexOf(activeTab as (typeof TABS)[number]);
-  const pagerHeight = Math.max(pageHeights[activePageIndex] ?? 0, screenHeight * 0.6);
-
-  const handlePageLayout = useCallback((pageIndex: number) => (e: { nativeEvent: { layout: { height: number } } }) => {
-    const h = e.nativeEvent.layout.height;
-    setPageHeights((prev) => {
-      if (Math.abs((prev[pageIndex] ?? 0) - h) < 2) return prev;
-      return { ...prev, [pageIndex]: h };
-    });
-  }, []);
-
-  const handleTabPress = useCallback((tab: string) => {
-    const idx = TABS.indexOf(tab as (typeof TABS)[number]);
-    if (idx >= 0) pagerRef.current?.setPage(idx);
-  }, []);
-
-  const onPageScroll = useCallback((e: { nativeEvent: { position: number; offset: number } }) => {
-    tabScrollPosition.value = e.nativeEvent.position + e.nativeEvent.offset;
-  }, []);
-
-  const pendingPageRef = useRef<number | null>(null);
-
-  const onPageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
-    pendingPageRef.current = e.nativeEvent.position;
-  }, []);
-
-  const onPageScrollStateChanged = useCallback((e: { nativeEvent: { pageScrollState: string } }) => {
-    if (e.nativeEvent.pageScrollState === "idle" && pendingPageRef.current !== null) {
-      const tab = TABS[pendingPageRef.current];
-      if (tab) setActiveTab(tab);
-      pendingPageRef.current = null;
-    }
-  }, []);
-
-  // --------------------- Reanimated scroll ---------------------
-  const scrollY = useSharedValue(0);
-
-  const scrollHandler = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
-
-  // BG fix v5 — bar lives OUTSIDE the ScrollView as an absolute overlay
-  // (Fallback B). Spacer below holds the bar's slot; bar measures the
-  // spacer's screen Y to position itself. pinFadeProgress drives the
-  // CollapsingHeader chrome; spacerLayoutVersion triggers the bar's
-  // worklet to re-run after first layout (otherwise measure() stays
-  // null until first scroll — visible on cold open of other-user
-  // profile as "bar missing until I scroll").
-  const spacerRef = useAnimatedRef<Animated.View>();
+  // 0 = chrome at rest (CollapsingHeader nav chrome invisible) → 1 = pinned.
+  // ProfileChromeRoot writes this from the active tab's synchronized scrollY;
+  // we feed it to the nav bar via setOptions.
   const pinFadeProgress = useSharedValue<number>(0);
-  const spacerLayoutVersion = useSharedValue<number>(0);
-  // BG-FU v2: schedule extra rAF re-runs after onLayout because iOS
-  // `contentInsetAdjustmentBehavior: "automatic"` settles ASYNC after
-  // layout on Stack-push routes (see profile/index.tsx for the full
-  // story — this screen is the exact symptom that motivated the fix).
-  const onSpacerLayout = useCallback(() => {
-    spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
-    let frame = 0;
-    const tick = () => {
-      spacerLayoutVersion.value = spacerLayoutVersion.value + 1;
-      frame++;
-      if (frame < 5) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [spacerLayoutVersion]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -336,147 +278,116 @@ export default function PublicProfileScreen() {
 
   return (
     <View style={dynStyles.screenRoot}>
-      <Animated.ScrollView
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-      >
-        {/* [0] Cover/gradient + header — KPI single-row pill lives inside */}
-        <ProfileHeader
-          name={profile.displayName}
-          username={profile.username}
-          avatarUrl={profile.avatarUrl}
-          coverUrl={profile.coverUrl}
-          bio={profile.bio}
-          homeGym={profile.homeGym}
-          followersCount={localFollowersCount}
-          followingCount={profile.followingCount}
-          viewMode="other"
-          isFollowing={isFollowing}
-          followLoading={followLoading}
-          msgLoading={msgLoading}
-          onFollowPress={handleFollow}
-          onMessagePress={handleMessage}
-          onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
-          onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
-          scrollY={scrollY}
-          gradeText={`${profile.boulderMax || "—"}/${profile.routeMax || "—"}`}
-          totalSends={profile.totalSends}
-          onKPIPress={() => router.push(`/users/${id}/ascents` as any)}
-        />
-
-        {/* Tab bar spacer — transparent + marginTop:-35 to overlap up
-            into the cover image area so the bar's animated rounded
-            corners reveal cover (carve effect). v5.3: contentShell
-            removed; see profile/index.tsx for the full rationale. */}
-        <Animated.View
-          ref={spacerRef}
-          onLayout={onSpacerLayout}
-          style={{ height: PROFILE_TAB_BAR_HEIGHT, marginTop: -35 }}
-        />
-
-        {/* Content — PagerView for swipe + smooth tab animation */}
-        <PagerView
-          ref={pagerRef}
-          style={{ height: pagerHeight }}
-          initialPage={0}
-          onPageScroll={onPageScroll}
-          onPageSelected={onPageSelected}
-          onPageScrollStateChanged={onPageScrollStateChanged}
-          overdrag
-        >
-          <View key="activity" style={dynStyles.contentArea}>
-            <View onLayout={handlePageLayout(0)}>
-              {privacy?.posts === false ? (
-                <PrivateSection
-                  message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
-                  colors={colors}
-                />
-              ) : (
-                <ActivityFeedSection userId={id!} viewMode="other" />
-              )}
-            </View>
-          </View>
-
-          <View key="stats" style={dynStyles.contentArea}>
-            <View onLayout={handlePageLayout(1)}>
-              {/* Stats card (public) — body info / lists / radar are self-only */}
-              {privacy?.analysis === false ? (
-                <PrivateSection
-                  message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
-                  colors={colors}
-                />
-              ) : profile ? (
-                <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
-              ) : null}
-
-              {/* Badges (public, sub-section under Stats segment) */}
-              {privacy?.badges === false ? (
-                <PrivateSection
-                  message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
-                  colors={colors}
-                />
-              ) : badges.length === 0 ? (
-                <View style={dynStyles.emptyState}>
-                  <Ionicons name="ribbon-outline" size={40} color={colors.border} />
-                  <Text style={dynStyles.emptyText}>
-                    {tt({ zh: "暂无徽章", en: "No badges yet" })}
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ paddingTop: 8 }}>
-                  {groupedBadges.map(group => (
-                    <View key={group.key} style={dynStyles.badgeSectionBlock}>
-                      <Text style={dynStyles.badgeSectionTitle}>{group.title}</Text>
-                      <FlatList
-                        data={group.badges}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        keyExtractor={item => item.id}
-                        renderItem={({ item }) => (
-                          <BadgeCard
-                            badge={item}
-                            size={badgeCardSize}
-                            onPress={item.sourceType === "challenge" && item.sourceId
-                              ? () => router.push(`/community/challenges/${item.sourceId}`)
-                              : undefined
-                            }
-                          />
-                        )}
-                        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-                        contentContainerStyle={{ paddingHorizontal: 12 }}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-
-          <View key="lists" style={dynStyles.contentArea}>
-            <View onLayout={handlePageLayout(2)} style={{ minHeight: screenHeight * 0.6 }}>
-              <ListsSection
-                userId={id}
-                contentPaddingHorizontal={16}
-                inScrollView
-              />
-            </View>
-          </View>
-        </PagerView>
-      </Animated.ScrollView>
-
-      {/* BG fix v5 (Fallback B) — absolute-overlay sticky tab bar
-          rendered outside ScrollView so PagerView's native layer can't
-          draw above it during the pin transition. */}
-      <StickyProfileTabBar
-        scrollY={scrollY}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-        scrollPosition={tabScrollPosition}
-        spacerRef={spacerRef}
-        layoutVersion={spacerLayoutVersion}
+      <ProfileChromeRoot
+        viewMode="other"
+        tabs={OTHER_TABS}
+        heroHeight={HERO_HEIGHT}
         pinFadeProgress={pinFadeProgress}
+        renderHero={(activeScrollY) => (
+          <ProfileHeader
+            name={profile.displayName}
+            username={profile.username}
+            avatarUrl={profile.avatarUrl}
+            coverUrl={profile.coverUrl}
+            bio={profile.bio}
+            homeGym={profile.homeGym}
+            followersCount={localFollowersCount}
+            followingCount={profile.followingCount}
+            viewMode="other"
+            isFollowing={isFollowing}
+            followLoading={followLoading}
+            msgLoading={msgLoading}
+            onFollowPress={handleFollow}
+            onMessagePress={handleMessage}
+            onFollowersPress={() => router.push(`/profile/followers?userId=${id}` as any)}
+            onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
+            scrollY={activeScrollY}
+            bleedUnderHeader={false}
+            gradeText={`${profile.boulderMax || "—"}/${profile.routeMax || "—"}`}
+            totalSends={profile.totalSends}
+            onKPIPress={() => router.push(`/users/${id}/ascents` as any)}
+          />
+        )}
+        renderPage={(handle) => {
+          switch (handle.key) {
+            case "activity":
+              return privacy?.posts === false ? (
+                <HandleScroller handle={handle} colors={colors}>
+                  <PrivateSection
+                    message={tt({ zh: "帖子已设为私密", en: "Posts are private" })}
+                    colors={colors}
+                  />
+                </HandleScroller>
+              ) : (
+                <ActivityFeedSection userId={id!} viewMode="other" pageHandle={handle} />
+              );
+            case "stats":
+              return (
+                <HandleScroller handle={handle} colors={colors}>
+                  {/* Stats card (public) — body info / lists / radar are self-only */}
+                  {privacy?.analysis === false ? (
+                    <PrivateSection
+                      message={tt({ zh: "统计数据已设为私密", en: "Stats are private" })}
+                      colors={colors}
+                    />
+                  ) : (
+                    <PublicStatsSection profile={profile} sessionSummary={sessionSummary} />
+                  )}
+
+                  {/* Badges (public, sub-section under Stats segment) */}
+                  {privacy?.badges === false ? (
+                    <PrivateSection
+                      message={tt({ zh: "徽章已设为私密", en: "Badges are private" })}
+                      colors={colors}
+                    />
+                  ) : badges.length === 0 ? (
+                    <View style={dynStyles.emptyState}>
+                      <Ionicons name="ribbon-outline" size={40} color={colors.border} />
+                      <Text style={dynStyles.emptyText}>
+                        {tt({ zh: "暂无徽章", en: "No badges yet" })}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ paddingTop: 8 }}>
+                      {groupedBadges.map(group => (
+                        <View key={group.key} style={dynStyles.badgeSectionBlock}>
+                          <Text style={dynStyles.badgeSectionTitle}>{group.title}</Text>
+                          <FlatList
+                            data={group.badges}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                              <BadgeCard
+                                badge={item}
+                                size={badgeCardSize}
+                                onPress={item.sourceType === "challenge" && item.sourceId
+                                  ? () => router.push(`/community/challenges/${item.sourceId}`)
+                                  : undefined
+                                }
+                              />
+                            )}
+                            ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+                            contentContainerStyle={{ paddingHorizontal: 12 }}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </HandleScroller>
+              );
+            case "lists":
+              return (
+                <ProfileListsWrapper
+                  pageHandle={handle}
+                  userId={id}
+                  contentPaddingHorizontal={16}
+                />
+              );
+            default:
+              return null;
+          }
+        }}
       />
 
       {/* Native toolbar menu (context menu from button position) */}
@@ -515,9 +426,40 @@ function PrivateSection({ message, colors }: { message: string; colors: ReturnTy
   );
 }
 
+/**
+ * Window BX — wraps inline tab content (other-user stats/badges, privacy
+ * placeholders) in the page's own Animated.ScrollView so it participates in
+ * the fixed-chrome collapse. Sections that already own a scroller
+ * (ActivityFeedSection, ProfileListsWrapper) don't use this.
+ */
+function HandleScroller({
+  handle,
+  colors,
+  children,
+}: {
+  handle: ProfileChromePageHandle;
+  colors: ReturnType<typeof useThemeColors>;
+  children: ReactNode;
+}) {
+  return (
+    <Animated.ScrollView
+      ref={handle.scrollRef}
+      onScroll={handle.scrollHandler}
+      scrollEventThrottle={1}
+      showsVerticalScrollIndicator={false}
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{
+        paddingTop: handle.contentInsetTop,
+        paddingBottom: handle.contentInsetBottom,
+      }}
+    >
+      {children}
+    </Animated.ScrollView>
+  );
+}
+
 const createDynStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: colors.background },
-  contentArea: { minHeight: 400 },
   emptyState: { padding: 48, alignItems: "center" },
   emptyText: { color: colors.textTertiary, marginTop: 8 },
   // Badges

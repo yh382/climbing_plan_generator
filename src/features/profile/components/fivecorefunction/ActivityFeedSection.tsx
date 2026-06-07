@@ -9,12 +9,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useCommunityStore } from "@/store/useCommunityStore";
 import { useUserAscents } from "@/features/profile/hooks/useUserAscents";
+import type { ProfileChromePageHandle } from "@/features/profile/components/ProfileChromeRoot.types";
 
 import ProfileMediaGrid from "./ProfileMediaGrid";
 import ProfileSessionList from "./ProfileSessionList";
@@ -27,6 +29,13 @@ import {
 type Props = {
   userId: string;
   viewMode: "self" | "other";
+  /**
+   * Window BX — when mounted inside ProfileChromeRoot, this tab owns its
+   * own scroller. The handle's reanimated plumbing is spread onto the
+   * wrapping Animated.ScrollView. When absent (legacy / standalone), the
+   * section renders a plain View and the caller provides scrolling.
+   */
+  pageHandle?: ProfileChromePageHandle;
 };
 
 type SubSectionProps = {
@@ -73,9 +82,10 @@ function formatCount(loadedCount: number, hasMore: boolean): string | null {
   return hasMore ? `${loadedCount}+` : String(loadedCount);
 }
 
-export default function ActivityFeedSection({ userId, viewMode }: Props) {
+export default function ActivityFeedSection({ userId, viewMode, pageHandle }: Props) {
   const { tr } = useSettings();
   const router = useRouter();
+  const colors = useThemeColors();
 
   const cache = useCommunityStore((s) => s.userActivityByUserId[userId]);
   const fetchUserActivity = useCommunityStore((s) => s.fetchUserActivity);
@@ -140,8 +150,8 @@ export default function ActivityFeedSection({ userId, viewMode }: Props) {
   const isLoading =
     !minTimeElapsed || !cache || (cache.loading && cache.items.length === 0);
 
-  return (
-    <View>
+  const content = (
+    <>
       <SubSection
         title={tr("媒体", "Media")}
         viewAllLabel={mediaCountLabel ? `${tr("查看全部", "View all")} (${mediaCountLabel})` : null}
@@ -199,9 +209,33 @@ export default function ActivityFeedSection({ userId, viewMode }: Props) {
           <ProfileLogList userId={userId} viewMode={viewMode} />
         </SubSection>
       ) : null}
-    </View>
+    </>
   );
+
+  if (pageHandle) {
+    return (
+      <Animated.ScrollView
+        ref={pageHandle.scrollRef}
+        onScroll={pageHandle.scrollHandler}
+        scrollEventThrottle={1}
+        showsVerticalScrollIndicator={false}
+        style={[styles.scroller, { backgroundColor: colors.background }]}
+        contentContainerStyle={{
+          paddingTop: pageHandle.contentInsetTop,
+          paddingBottom: pageHandle.contentInsetBottom,
+        }}
+      >
+        {content}
+      </Animated.ScrollView>
+    );
+  }
+
+  return <View>{content}</View>;
 }
+
+const styles = StyleSheet.create({
+  scroller: { flex: 1 },
+});
 
 const createSubSectionStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
