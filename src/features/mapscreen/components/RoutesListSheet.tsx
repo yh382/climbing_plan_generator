@@ -19,6 +19,7 @@
  */
 import React, { type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
 import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
@@ -33,6 +34,23 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import type { OutdoorListDetail, OutdoorRoute, Wall } from '../../outdoor/types';
 import RouteListCard from '../../outdoor/components/RouteListCard';
 import WallGroup from '../../outdoor/components/WallGroup';
+
+/** BS-FU-A — crag-browse sub-state summary. When set (and no focusedWall),
+ *  RoutesListSheet renders a mini snapshot card + the crag's walls list
+ *  (sorted by route_count desc by the caller) instead of the legacy
+ *  region-wide walls fan-out. ⓘ tap routes to CragInfoSheet via the
+ *  existing onPressTitle callback. */
+export type BrowsingCragSummary = {
+  id: string;
+  name: string;
+  /** Parent region/area display name surfaced as subtitle. */
+  region_name?: string | null;
+  cover_url?: string | null;
+  wall_count?: number;
+  /** Total routes (rope + boulder). */
+  route_count?: number;
+  boulder_count?: number;
+};
 
 /** Per-frame opaque tr() — pass the bound `tr` from useSettings(). */
 type TR = (zh: string, en: string) => string;
@@ -83,6 +101,16 @@ export type RoutesListSheetProps = {
   /** Day 6 — FilterChipsBar slot. Day 2 ships with this unset. */
   filterChipsSlot?: ReactNode;
 
+  // --- BS-FU-A crag-browse sub-state ---
+  /** When set (and `wallName` unset), body renders a Crag mini-snapshot
+   *  + walls list (sorted by caller) instead of the region-wide fan-out. */
+  browsingCrag?: BrowsingCragSummary | null;
+  /** Pre-sorted walls list (by route_count desc) for the browsing-crag
+   *  render branch. Caller owns sort logic. */
+  browsingCragWalls?: Wall[] | null;
+  /** Wall row tap inside crag-browse → caller transitions to focusedWall. */
+  onPressBrowseWall?: (wall: Wall) => void;
+
   // --- callbacks shared between modes ---
   onPressRoute: (routeId: string) => void;
 };
@@ -97,7 +125,13 @@ const RoutesListSheet: React.FC<RoutesListSheetProps> = (props) => {
     wallName, searchExpanded,
     onPressSearch, onPressCommunity, onPressHamburger, onPressTitle,
     filterChipsSlot, onPressRoute,
+    browsingCrag, browsingCragWalls, onPressBrowseWall,
   } = props;
+  const showBrowsingCrag =
+    mode.kind === 'area' && !!browsingCrag && !wallName && !searchResults;
+  const ropeCount = browsingCrag
+    ? Math.max(0, (browsingCrag.route_count ?? 0) - (browsingCrag.boulder_count ?? 0))
+    : 0;
 
   const showPinnedHeader = mode.kind === 'area' && !searchExpanded;
   const titleText = (() => {
@@ -181,6 +215,81 @@ const RoutesListSheet: React.FC<RoutesListSheetProps> = (props) => {
                 />
               ))
             )
+          ) : showBrowsingCrag && browsingCrag ? (
+            <>
+              {/* BS-FU-A — Crag mini snapshot (tap → CragInfoSheet via
+                  onPressTitle, same callback wired to pinned header). */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onPressTitle}
+                style={s.browseSnapshot}
+              >
+                <View style={s.browseSnapshotTextBlock}>
+                  <Text style={s.browseSnapshotName} numberOfLines={2}>
+                    {browsingCrag.name}
+                  </Text>
+                  {browsingCrag.region_name ? (
+                    <Text style={s.browseSnapshotSubtitle} numberOfLines={1}>
+                      {browsingCrag.region_name}
+                    </Text>
+                  ) : null}
+                  <Text style={s.browseSnapshotMeta} numberOfLines={1}>
+                    {browsingCrag.wall_count ?? 0}{' '}
+                    {tr(
+                      '岩壁',
+                      (browsingCrag.wall_count ?? 0) === 1 ? 'wall' : 'walls',
+                    )}
+                    {'  ·  '}
+                    {ropeCount}{' '}
+                    {tr('绳攀线路', ropeCount === 1 ? 'route' : 'routes')}
+                    {'  ·  '}
+                    {browsingCrag.boulder_count ?? 0}{' '}
+                    {tr(
+                      '抱石',
+                      (browsingCrag.boulder_count ?? 0) === 1 ? 'boulder' : 'boulders',
+                    )}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={22}
+                  color={colors.textTertiary}
+                />
+              </TouchableOpacity>
+
+              {browsingCragWalls && browsingCragWalls.length > 0 ? (
+                browsingCragWalls.map((wall) => (
+                  <TouchableOpacity
+                    key={wall.id}
+                    activeOpacity={0.7}
+                    onPress={() => onPressBrowseWall?.(wall)}
+                    style={s.browseWallRow}
+                  >
+                    <Text style={s.browseWallName} numberOfLines={1}>
+                      {wall.name}
+                    </Text>
+                    <View style={s.browseWallMetaRow}>
+                      <Text style={s.browseWallCount}>
+                        {wall.route_count}{' '}
+                        {tr(
+                          '条',
+                          wall.route_count === 1 ? 'route' : 'routes',
+                        )}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={colors.textTertiary}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={s.emptyText}>
+                  {tr('加载岩壁中…', 'Loading walls…')}
+                </Text>
+              )}
+            </>
           ) : walls.length > 0 ? (
             walls.map((wall) => (
               <WallGroup
@@ -361,5 +470,65 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       color: c.textTertiary,
       textAlign: 'center',
       marginTop: 40,
+    },
+    // BS-FU-A — crag-browse mini snapshot + walls list rows.
+    browseSnapshot: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 8,
+      marginBottom: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: c.sheetCardBackground,
+      borderRadius: 12,
+      gap: 12,
+    },
+    browseSnapshotTextBlock: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    browseSnapshotName: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 17,
+      color: c.textPrimary,
+    },
+    browseSnapshotSubtitle: {
+      fontFamily: theme.fonts.medium,
+      fontSize: 12,
+      color: c.textSecondary,
+    },
+    browseSnapshotMeta: {
+      fontFamily: theme.fonts.regular,
+      fontSize: 12,
+      color: c.textTertiary,
+      marginTop: 2,
+    },
+    browseWallRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      marginHorizontal: 8,
+      marginBottom: 6,
+      backgroundColor: c.sheetCardBackground,
+      borderRadius: 10,
+      gap: 12,
+    },
+    browseWallName: {
+      flex: 1,
+      fontFamily: theme.fonts.medium,
+      fontSize: 15,
+      color: c.textPrimary,
+    },
+    browseWallMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    browseWallCount: {
+      fontFamily: theme.fonts.regular,
+      fontSize: 13,
+      color: c.textSecondary,
     },
   });
