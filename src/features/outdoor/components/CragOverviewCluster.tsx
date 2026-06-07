@@ -44,7 +44,28 @@ export type CragOverviewClusterProps = {
    *  bbox RoutePinCluster. Default 13: tier-1 fades out before tier-2
    *  takes over. */
   maxZoom?: number;
+  /** BS-P1-ε importance-by-zoom filter. Hide crags with
+   *  route_count below this threshold so low-zoom views show only
+   *  significant climbing destinations (less noise). Caller derives
+   *  from camera zoom (see getMinRoutesForZoom in MapScreenMapbox).
+   *  Defaults to 0 (show all). */
+  minRoutes?: number;
 };
+
+/** Importance-by-zoom tier table. Returns the minimum
+ *  `route_count` a crag must have to render at the given zoom.
+ *  Threshold is intentionally moderate (not extreme) so sparse
+ *  climbing regions still show as small clusters — gives users a
+ *  density "dust" cue across the map rather than only flagship
+ *  destinations. Mapbox supercluster aggregates sparse features
+ *  into smaller cluster bubbles naturally. */
+export function getMinRoutesForZoom(zoom: number): number {
+  if (zoom < 6) return 200;
+  if (zoom < 8) return 60;
+  if (zoom < 10) return 20;
+  if (zoom < 12) return 5;
+  return 0;
+}
 
 const DEFAULT_MAX_ZOOM = 13;
 /** PLAN §3.2 — clusters dissolve before our crag pins themselves go
@@ -151,10 +172,24 @@ export default function CragOverviewCluster({
   onCragPress,
   onClusterPress,
   maxZoom = DEFAULT_MAX_ZOOM,
+  minRoutes = 0,
 }: CragOverviewClusterProps) {
   const colors = useThemeColors();
-  const shape = useMemo(() => toGeoJSON(crags), [crags]);
+  // BS-P1-ε — filter low-importance crags before clustering. We filter
+  // at source data level (not Mapbox layer filter) so cluster math
+  // respects the filter — Mapbox layer filters apply after cluster
+  // aggregation, so they would only hide post-cluster features.
+  const shape = useMemo(() => {
+    const filtered = minRoutes > 0
+      ? crags.filter((c) => (c.route_count ?? 0) >= minRoutes)
+      : crags;
+    return toGeoJSON(filtered);
+  }, [crags, minRoutes]);
 
+  // Lookup intentionally indexes the UNFILTERED crags array so tap
+  // handlers can still resolve a crag id even if the importance
+  // filter (BS-P1-ε) hid it from the source. Don't "optimize" by
+  // reusing the filtered shape.
   const cragLookup = useMemo(() => {
     const map = new Map<string, CragOverview>();
     for (const c of crags) map.set(c.id, c);

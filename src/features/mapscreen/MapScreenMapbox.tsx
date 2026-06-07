@@ -86,6 +86,7 @@ import RoutePinCluster, {
   type WallPinContext,
 } from '../outdoor/components/RoutePinCluster';
 import CragOverviewCluster, {
+  getMinRoutesForZoom,
   type CragPinContext,
 } from '../outdoor/components/CragOverviewCluster';
 import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
@@ -207,6 +208,10 @@ export default function MapScreenMapbox({
   // position after MapView key-bump remount on AppState background→
   // active recovery (otherwise Mapbox resets to [0,0] default).
   const lastCameraSnapshotRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  // BS-P1-ε — Importance-by-zoom tier for outdoor crag overview.
+  // Only re-renders the cluster source when the tier crosses a
+  // boundary (zoom 6 / 8 / 10 / 12) rather than every camera frame.
+  const [cragMinRoutes, setCragMinRoutes] = useState(() => getMinRoutesForZoom(0));
   // rnmapbox only lets the touch-start event bubble to RN (onTouchMove /
   // onTouchEnd are swallowed by Mapbox's UIGestureRecognizer — see
   // rnmapbox issues #3019, #1667). We work around the missing onTouchMove
@@ -830,6 +835,12 @@ export default function MapScreenMapbox({
       mapCenterRef.current = { lat: currentLat, lng: currentLng };
       lastCameraSnapshotRef.current = { center: [currentLng, currentLat], zoom };
       observeCamera({ center: [currentLng, currentLat], zoom });
+      // BS-P1-ε — recompute importance tier; setState short-circuits
+      // when value unchanged so this is cheap per camera frame.
+      const nextMinRoutes = getMinRoutesForZoom(zoom);
+      if (nextMinRoutes !== cragMinRoutes) {
+        setCragMinRoutes(nextMinRoutes);
+      }
 
       // Programmatic flyTo — don't let it poison the lat-delta tracking.
       if (programmaticMoveRef.current) {
@@ -867,7 +878,7 @@ export default function MapScreenMapbox({
 
       if (shouldCollapse) sheet.collapseSheet();
     },
-    [observeCamera, sheet, windowHeight],
+    [observeCamera, sheet, windowHeight, cragMinRoutes],
   );
 
   // ---- Gyms-mode pin presses ----
@@ -1475,6 +1486,7 @@ export default function MapScreenMapbox({
                 styleReady={styleReady}
                 onCragPress={onCragOverviewPress}
                 onClusterPress={onClusterBubblePress}
+                minRoutes={cragMinRoutes}
               />
             )}
 
