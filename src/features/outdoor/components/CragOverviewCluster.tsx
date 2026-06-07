@@ -75,7 +75,52 @@ const CLUSTER_RADIUS_EXPRESSION = [
   10000, 24,  // ≥10000
 ] as const;
 
-const SINGLE_PIN_RADIUS = 7;
+// Text size mirrors the radius step (≈ radius × 0.7) so text-to-bubble
+// ratio stays visually consistent across all cluster sizes — small
+// bubble had previously fit "640" with 12pt looking cramped; large
+// bubble had "5.4k" looking lost. Steps align 1:1 with
+// CLUSTER_RADIUS_EXPRESSION breakpoints.
+const CLUSTER_TEXT_SIZE_EXPRESSION = [
+  'step',
+  ['get', 'route_count_sum'],
+  9,     // <100   → radius 8  → text 9pt
+  100, 11,    // ≥100   → radius 12 → text 11pt
+  500, 13,    // ≥500   → radius 16 → text 13pt
+  2000, 15,   // ≥2000  → radius 20 → text 15pt
+  10000, 17,  // ≥10000 → radius 24 → text 17pt
+] as const;
+
+// Single crag pin radius mirrors cluster bubble scale (route count
+// based) so individual crags read as "1-route clusters" — visually
+// consistent with cluster bubbles, and large enough to fit the route
+// count text inside the pin. Same step breakpoints as cluster.
+const SINGLE_PIN_RADIUS_EXPRESSION = [
+  'step',
+  ['get', 'route_count'],
+  8,     // <100   → radius 8
+  100, 12,    // ≥100   → radius 12
+  500, 16,    // ≥500   → radius 16
+  2000, 20,   // ≥2000  → radius 20
+  10000, 24,  // ≥10000 → radius 24
+] as const;
+
+const SINGLE_TEXT_SIZE_EXPRESSION = [
+  'step',
+  ['get', 'route_count'],
+  9,     // <100   → text 9pt
+  100, 11,    // ≥100   → text 11pt
+  500, 13,    // ≥500   → text 13pt
+  2000, 15,   // ≥2000  → text 15pt
+  10000, 17,  // ≥10000 → text 17pt
+] as const;
+
+/** Compact route count: ≥10000→"Xk" (no decimal); 1000-9999→"X.Xk"
+ *  (1 decimal); <1000→raw. Same rule as cluster bubble. */
+function formatCount(n: number): string {
+  if (n >= 10000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `${Math.round(n / 100) / 10}k`;
+  return String(n);
+}
 
 function toGeoJSON(crags: CragOverview[]): GeoJSON.FeatureCollection {
   return {
@@ -90,6 +135,13 @@ function toGeoJSON(crags: CragOverview[]): GeoJSON.FeatureCollection {
         region_name: c.region_name,
         route_count: c.route_count,
         boulder_count: c.boulder_count,
+        // BS-P1-α (2026-06-06) — pre-computed display strings in JS
+        // rather than deeply nested Mapbox expressions (Mapbox RN
+        // silently drops case+concat+round+division textField — see
+        // handoff §10). `count_label` goes INSIDE the single-pin
+        // circle (cluster-bubble-like visual), `crag_name` is shown
+        // below the pin (existing name label).
+        count_label: c.route_count > 0 ? formatCount(c.route_count) : '',
       },
       geometry: {
         type: 'Point',
@@ -190,31 +242,70 @@ export default function CragOverviewCluster({
       />
       {/* Cluster bubble label — total route count across the cluster's
           child crags (more informative for climbers than crag-count).
-          Uses `to-string` on the aggregated `route_count_sum` clusterProperty
-          — kept simple to avoid the layer-makeLayer-nil failure that
-          nested case/concat expressions caused on this @rnmapbox/maps
-          version. No `textFont` (defaults work; DIN Pro Bold caused
-          font-lookup failures on the loaded outdoor-v12 style). */}
+          BS-P1-α (2026-06-06): abbreviate ≥1000 to "Xk" / "X.Xk" so
+          large clusters (e.g. 24581) don't bloat the bubble. Direct
+          interpretation per user: "10k" / "2k" reads as route count
+          without needing a "climbs" suffix; the upcoming Boulder/Rope
+          composition ring (BS-P1-ζ) will visually disambiguate. No
+          `textFont` — DIN Pro Bold previously caused font-lookup
+          failures on the loaded outdoor-v12 style. */}
       <MapboxGL.SymbolLayer
         id="crag-overview-cluster-labels"
         filter={['has', 'point_count']}
         style={{
-          textField: ['to-string', ['get', 'route_count_sum']] as any,
-          textSize: 12,
+          textField: [
+            'case',
+            // ≥10000 → round to "Xk" (no decimal, e.g. 24581→25k, 12792→13k)
+            ['>=', ['get', 'route_count_sum'], 10000],
+            [
+              'concat',
+              ['to-string', ['round', ['/', ['get', 'route_count_sum'], 1000]]],
+              'k',
+            ],
+            // 1000–9999 → "X.Xk" (1 decimal max, e.g. 1383→1.4k, 5247→5.2k)
+            // round(value/100)/10 to avoid number-format options being
+            // ignored by @rnmapbox/maps (which defaults to 3 decimals).
+            ['>=', ['get', 'route_count_sum'], 1000],
+            [
+              'concat',
+              ['to-string', ['/', ['round', ['/', ['get', 'route_count_sum'], 100]], 10]],
+              'k',
+            ],
+            // <1000 → raw "640"
+            ['to-string', ['get', 'route_count_sum']],
+          ] as any,
+          textSize: CLUSTER_TEXT_SIZE_EXPRESSION as any,
           textColor: '#FFFFFF',
           textAllowOverlap: true,
           textIgnorePlacement: true,
         }}
       />
-      {/* Single Crag pin — visible at zoom ≥ CLUSTER_MAX_ZOOM_LEVEL+1 */}
+      {/* Single Crag pin — visible at zoom ≥ CLUSTER_MAX_ZOOM_LEVEL+1.
+          Radius + textSize scale with route_count, mirroring cluster
+          bubble style so single crags read as "clusters of one" (the
+          route_count printed inside the pin lets users compare crag
+          sizes at a glance after zooming out of a parent cluster). */}
       <MapboxGL.CircleLayer
         id="crag-overview-single-pins"
         filter={['!', ['has', 'point_count']]}
         style={{
           circleColor: OUTDOOR_MARKER_ORANGE,
-          circleRadius: SINGLE_PIN_RADIUS,
+          circleRadius: SINGLE_PIN_RADIUS_EXPRESSION as any,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.4,
+        }}
+      />
+      {/* Route count INSIDE the single crag pin (white text on orange
+          circle). Mirrors cluster bubble's count label. */}
+      <MapboxGL.SymbolLayer
+        id="crag-overview-single-counts"
+        filter={['!', ['has', 'point_count']]}
+        style={{
+          textField: ['get', 'count_label'] as any,
+          textSize: SINGLE_TEXT_SIZE_EXPRESSION as any,
+          textColor: '#FFFFFF',
+          textAllowOverlap: true,
+          textIgnorePlacement: true,
         }}
       />
       {/* Single Crag name label — always visible alongside the single
@@ -223,7 +314,10 @@ export default function CragOverviewCluster({
           textAllowOverlap + textIgnorePlacement so every visible pin
           shows its name, even in dense areas (Yosemite-style). User
           requirement 2026-06-06 — "label should follow the pin, not
-          appear at a special zoom". */}
+          appear at a special zoom". Count moved INSIDE the pin
+          (crag-overview-single-counts), so this label is now name
+          only. textOffset increased to clear the larger
+          route-count-scaled pin radius (up to 24px). */}
       <MapboxGL.SymbolLayer
         id="crag-overview-single-labels"
         filter={['!', ['has', 'point_count']]}
@@ -235,7 +329,9 @@ export default function CragOverviewCluster({
           textHaloWidth: 1.4,
           textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
           textAnchor: 'top',
-          textOffset: [0, 0.8],
+          // Increased offset (was 0.8) so name clears the
+          // route-count-scaled pin (radius up to 24px).
+          textOffset: [0, 2.4],
           textAllowOverlap: true,
           textIgnorePlacement: true,
           textMaxWidth: 10,
