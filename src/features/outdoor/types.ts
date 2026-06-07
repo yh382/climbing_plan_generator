@@ -147,6 +147,10 @@ export type OutdoorRoute = {
   pitches: number;
   bolts?: number;
   style: string; // sport / trad / boulder / multi-pitch / DWS
+  /** BS-P1-β product-level discipline (BE-derived from style). FE prefers
+   *  this over `style` for boulder/rope count buckets + filter UI since
+   *  it's stable as `style` grows (toprope/aid/mixed/alpine). */
+  discipline: 'boulder' | 'rope' | 'other';
   first_ascent?: string;
   description?: string;
   photos?: PhotoItem[];

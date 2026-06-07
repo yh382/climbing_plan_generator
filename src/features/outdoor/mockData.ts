@@ -131,22 +131,22 @@ export const MOCK_WALLS: Record<string, Wall[]> = {
 
 export const MOCK_ROUTES: Record<string, OutdoorRoute[]> = {
   [ID.finNorth]: [
-    { id: ID.r1, wall_id: ID.finNorth, name: 'Lightning Bolt', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 25, pitches: 1, bolts: 8, style: 'sport', stars: 4.0, rating_count: 12, send_count: 45, attempt_count: 89, crag_name: 'The Fin', wall_name: 'North Face' },
-    { id: ID.r2, wall_id: ID.finNorth, name: 'Schoolroom', grade_text: '5.7', grade_system: 'yds', grade_score: 70, length_m: 20, pitches: 1, style: 'trad', stars: 3.5, rating_count: 8, send_count: 120, attempt_count: 150, crag_name: 'The Fin', wall_name: 'North Face' },
-    { id: ID.r3, wall_id: ID.finNorth, name: 'Green Adjective', grade_text: '5.9', grade_system: 'yds', grade_score: 90, length_m: 30, pitches: 1, bolts: 6, style: 'sport', stars: 4.5, rating_count: 20, send_count: 80, attempt_count: 130, crag_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r1, wall_id: ID.finNorth, name: 'Lightning Bolt', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 25, pitches: 1, bolts: 8, style: 'sport', discipline: 'rope', stars: 4.0, rating_count: 12, send_count: 45, attempt_count: 89, crag_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r2, wall_id: ID.finNorth, name: 'Schoolroom', grade_text: '5.7', grade_system: 'yds', grade_score: 70, length_m: 20, pitches: 1, style: 'trad', discipline: 'rope', stars: 3.5, rating_count: 8, send_count: 120, attempt_count: 150, crag_name: 'The Fin', wall_name: 'North Face' },
+    { id: ID.r3, wall_id: ID.finNorth, name: 'Green Adjective', grade_text: '5.9', grade_system: 'yds', grade_score: 90, length_m: 30, pitches: 1, bolts: 6, style: 'sport', discipline: 'rope', stars: 4.5, rating_count: 20, send_count: 80, attempt_count: 130, crag_name: 'The Fin', wall_name: 'North Face' },
   ],
   [ID.finSouth]: [
-    { id: ID.r4, wall_id: ID.finSouth, name: 'Bong Eater', grade_text: '5.8', grade_system: 'yds', grade_score: 80, length_m: 22, pitches: 1, style: 'trad', stars: 3.0, rating_count: 5, send_count: 30, attempt_count: 45, crag_name: 'The Fin', wall_name: 'South Face' },
-    { id: ID.r5, wall_id: ID.finSouth, name: 'The Coffin', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 28, pitches: 1, bolts: 9, style: 'sport', stars: 4.2, rating_count: 15, send_count: 25, attempt_count: 70, crag_name: 'The Fin', wall_name: 'South Face' },
+    { id: ID.r4, wall_id: ID.finSouth, name: 'Bong Eater', grade_text: '5.8', grade_system: 'yds', grade_score: 80, length_m: 22, pitches: 1, style: 'trad', discipline: 'rope', stars: 3.0, rating_count: 5, send_count: 30, attempt_count: 45, crag_name: 'The Fin', wall_name: 'South Face' },
+    { id: ID.r5, wall_id: ID.finSouth, name: 'The Coffin', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 28, pitches: 1, bolts: 9, style: 'sport', discipline: 'rope', stars: 4.2, rating_count: 15, send_count: 25, attempt_count: 70, crag_name: 'The Fin', wall_name: 'South Face' },
   ],
   [ID.gateMain]: [
-    { id: ID.r10, wall_id: ID.gateMain, name: "Goodro's Wall", grade_text: '5.10b', grade_system: 'yds', grade_score: 102, length_m: 24, pitches: 1, bolts: 7, style: 'sport', stars: 3.8, rating_count: 10, send_count: 40, attempt_count: 65, crag_name: 'Gate Buttress', wall_name: 'Main Wall' },
+    { id: ID.r10, wall_id: ID.gateMain, name: "Goodro's Wall", grade_text: '5.10b', grade_system: 'yds', grade_score: 102, length_m: 24, pitches: 1, bolts: 7, style: 'sport', discipline: 'rope', stars: 3.8, rating_count: 10, send_count: 40, attempt_count: 65, crag_name: 'Gate Buttress', wall_name: 'Main Wall' },
   ],
   [ID.menghuan]: [
-    { id: ID.r6, wall_id: ID.menghuan, name: '鸭子', name_en: 'Duck', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 20, pitches: 1, bolts: 7, style: 'sport', stars: 3.5, rating_count: 8, send_count: 15, attempt_count: 40, crag_name: '鸡蛋山', wall_name: '梦幻墙', description: '技巧型路线，核心在第三把到第五把' },
-    { id: ID.r7, wall_id: ID.menghuan, name: '飞鸟', name_en: 'Flying Bird', grade_text: '5.10c', grade_system: 'yds', grade_score: 103, length_m: 18, pitches: 1, bolts: 6, style: 'sport', stars: 3.0, rating_count: 5, send_count: 22, attempt_count: 35, crag_name: '鸡蛋山', wall_name: '梦幻墙' },
+    { id: ID.r6, wall_id: ID.menghuan, name: '鸭子', name_en: 'Duck', grade_text: '5.11b', grade_system: 'yds', grade_score: 113, length_m: 20, pitches: 1, bolts: 7, style: 'sport', discipline: 'rope', stars: 3.5, rating_count: 8, send_count: 15, attempt_count: 40, crag_name: '鸡蛋山', wall_name: '梦幻墙', description: '技巧型路线，核心在第三把到第五把' },
+    { id: ID.r7, wall_id: ID.menghuan, name: '飞鸟', name_en: 'Flying Bird', grade_text: '5.10c', grade_system: 'yds', grade_score: 103, length_m: 18, pitches: 1, bolts: 6, style: 'sport', discipline: 'rope', stars: 3.0, rating_count: 5, send_count: 22, attempt_count: 35, crag_name: '鸡蛋山', wall_name: '梦幻墙' },
   ],
   [ID.riluo]: [
-    { id: ID.r8, wall_id: ID.riluo, name: '夕阳红', name_en: 'Sunset Red', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 15, pitches: 1, bolts: 5, style: 'sport', stars: 3.0, rating_count: 3, send_count: 10, attempt_count: 15, crag_name: '鸡蛋山', wall_name: '日落墙' },
+    { id: ID.r8, wall_id: ID.riluo, name: '夕阳红', name_en: 'Sunset Red', grade_text: '5.10a', grade_system: 'yds', grade_score: 100, length_m: 15, pitches: 1, bolts: 5, style: 'sport', discipline: 'rope', stars: 3.0, rating_count: 3, send_count: 10, attempt_count: 15, crag_name: '鸡蛋山', wall_name: '日落墙' },
   ],
 };
