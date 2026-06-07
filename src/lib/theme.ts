@@ -57,9 +57,15 @@ export const theme = {
     // appears to drop the alpha channel from `rgba()` in circleColor
     // (gym pin rendered fully opaque despite rgba 0.74). Solid hex
     // fill + separate `markerOpacity` is the portable workaround.
-    outdoorMarkerFill: '#C27C40',                    // muted sandstone (solid)
+    outdoorMarkerFill: '#C27C40',                    // muted sandstone (solid, rope-dominant)
     outdoorMarkerStroke: '#A65F2B',
     outdoorMarkerText: '#FFFFFF',
+    // BS-P1-ζ — cluster discipline shift. Boulder-dominant clusters
+    // get a cooler brown ("mountain"); 50/50 mix uses a midpoint.
+    // Falls back to outdoorMarkerFill when unknown_ratio > 0.3
+    // (don't mislead with shifted color when data is sparse).
+    outdoorMarkerFillBoulder: '#8B6F5C',             // cooler brown (boulder-dominant)
+    outdoorMarkerFillMixed: '#A87560',               // midpoint blend
     gymMarkerFill: '#44847E',                        // muted teal (solid)
     gymMarkerStroke: '#2F6F6A',
     // (no gymMarkerText — gym label uses `gymLabelText` for dark teal

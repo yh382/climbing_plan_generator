@@ -259,17 +259,56 @@ export default function CragOverviewCluster({
       // outdoor cluster + pins entirely invisible).
       clusterProperties={{
         route_count_sum: ['+', ['get', 'route_count']],
+        // BS-P1-ζ — boulder/rope/unknown sums for cluster-level
+        // discipline ratio (powers circleColor case expression). All
+        // length-2 form (operator + mapExpression) per BS Track A fix.
+        boulder_count_sum: ['+', ['get', 'boulder_count']],
+        rope_count_sum: ['+', ['get', 'rope_count']],
+        unknown_count_sum: ['+', ['get', 'unknown_count']],
       }}
       onPress={handlePress}
       maxZoomLevel={maxZoom}
     >
-      {/* Cluster bubble — muted sandstone fill + sandstone stroke
-          (BS-P1-η softer palette). Size scales with route density. */}
+      {/* Cluster bubble — muted sandstone (rope-dominant) / cool
+          brown (boulder-dominant) / midpoint (mixed). Size scales
+          with route density. BS-P1-ζ (2026-06-06): discipline shift
+          via case expression. Falls back to default sandstone when
+          unknown_ratio > 0.3 (don't mislead with sparse data). Kept
+          expression shallow (handoff §10 caveat: @rnmapbox/maps RN
+          version chokes on deep nesting). */}
       <MapboxGL.CircleLayer
         id="crag-overview-cluster-circles"
         filter={['has', 'point_count']}
         style={{
-          circleColor: colors.outdoorMarkerFill,
+          circleColor: [
+            'case',
+            // Guard: too much unknown → neutral fallback
+            ['>',
+              ['/', ['get', 'unknown_count_sum'], ['get', 'route_count_sum']],
+              0.3,
+            ],
+            colors.outdoorMarkerFill,
+            // Boulder-dominant (≥70% of known are boulders)
+            ['>=',
+              ['/',
+                ['get', 'boulder_count_sum'],
+                ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']],
+              ],
+              0.7,
+            ],
+            colors.outdoorMarkerFillBoulder,
+            // Rope-dominant (≥70% of known are rope)
+            ['>=',
+              ['/',
+                ['get', 'rope_count_sum'],
+                ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']],
+              ],
+              0.7,
+            ],
+            colors.outdoorMarkerFill,
+            // Mixed — neither dominant
+            colors.outdoorMarkerFillMixed,
+          ] as any,
           circleOpacity: Number(colors.markerOpacity),
           circleRadius: CLUSTER_RADIUS_EXPRESSION,
           circleStrokeColor: colors.outdoorMarkerStroke,
@@ -325,7 +364,37 @@ export default function CragOverviewCluster({
         id="crag-overview-single-pins"
         filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: colors.outdoorMarkerFill,
+          // BS-P1-ζ — single-crag discipline shift mirrors cluster
+          // logic using per-feature boulder/rope/unknown counts.
+          circleColor: [
+            'case',
+            // Guard: too much unknown → neutral fallback
+            ['>',
+              ['/', ['get', 'unknown_count'], ['get', 'route_count']],
+              0.3,
+            ],
+            colors.outdoorMarkerFill,
+            // Boulder-dominant (≥70% of known are boulders)
+            ['>=',
+              ['/',
+                ['get', 'boulder_count'],
+                ['+', ['get', 'boulder_count'], ['get', 'rope_count']],
+              ],
+              0.7,
+            ],
+            colors.outdoorMarkerFillBoulder,
+            // Rope-dominant
+            ['>=',
+              ['/',
+                ['get', 'rope_count'],
+                ['+', ['get', 'boulder_count'], ['get', 'rope_count']],
+              ],
+              0.7,
+            ],
+            colors.outdoorMarkerFill,
+            // Mixed
+            colors.outdoorMarkerFillMixed,
+          ] as any,
           circleOpacity: Number(colors.markerOpacity),
           circleRadius: SINGLE_PIN_RADIUS_EXPRESSION as any,
           circleStrokeColor: colors.outdoorMarkerStroke,

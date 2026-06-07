@@ -44,6 +44,8 @@ export const darkColors: ThemeColors = {
   outdoorMarkerFill: '#C27C40',
   outdoorMarkerStroke: '#C68455',
   outdoorMarkerText: '#FFFFFF',
+  outdoorMarkerFillBoulder: '#9B7E68',
+  outdoorMarkerFillMixed: '#B58668',
   gymMarkerFill: '#44847E',
   gymMarkerStroke: '#5BA39C',
   // (no gymMarkerText — see theme.ts)
