@@ -38,4 +38,20 @@ export const darkColors: ThemeColors = {
   borderTertiary: '#38383A',
   trail: '#C9A78A',
   attempt: '#FFB95C',
+  // BS-P1-η dark variants — markers' rgba fills work on both light and
+  // dark Mapbox styles, but text labels must invert for contrast
+  // against the dark map background. Halos invert from light → dark.
+  outdoorMarkerFill: '#C27C40',
+  outdoorMarkerStroke: '#C68455',
+  outdoorMarkerText: '#FFFFFF',
+  gymMarkerFill: '#44847E',
+  gymMarkerStroke: '#5BA39C',
+  // (no gymMarkerText — see theme.ts)
+  markerOpacity: '0.74',
+  trailReference: '#6B7280',
+  warningTint: 'rgba(249, 115, 22, 0.12)',
+  outdoorLabelText: '#F5EBE0',
+  outdoorLabelHalo: 'rgba(20, 10, 5, 0.85)',
+  gymLabelText: '#E0F5F2',
+  gymLabelHalo: 'rgba(5, 20, 18, 0.85)',
 };

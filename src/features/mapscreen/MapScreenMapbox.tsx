@@ -1406,9 +1406,14 @@ export default function MapScreenMapbox({
                     minZoomLevel={8}
                     style={{
                       circleRadius: 6,
-                      circleColor: '#306E6F',
-                      circleStrokeWidth: 1.2,
-                      circleStrokeColor: '#fff',
+                      // BS-P1-η — softer muted teal palette (was raw
+                      // accent `#306E6F` + white stroke `#fff`).
+                      // Explicit circleOpacity because @rnmapbox/maps
+                      // drops alpha from `rgba()` in circleColor.
+                      circleColor: colors.gymMarkerFill,
+                      circleOpacity: Number(colors.markerOpacity),
+                      circleStrokeWidth: 2,
+                      circleStrokeColor: colors.gymMarkerStroke,
                     }}
                   />
                   {/* Gym name label — minZoomLevel matches pin (8) so
@@ -1426,12 +1431,18 @@ export default function MapScreenMapbox({
                     minZoomLevel={8}
                     style={{
                       textField: ['get', 'name'] as any,
-                      textSize: 10,
-                      textColor: scheme === 'dark' ? '#E2E8F0' : '#0F172A',
-                      textHaloColor:
-                        scheme === 'dark' ? 'rgba(11,18,32,0.85)' : 'rgba(255,255,255,0.85)',
-                      textHaloWidth: 1.2,
-                      textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                      // BS-P1-η — zoom-interpolated size + softer
+                      // palette tokens + Regular weight (was Bold).
+                      // Scheme-based hardcodes replaced by tokens.
+                      textSize: [
+                        'interpolate', ['linear'], ['zoom'],
+                        11, 10.5,
+                        14, 12,
+                      ] as any,
+                      textColor: colors.gymLabelText,
+                      textHaloColor: colors.gymLabelHalo,
+                      textHaloWidth: 1.25,
+                      textFont: ['DIN Pro Regular', 'Arial Unicode MS Regular'],
                       textVariableAnchor: ['top', 'bottom', 'left', 'right'],
                       textRadialOffset: 0.8,
                       textJustify: 'auto',

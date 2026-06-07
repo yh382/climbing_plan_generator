@@ -373,7 +373,7 @@ const CragInfoSheet = forwardRef<CragInfoSheetHandle, CragInfoSheetProps>(
                 <Ionicons
                   name="warning-outline"
                   size={18}
-                  color="#F97316"
+                  color={colors.outdoorMarkerStroke}
                   style={styles.osmTrailBannerIcon}
                 />
                 <Text style={styles.osmTrailBannerText}>
@@ -665,7 +665,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
-      backgroundColor: 'rgba(249, 115, 22, 0.08)',
+      backgroundColor: c.warningTint,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,

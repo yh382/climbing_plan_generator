@@ -24,8 +24,6 @@ import MapboxGL from '@rnmapbox/maps';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import type { TrailFeatureCollection, TrailSource } from '../types';
 
-const OSM_LINE_COLOR = '#9CA3AF'; // neutral gray for OSM reference trails
-
 type TrailLayerProps = {
   trailGeoJSON: TrailFeatureCollection | null | undefined;
   trailSource?: TrailSource | null;
@@ -45,7 +43,8 @@ export default function TrailLayer({ trailGeoJSON, trailSource }: TrailLayerProp
       <MapboxGL.LineLayer
         id="trail-line"
         style={{
-          lineColor: isOSM ? OSM_LINE_COLOR : colors.trail,
+          // BS-P1-η — `trailReference` token replaces hardcoded gray.
+          lineColor: isOSM ? colors.trailReference : colors.trail,
           lineOpacity: isOSM ? 0.5 : 0.9,
           lineWidth: isOSM ? 2 : 3,
           lineDasharray: [2, 2],

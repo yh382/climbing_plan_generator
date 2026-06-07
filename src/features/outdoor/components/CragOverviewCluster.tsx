@@ -18,14 +18,8 @@
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
+import { useThemeColors } from '../../../lib/useThemeColors';
 import type { CragOverview } from '../types';
-
-// BS Track A 2026-06-06 — outdoor cluster orange, visually distinct
-// from the teal accent (#306E6F) used by gym cluster. User explicitly
-// required "orange like the fruit". Hard-coded for now; should migrate
-// to a `theme.colors.outdoorMarker` token in a BS follow-up so dark
-// mode can pick a brighter variant if needed.
-const OUTDOOR_MARKER_ORANGE = '#F97316';
 
 /** Per-crag context attached to features so a tap surfaces full info
  *  without a second fetch. */
@@ -158,6 +152,7 @@ export default function CragOverviewCluster({
   onClusterPress,
   maxZoom = DEFAULT_MAX_ZOOM,
 }: CragOverviewClusterProps) {
+  const colors = useThemeColors();
   const shape = useMemo(() => toGeoJSON(crags), [crags]);
 
   const cragLookup = useMemo(() => {
@@ -228,16 +223,17 @@ export default function CragOverviewCluster({
       onPress={handlePress}
       maxZoomLevel={maxZoom}
     >
-      {/* Cluster bubble — orange circle, size scales with route density */}
+      {/* Cluster bubble — muted sandstone fill + sandstone stroke
+          (BS-P1-η softer palette). Size scales with route density. */}
       <MapboxGL.CircleLayer
         id="crag-overview-cluster-circles"
         filter={['has', 'point_count']}
         style={{
-          circleColor: OUTDOOR_MARKER_ORANGE,
+          circleColor: colors.outdoorMarkerFill,
+          circleOpacity: Number(colors.markerOpacity),
           circleRadius: CLUSTER_RADIUS_EXPRESSION,
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 1.6,
-          circleOpacity: 0.92,
+          circleStrokeColor: colors.outdoorMarkerStroke,
+          circleStrokeWidth: 2,
         }}
       />
       {/* Cluster bubble label — total route count across the cluster's
@@ -275,7 +271,7 @@ export default function CragOverviewCluster({
             ['to-string', ['get', 'route_count_sum']],
           ] as any,
           textSize: CLUSTER_TEXT_SIZE_EXPRESSION as any,
-          textColor: '#FFFFFF',
+          textColor: colors.outdoorMarkerText,
           textAllowOverlap: true,
           textIgnorePlacement: true,
         }}
@@ -289,10 +285,11 @@ export default function CragOverviewCluster({
         id="crag-overview-single-pins"
         filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: OUTDOOR_MARKER_ORANGE,
+          circleColor: colors.outdoorMarkerFill,
+          circleOpacity: Number(colors.markerOpacity),
           circleRadius: SINGLE_PIN_RADIUS_EXPRESSION as any,
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 1.4,
+          circleStrokeColor: colors.outdoorMarkerStroke,
+          circleStrokeWidth: 2,
         }}
       />
       {/* Route count INSIDE the single crag pin (white text on orange
@@ -303,7 +300,7 @@ export default function CragOverviewCluster({
         style={{
           textField: ['get', 'count_label'] as any,
           textSize: SINGLE_TEXT_SIZE_EXPRESSION as any,
-          textColor: '#FFFFFF',
+          textColor: colors.outdoorMarkerText,
           textAllowOverlap: true,
           textIgnorePlacement: true,
         }}
@@ -323,14 +320,21 @@ export default function CragOverviewCluster({
         filter={['!', ['has', 'point_count']]}
         style={{
           textField: ['get', 'crag_name'] as any,
-          textSize: 11,
-          textColor: '#0F172A',
-          textHaloColor: 'rgba(255,255,255,0.92)',
-          textHaloWidth: 1.4,
-          textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          // BS-P1-η label visual system — softer outdoor palette,
+          // zoom-interpolated size, Medium weight (was Bold) for
+          // less debug-overlay feel.
+          textSize: [
+            'interpolate', ['linear'], ['zoom'],
+            8, 11,
+            11, 12,
+            14, 13.5,
+          ] as any,
+          textColor: colors.outdoorLabelText,
+          textHaloColor: colors.outdoorLabelHalo,
+          textHaloWidth: 1.5,
+          textFont: ['DIN Pro Medium', 'Arial Unicode MS Regular'],
           textAnchor: 'top',
-          // Increased offset (was 0.8) so name clears the
-          // route-count-scaled pin (radius up to 24px).
+          // Offset clears the route-count-scaled pin (radius up to 24px).
           textOffset: [0, 2.4],
           textAllowOverlap: true,
           textIgnorePlacement: true,

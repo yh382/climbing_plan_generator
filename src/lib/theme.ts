@@ -48,6 +48,36 @@ export const theme = {
     trail: '#A08060',
     // Window DAILY_GROUP — "Attempted" badge tint (no send yet on a route).
     attempt: '#D97706',
+    // BS-P1-η + BS-Track-A/B/D-FU-theme-tokens (2026-06-06) — softer
+    // outdoor/gym map marker palette + label style. Replaces Track A/D
+    // hardcoded `#F97316` (outdoor) + `#306E6F` (gym pin via accent).
+    // Markers use semi-transparent fill (rgba 0.74) so dense areas
+    // don't visually scream; stroke gives the soft "pin" look.
+    // BS-P1-η iteration: split fill color and opacity. @rnmapbox/maps
+    // appears to drop the alpha channel from `rgba()` in circleColor
+    // (gym pin rendered fully opaque despite rgba 0.74). Solid hex
+    // fill + separate `markerOpacity` is the portable workaround.
+    outdoorMarkerFill: '#C27C40',                    // muted sandstone (solid)
+    outdoorMarkerStroke: '#A65F2B',
+    outdoorMarkerText: '#FFFFFF',
+    gymMarkerFill: '#44847E',                        // muted teal (solid)
+    gymMarkerStroke: '#2F6F6A',
+    // (no gymMarkerText — gym label uses `gymLabelText` for dark teal
+    // text below the pin; gym pin has no in-circle text like cluster
+    // bubbles have.)
+    markerOpacity: '0.74',                           // shared for outdoor + gym
+    // Trail provenance — `trail` (above) is the curated approach color;
+    // OSM reference trails use this neutral gray to communicate "not
+    // verified".
+    trailReference: '#9CA3AF',
+    // Warning UI tint — banner background for OSM trail safety notice
+    // (CragInfoSheet). Faint outdoor-orange tint, low alpha.
+    warningTint: 'rgba(249, 115, 22, 0.08)',
+    // Map name labels — text + halo for soft, magazine-style legibility.
+    outdoorLabelText: '#2A1A10',
+    outdoorLabelHalo: 'rgba(255, 250, 244, 0.92)',
+    gymLabelText: '#1D3331',
+    gymLabelHalo: 'rgba(245, 255, 253, 0.88)',
   },
   typography: {
     hero: { fontSize: 33, fontWeight: '900' as const, letterSpacing: -1.5 },
