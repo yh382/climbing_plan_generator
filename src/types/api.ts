@@ -3970,10 +3970,18 @@ export interface paths {
          * @description Tier-1 map overview source — lightweight Crag list for client-side
          *     `cluster:true` ShapeSource (PLAN §3.2 redesign).
          *
-         *     Returns approved crags with lat/lng populated, plus aggregate
-         *     route_count / boulder_count computed in one GROUP BY (no N+1).
-         *     Default `min_routes=1` filters out empty Crags so the map shows
-         *     actual climbing density. ~15k rows in NA prod, ~3MB JSON.
+         *     Returns approved crags with derived lat/lng + aggregate
+         *     route_count / boulder_count, all computed in one GROUP BY (no N+1).
+         *
+         *     **Coordinate derivation**: OpenBeta import populated per-route
+         *     `lat/lng` but left `crag.lat/lng` NULL on most rows. We use
+         *     `COALESCE(crag.lat, AVG(routes.lat))` so a Crag with no explicit
+         *     coords inherits its routes' centroid — visually accurate for
+         *     cluster placement. Crags where BOTH the crag and all child
+         *     routes lack coords are dropped (can't place them on the map).
+         *
+         *     Default `min_routes=1` filters out empty Crags. ~15k rows expected
+         *     in NA prod (post-OpenBeta full import); ~3MB JSON.
          *
          *     Anonymous OK (`get_optional_user`) — map overview is public.
          */
@@ -4002,6 +4010,33 @@ export interface paths {
         head?: never;
         /** Update Crag */
         patch: operations["update_crag_outdoor_crags__crag_id__patch"];
+        trace?: never;
+    };
+    "/outdoor/crags/{crag_id}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Crag Map
+         * @description BS-P1-δ — stable map payload for one crag.
+         *
+         *     Returns crag + walls (with discipline counts + location audit) +
+         *     placeholder lists for future parking/approach_paths/background_
+         *     trails. Replaces the legacy bbox-driven `/outdoor/pins` re-fetching
+         *     that caused cluster reorder + count jitter on pan (plan §3.3).
+         *
+         *     Public endpoint (`get_optional_user`).
+         */
+        get: operations["get_crag_map_outdoor_crags__crag_id__map_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/outdoor/crags/{crag_id}/walls": {
@@ -6576,6 +6611,8 @@ export interface components {
              * @default 0
              */
             route_count: number;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
         };
@@ -7800,6 +7837,9 @@ export interface components {
             lat?: number | null;
             /** Lng */
             lng?: number | null;
+            location?: components["schemas"]["LocationAudit"];
+            /** Location Description */
+            location_description?: string | null;
             /** Name */
             name: string;
             /** Name En */
@@ -7815,6 +7855,8 @@ export interface components {
             route_count: number;
             /** Sort Order */
             sort_order: number;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
             /** Trail Geojson */
@@ -7833,6 +7875,117 @@ export interface components {
              * @default []
              */
             walls: components["schemas"]["WallOut"][];
+        };
+        /**
+         * CragMapOut
+         * @description BS-P1-δ — stable map payload for one crag, used by area-mode
+         *     once the user focuses a crag. Replaces the legacy bbox-driven
+         *     `/outdoor/pins` re-fetching on every pan (which caused cluster
+         *     reorder + count jitter, plan §3.3).
+         *
+         *     Future placeholders for P2/P3 expansion (kept in schema so FE
+         *     can render without API contract change):
+         *       - parking: parking points
+         *       - approach_paths: verified approach line(s)
+         *       - background_trails: nearby OSM trails (separate from
+         *         crag.trail_geojson which is the curated overlay)
+         */
+        CragMapOut: {
+            /** Approach Paths */
+            approach_paths?: unknown[];
+            /** Background Trails */
+            background_trails?: unknown[];
+            /** Bbox */
+            bbox: number[];
+            /**
+             * Boulder Count
+             * @default 0
+             */
+            boulder_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            location?: components["schemas"]["LocationAudit"];
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Parking */
+            parking?: unknown[];
+            /**
+             * Rope Count
+             * @default 0
+             */
+            rope_count: number;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trail Source */
+            trail_source?: string | null;
+            /**
+             * Unknown Count
+             * @default 0
+             */
+            unknown_count: number;
+            /** Walls */
+            walls?: components["schemas"]["CragMapWallOut"][];
+        };
+        /**
+         * CragMapWallOut
+         * @description Per-wall map data for /outdoor/crags/{id}/map (BS-P1-δ).
+         *     Differs from WallOut: includes discipline counts + location audit;
+         *     omits admin-oriented fields (sort_order / description). Derived
+         *     lat/lng falls back to centroid of child routes when Wall.lat is
+         *     NULL. Walls with neither explicit nor derivable coords are
+         *     silently dropped (can't render anyway).
+         */
+        CragMapWallOut: {
+            /**
+             * Boulder Count
+             * @default 0
+             */
+            boulder_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            location?: components["schemas"]["LocationAudit"];
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /**
+             * Rope Count
+             * @default 0
+             */
+            rope_count: number;
+            /**
+             * Route Count
+             * @default 0
+             */
+            route_count: number;
+            /**
+             * Unknown Count
+             * @default 0
+             */
+            unknown_count: number;
         };
         /** CragOut */
         CragOut: {
@@ -7856,6 +8009,9 @@ export interface components {
             lat?: number | null;
             /** Lng */
             lng?: number | null;
+            location?: components["schemas"]["LocationAudit"];
+            /** Location Description */
+            location_description?: string | null;
             /** Name */
             name: string;
             /** Name En */
@@ -7871,6 +8027,8 @@ export interface components {
             route_count: number;
             /** Sort Order */
             sort_order: number;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
             /** Trail Geojson */
@@ -7895,6 +8053,13 @@ export interface components {
          *     description / approach / cover_url / trail_geojson — those load on
          *     demand via CragDetailOut. Aggregate counts populated by a single
          *     GROUP BY query, not N+1.
+         *
+         *     BS-P1-β (2026-06-06) — discipline counts pivot on `OutdoorRoute.
+         *     discipline` ('boulder' | 'rope' | 'other'), which is the product-
+         *     level dimension explicitly designed for FE count queries (see
+         *     model comment). Three buckets sum to `route_count`. Drives
+         *     upcoming BS-P1-ζ Boulder/Rope composition ring (renders only when
+         *     `unknown_count / route_count <= 0.3` to avoid misleading display).
          */
         CragOverviewOut: {
             /**
@@ -7911,6 +8076,7 @@ export interface components {
             lat: number;
             /** Lng */
             lng: number;
+            location?: components["schemas"]["LocationAudit"];
             /** Name */
             name: string;
             /** Name En */
@@ -7923,10 +8089,20 @@ export interface components {
             /** Region Name */
             region_name: string;
             /**
+             * Rope Count
+             * @default 0
+             */
+            rope_count: number;
+            /**
              * Route Count
              * @default 0
              */
             route_count: number;
+            /**
+             * Unknown Count
+             * @default 0
+             */
+            unknown_count: number;
         };
         /** CragUpdateIn */
         CragUpdateIn: {
@@ -8932,6 +9108,21 @@ export interface components {
             blocks: components["schemas"]["BlockInventorySummary"][];
             /** Library Version */
             library_version: string;
+        };
+        /**
+         * LocationAudit
+         * @description BS-P1-γ (2026-06-06) — coordinate provenance triple. Embedded
+         *     in CragOverviewOut + CragOut so FE can label derived coords as
+         *     approximate (safety/trust per ChatGPT design: centroid OK for
+         *     overview but NOT for approach targets).
+         */
+        LocationAudit: {
+            /** Confidence */
+            confidence?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Source */
+            source?: string | null;
         };
         /** LogCreateIn */
         LogCreateIn: {
@@ -10421,6 +10612,8 @@ export interface components {
              * @default 0
              */
             route_count: number;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
         };
@@ -10485,6 +10678,8 @@ export interface components {
             route_count: number;
             /** Safety Notes */
             safety_notes?: string | null;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
             /** Trail Geojson */
@@ -10759,6 +10954,8 @@ export interface components {
             created_at: string;
             /** Description */
             description?: string | null;
+            /** Discipline */
+            discipline: string;
             /** First Ascent */
             first_ascent?: string | null;
             /** Grade Score */
@@ -10767,6 +10964,10 @@ export interface components {
             grade_system: string;
             /** Grade Text */
             grade_text: string;
+            /** Grades All */
+            grades_all?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Id
              * Format: uuid
@@ -10778,6 +10979,8 @@ export interface components {
             length_m?: number | null;
             /** Lng */
             lng?: number | null;
+            /** Location Path */
+            location_path?: unknown[] | null;
             /** Name */
             name: string;
             /** Name En */
@@ -10786,6 +10989,8 @@ export interface components {
             photos?: unknown[] | null;
             /** Pitches */
             pitches: number;
+            /** Protection */
+            protection?: string | null;
             /**
              * Rating Count
              * @default 0
@@ -10795,6 +11000,8 @@ export interface components {
             region_id?: string | null;
             /** Region Name */
             region_name?: string | null;
+            /** Safety */
+            safety?: string | null;
             /**
              * Send Count
              * @default 0
@@ -12061,6 +12268,8 @@ export interface components {
             route_count: number;
             /** Sort Order */
             sort_order: number;
+            /** Source External Id */
+            source_external_id?: string | null;
             /** Status */
             status: string;
             /** Topo Url */
@@ -21079,6 +21288,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CragOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_crag_map_outdoor_crags__crag_id__map_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                crag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CragMapOut"];
                 };
             };
             /** @description Validation Error */
