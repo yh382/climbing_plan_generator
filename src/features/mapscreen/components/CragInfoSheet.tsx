@@ -385,6 +385,28 @@ const CragInfoSheet = forwardRef<CragInfoSheetHandle, CragInfoSheetProps>(
               </View>
             ) : null}
 
+            {/* BS-P1-γ — derived coordinate banner. When the crag's
+                lat/lng is a centroid of child routes (not an explicit
+                admin/user/import-set coord), tell the user the pin is
+                approximate. Safety/trust per ChatGPT design: centroid
+                OK for overview navigation but not for approach. */}
+            {detail?.location && detail.location.source === 'derived' ? (
+              <View style={styles.osmTrailBanner}>
+                <Ionicons
+                  name="locate-outline"
+                  size={18}
+                  color={colors.outdoorMarkerStroke}
+                  style={styles.osmTrailBannerIcon}
+                />
+                <Text style={styles.osmTrailBannerText}>
+                  {tr(
+                    '位置根据路线坐标估算，可能不精确。',
+                    'Approximate location based on route coordinates.',
+                  )}
+                </Text>
+              </View>
+            ) : null}
+
             {showSkeleton ? (
               <View style={[styles.contentCard, styles.skeleton]}>
                 <ActivityIndicator color={colors.accent} />

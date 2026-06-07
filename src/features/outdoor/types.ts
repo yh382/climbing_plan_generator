@@ -270,6 +270,16 @@ export type RoutePinsResponse = {
  *  PLAN §3.2 redesign — climber-recognizable Crag-level pins replace the
  *  legacy Region-overview source. Loaded once on gyms-mode mount (~15k
  *  rows NA prod). Aggregate counts computed BE-side in one GROUP BY. */
+/** BS-P1-γ (2026-06-06) — coordinate provenance triple. Embedded in
+ *  CragOverview + CragDetail. FE uses to label derived coords as
+ *  approximate (safety/trust: centroid OK for overview but NOT for
+ *  approach targets). */
+export type LocationAudit = {
+  source: 'user' | 'admin' | 'import' | 'osm' | 'derived' | null;
+  method: 'explicit' | 'centroid:routes' | 'centroid:walls' | 'centroid:area' | null;
+  confidence: 'high' | 'medium' | 'low' | null;
+};
+
 export type CragOverview = {
   id: string;
   name: string;
@@ -287,6 +297,7 @@ export type CragOverview = {
   unknown_count: number;
   region_id: string;
   region_name: string;
+  location: LocationAudit;
 };
 
 // ---- BR Track D — Crag detail (CragInfoSheet source) ----
@@ -317,6 +328,10 @@ export type CragDetail = Crag & {
   osm_synced_at?: string | null;
   walls: Wall[];
   community: CragCommunitySummary;
+  /** BS-P1-γ — coordinate provenance audit. Use to decide whether to
+   *  show an "approximate location based on route coordinates" banner
+   *  in CragInfoSheet. */
+  location: LocationAudit;
 };
 
 // ---- BR Track D — Cross-level search ----
