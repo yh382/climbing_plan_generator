@@ -910,17 +910,9 @@ export default function MapScreenMapbox({
     (e: { features: GeoJSON.Feature[] }) => {
       const feature = e.features?.[0];
       if (!feature) return;
-      // BR Track D Day 7 follow-up — gyms-src now uses cluster:true,
-      // so cluster bubble taps land here too. Fly camera into the
-      // cluster centroid to break it apart (same +2 zoom step the
-      // Crag cluster uses).
-      if (feature.properties?.cluster) {
-        const geom = feature.geometry;
-        if (geom?.type === 'Point') {
-          void onClusterBubblePress(geom.coordinates as [number, number]);
-        }
-        return;
-      }
+      // BS Track D (2026-06-06) — gyms-src no longer uses cluster:true,
+      // so all feature taps are single gym pins. Previous cluster-bubble
+      // branch removed (would dispatch to onClusterBubblePress).
       const placeId = feature.properties?.place_id;
       if (!placeId) return;
       // Use the accumulated set so a gym fetched in a previous pan
@@ -929,7 +921,7 @@ export default function MapScreenMapbox({
       const gym = accumulatedGyms[placeId];
       if (gym) useGymsStore.getState().setSelectedGym(gym);
     },
-    [accumulatedGyms, onClusterBubblePress],
+    [accumulatedGyms],
   );
 
   // BR Track D Day 7 dogfood fix — legacy Region-overview orange pin
@@ -1394,54 +1386,24 @@ export default function MapScreenMapbox({
             {/* Explore mode: inline gym + crag shape sources */}
             {styleLoaded && mode.kind === 'explore' && (
               <>
-                {/* BR Track D Day 7 follow-up — gym ShapeSource is now
-                    `cluster:true` with accumulated-set source data,
-                    matching the tier-1 Crag overview pattern. PLAN §3.2
-                    redesign: industry-standard stable cluster source
-                    (Apple Maps / Strava). */}
+                {/* BS Track D (2026-06-06) — gym cluster撤回. City gym
+                    counts are low (Seattle ~12, SLC ~10); cluster
+                    bubbles add a click-cost without helping
+                    discovery (vs ChatGPT strategy review §4). 2 档:
+                    zoom < 8 全 hide (continental view 不显示 gym pin
+                    point), zoom ≥ 8 显示每个 gym 单 pin. Mapbox
+                    `minZoomLevel` 是 native 层级 hide (无 RN zoom
+                    state 同步). 不为极端密集城市加 fallback
+                    cluster — 真出现 (e.g. Manhattan) 再做.
+                    Previous: cluster + clusterMaxZoomLevel=12. */}
                 <MapboxGL.ShapeSource
                   id="gyms-src"
                   shape={gymsGeoJSON}
-                  cluster
-                  clusterMaxZoomLevel={12}
-                  clusterRadius={50}
                   onPress={onGymPinPress}
                 >
-                  {/* Cluster bubble — teal circle, label = count */}
-                  <MapboxGL.CircleLayer
-                    id="gyms-clusters"
-                    filter={['has', 'point_count']}
-                    style={{
-                      circleRadius: [
-                        'step',
-                        ['get', 'point_count'],
-                        14,
-                        10, 18,
-                        50, 22,
-                        200, 26,
-                      ] as any,
-                      circleColor: '#306E6F',
-                      circleStrokeWidth: 1.4,
-                      circleStrokeColor: '#fff',
-                      circleOpacity: 0.92,
-                    }}
-                  />
-                  <MapboxGL.SymbolLayer
-                    id="gyms-cluster-labels"
-                    filter={['has', 'point_count']}
-                    style={{
-                      textField: ['get', 'point_count_abbreviated'] as any,
-                      textSize: 12,
-                      textColor: '#fff',
-                      textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-                      textAllowOverlap: true,
-                      textIgnorePlacement: true,
-                    }}
-                  />
-                  {/* Single gym pin — visible at zoom > clusterMaxZoom */}
                   <MapboxGL.CircleLayer
                     id="gyms-pins"
-                    filter={['!', ['has', 'point_count']]}
+                    minZoomLevel={8}
                     style={{
                       circleRadius: 6,
                       circleColor: '#306E6F',
@@ -1449,10 +1411,19 @@ export default function MapScreenMapbox({
                       circleStrokeColor: '#fff',
                     }}
                   />
+                  {/* Gym name label — minZoomLevel matches pin (8) so
+                      labels appear with their pin, NOT at a separate
+                      zoom gate. Collision resolution enabled
+                      (allowOverlap: false + ignorePlacement: false)
+                      with textVariableAnchor so Mapbox tries
+                      top/bottom/left/right anchors before hiding the
+                      label. textPadding: 4 adds a small buffer so
+                      labels don't visually touch. Result: at low zoom
+                      where pins are dense (Seattle ~12), some labels
+                      hide cleanly; zoom in to see hidden ones. */}
                   <MapboxGL.SymbolLayer
                     id="gyms-labels"
-                    filter={['!', ['has', 'point_count']]}
-                    minZoomLevel={11}
+                    minZoomLevel={8}
                     style={{
                       textField: ['get', 'name'] as any,
                       textSize: 10,
@@ -1460,12 +1431,13 @@ export default function MapScreenMapbox({
                       textHaloColor:
                         scheme === 'dark' ? 'rgba(11,18,32,0.85)' : 'rgba(255,255,255,0.85)',
                       textHaloWidth: 1.2,
+                      textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
                       textVariableAnchor: ['top', 'bottom', 'left', 'right'],
-                      textRadialOffset: 1.4,
+                      textRadialOffset: 0.8,
                       textJustify: 'auto',
                       textAllowOverlap: false,
                       textIgnorePlacement: false,
-                      textPadding: 8,
+                      textPadding: 4,
                       textMaxWidth: 8,
                       symbolZOrder: 'auto',
                     }}
