@@ -701,6 +701,36 @@ export default function OutdoorRouteDetailPage() {
             {route.bolts ? ` · ${route.bolts} bolts` : ''}
             {route.pitches > 1 ? ` · ${route.pitches}p` : ''}
           </Text>
+          {/* BV — alternate grade systems on a secondary row. Renders only
+              when grades_all has at least one OTHER system filled (excluding
+              the primary that's already in grade_text). Lets international
+              users see their preferred system without a settings round-trip.
+              French/UIAA/Ewbank/Font are the common alternates. */}
+          {(() => {
+            const all = route.grades_all;
+            if (!all) return null;
+            const primarySys = route.grade_system?.toLowerCase();
+            const alts: string[] = [];
+            const entries: Array<[string, string]> = [
+              ['yds', '美'],
+              ['french', '法'],
+              ['ewbank', 'AU'],
+              ['uiaa', 'UIAA'],
+              ['vscale', 'V'],
+              ['font', 'Font'],
+            ];
+            for (const [sys, label] of entries) {
+              if (sys === primarySys) continue;
+              const v = (all as any)[sys];
+              if (v && String(v).trim()) alts.push(`${label} ${v}`);
+            }
+            if (alts.length === 0) return null;
+            return (
+              <Text style={styles.gradesAltText} numberOfLines={2}>
+                {alts.join(' · ')}
+              </Text>
+            );
+          })()}
           {route.first_ascent ? <Text style={styles.faText}>FA: {route.first_ascent}</Text> : null}
           {/* BV — safety grade badge. Only render the warnings (PG-13/R/X);
               G and PG are skipped since they're the default-safe norm and
@@ -1129,6 +1159,14 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     body: { padding: theme.spacing.screenPadding },
     routeName: { fontFamily: theme.fonts.black, fontSize: 24, color: c.textPrimary, marginBottom: 4 },
     routeInfo: { fontFamily: theme.fonts.regular, fontSize: 14, color: c.textSecondary, marginBottom: 2 },
+    // BV — secondary row showing alternate grade systems (yds/french/uiaa/etc).
+    // Smaller + tertiary so it doesn't compete with the primary grade above.
+    gradesAltText: {
+      fontFamily: theme.fonts.regular,
+      fontSize: 12,
+      color: c.textTertiary,
+      marginBottom: 4,
+    },
     faText: { fontFamily: theme.fonts.regular, fontSize: 12, color: c.textTertiary, marginBottom: 4 },
     // BV — safety badge (PG-13 / R / X warnings only). Inline rounded pill
     // sized to the grade text. Background color set per-render based on
