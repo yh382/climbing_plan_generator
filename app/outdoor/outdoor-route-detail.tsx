@@ -839,6 +839,20 @@ export default function OutdoorRouteDetailPage() {
             <RouteDescriptionCard description={route.description} />
           </View>
 
+          {/* BV — protection / gear notes. OpenBeta `content.protection`
+              tells the climber what gear is needed (bolts spacing, cam
+              sizes, etc). Only shown when non-empty; never renders an
+              empty "No protection info" placeholder since lack of data is
+              the norm for most routes. */}
+          {route.protection && route.protection.trim() ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{tr('保护 / 装备', 'Protection')}</Text>
+              <View style={styles.protectionCard}>
+                <Text style={styles.protectionText}>{route.protection.trim()}</Text>
+              </View>
+            </View>
+          ) : null}
+
           {/* GradeSuggestionCard — whole-card tap opens the climbers page */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{tr('攀登数据', 'Climber Data')}</Text>
@@ -1166,6 +1180,19 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: c.textTertiary,
       marginBottom: 4,
+    },
+    // BV — Protection / gear card. Mirrors RouteDescriptionCard styling so
+    // the two sections sit visually consistent.
+    protectionCard: {
+      backgroundColor: c.cardBackground,
+      borderRadius: 16,
+      padding: 16,
+    },
+    protectionText: {
+      fontFamily: theme.fonts.regular,
+      fontSize: 15,
+      lineHeight: 22,
+      color: c.textPrimary,
     },
     faText: { fontFamily: theme.fonts.regular, fontSize: 12, color: c.textTertiary, marginBottom: 4 },
     // BV — safety badge (PG-13 / R / X warnings only). Inline rounded pill
