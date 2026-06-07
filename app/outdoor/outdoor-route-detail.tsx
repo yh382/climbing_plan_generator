@@ -693,6 +693,21 @@ export default function OutdoorRouteDetailPage() {
             onPressWall={presentCragSheet}
           />
 
+          {/* BV — full OpenBeta location_path. RouteBreadcrumb shows the
+              ClimMate 4-level chain (Region → Area → Crag → Wall); this
+              row surfaces the FULL OpenBeta chain including country +
+              state + any squashed intermediate levels (n≥5 paths). Only
+              renders when location_path has more entries than the
+              breadcrumb (i.e. there's extra info worth showing). */}
+          {Array.isArray(route.location_path) && route.location_path.length > 4 ? (
+            <Text style={styles.locationPathText} numberOfLines={2}>
+              {route.location_path
+                .map((p) => p?.name)
+                .filter(Boolean)
+                .join(' › ')}
+            </Text>
+          ) : null}
+
           {/* Name + grade + stars */}
           <Text style={styles.routeName}>{route.name}</Text>
           <Text style={styles.routeInfo}>
@@ -1180,6 +1195,16 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: c.textTertiary,
       marginBottom: 4,
+    },
+    // BV — full OpenBeta location_path text row. Sits beneath the
+    // RouteBreadcrumb; smaller + tertiary so it doesn't compete visually.
+    locationPathText: {
+      fontFamily: theme.fonts.regular,
+      fontSize: 11,
+      color: c.textTertiary,
+      lineHeight: 16,
+      marginTop: 4,
+      marginBottom: 12,
     },
     // BV — Protection / gear card. Mirrors RouteDescriptionCard styling so
     // the two sections sit visually consistent.
