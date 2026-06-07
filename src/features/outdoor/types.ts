@@ -73,6 +73,9 @@ export type Region = {
   route_count?: number;
   boulder_count?: number;
   is_favorited?: boolean;
+  /** BV — upstream provider's stable UUID (OpenBeta area UUID at this
+   *  level). Enables incremental sync without full re-import. */
+  source_external_id?: string | null;
 };
 
 // ---- Level 2: Area (攀岩区, e.g. Central Wasatch, 白山地区) ----
@@ -90,6 +93,8 @@ export type Area = {
   status: string;
   crag_count?: number;
   route_count?: number;
+  /** BV — upstream provider's stable UUID (OpenBeta area UUID). */
+  source_external_id?: string | null;
 };
 
 // ---- Level 3: Crag (攀岩点, e.g. Little Cottonwood Canyon, 鸡蛋山) ----
@@ -112,6 +117,11 @@ export type Crag = {
   trail_geojson?: TrailFeatureCollection | null;
   wall_count?: number;
   route_count?: number;
+  /** BV — OpenBeta crag-level approach text (their `content.location`).
+   *  Falls back to admin-curated `approach` when both present. */
+  location_description?: string | null;
+  /** BV — upstream provider's stable UUID (OpenBeta area UUID). */
+  source_external_id?: string | null;
 };
 
 // ---- Level 4: Wall (一面墙, e.g. 梦幻墙) ----
@@ -131,6 +141,8 @@ export type Wall = {
   status: string;
   route_count?: number;
   routes?: OutdoorRoute[];
+  /** BV — upstream provider's stable UUID (OpenBeta leaf-area UUID). */
+  source_external_id?: string | null;
 };
 
 // ---- Level 5: Route (路线, e.g. 鸭子 5.11b) ----
@@ -146,7 +158,7 @@ export type OutdoorRoute = {
   length_m?: number;
   pitches: number;
   bolts?: number;
-  style: string; // sport / trad / boulder / multi-pitch / DWS
+  style: string; // sport / trad / boulder / multi-pitch / DWS / toprope / alpine / mixed / aid
   /** BS-P1-β product-level discipline (BE-derived from style). FE prefers
    *  this over `style` for boulder/rope count buckets + filter UI since
    *  it's stable as `style` grows (toprope/aid/mixed/alpine). */
@@ -183,6 +195,25 @@ export type OutdoorRoute = {
   region_id?: string;
   area_id?: string;
   crag_id?: string;
+  /** BV — OpenBeta safety grade (G / PG / PG-13 / R / X). 'UNSPECIFIED'
+   *  → omitted on BE side. */
+  safety?: string | null;
+  /** BV — gear / protection notes from OpenBeta `content.protection`. */
+  protection?: string | null;
+  /** BV — full grade pyramid keyed by system. Primary grade stays in
+   *  `grade_text` + `grade_system` for SQL filtering; `grades_all` lets FE
+   *  show e.g. "5.10c / 6b / 19" or auto-pick the user's preferred system. */
+  grades_all?: {
+    yds?: string | null;
+    vscale?: string | null;
+    french?: string | null;
+    ewbank?: string | null;
+    uiaa?: string | null;
+    font?: string | null;
+  } | null;
+  /** BV — OpenBeta ancestor chain {uuid, name?} from root → leaf area.
+   *  Forensic / provenance UI (e.g. show full nesting depth on route detail). */
+  location_path?: Array<{ uuid: string; name?: string | null }> | null;
 };
 
 // ---- Route-level social data ----
