@@ -277,7 +277,14 @@ export type CragOverview = {
   lat: number;
   lng: number;
   route_count: number;
+  /** BS-P1-β (2026-06-06) — discipline buckets sum to `route_count`,
+   *  pivoting on BE `OutdoorRoute.discipline` ('boulder' | 'rope' |
+   *  'other'). Powers the upcoming BS-P1-ζ Boulder/Rope composition
+   *  ring (renders only when `unknown_count / route_count <= 0.3` to
+   *  avoid misleading display). */
   boulder_count: number;
+  rope_count: number;
+  unknown_count: number;
   region_id: string;
   region_name: string;
 };

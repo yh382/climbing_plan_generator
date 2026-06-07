@@ -150,6 +150,11 @@ function toGeoJSON(crags: CragOverview[]): GeoJSON.FeatureCollection {
         region_name: c.region_name,
         route_count: c.route_count,
         boulder_count: c.boulder_count,
+        // BS-P1-β data plumbing — emitted now so BS-P1-ζ Boulder/Rope
+        // composition ring can read at Mapbox expression time without
+        // re-touching toGeoJSON.
+        rope_count: c.rope_count,
+        unknown_count: c.unknown_count,
         // BS-P1-α (2026-06-06) — pre-computed display strings in JS
         // rather than deeply nested Mapbox expressions (Mapbox RN
         // silently drops case+concat+round+division textField — see
