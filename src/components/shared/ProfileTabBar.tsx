@@ -1,161 +1,130 @@
 // src/components/shared/ProfileTabBar.tsx
-// Window β — Profile KAYA: 2-segment underline (Apple Messages contact card style).
-// Was 4-chip icon row (posts/stats/badges/lists) → now 2 text labels with
-// animated bottom underline that follows PagerView scroll position.
+// Profile sub-tab bar — iOS-native UISegmentedControl. Permanent variant
+// shipped in Window BY after the BY-spike A/B 真机拍板 (native reads clean over
+// the fixed-chrome bg). Replaces the former animated-underline implementation
+// (see spike commit e8fb677 for the underline snapshot).
+//
+// scrollPosition is accepted-but-ignored for prop-shape parity: a native
+// segmented control snaps discretely on change and has no swipe-progress
+// affordance. PagerView swipe still drives activeTab → selectedIndex upstream,
+// so the indicator snaps after a swipe settles.
+//
+// Window BY — opaque colors.background fill. Seamless at rest because the cover
+// gradient now lands FULL bg before its clip point, so the visible cover bottom
+// is the exact same bg as this bar (no transparency/blur tricks needed); opaque
+// also means pinned-state scrolling content never bleeds through. The bottom
+// separator is scroll-driven (pinProgress): hidden at rest so the bar dissolves
+// into the cover field, visible when pinned.
 
-import React, { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-native";
+import React, { useCallback, useMemo } from "react";
+import { View, StyleSheet } from "react-native";
+import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import Animated, {
   useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  interpolate,
-  SharedValue,
+  type SharedValue,
 } from "react-native-reanimated";
-import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 
-// Default self tab set. Other-user also renders 3 tabs (its "stats" tab is
-// the PUBLIC stats). Callers pass their own `tabs` prop (Window BX); this
-// const is only the internal default, hence no longer exported.
-const PROFILE_TABS = [
-  { key: "activity", label: "Activity" },
-  { key: "stats", label: "Stats & Badges" },
-  { key: "lists", label: "Lists" },
-] as const;
+// Public bar height — the fixed-chrome host (ProfileChromeRoot) positions the
+// PagerView content beneath the bar's resting position using this exact value.
+export const PROFILE_TAB_BAR_HEIGHT = 52;
 
 export type ProfileTabBarItem = { key: string; label: string };
-
-const UNDERLINE_WIDTH_RATIO = 0.4; // mockup: left:30%/right:30% → 40% wide
-
-// Public for the floating-bar layout in profile screens — they need the
-// exact bar height to position the absolute chrome tab bar so the
-// PagerView content lands beneath the bar's resting position.
-export const PROFILE_TAB_BAR_HEIGHT = 46;
 
 export interface ProfileTabBarProps {
   activeTab: string;
   onTabPress: (key: string) => void;
+  /** Accepted for prop-shape parity with the former underline bar; a native
+   *  segmented control snaps discretely, so swipe-progress is ignored. */
   scrollPosition?: SharedValue<number>;
-  /**
-   * Window BX — tab set is now caller-driven so the same underline bar
-   * serves self and other-user (both 3 tabs; other-user's "stats" tab shows
-   * public stats). Defaults to the canonical 3-tab self set.
-   */
+  /** Window BY — 0 = rest → 1 = pinned. Drives the bottom separator's opacity
+   *  so the bar blends into the cover field at rest and separates from
+   *  scrolling content when pinned. Defaults to a static visible line. */
+  pinProgress?: SharedValue<number>;
+  /** Caller-driven tab set — self + other-user both supply their own
+   *  (both 3 tabs; other-user's "stats" tab shows public stats). */
   tabs?: readonly ProfileTabBarItem[];
 }
+
+const PROFILE_TABS_FALLBACK: readonly ProfileTabBarItem[] = [
+  { key: "activity", label: "Activity" },
+  { key: "stats", label: "Stats & Badges" },
+  { key: "lists", label: "Lists" },
+];
 
 export default function ProfileTabBar({
   activeTab,
   onTabPress,
-  scrollPosition: scrollPositionProp,
-  tabs = PROFILE_TABS,
+  pinProgress,
+  tabs = PROFILE_TABS_FALLBACK,
 }: ProfileTabBarProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const tabCount = tabs.length;
-
-  const fallbackPosition = useSharedValue(
-    Math.max(0, tabs.findIndex((t) => t.key === activeTab)),
-  );
-  if (!scrollPositionProp) {
-    const idx = Math.max(0, tabs.findIndex((t) => t.key === activeTab));
-    fallbackPosition.value = withTiming(idx, { duration: 250 });
-  }
-  const scrollPosition = scrollPositionProp ?? fallbackPosition;
-
-  const [barWidth, setBarWidth] = useState(0);
-  const onBarLayout = useCallback((e: LayoutChangeEvent) => {
-    setBarWidth(e.nativeEvent.layout.width);
-  }, []);
-
-  const tabWidth = barWidth / tabCount;
-  const underlineWidth = tabWidth * UNDERLINE_WIDTH_RATIO;
-
-  // Pre-compute on JS thread — Array.prototype.map can't run inside a worklet.
-  const indices = useMemo(() => tabs.map((_, i) => i), [tabs]);
-  const offsets = useMemo(
-    () => tabs.map((_, i) => tabWidth * i + (tabWidth - underlineWidth) / 2),
-    [tabs, tabWidth, underlineWidth],
+  const values = useMemo(() => tabs.map((t) => t.label), [tabs]);
+  const selectedIndex = Math.max(
+    0,
+    tabs.findIndex((t) => t.key === activeTab),
   );
 
-  const underlineStyle = useAnimatedStyle(() => {
-    if (tabWidth === 0) return { opacity: 0 };
-    const translateX = interpolate(scrollPosition.value, indices, offsets);
-    return { transform: [{ translateX }], opacity: 1 };
-  });
+  const onChange = useCallback(
+    (e: { nativeEvent: { selectedSegmentIndex: number } }) => {
+      const idx = e.nativeEvent.selectedSegmentIndex;
+      const key = tabs[idx]?.key;
+      if (key) onTabPress(key);
+    },
+    [tabs, onTabPress],
+  );
+
+  const separatorStyle = useAnimatedStyle(() => ({
+    opacity: pinProgress ? pinProgress.value : 1,
+  }));
 
   return (
     <View style={styles.stickyWrap}>
-      <View style={styles.bar} onLayout={onBarLayout}>
-        {tabs.map((t) => {
-          const isActive = t.key === activeTab;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={styles.segmentItem}
-              onPress={() => onTabPress(t.key)}
-              activeOpacity={0.7}
-              accessibilityRole="tab"
-              accessibilityLabel={t.label}
-              accessibilityState={{ selected: isActive }}
-            >
-              <Text
-                style={[
-                  styles.label,
-                  { color: isActive ? colors.textPrimary : colors.textTertiary },
-                ]}
-              >
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-        <Animated.View
-          style={[
-            styles.underline,
-            { width: underlineWidth },
-            underlineStyle,
-          ]}
+      <View style={styles.inner}>
+        <SegmentedControl
+          values={values}
+          selectedIndex={selectedIndex}
+          onChange={onChange}
+          style={styles.segmented}
         />
       </View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.separator,
+          { backgroundColor: colors.border },
+          separatorStyle,
+        ]}
+      />
     </View>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
+    // Opaque bg — seamless with the cover bottom (now true bg) at rest, and no
+    // content bleed-through when pinned. Separator fades in via pinProgress.
     stickyWrap: {
       backgroundColor: colors.background,
+      height: PROFILE_TAB_BAR_HEIGHT,
+      justifyContent: "center",
       zIndex: 20,
       elevation: 20,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-      // No horizontal padding: segments flush to screen edges so underline +
-      // border-bottom stretch full width and align with the stat-strip divider.
     },
-    bar: {
-      flexDirection: "row",
-      height: 46,
-      position: "relative",
+    inner: {
+      paddingHorizontal: 12,
     },
-    segmentItem: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    label: {
-      fontSize: 16,
-      fontWeight: "600",
-      fontFamily: theme.fonts.medium,
-    },
-    underline: {
+    // Full-width hairline at the bar's bottom edge; opacity scroll-driven.
+    separator: {
       position: "absolute",
-      bottom: 0,
       left: 0,
-      height: 2,
-      borderRadius: 2,
-      backgroundColor: colors.accent,
+      right: 0,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+    },
+    segmented: {
+      height: 40,
     },
   });

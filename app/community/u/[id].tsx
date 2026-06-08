@@ -303,8 +303,10 @@ export default function PublicProfileScreen() {
             onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
             scrollY={activeScrollY}
             bleedUnderHeader={false}
-            gradeText={`${profile.boulderMax || "—"}/${profile.routeMax || "—"}`}
+            boulderGrade={profile.boulderMax || "—"}
+            routeGrade={profile.routeMax || "—"}
             totalSends={profile.totalSends}
+            // Public profile contract has no session count → card renders "—".
             onKPIPress={() => router.push(`/users/${id}/ascents` as any)}
           />
         )}

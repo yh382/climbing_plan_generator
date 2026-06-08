@@ -18,19 +18,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import MaskedView from "@react-native-masked-view/masked-view";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import ProfileStatsFloatingCard from "@/components/shared/ProfileStatsFloatingCard";
+import GlassFill from "@/components/ui/GlassFill";
 
-// BY-spike Item 1 — cover fade A/B: 'gradient' = cheap LinearGradient 渐白;
-// 'blur' = MaskedView + BlurView 渐变磨砂玻璃(用户拍板要看的升级版)。
-// spike-only: BY full plan 拍板后留一边、删此开关。
-const COVER_FADE_VARIANT: "gradient" | "blur" = "gradient";
-
-const PROFILE_COVER_VISIBLE = 300;
+// Window BY — visible cover height bumped 300 → 370 (+70) to host the 4-up
+// stats glass card at the cover's bottom, above the sub tab bar, fully inside
+// the fixed-chrome hero's visible bounds (no clip, no tab-bar overlap).
+const PROFILE_COVER_VISIBLE = 370;
 // Content-shell overlaps cover by 24pt with rounded top corners. The cut-out
 // corners need to reveal cover *image* (not the ScrollView's white bg behind
 // the sibling shell), so the cover container is taller than its visible area
@@ -38,8 +36,14 @@ const PROFILE_COVER_VISIBLE = 300;
 // to the visible bottom, so we offset by COVER_OVERLAP.
 const COVER_OVERLAP = 35;
 const PROFILE_COVER_H = PROFILE_COVER_VISIBLE + COVER_OVERLAP;
-const ID_BLOCK_BOTTOM = 22 + COVER_OVERLAP;
-const ACTION_FAB_BOTTOM = 22 + COVER_OVERLAP;
+// Window BY — stats card sits ~14pt above the visible cover bottom (= sub tab
+// bar's rest line); id-block + Edit pill ride the band above the card.
+const STATS_CARD_HEIGHT = 60;
+// +8 (was +14) — tighter gap to the sub tab bar so the rest-state band reads
+// as one field (BY seam polish).
+const STATS_CARD_BOTTOM = COVER_OVERLAP + 8;
+const ID_BLOCK_BOTTOM = STATS_CARD_BOTTOM + STATS_CARD_HEIGHT + 14;
+const ACTION_FAB_BOTTOM = ID_BLOCK_BOTTOM;
 
 // Exported so the sticky tab bar spacer (in profile screens) can replicate
 // the cover's bottom slice — see ProfileCoverArt below.
@@ -132,13 +136,15 @@ export interface ProfileHeaderProps {
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
   scrollY?: SharedValue<number>;
-  /** Window BG — single-line KPI pill (cover idblock below countsRow).
-   *  Reuses counts/countsNum/countsSep visual to mirror followers/following.
-   *  Pre-formatted as "V7/5.13b" (boulder + rope merged with a slash). */
-  gradeText?: string;
-  /** Window BG — total sends count rendered alongside gradeText. */
+  /** Window BY — 4-up stats glass card (B Best / R Best / Sends / Sessions).
+   *  Formerly a 2-up pill fed a joined `gradeText`; now split so the card can
+   *  render each grade in its own cell. */
+  boulderGrade?: string;
+  routeGrade?: string;
   totalSends?: number;
-  /** Window BG — tap callback for the entire KPI pill row. */
+  /** Window BY — session count (kpis.sessionCount). Other-user omits → "—". */
+  totalSessions?: number;
+  /** Window BY — tap callback for the stats card (→ ascents history). */
   onKPIPress?: () => void;
   /**
    * Window BX — when true (default, legacy ScrollView-child usage) the cover
@@ -169,24 +175,16 @@ export default function ProfileHeader({
   onFollowersPress,
   onFollowingPress,
   scrollY,
-  gradeText,
+  boulderGrade,
+  routeGrade,
   totalSends,
+  totalSessions,
   onKPIPress,
   bleedUnderHeader = true,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
   const isDark = useColorScheme() === "dark";
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  // BY-spike Item 3 — Edit "glass ghost pill" (cheap translucent fill; iOS 26
-  // .glassEffect()/BlurView upgrade gated on on-device review per plan §决策).
-  // Black icon/text on light, white on dark — top-actions capsule language,
-  // intentionally NOT accent green.
-  const editGlassBg = isDark ? "rgba(28,28,30,0.72)" : "rgba(255,255,255,0.72)";
-  const editGlassBorder = isDark
-    ? "rgba(255,255,255,0.18)"
-    : "rgba(255,255,255,0.5)";
-  const editGlassFg = isDark ? "#FFFFFF" : "#1C1C1E";
 
   // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
   // "automatic"`, so the ScrollView prepends headerHeight worth of top padding.
@@ -221,16 +219,33 @@ export default function ProfileHeader({
   // bottom stop stays anchored to the content seam while the image scrolls
   // underneath. Bottom stop = exact theme bg so cover dissolves into content.
   const bgRgb = useMemo(() => hexToRgb(colors.background), [colors.background]);
+  // Window BY — the gradient must reach FULL bg before the hero's clip point so
+  // the *visible* cover bottom is pure bg and connects seamlessly with the
+  // (opaque-bg) sub tab bar below it. The hero clips at heroHeight/cover ≈
+  // 370/405 ≈ 0.914, so a full-bg stop at 1.0 would leave the visible bottom at
+  // ~0.97 bg (≈3% photo bleeding through → the seam). Land full bg at 0.88
+  // instead → the last visible band is solid bg = exact bar color. No layers,
+  // no architecture change; this is the whole "seam" fix.
+  // Even, linear fade-to-bg: a mild dark wash up top (white id-block text), then
+  // a CLEAN bg-alpha ramp 0 → 1 in equal steps (0.25 each) from 0.48 → 0.88.
+  // No black→bg color flip mid-gradient (that produced a muddy grey band + the
+  // "sudden coverage" jump); full bg lands at 0.88, before the hero clip
+  // (~0.914), so the visible bottom is solid bg and joins the bar seamlessly.
   const coverFadeColors = useMemo(
     () =>
       [
         "rgba(0,0,0,0.10)",
-        "rgba(0,0,0,0.18)",
-        `rgba(${bgRgb},0.96)`,
+        "rgba(0,0,0,0.10)",
+        `rgba(${bgRgb},0)`,
+        `rgba(${bgRgb},0.25)`,
+        `rgba(${bgRgb},0.5)`,
+        `rgba(${bgRgb},0.75)`,
+        colors.background,
         colors.background,
       ] as const,
     [bgRgb, colors.background],
   );
+  const coverFadeLocations = [0, 0.3, 0.48, 0.58, 0.68, 0.78, 0.88, 1] as const;
 
   const bioText = bio?.trim() || "";
   const homeGymText = homeGym?.trim() || "";
@@ -262,50 +277,17 @@ export default function ProfileHeader({
         <ProfileCoverArt coverUrl={coverUrl} />
       </Animated.View>
 
-      {/* BY-spike Item 1 — fade-to-bg overlay. Sits above the parallax cover,
-          below id-block so identity text stays readable (it lives in the mid
-          0.18 band, well above the near-solid bottom stops). Two variants
-          behind COVER_FADE_VARIANT for on-device A/B. */}
-      {COVER_FADE_VARIANT === "blur" ? (
-        // 渐变磨砂玻璃: progressive blur — MaskedView's vertical alpha gradient
-        // ramps the BlurView in from cover mid → bottom (same 0.42→0.96 band as
-        // the cheap gradient), then a bg-color stop seals the very bottom solid
-        // so the cover dissolves into the content seam.
-        <MaskedView
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-          maskElement={
-            <LinearGradient
-              colors={["transparent", "transparent", "black", "black"]}
-              locations={[0, 0.42, 0.96, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-          }
-        >
-          <BlurView
-            intensity={48}
-            tint={isDark ? "dark" : "light"}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={[
-              "transparent",
-              `rgba(${bgRgb},0)`,
-              `rgba(${bgRgb},0.85)`,
-              colors.background,
-            ]}
-            locations={[0, 0.42, 0.96, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </MaskedView>
-      ) : (
-        <LinearGradient
-          pointerEvents="none"
-          colors={coverFadeColors}
-          locations={[0, 0.42, 0.96, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
+      {/* Window BY — cover fade-to-bg overlay (even linear LinearGradient).
+          Sits above the parallax cover, below id-block. Reaches full bg before
+          the hero clip so the visible bottom is solid bg and joins the sub tab
+          bar seamlessly. (BY-spike blur variant dropped — on-device it showed
+          no visible gain over the gradient.) */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={coverFadeColors}
+        locations={coverFadeLocations}
+        style={StyleSheet.absoluteFill}
+      />
 
       {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}
       <View style={styles.idBlock} pointerEvents="box-none">
@@ -354,46 +336,36 @@ export default function ProfileHeader({
             </Text>
           </Pressable>
         </View>
-        {/* Window BG — KPI single-row pill: V7/5.13b Grade · 74 Sends.
-            Reuses counts visuals so it matches the followers/following row
-            stacked directly above. Renders only when at least one value is
-            supplied (props are optional for backward compat). */}
-        {(gradeText !== undefined || totalSends !== undefined) && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View ascents history"
-            onPress={onKPIPress}
-            disabled={!onKPIPress}
-            hitSlop={6}
-            style={styles.kpiRow}
-          >
-            <Text style={styles.counts}>
-              <Text style={styles.countsNum}>{gradeText ?? "—"}</Text>
-              {" Grade"}
-            </Text>
-            <Text style={styles.countsSep}>·</Text>
-            <Text style={styles.counts}>
-              <Text style={styles.countsNum}>{String(totalSends ?? 0)}</Text>
-              {" Sends"}
-            </Text>
-          </Pressable>
-        )}
       </View>
 
-      {/* Action FAB (bottom-right) */}
+      {/* Window BY — 4-up stats glass card, anchored at the cover bottom above
+          the sub tab bar. Child of the cover (within the visible region, so
+          not clipped by overflow:hidden); floats over the 渐白 fade band. */}
+      <ProfileStatsFloatingCard
+        style={styles.statsCard}
+        boulderGrade={boulderGrade}
+        routeGrade={routeGrade}
+        totalSends={totalSends}
+        totalSessions={totalSessions}
+        onPress={onKPIPress}
+      />
+
+      {/* Action FAB (bottom-right) — Edit glass ghost pill (BY: theme-tokened
+          via GlassFill; black icon/text on light, white on dark). */}
       {viewMode === "self" ? (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Edit profile"
           onPress={onEditPress}
           activeOpacity={0.85}
-          style={[
-            styles.editPill,
-            { backgroundColor: editGlassBg, borderColor: editGlassBorder },
-          ]}
+          style={styles.editPillWrap}
         >
-          <Ionicons name="pencil" size={15} color={editGlassFg} />
-          <Text style={[styles.editPillText, { color: editGlassFg }]}>Edit</Text>
+          <GlassFill style={styles.editPill} intensity={28}>
+            <Ionicons name="pencil" size={15} color={colors.textPrimary} />
+            <Text style={[styles.editPillText, { color: colors.textPrimary }]}>
+              Edit
+            </Text>
+          </GlassFill>
         </TouchableOpacity>
       ) : (
         <View style={styles.actionRow}>
@@ -502,14 +474,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
       gap: 6,
     },
-    // Window BG — single-row KPI pill below countsRow. Same shape as
-    // countsRow with a slightly tighter gap; pulls counts/countsNum/countsSep
-    // styles unchanged so it lines up visually 1:1.
-    kpiRow: {
-      marginTop: 6,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
+    // Window BY — stats glass card anchor: full-width band at the cover bottom,
+    // above the sub tab bar (positioning only; visual lives in
+    // ProfileStatsFloatingCard / GlassFill).
+    statsCard: {
+      position: "absolute",
+      left: 16,
+      right: 16,
+      bottom: STATS_CARD_BOTTOM,
     },
     counts: {
       fontSize: 12,
@@ -527,22 +499,22 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: "rgba(255,255,255,0.55)",
     },
-    // BY-spike Item 3 — glass ghost pill: translucent fill + hairline border +
-    // pill radius, pencil icon + "Edit" label. bg/border/fg colors are applied
-    // inline (theme-aware) over this base.
-    editPill: {
+    // Window BY — Edit glass ghost pill. Wrap = absolute positioning; inner
+    // editPill = GlassFill container layout (glass fill + hairline border +
+    // pill radius come from GlassFill / theme tokens).
+    editPillWrap: {
       position: "absolute",
       right: 18,
       bottom: ACTION_FAB_BOTTOM,
+    },
+    editPill: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 5,
       height: 36,
       paddingHorizontal: 14,
-      paddingVertical: 8,
       borderRadius: 999,
-      borderWidth: 1,
     },
     editPillText: {
       fontSize: 14,

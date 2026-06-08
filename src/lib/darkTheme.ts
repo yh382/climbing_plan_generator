@@ -5,22 +5,27 @@ import type { ThemeColors } from './theme';
 
 export const darkColors: ThemeColors = {
   accent: '#306E6F',              // unchanged — brand color
-  background: '#000000',          // pure black (OLED friendly)
-  sheetBackground: '#1C1C1E',    // iOS elevated surface for sheets
+  // Window BY — dark base lifted off pure black to a dark grey (mirrors the
+  // light off-white bg). The whole elevation ladder shifts up one notch so
+  // cards still separate: bg #161618 → card #242426 → elevated #2C2C2E →
+  // border #38383A. App-wide change — verify across dark screens.
+  background: '#161618',          // dark grey base (was pure black)
+  sheetBackground: '#242426',    // iOS elevated surface for sheets
   sheetCardBackground: '#2C2C2E', // card/input backgrounds inside sheets
-  backgroundSecondary: '#1C1C1E', // iOS systemGroupedBackground dark
+  backgroundSecondary: '#242426', // iOS systemGroupedBackground dark
   cardDark: '#2C2C2E',           // iOS secondarySystemGroupedBackground dark
   cardDarkImage: '#3A3A3C',      // slightly lighter dark gray
   textPrimary: '#FFFFFF',         // white text
   textSecondary: '#8E8E93',      // iOS systemGray
   textTertiary: '#48484A',       // iOS systemGray3
   border: 'rgba(255,255,255,0.10)',
-  // Window BY — glass surface tokens (see theme.ts).
-  glassFill: 'rgba(28,28,30,0.78)',
+  // Window BY — glass surface tokens (see theme.ts). Lifted to ~#2C so the
+  // glass card reads as elevated over the new dark-grey bg.
+  glassFill: 'rgba(44,44,48,0.78)',
   glassBorder: 'rgba(255,255,255,0.12)',
-  glassFillSolid: 'rgba(28,28,30,0.92)',
+  glassFillSolid: 'rgba(44,44,48,0.92)',
   // Dark-mode-aware tokens (Phase 3)
-  cardBackground: '#1C1C1E',
+  cardBackground: '#242426',
   cardBorder: '#38383A',
   toggleBackground: '#2C2C2E',
   toggleActiveBackground: '#FFFFFF',
@@ -31,7 +36,7 @@ export const darkColors: ThemeColors = {
   chartTitle: '#FFFFFF',
   chartValue: '#E5E7EB',
   divider: 'rgba(255,255,255,0.08)',
-  inputBackground: '#1C1C1E',
+  inputBackground: '#242426',
   bubbleAI: '#2C2C2E',
   bubbleAIBorder: '#38383A',
   bubbleAIText: '#FFFFFF',

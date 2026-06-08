@@ -75,6 +75,7 @@ type HeaderViewModel = {
     boulderGrade: string;
     routeGrade: string;
     totalSends: number;
+    totalSessions: number;
   };
 
   bodyMetrics: {
@@ -222,6 +223,7 @@ export default function ProfileScreen() {
         boulderGrade,
         routeGrade,
         totalSends: kpis.totalSends,
+        totalSessions: kpis.sessionCount,
       },
 
       bodyMetrics: { height, weight, apeIndex },
@@ -314,8 +316,10 @@ export default function ProfileScreen() {
             onFollowingPress={() => router.push("/profile/following" as any)}
             scrollY={activeScrollY}
             bleedUnderHeader={false}
-            gradeText={`${user.stats.boulderGrade}/${user.stats.routeGrade}`}
+            boulderGrade={user.stats.boulderGrade}
+            routeGrade={user.stats.routeGrade}
             totalSends={user.stats.totalSends}
+            totalSessions={user.stats.totalSessions}
             onKPIPress={() => {
               if (me?.id) router.push(`/users/${me.id}/ascents` as any);
             }}
