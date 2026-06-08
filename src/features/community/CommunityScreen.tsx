@@ -281,7 +281,7 @@ export default function CommunityScreen() {
               options={[tr("推荐", "For You"), tr("关注", "Following")]}
               selectedIndex={feedMode === "all" ? 0 : 1}
               onSelect={(i) => setFeedMode(i === 0 ? "all" : "following")}
-              style={{ width: 200, height: 32 }}
+              style={{ width: 200, height: 44 }}
             />
           </Stack.Toolbar.View>
         </Stack.Toolbar>
