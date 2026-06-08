@@ -18,10 +18,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import MaskedView from "@react-native-masked-view/masked-view";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+
+// BY-spike Item 1 — cover fade A/B: 'gradient' = cheap LinearGradient 渐白;
+// 'blur' = MaskedView + BlurView 渐变磨砂玻璃(用户拍板要看的升级版)。
+// spike-only: BY full plan 拍板后留一边、删此开关。
+const COVER_FADE_VARIANT: "gradient" | "blur" = "gradient";
 
 const PROFILE_COVER_VISIBLE = 300;
 // Content-shell overlaps cover by 24pt with rounded top corners. The cut-out
@@ -38,6 +45,19 @@ const ACTION_FAB_BOTTOM = 22 + COVER_OVERLAP;
 // the cover's bottom slice — see ProfileCoverArt below.
 export const PROFILE_COVER_HEIGHT_FULL = PROFILE_COVER_H;
 export const PROFILE_COVER_OVERLAP_PT = COVER_OVERLAP;
+
+// BY-spike Item 1 — convert theme bg hex (#F4F3F2 / #000000) to "r,g,b" so the
+// cover-fade gradient can land on the exact background color at its bottom stop
+// (渐白 in light, 渐黑 in dark — never a hardcoded white).
+function hexToRgb(hex: string): string {
+  const h = hex.replace("#", "");
+  const full =
+    h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `${r},${g},${b}`;
+}
 
 // Default cover gradients when no cover image set.
 const DEFAULT_GRADIENT_LIGHT: [string, string, string] = [
@@ -155,7 +175,18 @@ export default function ProfileHeader({
   bleedUnderHeader = true,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
+  const isDark = useColorScheme() === "dark";
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // BY-spike Item 3 — Edit "glass ghost pill" (cheap translucent fill; iOS 26
+  // .glassEffect()/BlurView upgrade gated on on-device review per plan §决策).
+  // Black icon/text on light, white on dark — top-actions capsule language,
+  // intentionally NOT accent green.
+  const editGlassBg = isDark ? "rgba(28,28,30,0.72)" : "rgba(255,255,255,0.72)";
+  const editGlassBorder = isDark
+    ? "rgba(255,255,255,0.18)"
+    : "rgba(255,255,255,0.5)";
+  const editGlassFg = isDark ? "#FFFFFF" : "#1C1C1E";
 
   // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
   // "automatic"`, so the ScrollView prepends headerHeight worth of top padding.
@@ -186,6 +217,21 @@ export default function ProfileHeader({
     };
   });
 
+  // BY-spike Item 1 — cover fade-to-bg overlay. Fixed (non-parallax) so the
+  // bottom stop stays anchored to the content seam while the image scrolls
+  // underneath. Bottom stop = exact theme bg so cover dissolves into content.
+  const bgRgb = useMemo(() => hexToRgb(colors.background), [colors.background]);
+  const coverFadeColors = useMemo(
+    () =>
+      [
+        "rgba(0,0,0,0.10)",
+        "rgba(0,0,0,0.18)",
+        `rgba(${bgRgb},0.96)`,
+        colors.background,
+      ] as const,
+    [bgRgb, colors.background],
+  );
+
   const bioText = bio?.trim() || "";
   const homeGymText = homeGym?.trim() || "";
   const subtitle = homeGymText
@@ -215,6 +261,51 @@ export default function ProfileHeader({
       >
         <ProfileCoverArt coverUrl={coverUrl} />
       </Animated.View>
+
+      {/* BY-spike Item 1 — fade-to-bg overlay. Sits above the parallax cover,
+          below id-block so identity text stays readable (it lives in the mid
+          0.18 band, well above the near-solid bottom stops). Two variants
+          behind COVER_FADE_VARIANT for on-device A/B. */}
+      {COVER_FADE_VARIANT === "blur" ? (
+        // 渐变磨砂玻璃: progressive blur — MaskedView's vertical alpha gradient
+        // ramps the BlurView in from cover mid → bottom (same 0.42→0.96 band as
+        // the cheap gradient), then a bg-color stop seals the very bottom solid
+        // so the cover dissolves into the content seam.
+        <MaskedView
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          maskElement={
+            <LinearGradient
+              colors={["transparent", "transparent", "black", "black"]}
+              locations={[0, 0.42, 0.96, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+          }
+        >
+          <BlurView
+            intensity={48}
+            tint={isDark ? "dark" : "light"}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={[
+              "transparent",
+              `rgba(${bgRgb},0)`,
+              `rgba(${bgRgb},0.85)`,
+              colors.background,
+            ]}
+            locations={[0, 0.42, 0.96, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </MaskedView>
+      ) : (
+        <LinearGradient
+          pointerEvents="none"
+          colors={coverFadeColors}
+          locations={[0, 0.42, 0.96, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}
       <View style={styles.idBlock} pointerEvents="box-none">
@@ -296,9 +387,13 @@ export default function ProfileHeader({
           accessibilityLabel="Edit profile"
           onPress={onEditPress}
           activeOpacity={0.85}
-          style={styles.editPill}
+          style={[
+            styles.editPill,
+            { backgroundColor: editGlassBg, borderColor: editGlassBorder },
+          ]}
         >
-          <Text style={styles.editPillText}>Edit</Text>
+          <Ionicons name="pencil" size={15} color={editGlassFg} />
+          <Text style={[styles.editPillText, { color: editGlassFg }]}>Edit</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.actionRow}>
@@ -432,22 +527,27 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: "rgba(255,255,255,0.55)",
     },
+    // BY-spike Item 3 — glass ghost pill: translucent fill + hairline border +
+    // pill radius, pencil icon + "Edit" label. bg/border/fg colors are applied
+    // inline (theme-aware) over this base.
     editPill: {
       position: "absolute",
       right: 18,
       bottom: ACTION_FAB_BOTTOM,
-      height: 40,
-      paddingHorizontal: 18,
-      borderRadius: 24,
+      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: colors.accent,
+      gap: 5,
+      height: 36,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
     },
     editPillText: {
       fontSize: 14,
       fontWeight: "700",
       fontFamily: theme.fonts.bold,
-      color: "#FFFFFF",
     },
     actionRow: {
       position: "absolute",

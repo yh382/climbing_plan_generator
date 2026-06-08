@@ -56,6 +56,12 @@ import { useThemeColors } from "@/lib/useThemeColors";
 import ProfileTabBar, {
   PROFILE_TAB_BAR_HEIGHT,
 } from "@/components/shared/ProfileTabBar";
+import ProfileTabBarNative from "@/components/shared/ProfileTabBarNative";
+
+// BY-spike Item 2 — switch underline ↔ native segmented to capture on-device
+// A/B screenshots. spike-only: removed by BY full plan once the user picks a
+// permanent variant. grep `SUB_TAB_VARIANT` before shipping BY (risk R4).
+const SUB_TAB_VARIANT: "underline" | "native" = "native";
 
 import type {
   ProfileChromePageHandle,
@@ -301,12 +307,21 @@ export default function ProfileChromeRoot({
           tabBarStyle,
         ]}
       >
-        <ProfileTabBar
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-          scrollPosition={tabScrollPosition}
-        />
+        {SUB_TAB_VARIANT === "native" ? (
+          <ProfileTabBarNative
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+            scrollPosition={tabScrollPosition}
+          />
+        ) : (
+          <ProfileTabBar
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+            scrollPosition={tabScrollPosition}
+          />
+        )}
       </Animated.View>
     </View>
   );
