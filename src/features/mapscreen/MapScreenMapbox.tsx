@@ -93,6 +93,7 @@ import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 import { useCragsOverview } from './useCragsOverview';
 import TrailLayer from '../outdoor/components/TrailLayer';
+import CragPolygonOverlay from '../outdoor/components/CragPolygonOverlay';
 import { getDevTrailFallback } from '../outdoor/devTrailFixture';
 import { FilterChipsBar } from './components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../store/useOutdoorMapFiltersStore';
@@ -600,9 +601,18 @@ export default function MapScreenMapbox({
   // ---- Camera choreography on mode change ----
   // On entering area mode via deep link (mount) or via in-screen transition,
   // fit to area pins once data loads. On backToExplore, fly to prevCamera.
+  //
+  // BU 2026-06-07 two-path invariant for area-mode camera:
+  //   - **Crag-browse path** (onCragOverviewPress): sets browsingCrag FIRST,
+  //     then enterArea + explicit flyTo(crag.lat, crag.lng, zoom 14). The
+  //     `!browsingCrag` gate below SKIPS the region-centroid setCamera so
+  //     the per-crag flyTo wins.
+  //   - **Direct enterArea path** (saved-spots row / search hit / deep link):
+  //     does NOT touch browsingCrag → gate is true → region-centroid fires
+  //     normally (zoom 10 region overview is the right framing here).
   useEffect(() => {
     if (!styleReady || !mapReady || !camRef.current) return;
-    if (mode.kind === 'area') {
+    if (mode.kind === 'area' && !browsingCrag) {
       // Area mode lands at MEDIUM — the user navigated here to browse
       // the crag's routes, not to stare at the map, so default to
       // showing a useful chunk of list. COLLAPSED is still reachable
@@ -649,7 +659,15 @@ export default function MapScreenMapbox({
     // drives the initial camera via store.userLoc. We handle the explicit
     // "back to gyms" fly-to separately in onBackToExplore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode.kind, areaId, listId, areaData.area, listData.pins, styleReady, mapReady]);
+    // BU dep: `browsingCrag` is read in the area-mode gate. Without it in
+    // deps, the effect doesn't re-evaluate when browsingCrag changes —
+    // exhaustive-deps would complain, but the gate would never re-evaluate
+    // on subsequent crag-pin taps even though the effect IS supposed to
+    // run on mode/area transitions. Effect identity is fine: when a NEW
+    // crag is browsed (focusedWall cleared, browsingCrag flipped), we
+    // already rely on the per-tap onCragOverviewPress flyTo, not this
+    // effect. So the dep is conservative — it just gates correctness.
+  }, [mode.kind, areaId, listId, areaData.area, listData.pins, styleReady, mapReady, browsingCrag]);
 
   // explore mode: when user location first arrives, snap the camera to it.
   // Map + style must both be ready — otherwise setCamera can be eaten by
@@ -847,10 +865,53 @@ export default function MapScreenMapbox({
         return;
       }
       if (mode.kind === 'area') {
+        // BU 2026-06-07 — cross-crag wall tap in crag-browse sub-state.
+        // If the tapped wall belongs to a DIFFERENT crag than the current
+        // browsing crag, switch browse focus to that wall's crag (looking
+        // up its full overview from the in-memory cragsOverview cache
+        // when available). Otherwise (same crag, or no browsing crag),
+        // fall through to the legacy focusOnWall.
+        if (browsingCrag && ctx.crag_id !== browsingCrag.crag_id) {
+          const overview = cragsOverview.crags.find((c) => c.id === ctx.crag_id);
+          const nextCrag: CragPinContext = overview
+            ? {
+                crag_id: overview.id,
+                crag_name: overview.name,
+                region_id: overview.region_id,
+                region_name: overview.region_name,
+                lat: overview.lat,
+                lng: overview.lng,
+                route_count: overview.route_count,
+                boulder_count: overview.boulder_count,
+              }
+            : {
+                // Cache miss (rare — overview is module-cached at explore-
+                // mode load). Synthesize from wall pin metadata; counts
+                // stay undefined and consumers fall back to `?? 0`.
+                crag_id: ctx.crag_id,
+                crag_name: ctx.crag_name,
+                region_id: ctx.region_id,
+                region_name: ctx.region_name,
+                lat: ctx.lat,
+                lng: ctx.lng,
+              };
+          setFocusedWall(null);
+          setBrowsingCrag(nextCrag);
+          try {
+            markProgrammaticMove(500);
+            camRef.current?.setCamera({
+              centerCoordinate: [nextCrag.lng, nextCrag.lat],
+              zoomLevel: 14,
+              animationDuration: 500,
+              padding: pinFocusPadding,
+            });
+          } catch {}
+          return;
+        }
         void focusOnWall(ctx);
       }
     },
-    [mode.kind, enterArea, focusOnWall],
+    [mode.kind, enterArea, focusOnWall, browsingCrag, cragsOverview.crags, markProgrammaticMove, pinFocusPadding],
   );
 
   // BS-FU-A — tier-1 Crag pin tap. Earlier BR Track D Day 7 behavior was
@@ -1588,6 +1649,26 @@ export default function MapScreenMapbox({
                 enterArea, or directly via GymsSavedSpotsRow / search
                 hit. Once inside area mode the bbox follows the camera
                 so users can pan within the focused Region. */}
+            {/* BU 2026-06-07 — crag boundary polygon overlay for crag-browse
+                sub-state. **Z-order**: mounted BEFORE RoutePinCluster /
+                MapPinCluster / TrailLayer so wall pins + numbers paint ON
+                TOP of the polygon. Mapbox-RN add order = paint order;
+                later JSX children render above earlier ones.
+                visible-gate ensures we ONLY render when the fetched
+                focusedCragDetail belongs to the currently browsing crag
+                (avoids stale polygon during async detail re-fetch on
+                cross-crag wall tap). Pre-BV legacy crags with NULL wall
+                coords gracefully render no polygon (computeCragPolygon
+                returns null). */}
+            <CragPolygonOverlay
+              walls={focusedCragDetail?.walls}
+              visible={
+                !!browsingCrag &&
+                !!focusedCragDetail &&
+                focusedCragDetail.id === browsingCrag.crag_id
+              }
+            />
+
             {mode.kind === 'area' && (
               <RoutePinCluster
                 pins={viewportPins.pins}
@@ -1888,7 +1969,13 @@ export default function MapScreenMapbox({
             onPressRoute={navigateToRoute}
             // BR Track D Day 6 — FilterChipsBar mounts only in area mode
             // (list mode shows pre-selected saved routes, no chip filter).
-            filterChipsSlot={mode.kind === 'area' ? <FilterChipsBar /> : undefined}
+            // BU 2026-06-07 — hidden when browsingCrag is active. In crag-
+            // browse sub-state the wall list itself surfaces per-wall
+            // discipline breakdown (X boulder · Y sport · Z trad), making
+            // the region-level filter chips redundant + visually cluttering.
+            filterChipsSlot={
+              mode.kind === 'area' && !browsingCrag ? <FilterChipsBar /> : undefined
+            }
             // BS-FU-A — crag-browse sub-state. Active when user tapped a
             // tier-1 Crag pin (no focusedWall, no list mode). Renders mini
             // snapshot + walls list sorted by route_count desc.

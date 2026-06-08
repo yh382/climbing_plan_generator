@@ -15,6 +15,10 @@ export const darkColors: ThemeColors = {
   textSecondary: '#8E8E93',      // iOS systemGray
   textTertiary: '#48484A',       // iOS systemGray3
   border: 'rgba(255,255,255,0.10)',
+  // Window BY — glass surface tokens (see theme.ts).
+  glassFill: 'rgba(28,28,30,0.78)',
+  glassBorder: 'rgba(255,255,255,0.12)',
+  glassFillSolid: 'rgba(28,28,30,0.92)',
   // Dark-mode-aware tokens (Phase 3)
   cardBackground: '#1C1C1E',
   cardBorder: '#38383A',
@@ -51,6 +55,10 @@ export const darkColors: ThemeColors = {
   // (no gymMarkerText — see theme.ts)
   markerOpacity: '0.74',
   trailReference: '#6B7280',
+  // BU crag boundary polygon — slightly lighter pink for dark-mode contrast
+  // (light fill at 0.08 opacity on dark Mapbox basemap would be near-invisible
+  // with the light-theme hex).
+  cragBoundary: '#FF80AB',
   warningTint: 'rgba(249, 115, 22, 0.12)',
   outdoorLabelText: '#F5EBE0',
   outdoorLabelHalo: 'rgba(20, 10, 5, 0.85)',

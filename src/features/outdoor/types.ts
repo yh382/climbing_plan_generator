@@ -143,6 +143,15 @@ export type Wall = {
   routes?: OutdoorRoute[];
   /** BV — upstream provider's stable UUID (OpenBeta leaf-area UUID). */
   source_external_id?: string | null;
+  /** BU — style-level counts populated by CragDetail endpoint (single
+   *  GROUP BY). UX 一级分类 per user 2026-06-07: Boulder / Sport / Trad
+   *  primary; everything else (toprope/alpine/multi-pitch/aid/DWS/mixed)
+   *  rolls into `other_count` for future 二级 tags UI (BU-FU). Other
+   *  endpoints (search / pins / route detail / list) leave these null. */
+  boulder_count?: number | null;
+  sport_count?: number | null;
+  trad_count?: number | null;
+  other_count?: number | null;
 };
 
 // ---- Level 5: Route (路线, e.g. 鸭子 5.11b) ----

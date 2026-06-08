@@ -12239,6 +12239,8 @@ export interface components {
         WallOut: {
             /** Approach */
             approach?: string | null;
+            /** Boulder Count */
+            boulder_count?: number | null;
             /**
              * Crag Id
              * Format: uuid
@@ -12261,6 +12263,8 @@ export interface components {
             name_en?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Other Count */
+            other_count?: number | null;
             /**
              * Route Count
              * @default 0
@@ -12270,10 +12274,14 @@ export interface components {
             sort_order: number;
             /** Source External Id */
             source_external_id?: string | null;
+            /** Sport Count */
+            sport_count?: number | null;
             /** Status */
             status: string;
             /** Topo Url */
             topo_url?: string | null;
+            /** Trad Count */
+            trad_count?: number | null;
         };
         /** WallSectionCreateIn */
         WallSectionCreateIn: {

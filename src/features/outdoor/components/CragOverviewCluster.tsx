@@ -22,7 +22,15 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import type { CragOverview } from '../types';
 
 /** Per-crag context attached to features so a tap surfaces full info
- *  without a second fetch. */
+ *  without a second fetch.
+ *
+ *  BU 2026-06-07 — route_count / boulder_count widened to optional.
+ *  Cross-crag wall tap (from inside another crag's browse mode) lacks
+ *  these crag-level totals: wall pin metadata doesn't carry them.
+ *  Callers that synthesize a partial CragPinContext from wall pin info
+ *  leave them undefined; consumers use `?? 0` fallback for display.
+ *  Pin-source flow (CragOverviewCluster → onCragPress) always populates
+ *  both from the GroupedRecord projection. */
 export type CragPinContext = {
   crag_id: string;
   crag_name: string;
@@ -30,8 +38,8 @@ export type CragPinContext = {
   region_name: string;
   lat: number;
   lng: number;
-  route_count: number;
-  boulder_count: number;
+  route_count?: number;
+  boulder_count?: number;
 };
 
 export type CragOverviewClusterProps = {

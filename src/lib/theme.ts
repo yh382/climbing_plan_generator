@@ -24,6 +24,12 @@ export const theme = {
     textSecondary: '#888888',
     textTertiary: '#BBBBBB',
     border: 'rgba(0,0,0,0.08)',
+    // Window BY — glass surface tokens (stats floating card + Edit ghost pill).
+    // glassFill/glassBorder back a translucent BlurView-fronted surface;
+    // glassFillSolid is the opaque iOS-17 fallback when BlurView reads too weak.
+    glassFill: 'rgba(255,255,255,0.78)',
+    glassBorder: 'rgba(255,255,255,0.68)',
+    glassFillSolid: 'rgba(255,255,255,0.92)',
     // Dark-mode-aware tokens (Phase 3)
     cardBackground: '#FFFFFF',
     cardBorder: '#E5E2D8',
@@ -76,6 +82,10 @@ export const theme = {
     // OSM reference trails use this neutral gray to communicate "not
     // verified".
     trailReference: '#9CA3AF',
+    // BU 2026-06-07 — crag boundary polygon overlay (focused crag's
+    // spatial extent during crag-browse). OpenBeta-ish pink; stroke +
+    // light fill (different opacity) painted from the same hex token.
+    cragBoundary: '#E91E63',
     // Warning UI tint — banner background for OSM trail safety notice
     // (CragInfoSheet). Faint outdoor-orange tint, low alpha.
     warningTint: 'rgba(249, 115, 22, 0.08)',

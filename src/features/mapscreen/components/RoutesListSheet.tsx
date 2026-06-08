@@ -258,32 +258,49 @@ const RoutesListSheet: React.FC<RoutesListSheetProps> = (props) => {
               </TouchableOpacity>
 
               {browsingCragWalls && browsingCragWalls.length > 0 ? (
-                browsingCragWalls.map((wall) => (
-                  <TouchableOpacity
-                    key={wall.id}
-                    activeOpacity={0.7}
-                    onPress={() => onPressBrowseWall?.(wall)}
-                    style={s.browseWallRow}
-                  >
-                    <Text style={s.browseWallName} numberOfLines={1}>
-                      {wall.name}
-                    </Text>
-                    <View style={s.browseWallMetaRow}>
-                      <Text style={s.browseWallCount}>
-                        {wall.route_count}{' '}
-                        {tr(
-                          '条',
-                          wall.route_count === 1 ? 'route' : 'routes',
-                        )}
+                browsingCragWalls.map((wall) => {
+                  /* BU — style-level breakdown per user 2026-06-07 一级
+                     design: Boulder / Sport / Trad. Render non-zero
+                     primary segments; fall back to total `X routes` when
+                     all 3 are 0 (e.g. toprope-only wall — `other_count`
+                     not surfaced in BU; future BU-FU adds 二级 tags). */
+                  const b = wall.boulder_count ?? 0;
+                  const sp = wall.sport_count ?? 0;
+                  const tr_ = wall.trad_count ?? 0;
+                  const hasPrimary = b > 0 || sp > 0 || tr_ > 0;
+                  const primaryLabel = hasPrimary
+                    ? [
+                        b > 0 ? `${b} ${tr('抱石', 'boulder')}` : null,
+                        sp > 0 ? `${sp} ${tr('运动', 'sport')}` : null,
+                        tr_ > 0 ? `${tr_} ${tr('传统', 'trad')}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                    : `${wall.route_count} ${tr(
+                        '条',
+                        wall.route_count === 1 ? 'route' : 'routes',
+                      )}`;
+                  return (
+                    <TouchableOpacity
+                      key={wall.id}
+                      activeOpacity={0.7}
+                      onPress={() => onPressBrowseWall?.(wall)}
+                      style={s.browseWallRow}
+                    >
+                      <Text style={s.browseWallName} numberOfLines={1}>
+                        {wall.name}
                       </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color={colors.textTertiary}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                ))
+                      <View style={s.browseWallMetaRow}>
+                        <Text style={s.browseWallCount}>{primaryLabel}</Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={colors.textTertiary}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               ) : (
                 <Text style={s.emptyText}>
                   {tr('加载岩壁中…', 'Loading walls…')}
