@@ -1,50 +1,62 @@
 /**
- * RoutePinCluster — BR Track D Day 5 map cluster source.
+ * RoutePinCluster — bbox-driven Mapbox cluster source.
  *
- * Replaces the multi-level `MapPinCluster` per PLAN_OUTDOOR_MAP_UX_V2 §2:
- *  - Single Mapbox ShapeSource with `cluster: true`
- *  - Uniform `theme.colors.accent` orange (PLAN §2.3 — drop boulder/rope split;
- *    filter chips do type segmentation)
- *  - Source data: pre-grouped by `wall_id` client-side so a wall with N
- *    routes collapses to ONE single Wall pin at zoom ≥15 (PLAN §2.2's
- *    "single Wall pin" invariant). Mapbox cluster:true then aggregates
- *    those Wall pins into bubbles at lower zooms.
+ * CA Phase 6.2 — renamed from WallPinContext to AreaPinContext. UX
+ * concept of "wall pin" stays (zoom ≥15 dissolves clusters into single
+ * pins for each leaf-level area), but the data layer speaks in
+ * canonical outdoor_area UUIDs exclusively:
+ *  - BE RoutePin slimmed to {area_id, area_name, display_kind, lat, lng,
+ *    discipline, style} (was 7-column 4-level ancestor chain).
+ *  - FE groups by `area_id` to enforce the single-pin invariant.
+ *  - Pin tap surfaces `AreaPinContext.area_id` to the caller; caller
+ *    hydrates ancestor breadcrumb via `/outdoor/areas/{id}` if needed.
  *
- * Pin tap:
- *  - Cluster bubble  → `onClusterPress(coords)` — caller flies camera in
- *  - Single Wall pin → `onWallPress(wallContext)` with the ancestor chain
- *    so caller can open RoutesListSheet focused on that wall.
- *
- * Day 5a delivery: new file only. Day 5b wires it into MapScreenMapbox in
- * place of MapPinCluster, and removes the legacy multi-level layers.
+ * Single ShapeSource with `cluster:true`; uniform `theme.colors.accent`
+ * orange (filter chips do discipline segmentation, not color).
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 import { theme } from '../../../lib/theme';
 import type { RoutePin } from '../types';
 
-/** Per-wall aggregated context attached to features so a tap surfaces the
- *  full ancestor chain without a second fetch. */
-export type WallPinContext = {
+/** Per-area aggregated context attached to features so a tap surfaces
+ *  the canonical UUID without a second fetch. CA Phase 6.2 — primary
+ *  field is `area_id` (the canonical outdoor_area UUID for the pin's
+ *  parent area). Legacy aliases (`wall_id` / `crag_id` / `region_id`
+ *  and their name pairs) are all filled with the SAME values
+ *  (area_id / area_name) as a compat shim so the existing MapScreenMapbox
+ *  state machine — which still thinks in 4-level terms — keeps working
+ *  without a deep refactor. Real ancestor breadcrumb hydrates via
+ *  `/outdoor/areas/{area_id}` when the sheet presents.
+ *  Follow-up (Phase 6.2-FU): collapse these aliases once the state
+ *  machine speaks only in canonical area_id terms. */
+export type AreaPinContext = {
+  area_id: string;
+  area_name: string;
+  display_kind: string;
+  /** Centroid lat/lng of the routes grouped under this area. */
+  lat: number;
+  lng: number;
+  /** Number of routes attached to this area in the current bbox. */
+  route_count: number;
+  /** Legacy aliases — all populated with the area_id / area_name. */
   wall_id: string;
   wall_name: string;
   crag_id: string;
   crag_name: string;
-  area_id: string;
-  area_name: string;
   region_id: string;
   region_name: string;
-  /** Centroid lat/lng of the routes grouped under this wall. */
-  lat: number;
-  lng: number;
-  /** Number of routes attached to this wall in the current bbox. */
-  route_count: number;
 };
+/** Backward-compat alias for callers still importing the legacy name. */
+export type WallPinContext = AreaPinContext;
 
 export type RoutePinClusterProps = {
   pins: RoutePin[];
   styleReady: boolean;
-  onWallPress: (ctx: WallPinContext) => void;
+  /** Renamed in CA Phase 6.2 from `onWallPress`. Legacy callers can
+   *  continue passing `onWallPress` for backward compat. */
+  onAreaPress?: (ctx: AreaPinContext) => void;
+  onWallPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
   onClusterPress: (coords: [number, number]) => void;
@@ -69,38 +81,44 @@ const CLUSTER_RADIUS_EXPRESSION = [
   1000, 34, // ≥ 1000
 ] as const;
 
-const WALL_PIN_RADIUS = 8;
+const AREA_PIN_RADIUS = 8;
 
-/** Pre-group RoutePin[] by wall_id. Output is one Feature per wall, with
- *  the wall context attached as properties so tap handlers can recover
- *  the ancestor chain. Lat/lng = centroid of the grouped routes. */
-function groupByWall(pins: RoutePin[]): WallPinContext[] {
-  const buckets = new Map<string, { sumLat: number; sumLng: number; count: number; ctx: Omit<WallPinContext, 'lat' | 'lng' | 'route_count'> }>();
+/** Pre-group RoutePin[] by area_id. Output is one Feature per area,
+ *  with the area context attached as properties so tap handlers can
+ *  recover canonical UUID + label. Lat/lng = centroid of the grouped
+ *  routes. */
+function groupByArea(pins: RoutePin[]): AreaPinContext[] {
+  const buckets = new Map<string, { sumLat: number; sumLng: number; count: number; ctx: Omit<AreaPinContext, 'lat' | 'lng' | 'route_count'> }>();
   for (const p of pins) {
-    const existing = buckets.get(p.wall_id);
+    const existing = buckets.get(p.area_id);
     if (existing) {
       existing.sumLat += p.lat;
       existing.sumLng += p.lng;
       existing.count += 1;
     } else {
-      buckets.set(p.wall_id, {
+      buckets.set(p.area_id, {
         sumLat: p.lat,
         sumLng: p.lng,
         count: 1,
         ctx: {
-          wall_id: p.wall_id,
-          wall_name: p.wall_name,
-          crag_id: p.crag_id,
-          crag_name: p.crag_name,
           area_id: p.area_id,
           area_name: p.area_name,
-          region_id: p.region_id,
-          region_name: p.region_name,
+          display_kind: p.display_kind,
+          // Legacy aliases: same UUID + name across the legacy chain so
+          // the state machine's `ctx.wall_id` / `.crag_id` / `.region_id`
+          // reads keep returning a meaningful value (= the canonical
+          // outdoor_area UUID).
+          wall_id: p.area_id,
+          wall_name: p.area_name,
+          crag_id: p.area_id,
+          crag_name: p.area_name,
+          region_id: p.area_id,
+          region_name: p.area_name,
         },
       });
     }
   }
-  const out: WallPinContext[] = [];
+  const out: AreaPinContext[] = [];
   for (const { sumLat, sumLng, count, ctx } of buckets.values()) {
     out.push({
       ...ctx,
@@ -112,26 +130,21 @@ function groupByWall(pins: RoutePin[]): WallPinContext[] {
   return out;
 }
 
-function toGeoJSON(walls: WallPinContext[]): GeoJSON.FeatureCollection {
+function toGeoJSON(areas: AreaPinContext[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: walls.map((w) => ({
+    features: areas.map((a) => ({
       type: 'Feature',
-      id: w.wall_id,
+      id: a.area_id,
       properties: {
-        wall_id: w.wall_id,
-        wall_name: w.wall_name,
-        crag_id: w.crag_id,
-        crag_name: w.crag_name,
-        area_id: w.area_id,
-        area_name: w.area_name,
-        region_id: w.region_id,
-        region_name: w.region_name,
-        route_count: w.route_count,
+        area_id: a.area_id,
+        area_name: a.area_name,
+        display_kind: a.display_kind,
+        route_count: a.route_count,
       },
       geometry: {
         type: 'Point',
-        coordinates: [w.lng, w.lat],
+        coordinates: [a.lng, a.lat],
       },
     })),
   };
@@ -140,16 +153,18 @@ function toGeoJSON(walls: WallPinContext[]): GeoJSON.FeatureCollection {
 export default function RoutePinCluster({
   pins,
   styleReady,
+  onAreaPress,
   onWallPress,
   onClusterPress,
 }: RoutePinClusterProps) {
-  const wallContexts = useMemo(() => groupByWall(pins), [pins]);
-  const shape = useMemo(() => toGeoJSON(wallContexts), [wallContexts]);
-  const wallLookup = useMemo(() => {
-    const map = new Map<string, WallPinContext>();
-    for (const w of wallContexts) map.set(w.wall_id, w);
+  const tapHandler = onAreaPress ?? onWallPress;
+  const areaContexts = useMemo(() => groupByArea(pins), [pins]);
+  const shape = useMemo(() => toGeoJSON(areaContexts), [areaContexts]);
+  const areaLookup = useMemo(() => {
+    const map = new Map<string, AreaPinContext>();
+    for (const a of areaContexts) map.set(a.area_id, a);
     return map;
-  }, [wallContexts]);
+  }, [areaContexts]);
 
   const handlePress = useCallback(
     (e: { features: GeoJSON.Feature[]; coordinates?: { latitude: number; longitude: number } }) => {
@@ -157,7 +172,7 @@ export default function RoutePinCluster({
       if (!feature) return;
       const props = feature.properties ?? {};
       // Cluster bubbles carry `cluster: true` + `point_count`; individual
-      // features carry our wall_id property.
+      // features carry our area_id property.
       if (props.cluster) {
         const geom = feature.geometry;
         if (geom?.type === 'Point') {
@@ -166,12 +181,12 @@ export default function RoutePinCluster({
         }
         return;
       }
-      const wallId = props.wall_id as string | undefined;
-      if (!wallId) return;
-      const ctx = wallLookup.get(wallId);
-      if (ctx) onWallPress(ctx);
+      const areaId = props.area_id as string | undefined;
+      if (!areaId) return;
+      const ctx = areaLookup.get(areaId);
+      if (ctx && tapHandler) tapHandler(ctx);
     },
-    [wallLookup, onWallPress, onClusterPress],
+    [areaLookup, tapHandler, onClusterPress],
   );
 
   if (!styleReady || shape.features.length === 0) return null;
@@ -208,13 +223,13 @@ export default function RoutePinCluster({
           textIgnorePlacement: true,
         }}
       />
-      {/* Single Wall pin — visible at zoom ≥15+ when clusters dissolve. */}
+      {/* Single area pin — visible at zoom ≥15+ when clusters dissolve. */}
       <MapboxGL.CircleLayer
-        id="outdoor-route-pins-wall"
+        id="outdoor-route-pins-single"
         filter={['!', ['has', 'point_count']]}
         style={{
           circleColor: theme.colors.accent,
-          circleRadius: WALL_PIN_RADIUS,
+          circleRadius: AREA_PIN_RADIUS,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,
         }}

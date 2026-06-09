@@ -283,14 +283,13 @@ export type RoutePin = {
   route_id: string;
   lat: number;
   lng: number;
-  wall_id: string;
-  wall_name: string;
-  crag_id: string;
-  crag_name: string;
+  /** CA Phase 6.2 — single canonical parent reference (outdoor_areas.id
+   *  at the wall-equivalent leaf, occasionally higher). Replaces the
+   *  prior 7-column ancestor chain. FE groups pins by area_id; the
+   *  ancestor breadcrumb hydrates via `/outdoor/areas/{id}` on tap. */
   area_id: string;
   area_name: string;
-  region_id: string;
-  region_name: string;
+  display_kind: string;
   /** BE includes 'other' for routes that don't cleanly classify (e.g.
    *  via ferrata, aid). FE filter chips only cover boulder/rope; other
    *  pins show under [All] but no dedicated chip. */

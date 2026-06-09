@@ -563,74 +563,6 @@ export interface paths {
         patch: operations["update_org_status_admin_orgs__org_id__patch"];
         trace?: never;
     };
-    "/admin/outdoor/batches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Batches */
-        get: operations["list_batches_admin_outdoor_batches_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/outdoor/batches/{batch_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Batch */
-        get: operations["get_batch_admin_outdoor_batches__batch_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/outdoor/batches/{batch_id}/revert": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Revert Batch Endpoint */
-        post: operations["revert_batch_endpoint_admin_outdoor_batches__batch_id__revert_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/outdoor/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import Outdoor Csv */
-        post: operations["import_outdoor_csv_admin_outdoor_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/admin/reports": {
         parameters: {
             query?: never;
@@ -3933,8 +3865,29 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Area */
-        patch: operations["update_area_outdoor_areas__area_id__patch"];
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/{area_id}/beta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Beta For Outdoor Area
+         * @description CA Phase 6.2 — replaces the legacy /regions/{id}/beta endpoint.
+         *     Walks `outdoor_areas.path_ids` so all routes under the subtree
+         *     surface, with one indexed JOIN instead of the prior 4-table chain.
+         */
+        get: operations["list_beta_for_outdoor_area_outdoor_areas__area_id__beta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/outdoor/areas/{area_id}/children": {
@@ -3965,24 +3918,6 @@ export interface paths {
         get: operations["get_outdoor_area_coverage_outdoor_areas__area_id__coverage_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/areas/{area_id}/crags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Crags */
-        get: operations["list_crags_outdoor_areas__area_id__crags_get"];
-        put?: never;
-        /** Create Crag */
-        post: operations["create_crag_outdoor_areas__area_id__crags_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4039,126 +3974,6 @@ export interface paths {
         post: operations["like_beta_endpoint_outdoor_beta__beta_id__like_post"];
         /** Unlike Beta Endpoint */
         delete: operations["unlike_beta_endpoint_outdoor_beta__beta_id__like_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/crags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Crags Overview
-         * @description Tier-1 map overview source — lightweight Crag list for client-side
-         *     `cluster:true` ShapeSource (PLAN §3.2 redesign).
-         *
-         *     Returns approved crags with derived lat/lng + aggregate
-         *     route_count / boulder_count, all computed in one GROUP BY (no N+1).
-         *
-         *     **Coordinate derivation**: OpenBeta import populated per-route
-         *     `lat/lng` but left `crag.lat/lng` NULL on most rows. We use
-         *     `COALESCE(crag.lat, AVG(routes.lat))` so a Crag with no explicit
-         *     coords inherits its routes' centroid — visually accurate for
-         *     cluster placement. Crags where BOTH the crag and all child
-         *     routes lack coords are dropped (can't place them on the map).
-         *
-         *     Default `min_routes=1` filters out empty Crags. ~15k rows expected
-         *     in NA prod (post-OpenBeta full import); ~3MB JSON.
-         *
-         *     Anonymous OK (`get_optional_user`) — map overview is public.
-         */
-        get: operations["list_crags_overview_outdoor_crags_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/crags/{crag_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Crag Detail */
-        get: operations["get_crag_detail_outdoor_crags__crag_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Crag */
-        patch: operations["update_crag_outdoor_crags__crag_id__patch"];
-        trace?: never;
-    };
-    "/outdoor/crags/{crag_id}/map": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Crag Map
-         * @description BS-P1-δ — stable map payload for one crag.
-         *
-         *     Returns crag + walls (with discipline counts + location audit) +
-         *     placeholder lists for future parking/approach_paths/background_
-         *     trails. Replaces the legacy bbox-driven `/outdoor/pins` re-fetching
-         *     that caused cluster reorder + count jitter on pan (plan §3.3).
-         *
-         *     Public endpoint (`get_optional_user`).
-         */
-        get: operations["get_crag_map_outdoor_crags__crag_id__map_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/crags/{crag_id}/walls": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Walls */
-        get: operations["list_walls_outdoor_crags__crag_id__walls_get"];
-        put?: never;
-        /** Create Wall */
-        post: operations["create_wall_outdoor_crags__crag_id__walls_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/crags/{old_id}/v2": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DEPRECATED — use /outdoor/areas/{id}
-         * @deprecated
-         * @description 7-14d bridge. Returns 404 if old_id resolves to non-crag display_kind.
-         */
-        get: operations["legacy_crag_alias_v2_outdoor_crags__old_id__v2_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4306,102 +4121,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/outdoor/regions/{old_id}/v2": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DEPRECATED — use /outdoor/areas/{id}
-         * @deprecated
-         */
-        get: operations["legacy_region_alias_v2_outdoor_regions__old_id__v2_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/regions/{region_id}/areas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Areas */
-        get: operations["list_areas_outdoor_regions__region_id__areas_get"];
-        put?: never;
-        /** Create Area */
-        post: operations["create_area_outdoor_regions__region_id__areas_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/regions/{region_id}/beta": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Beta For Region */
-        get: operations["list_beta_for_region_outdoor_regions__region_id__beta_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/regions/{region_id}/pins": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Region Pins */
-        get: operations["get_region_pins_outdoor_regions__region_id__pins_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/routes/submit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Submit Route
-         * @description User-facing "Add a Route" submission. Creates a pending route
-         *     attached to the region's system placeholder wall. Coords live on the
-         *     route itself (per-submission), not on the wall, so admin review
-         *     sees each pending route's real location. Rate-limited to 20 per
-         *     user per 24h.
-         */
-        post: operations["submit_route_outdoor_routes_submit_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/outdoor/routes/{route_id}": {
         parameters: {
             query?: never;
@@ -4409,7 +4128,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Route */
+        /**
+         * Get Route
+         * @description Returns the route + its parent area's name + display_kind so FE
+         *     can label session names without a follow-up fetch.
+         */
         get: operations["get_route_outdoor_routes__route_id__get"];
         put?: never;
         post?: never;
@@ -4427,7 +4150,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Ascents */
+        /**
+         * List Ascents
+         * @description Privacy filter: PrivacySettings.logs_public single-gate (NULL → True).
+         *     Row-level visibility is not consulted; users whose global toggle is
+         *     on expose all ascent rows.
+         */
         get: operations["list_ascents_outdoor_routes__route_id__ascents_get"];
         put?: never;
         post?: never;
@@ -4504,7 +4232,7 @@ export interface paths {
         put?: never;
         /**
          * Save Spot
-         * @description Save a Region/Area/Crag/Route to the user's saved spots. Idempotent —
+         * @description Save an outdoor_area / route to the user's saved spots. Idempotent —
          *     409 if already saved.
          */
         post: operations["save_spot_outdoor_saved_spots_post"];
@@ -4529,112 +4257,6 @@ export interface paths {
          * @description Idempotent — 204 even when already absent.
          */
         delete: operations["unsave_spot_outdoor_saved_spots__target_type___target_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Search Outdoor */
-        get: operations["search_outdoor_outdoor_search_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/walls/{old_id}/v2": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DEPRECATED — use /outdoor/areas/{id}
-         * @deprecated
-         */
-        get: operations["legacy_wall_alias_v2_outdoor_walls__old_id__v2_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/walls/{wall_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Wall */
-        patch: operations["update_wall_outdoor_walls__wall_id__patch"];
-        trace?: never;
-    };
-    "/outdoor/walls/{wall_id}/routes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Routes */
-        get: operations["list_routes_outdoor_walls__wall_id__routes_get"];
-        put?: never;
-        /** Create Route */
-        post: operations["create_route_outdoor_walls__wall_id__routes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/{level}/{item_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve Item */
-        post: operations["approve_item_outdoor__level___item_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/outdoor/{level}/{item_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject Item */
-        post: operations["reject_item_outdoor__level___item_id__reject_post"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5435,93 +5057,6 @@ export interface paths {
         put?: never;
         /** Recalculate Ranks */
         post: operations["recalculate_ranks_rank_recalculate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Regions */
-        get: operations["list_regions_regions_get"];
-        put?: never;
-        /** Create Region */
-        post: operations["create_region_regions_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions/nearby": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Nearby Regions */
-        get: operations["nearby_regions_regions_nearby_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions/{region_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Region */
-        get: operations["get_region_regions__region_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Region */
-        patch: operations["update_region_regions__region_id__patch"];
-        trace?: never;
-    };
-    "/regions/{region_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve Region */
-        post: operations["approve_region_regions__region_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions/{region_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject Region */
-        post: operations["reject_region_regions__region_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6695,21 +6230,6 @@ export interface components {
             /** Identity Token */
             identity_token: string;
         };
-        /** AreaCreateIn */
-        AreaCreateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-        };
         /**
          * AreaListItem
          * @description Lightweight projection for /children / /areas?bbox= / /search.
@@ -6752,64 +6272,6 @@ export interface components {
             parent_id?: string | null;
             /** Subtree Route Count */
             subtree_route_count: number;
-        };
-        /** AreaOut */
-        AreaOut: {
-            /** Approach */
-            approach?: string | null;
-            /** Cover Url */
-            cover_url?: string | null;
-            /**
-             * Crag Count
-             * @default 0
-             */
-            crag_count: number;
-            /** Description */
-            description?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /**
-             * Region Id
-             * Format: uuid
-             */
-            region_id: string;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Status */
-            status: string;
-        };
-        /** AreaUpdateIn */
-        AreaUpdateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Cover Url */
-            cover_url?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name?: string | null;
-            /** Name En */
-            name_en?: string | null;
         };
         /** AuditLogOut */
         AuditLogOut: {
@@ -6874,47 +6336,6 @@ export interface components {
             sort_order?: number | null;
             /** Tier */
             tier?: string | null;
-        };
-        /** BatchListResponse */
-        BatchListResponse: {
-            /** Items */
-            items: components["schemas"]["BatchSummary"][];
-            /** Total */
-            total: number;
-        };
-        /** BatchSummary */
-        BatchSummary: {
-            /** Auto Approved */
-            auto_approved: boolean;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Created By
-             * Format: uuid
-             */
-            created_by: string;
-            /** Csv Url */
-            csv_url: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Inserted Counts */
-            inserted_counts: {
-                [key: string]: number;
-            } | null;
-            /** Provider Contact */
-            provider_contact: string | null;
-            /** Provider Name */
-            provider_name: string;
-            /** Row Count */
-            row_count: number;
-            /** Status */
-            status: string;
         };
         /** BetaAuthor */
         BetaAuthor: {
@@ -7136,16 +6557,6 @@ export interface components {
             lang?: string | null;
             /** Title */
             title?: string | null;
-        };
-        /** Body_import_outdoor_csv_admin_outdoor_import_post */
-        Body_import_outdoor_csv_admin_outdoor_import_post: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: string;
-            /** Source Raw File */
-            source_raw_file?: string | null;
         };
         /** CSMFullOut */
         CSMFullOut: {
@@ -7973,371 +7384,6 @@ export interface components {
             polygon?: {
                 [key: string]: unknown;
             } | null;
-        };
-        /**
-         * CragCommunitySummary
-         * @description Crag-level activity rollup over the last 30 days.
-         *
-         *     Beta stub: activity = climb-log entries against routes under this crag.
-         *     Future: extends to include posts / partner-finds / events (PLAN §3.3).
-         */
-        CragCommunitySummary: {
-            /** Last Activity At */
-            last_activity_at?: string | null;
-            /**
-             * Recent Ascent Count
-             * @default 0
-             */
-            recent_ascent_count: number;
-            /**
-             * Recent Post Count
-             * @default 0
-             */
-            recent_post_count: number;
-        };
-        /** CragCreateIn */
-        CragCreateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /**
-             * Sort Order
-             * @default 0
-             */
-            sort_order: number;
-        };
-        /**
-         * CragDetailOut
-         * @description Enriched Crag with wall list + community summary for CragInfoSheet.
-         */
-        CragDetailOut: {
-            /** Approach */
-            approach?: string | null;
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
-            community?: components["schemas"]["CragCommunitySummary"];
-            /** Cover Url */
-            cover_url?: string | null;
-            /** Description */
-            description?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            location?: components["schemas"]["LocationAudit"];
-            /** Location Description */
-            location_description?: string | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Osm Synced At */
-            osm_synced_at?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Sort Order */
-            sort_order: number;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Status */
-            status: string;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Trail Source */
-            trail_source?: string | null;
-            /**
-             * Wall Count
-             * @default 0
-             */
-            wall_count: number;
-            /**
-             * Walls
-             * @default []
-             */
-            walls: components["schemas"]["WallOut"][];
-        };
-        /**
-         * CragMapOut
-         * @description BS-P1-δ — stable map payload for one crag, used by area-mode
-         *     once the user focuses a crag. Replaces the legacy bbox-driven
-         *     `/outdoor/pins` re-fetching on every pan (which caused cluster
-         *     reorder + count jitter, plan §3.3).
-         *
-         *     Future placeholders for P2/P3 expansion (kept in schema so FE
-         *     can render without API contract change):
-         *       - parking: parking points
-         *       - approach_paths: verified approach line(s)
-         *       - background_trails: nearby OSM trails (separate from
-         *         crag.trail_geojson which is the curated overlay)
-         */
-        CragMapOut: {
-            /** Approach Paths */
-            approach_paths?: unknown[];
-            /** Background Trails */
-            background_trails?: unknown[];
-            /** Bbox */
-            bbox: number[];
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat: number;
-            /** Lng */
-            lng: number;
-            location?: components["schemas"]["LocationAudit"];
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Parking */
-            parking?: unknown[];
-            /**
-             * Rope Count
-             * @default 0
-             */
-            rope_count: number;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Trail Source */
-            trail_source?: string | null;
-            /**
-             * Unknown Count
-             * @default 0
-             */
-            unknown_count: number;
-            /** Walls */
-            walls?: components["schemas"]["CragMapWallOut"][];
-        };
-        /**
-         * CragMapWallOut
-         * @description Per-wall map data for /outdoor/crags/{id}/map (BS-P1-δ).
-         *     Differs from WallOut: includes discipline counts + location audit;
-         *     omits admin-oriented fields (sort_order / description). Derived
-         *     lat/lng falls back to centroid of child routes when Wall.lat is
-         *     NULL. Walls with neither explicit nor derivable coords are
-         *     silently dropped (can't render anyway).
-         */
-        CragMapWallOut: {
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat: number;
-            /** Lng */
-            lng: number;
-            location?: components["schemas"]["LocationAudit"];
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /**
-             * Rope Count
-             * @default 0
-             */
-            rope_count: number;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /**
-             * Unknown Count
-             * @default 0
-             */
-            unknown_count: number;
-        };
-        /** CragOut */
-        CragOut: {
-            /** Approach */
-            approach?: string | null;
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
-            /** Cover Url */
-            cover_url?: string | null;
-            /** Description */
-            description?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            location?: components["schemas"]["LocationAudit"];
-            /** Location Description */
-            location_description?: string | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Osm Synced At */
-            osm_synced_at?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Sort Order */
-            sort_order: number;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Status */
-            status: string;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Trail Source */
-            trail_source?: string | null;
-            /**
-             * Wall Count
-             * @default 0
-             */
-            wall_count: number;
-        };
-        /**
-         * CragOverviewOut
-         * @description Lightweight Crag projection for map tier-1 overview rendering
-         *     (PLAN §3.2 redesign — climber-recognizable Crag-level pins replace
-         *     Region-level overview).
-         *
-         *     Optimized for bulk delivery: ~15k crags in one response. Skips
-         *     description / approach / cover_url / trail_geojson — those load on
-         *     demand via CragDetailOut. Aggregate counts populated by a single
-         *     GROUP BY query, not N+1.
-         *
-         *     BS-P1-β (2026-06-06) — discipline counts pivot on `OutdoorRoute.
-         *     discipline` ('boulder' | 'rope' | 'other'), which is the product-
-         *     level dimension explicitly designed for FE count queries (see
-         *     model comment). Three buckets sum to `route_count`. Drives
-         *     upcoming BS-P1-ζ Boulder/Rope composition ring (renders only when
-         *     `unknown_count / route_count <= 0.3` to avoid misleading display).
-         */
-        CragOverviewOut: {
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat: number;
-            /** Lng */
-            lng: number;
-            location?: components["schemas"]["LocationAudit"];
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /**
-             * Region Id
-             * Format: uuid
-             */
-            region_id: string;
-            /** Region Name */
-            region_name: string;
-            /**
-             * Rope Count
-             * @default 0
-             */
-            rope_count: number;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /**
-             * Unknown Count
-             * @default 0
-             */
-            unknown_count: number;
-        };
-        /** CragUpdateIn */
-        CragUpdateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Cover Url */
-            cover_url?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name?: string | null;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Osm Synced At */
-            osm_synced_at?: string | null;
-            /** Sort Order */
-            sort_order?: number | null;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Trail Source */
-            trail_source?: string | null;
         };
         /** DailySummaryOut */
         DailySummaryOut: {
@@ -9308,21 +8354,6 @@ export interface components {
              */
             user_id: string;
         };
-        /**
-         * LegacyAliasOut
-         * @description Wraps the upstream detail response in a deprecation envelope so the
-         *     FE can show "deprecated" hint during the 7-14 day alias period.
-         */
-        LegacyAliasOut: {
-            area: components["schemas"]["OutdoorAreaDetail"];
-            /** Canonical Url */
-            canonical_url: string;
-            /**
-             * Deprecated
-             * @default true
-             */
-            deprecated: boolean;
-        };
         /** LibrarySummary */
         LibrarySummary: {
             /** Blocks */
@@ -9332,10 +8363,9 @@ export interface components {
         };
         /**
          * LocationAudit
-         * @description BS-P1-γ (2026-06-06) — coordinate provenance triple. Embedded
-         *     in CragOverviewOut + CragOut so FE can label derived coords as
-         *     approximate (safety/trust per ChatGPT design: centroid OK for
-         *     overview but NOT for approach targets).
+         * @description Coordinate provenance triple — embedded in OutdoorAreaDetail.
+         *     Lets FE label derived coordinates as approximate (centroid OK for
+         *     panning but not for the "Get directions" CTA).
          */
         LocationAudit: {
             /** Confidence */
@@ -10005,7 +9035,7 @@ export interface components {
             /** Target Id */
             target_id?: string | null;
             /** Target Type */
-            target_type?: ("region" | "area" | "crag" | "route" | "outdoor_area") | null;
+            target_type?: ("route" | "outdoor_area") | null;
         };
         /** OutdoorListItemOut */
         OutdoorListItemOut: {
@@ -10042,7 +9072,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
+            target_type: "route" | "outdoor_area";
             /** Wall Lat */
             wall_lat?: number | null;
             /** Wall Lng */
@@ -10125,17 +9155,6 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
-        };
-        /** PaginatedRegions */
-        PaginatedRegions: {
-            /** Items */
-            items: components["schemas"]["RegionListOut"][];
-            /** Limit */
-            limit: number;
-            /** Page */
-            page: number;
-            /** Total */
-            total: number;
         };
         /** PaginatedUsers */
         PaginatedUsers: {
@@ -10842,212 +9861,6 @@ export interface components {
              */
             token_type: string;
         };
-        /** RegionCreateIn */
-        RegionCreateIn: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
-            /** Approach */
-            approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /**
-             * Country
-             * @default CN
-             */
-            country: string;
-            /** Description */
-            description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Region */
-            region?: string | null;
-            /** Safety Notes */
-            safety_notes?: string | null;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** RegionListOut */
-        RegionListOut: {
-            /**
-             * Area Count
-             * @default 0
-             */
-            area_count: number;
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /** Country */
-            country: string;
-            /** Cover Url */
-            cover_url?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Region */
-            region?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Status */
-            status: string;
-        };
-        /** RegionOut */
-        RegionOut: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
-            /** Approach */
-            approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /**
-             * Area Count
-             * @default 0
-             */
-            area_count: number;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /**
-             * Boulder Count
-             * @default 0
-             */
-            boulder_count: number;
-            /** Country */
-            country: string;
-            /** Cover Url */
-            cover_url?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Description */
-            description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Photos */
-            photos?: unknown[] | null;
-            /** Region */
-            region?: string | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Safety Notes */
-            safety_notes?: string | null;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Status */
-            status: string;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** RegionUpdateIn */
-        RegionUpdateIn: {
-            /** Accommodation */
-            accommodation?: unknown[] | null;
-            /** Amenities */
-            amenities?: unknown[] | null;
-            /** Approach */
-            approach?: string | null;
-            /** Approach Difficulty */
-            approach_difficulty?: string | null;
-            /** Approach Photos */
-            approach_photos?: unknown[] | null;
-            /** Approach Time Min */
-            approach_time_min?: number | null;
-            /** Best Seasons */
-            best_seasons?: unknown[] | null;
-            /** Country */
-            country?: string | null;
-            /** Cover Url */
-            cover_url?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Emergency Info */
-            emergency_info?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name?: string | null;
-            /** Name En */
-            name_en?: string | null;
-            /** Photos */
-            photos?: unknown[] | null;
-            /** Region */
-            region?: string | null;
-            /** Safety Notes */
-            safety_notes?: string | null;
-            /** Trail Geojson */
-            trail_geojson?: {
-                [key: string]: unknown;
-            } | null;
-            /** Transport */
-            transport?: {
-                [key: string]: unknown;
-            } | null;
-        };
         /** RegisterIn */
         RegisterIn: {
             /** Email */
@@ -11095,32 +9908,6 @@ export interface components {
             new_password: string;
             /** Token */
             token: string;
-        };
-        /** RevertResponse */
-        RevertResponse: {
-            /**
-             * Batch Id
-             * Format: uuid
-             */
-            batch_id: string;
-            /** Deleted Counts */
-            deleted_counts: {
-                [key: string]: number;
-            };
-            /** Revert Skipped */
-            revert_skipped?: components["schemas"]["RevertSkipped"][];
-        };
-        /** RevertSkipped */
-        RevertSkipped: {
-            /**
-             * Item Id
-             * Format: uuid
-             */
-            item_id: string;
-            /** Level */
-            level: string;
-            /** Reason */
-            reason: string;
         };
         /** ReviewActionIn */
         ReviewActionIn: {
@@ -11214,34 +10001,10 @@ export interface components {
              */
             list_id: string;
         };
-        /** RouteCreateIn */
-        RouteCreateIn: {
-            /** Bolts */
-            bolts?: number | null;
-            /** Description */
-            description?: string | null;
-            /** First Ascent */
-            first_ascent?: string | null;
-            /** Grade System */
-            grade_system: string;
-            /** Grade Text */
-            grade_text: string;
-            /** Length M */
-            length_m?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /**
-             * Pitches
-             * @default 1
-             */
-            pitches: number;
-            /** Style */
-            style: string;
-        };
         /** RouteOut */
         RouteOut: {
+            /** Area Display Kind */
+            area_display_kind?: string | null;
             /** Area Id */
             area_id?: string | null;
             /** Area Name */
@@ -11253,10 +10016,6 @@ export interface components {
             attempt_count: number;
             /** Bolts */
             bolts?: number | null;
-            /** Crag Id */
-            crag_id?: string | null;
-            /** Crag Name */
-            crag_name?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -11289,8 +10048,7 @@ export interface components {
             length_m?: number | null;
             /** Lng */
             lng?: number | null;
-            /** Location Path */
-            location_path?: unknown[] | null;
+            location_audit?: components["schemas"]["LocationAudit"] | null;
             /** Name */
             name: string;
             /** Name En */
@@ -11306,10 +10064,6 @@ export interface components {
              * @default 0
              */
             rating_count: number;
-            /** Region Id */
-            region_id?: string | null;
-            /** Region Name */
-            region_name?: string | null;
             /** Safety */
             safety?: string | null;
             /**
@@ -11323,25 +10077,21 @@ export interface components {
             status: string;
             /** Style */
             style: string;
-            /**
-             * Wall Id
-             * Format: uuid
-             */
-            wall_id: string;
-            /** Wall Name */
-            wall_name?: string | null;
         };
         /**
          * RoutePin
          * @description Single climb pin for the bbox map cluster source.
          *
-         *     Named `RoutePin` (not `MapPin`) to avoid clash with FE's existing `MapPin`
-         *     type for legacy `/regions/{id}/pins`. Track D consumes this directly.
+         *     CA Phase 6.2 — schema slimmed from 7 ancestor fields (wall + crag +
+         *     area + region IDs and names) to 1 canonical `area_id` + `area_name`
+         *     + `display_kind`. FE groups pins by `area_id` (same single-pin
+         *     invariant the wall_id-based grouping enforced), looks up ancestor
+         *     chain via `/outdoor/areas/{area_id}` if needed — pins payload stays
+         *     lean for the hot bbox path.
          *
-         *     Track D D-1: ancestor UUIDs added so FE can client-side group pins by
-         *     `wall_id` (single-Wall-pin invariant at zoom 15+) and route taps from
-         *     cluster expansion can open the correct InfoSheet without a second
-         *     lookup.
+         *     `display_kind` exposes the tree-node's category (usually 'wall' for
+         *     leaf-attached routes, occasionally 'crag' for direct-route crags) so
+         *     FE can label/icon without a follow-up fetch.
          */
         RoutePin: {
             /**
@@ -11352,28 +10102,16 @@ export interface components {
             /** Area Name */
             area_name: string;
             /**
-             * Crag Id
-             * Format: uuid
-             */
-            crag_id: string;
-            /** Crag Name */
-            crag_name: string;
-            /**
              * Discipline
              * @enum {string}
              */
             discipline: "boulder" | "rope" | "other";
+            /** Display Kind */
+            display_kind: string;
             /** Lat */
             lat: number;
             /** Lng */
             lng: number;
-            /**
-             * Region Id
-             * Format: uuid
-             */
-            region_id: string;
-            /** Region Name */
-            region_name: string;
             /**
              * Route Id
              * Format: uuid
@@ -11381,13 +10119,6 @@ export interface components {
             route_id: string;
             /** Style */
             style: string;
-            /**
-             * Wall Id
-             * Format: uuid
-             */
-            wall_id: string;
-            /** Wall Name */
-            wall_name: string;
         };
         /** RoutePinsOut */
         RoutePinsOut: {
@@ -11442,7 +10173,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
+            target_type: "route" | "outdoor_area";
         };
         /**
          * SavedSpotOut
@@ -11470,7 +10201,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
+            target_type: "route" | "outdoor_area";
         };
         /** SavedSpotsListOut */
         SavedSpotsListOut: {
@@ -11486,46 +10217,6 @@ export interface components {
              * Format: date-time
              */
             scheduled_publish_at: string;
-        };
-        /**
-         * SearchResult
-         * @description Cross-level outdoor search result.
-         *
-         *     Track C: top-level discriminator fields added so FE can render icon hints
-         *     (📁/📂/📍/🧗/⚡). `extra` kept and dual-populated during compat window —
-         *     drop after Track D consumers migrate.
-         */
-        SearchResult: {
-            /** Area Name */
-            area_name?: string | null;
-            /** Crag Name */
-            crag_name?: string | null;
-            /** Extra */
-            extra?: {
-                [key: string]: unknown;
-            } | null;
-            /** Grade Text */
-            grade_text?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Region Name */
-            region_name?: string | null;
-            /** Route Count */
-            route_count?: number | null;
-            /** Style */
-            style?: string | null;
-            /**
-             * Type
-             * @enum {string}
-             */
-            type: "region" | "area" | "crag" | "wall" | "route";
         };
         /** SearchResultOut */
         SearchResultOut: {
@@ -11915,55 +10606,6 @@ export interface components {
             total_rope: number;
             /** Total Sends */
             total_sends: number;
-        };
-        /**
-         * SubmitRouteIn
-         * @description Payload for POST /outdoor/routes/submit.
-         *
-         *     Minimum-viable set per the AE window decision (2026-04-22): style +
-         *     name + grade + coords + at least one photo. Everything else (FA,
-         *     description, length, pitches, bolts) is deferred and can be added by
-         *     the admin during review, or in a later UI polish pass.
-         *
-         *     Field rename `area_id` → `region_id` in BR Track A (semantic submission
-         *     entry stays at top level; PLAN §3.5 Crag-level shift is Track D scope).
-         */
-        SubmitRouteIn: {
-            /**
-             * Grade System
-             * @enum {string}
-             */
-            grade_system: "yds" | "vscale";
-            /** Grade Text */
-            grade_text: string;
-            /** Lat */
-            lat: number;
-            /** Lng */
-            lng: number;
-            /** Name */
-            name: string;
-            /** Photo Urls */
-            photo_urls: string[];
-            /**
-             * Region Id
-             * Format: uuid
-             */
-            region_id: string;
-            /**
-             * Style
-             * @enum {string}
-             */
-            style: "sport" | "trad" | "boulder" | "multi-pitch";
-        };
-        /** SubmitRouteOut */
-        SubmitRouteOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Status */
-            status: string;
         };
         /** TaskCreateIn */
         TaskCreateIn: {
@@ -12528,78 +11170,6 @@ export interface components {
             /** Time Range */
             time_range: string;
         };
-        /** WallCreateIn */
-        WallCreateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /**
-             * Sort Order
-             * @default 0
-             */
-            sort_order: number;
-            /** Topo Url */
-            topo_url?: string | null;
-        };
-        /** WallOut */
-        WallOut: {
-            /** Approach */
-            approach?: string | null;
-            /** Boulder Count */
-            boulder_count?: number | null;
-            /**
-             * Crag Id
-             * Format: uuid
-             */
-            crag_id: string;
-            /** Description */
-            description?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name: string;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Other Count */
-            other_count?: number | null;
-            /**
-             * Route Count
-             * @default 0
-             */
-            route_count: number;
-            /** Sort Order */
-            sort_order: number;
-            /** Source External Id */
-            source_external_id?: string | null;
-            /** Sport Count */
-            sport_count?: number | null;
-            /** Status */
-            status: string;
-            /** Topo Url */
-            topo_url?: string | null;
-            /** Trad Count */
-            trad_count?: number | null;
-        };
         /** WallSectionCreateIn */
         WallSectionCreateIn: {
             /**
@@ -12674,27 +11244,6 @@ export interface components {
             status?: ("approved" | "archived") | null;
             /** Style */
             style?: ("boulder" | "rope" | "mixed") | null;
-        };
-        /** WallUpdateIn */
-        WallUpdateIn: {
-            /** Approach */
-            approach?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Lat */
-            lat?: number | null;
-            /** Lng */
-            lng?: number | null;
-            /** Name */
-            name?: string | null;
-            /** Name En */
-            name_en?: string | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Sort Order */
-            sort_order?: number | null;
-            /** Topo Url */
-            topo_url?: string | null;
         };
         /** WeeklyPref */
         WeeklyPref: {
@@ -14192,141 +12741,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OrgStatusIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_batches_admin_outdoor_batches_get: {
-        parameters: {
-            query?: {
-                provider_name?: string | null;
-                status?: string | null;
-                auto_approved?: boolean | null;
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BatchListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_batch_admin_outdoor_batches__batch_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                batch_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BatchSummary"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revert_batch_endpoint_admin_outdoor_batches__batch_id__revert_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                batch_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RevertResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    import_outdoor_csv_admin_outdoor_import_post: {
-        parameters: {
-            query: {
-                provider_name: string;
-                provider_contact?: string | null;
-                dry_run?: boolean;
-                auto_approve?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_import_outdoor_csv_admin_outdoor_import_post"];
             };
         };
         responses: {
@@ -21445,20 +19859,19 @@ export interface operations {
             };
         };
     };
-    update_area_outdoor_areas__area_id__patch: {
+    list_beta_for_outdoor_area_outdoor_areas__area_id__beta_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 area_id: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AreaUpdateIn"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -21466,7 +19879,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AreaOut"];
+                    "application/json": components["schemas"]["BetaOut"][];
                 };
             };
             /** @description Validation Error */
@@ -21539,72 +19952,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    list_crags_outdoor_areas__area_id__crags_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_crag_outdoor_areas__area_id__crags_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                area_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CragCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
             };
         };
     };
@@ -21718,233 +20065,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_crags_overview_outdoor_crags_get: {
-        parameters: {
-            query?: {
-                status?: string;
-                min_routes?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragOverviewOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_crag_detail_outdoor_crags__crag_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                crag_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragDetailOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_crag_outdoor_crags__crag_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                crag_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CragUpdateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_crag_map_outdoor_crags__crag_id__map_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                crag_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CragMapOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_walls_outdoor_crags__crag_id__walls_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                crag_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WallOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_wall_outdoor_crags__crag_id__walls_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                crag_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WallCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WallOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    legacy_crag_alias_v2_outdoor_crags__old_id__v2_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                old_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LegacyAliasOut"];
-                };
             };
             /** @description Validation Error */
             422: {
@@ -22268,201 +20388,6 @@ export interface operations {
             };
         };
     };
-    legacy_region_alias_v2_outdoor_regions__old_id__v2_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                old_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LegacyAliasOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_areas_outdoor_regions__region_id__areas_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_area_outdoor_regions__region_id__areas_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AreaCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AreaOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_beta_for_region_outdoor_regions__region_id__beta_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BetaOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_region_pins_outdoor_regions__region_id__pins_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    submit_route_outdoor_routes_submit_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubmitRouteIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubmitRouteOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_route_outdoor_routes__route_id__get: {
         parameters: {
             query?: never;
@@ -22755,7 +20680,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
+                target_type: "route" | "outdoor_area";
                 target_id: string;
             };
             cookie?: never;
@@ -22768,241 +20693,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    search_outdoor_outdoor_search_get: {
-        parameters: {
-            query: {
-                q: string;
-                /** @description csv of region,area,crag,wall,route */
-                types?: string | null;
-                region_id?: string | null;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchResult"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    legacy_wall_alias_v2_outdoor_walls__old_id__v2_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                old_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LegacyAliasOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_wall_outdoor_walls__wall_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wall_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WallUpdateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WallOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_routes_outdoor_walls__wall_id__routes_get: {
-        parameters: {
-            query?: {
-                style?: string | null;
-                grade_min?: number | null;
-                grade_max?: number | null;
-            };
-            header?: never;
-            path: {
-                wall_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RouteOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_route_outdoor_walls__wall_id__routes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wall_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RouteCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RouteOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_item_outdoor__level___item_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                level: string;
-                item_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_item_outdoor__level___item_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                level: string;
-                item_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
             };
             /** @description Validation Error */
             422: {
@@ -24726,236 +22416,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_regions_regions_get: {
-        parameters: {
-            query?: {
-                country?: string | null;
-                region?: string | null;
-                status?: string;
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedRegions"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_region_regions_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegionCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    nearby_regions_regions_nearby_get: {
-        parameters: {
-            query: {
-                lat: number;
-                lng: number;
-                radius_km?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionListOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_region_regions__region_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_region_regions__region_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegionUpdateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_region_regions__region_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_region_regions__region_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

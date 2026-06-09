@@ -773,7 +773,7 @@ export default function MapScreenMapbox({
       setSheetTitle('');
       setLoadingSheet(true);
       try {
-        const routes = await outdoorApi.getRoutes(ctx.wall_id);
+        const routes = await outdoorApi.listAreaRoutes(ctx.area_id);
         const wall: Wall = {
           id: ctx.wall_id,
           crag_id: ctx.crag_id,
@@ -813,12 +813,17 @@ export default function MapScreenMapbox({
     (wall: Wall) => {
       if (!browsingCrag) return;
       const ctx: WallPinContext = {
+        // CA Phase 6.2 — area_id is the canonical UUID; legacy aliases
+        // (wall_id / crag_id / region_id and name pairs) all carry the
+        // same value so the state machine continues to read meaningful
+        // ancestor refs.
+        area_id: wall.id,
+        area_name: wall.name,
+        display_kind: 'wall',
         wall_id: wall.id,
         wall_name: wall.name,
         crag_id: browsingCrag.crag_id,
         crag_name: browsingCrag.crag_name,
-        area_id: '',
-        area_name: '',
         region_id: browsingCrag.region_id,
         region_name: browsingCrag.region_name,
         lat: wall.lat ?? browsingCrag.lat,

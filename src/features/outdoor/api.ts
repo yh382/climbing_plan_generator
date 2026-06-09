@@ -53,26 +53,52 @@ export const outdoorApi = {
   // ---- Regions (top level) ----
   listRegions: async (_params?: { country?: string; status?: string }): Promise<Region[]> => {
     if (USE_MOCK) return MOCK_REGIONS;
-    const qs = new URLSearchParams();
-    if (_params?.country) qs.set('country', _params.country);
-    if (_params?.status) qs.set('status', _params.status);
-    // BE returns PaginatedRegions { items, total, page, limit } — unwrap
-    // here so the public contract stays Region[]. Pagination not yet
-    // surfaced. BL post-ship we have 700+ regions so 2000 cap matches the
-    // BE's new upper bound; beyond that we'd want viewport bbox filter.
-    qs.set('limit', '2000');
-    const page = await api.get<{ items: Region[]; total: number }>(`/regions?${qs}`);
-    return page.items ?? [];
+    // CA Phase 6.2 — legacy /regions endpoint deleted. Read region-tier
+    // areas from the canonical outdoor_areas tree via a worldwide bbox
+    // query filtered to display_kind='region'. The OutdoorAreaListItem
+    // shape doesn't cleanly match Region, so we shim to the legacy shape
+    // here. Future: callers should accept OutdoorAreaListItem directly.
+    const list = await outdoorApi.listAreasInBbox({
+      bbox: { south: -90, west: -180, north: 90, east: 180 },
+      displayKinds: ['region'],
+      limit: 2000,
+    });
+    return list.map((item) => ({
+      id: item.id,
+      name: item.name,
+      name_en: item.name_en ?? undefined,
+      country: '',  // not on tree items; legacy shape filler
+      lat: item.lat ?? undefined,
+      lng: item.lng ?? undefined,
+      cover_url: undefined,
+      status: 'approved',
+    })) as Region[];
   },
 
   getRegion: async (id: string): Promise<Region | null> => {
     if (USE_MOCK) return MOCK_REGIONS.find((r) => r.id === id) ?? null;
-    return api.get<Region>(`/regions/${id}`);
+    // CA Phase 6.2 — legacy /regions/{id} endpoint deleted. Use
+    // /outdoor/areas/{id} + shim to Region shape for legacy callers
+    // (OfflineMapsSheet / OfflineDownloadPicker / GymsScreen).
+    const detail = await outdoorApi.getArea(id);
+    return {
+      id: detail.id,
+      name: detail.name,
+      name_en: detail.name_en ?? undefined,
+      country: '',
+      lat: detail.lat ?? undefined,
+      lng: detail.lng ?? undefined,
+      cover_url: detail.cover_url ?? undefined,
+      status: 'approved',
+    } as Region;
   },
 
-  nearbyRegions: async (lat: number, lng: number, radiusKm: number): Promise<Region[]> => {
+  nearbyRegions: async (_lat: number, _lng: number, _radiusKm: number): Promise<Region[]> => {
     if (USE_MOCK) return MOCK_REGIONS;
-    return api.get<Region[]>(`/regions/nearby?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`);
+    // CA Phase 6.2 — legacy /regions/nearby endpoint deleted; no caller
+    // post-Phase 4b. Stub returns empty until a follow-up wires up
+    // /outdoor/areas?bbox=... with a "near me" radius helper.
+    return [];
   },
 
   // CA Phase 6.1 — favoriteRegion / unfavoriteRegion / listFavoriteRegions
@@ -170,17 +196,18 @@ export const outdoorApi = {
   // for the client-side `cluster:true` ShapeSource that replaces the
   // legacy Region-overview + bbox shifting source in explore mode (PLAN §3.2).
   // Load once on explore-mode mount.
-  listCragsOverview: async (params?: {
+  listCragsOverview: async (_params?: {
     status?: string;
     min_routes?: number;
     limit?: number;
   }): Promise<CragOverview[]> => {
-    const qs = new URLSearchParams();
-    if (params?.status) qs.set('status', params.status);
-    if (params?.min_routes != null) qs.set('min_routes', String(params.min_routes));
-    if (params?.limit != null) qs.set('limit', String(params.limit));
-    const q = qs.toString();
-    return api.get<CragOverview[]>(`/outdoor/crags${q ? `?${q}` : ''}`);
+    // CA Phase 6.2 — `/outdoor/crags` overview endpoint deleted along
+    // with the 4 legacy tables. Stub returns empty so CragOverviewCluster
+    // renders nothing (low-zoom crag pin decoration is temporarily lost;
+    // route pin bbox source still works). Follow-up: re-implement on
+    // top of `/outdoor/areas?display_kinds=crag&bbox=...` once the
+    // viewport-driven crag pin source is designed.
+    return [];
   },
 
   // ---- BR Track D — Crag detail (CragInfoSheet source) ----

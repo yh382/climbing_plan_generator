@@ -129,7 +129,14 @@ const config: ExpoConfig = {
   },
 
   assetBundlePatterns: ["**/*"],
-  experiments: { typedRoutes: true, reactCompiler: true },
+  experiments: {
+    typedRoutes: true,
+    // React Compiler 是 babel transform，dev 冷启动每个模块都要多跑一遍，
+    // 显著拖慢 Metro 打包 / dev client 拉包（download 卡在 X% 的放大因素之一）。
+    // 它的收益在「生产运行时」memoization，dev 阶段纯付成本 → 只在非 dev 构建开启。
+    // 想临时全开/全关，把右侧条件改成 true / false 即可。
+    reactCompiler: process.env.NODE_ENV !== "development",
+  },
   owner: "1185679154",
 };
 

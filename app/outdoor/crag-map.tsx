@@ -34,7 +34,7 @@ import { outdoorApi } from '../../src/features/outdoor/api';
 import { outdoorListsApi } from '../../src/features/outdoor/listsApi';
 // BR Track A: top-level outdoor entity is now Region (was Area). Alias kept
 // for caller minimum-diff — Track D will rewrite this whole file.
-import type { Region as Area, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
+import type { OutdoorAreaDetail, MapPin, Wall, OutdoorRoute, OutdoorListDetail } from '../../src/features/outdoor/types';
 import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 import MapPinCluster from '../../src/features/outdoor/components/MapPinCluster';
 import RoutePinCluster, {
@@ -143,7 +143,7 @@ export default function CragMapPage() {
   const prePinPickDetentRef = useRef<number>(DETENT_COLLAPSED);
 
   // Data state
-  const [area, setArea] = useState<Area | null>(null);
+  const [area, setArea] = useState<OutdoorAreaDetail | null>(null);
   // BR Track D Day 5e — `pins` is now list-mode-only. Area mode uses
   // `viewportPins` (bbox-driven RoutePin source) + `focusedWall`.
   // useListData mirror keeps the list-mode synth (one MapPin per listItem
@@ -273,7 +273,7 @@ export default function CragMapPage() {
       setSearchExpanded(false);
       if (!areaId) return;
       setLoading(true);
-      outdoorApi.getRegion(areaId).then((areaData) => {
+      outdoorApi.getArea(areaId).then((areaData) => {
         if (areaData) setArea(areaData);
         setLoading(false);
       });
@@ -377,7 +377,7 @@ export default function CragMapPage() {
     setSheetTitle('');
     setLoadingSheet(true);
     try {
-      const wallRoutes = await outdoorApi.getRoutes(ctx.wall_id);
+      const wallRoutes = await outdoorApi.listAreaRoutes(ctx.area_id);
       const wall: Wall = {
         id: ctx.wall_id,
         crag_id: ctx.crag_id,
