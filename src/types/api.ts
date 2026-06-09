@@ -3885,6 +3885,40 @@ export interface paths {
         patch: operations["update_shift_orgs__org_id__scheduling_shifts__shift_id__patch"];
         trace?: never;
     };
+    "/outdoor/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bbox-filtered area pin source (zoom-aware) */
+        get: operations["list_outdoor_areas_bbox_outdoor_areas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Area name search (ILIKE on name + name_en) */
+        get: operations["search_outdoor_areas_outdoor_areas_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/areas/{area_id}": {
         parameters: {
             query?: never;
@@ -3892,7 +3926,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Area detail + ancestors + location audit */
+        get: operations["get_outdoor_area_outdoor_areas__area_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3900,6 +3935,40 @@ export interface paths {
         head?: never;
         /** Update Area */
         patch: operations["update_area_outdoor_areas__area_id__patch"];
+        trace?: never;
+    };
+    "/outdoor/areas/{area_id}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Direct children of area, sorted by subtree_route_count desc */
+        get: operations["list_outdoor_area_children_outdoor_areas__area_id__children_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/{area_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Convex hull polygon of subtree route points */
+        get: operations["get_outdoor_area_coverage_outdoor_areas__area_id__coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/outdoor/areas/{area_id}/crags": {
@@ -3914,6 +3983,23 @@ export interface paths {
         put?: never;
         /** Create Crag */
         post: operations["create_crag_outdoor_areas__area_id__crags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/{area_id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Routes attached to area (direct or include subtree descendants) */
+        get: operations["list_outdoor_area_routes_outdoor_areas__area_id__routes_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4057,6 +4143,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/crags/{old_id}/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DEPRECATED — use /outdoor/areas/{id}
+         * @deprecated
+         * @description 7-14d bridge. Returns 404 if old_id resolves to non-crag display_kind.
+         */
+        get: operations["legacy_crag_alias_v2_outdoor_crags__old_id__v2_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/lists": {
         parameters: {
             query?: never;
@@ -4191,6 +4298,26 @@ export interface paths {
         };
         /** List Route Pins */
         get: operations["list_route_pins_outdoor_pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/regions/{old_id}/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DEPRECATED — use /outdoor/areas/{id}
+         * @deprecated
+         */
+        get: operations["legacy_region_alias_v2_outdoor_regions__old_id__v2_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4416,6 +4543,26 @@ export interface paths {
         };
         /** Search Outdoor */
         get: operations["search_outdoor_outdoor_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/walls/{old_id}/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DEPRECATED — use /outdoor/areas/{id}
+         * @deprecated
+         */
+        get: operations["legacy_wall_alias_v2_outdoor_walls__old_id__v2_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6536,6 +6683,29 @@ export interface components {
              */
             range_supported: boolean;
         };
+        /**
+         * AncestorBreadcrumb
+         * @description One node in the area's ancestor chain (root → parent inclusive).
+         *
+         *     Used by /outdoor/areas/{id} detail to render breadcrumb UI without
+         *     requiring N follow-up queries by FE.
+         */
+        AncestorBreadcrumb: {
+            /** Depth */
+            depth: number;
+            /**
+             * Display Kind
+             * @enum {string}
+             */
+            display_kind: "country" | "state" | "region" | "area" | "crag" | "wall";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** Anthropometrics */
         Anthropometrics: {
             /** Ape Index */
@@ -6574,6 +6744,49 @@ export interface components {
             name: string;
             /** Name En */
             name_en?: string | null;
+        };
+        /**
+         * AreaListItem
+         * @description Lightweight projection for /children / /areas?bbox= / /search.
+         *
+         *     Skips ancestors / description / approach / location audit which the
+         *     list views don't render. Saves payload size on dense responses.
+         */
+        AreaListItem: {
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Depth */
+            depth: number;
+            /** Direct Child Count */
+            direct_child_count: number;
+            /** Direct Route Count */
+            direct_route_count: number;
+            /**
+             * Display Kind
+             * @enum {string}
+             */
+            display_kind: "country" | "state" | "region" | "area" | "crag" | "wall";
+            /** Has Routes */
+            has_routes: boolean;
+            /** Has Subareas */
+            has_subareas: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Subtree Route Count */
+            subtree_route_count: number;
         };
         /** AreaOut */
         AreaOut: {
@@ -6667,6 +6880,20 @@ export interface components {
             target_id: string;
             /** Target Type */
             target_type: string;
+        };
+        /**
+         * BBoxOut
+         * @description Axis-aligned bounding box for area coverage (south-west / north-east).
+         */
+        BBoxOut: {
+            /** Ne Lat */
+            ne_lat: number;
+            /** Ne Lng */
+            ne_lng: number;
+            /** Sw Lat */
+            sw_lat: number;
+            /** Sw Lng */
+            sw_lng: number;
         };
         /** BadgeUpdateIn */
         BadgeUpdateIn: {
@@ -7767,6 +7994,20 @@ export interface components {
             save_count: number;
             /** View Count */
             view_count: number;
+        };
+        /**
+         * CoverageOut
+         * @description Polygon = convex hull GeoJSON or null when fewer than 3 distinct
+         *     points. point_count reflects the hull input cardinality.
+         */
+        CoverageOut: {
+            bbox?: components["schemas"]["BBoxOut"] | null;
+            /** Point Count */
+            point_count: number;
+            /** Polygon */
+            polygon?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * CragCommunitySummary
@@ -9102,6 +9343,21 @@ export interface components {
              */
             user_id: string;
         };
+        /**
+         * LegacyAliasOut
+         * @description Wraps the upstream detail response in a deprecation envelope so the
+         *     FE can show "deprecated" hint during the 7-14 day alias period.
+         */
+        LegacyAliasOut: {
+            area: components["schemas"]["OutdoorAreaDetail"];
+            /** Canonical Url */
+            canonical_url: string;
+            /**
+             * Deprecated
+             * @default true
+             */
+            deprecated: boolean;
+        };
         /** LibrarySummary */
         LibrarySummary: {
             /** Blocks */
@@ -9119,6 +9375,15 @@ export interface components {
         LocationAudit: {
             /** Confidence */
             confidence?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Source */
+            source?: string | null;
+        };
+        /** LocationAuditOut */
+        LocationAuditOut: {
+            /** Confidence */
+            confidence?: ("high" | "medium" | "low") | null;
             /** Method */
             method?: string | null;
             /** Source */
@@ -9632,6 +9897,86 @@ export interface components {
              */
             status: "active" | "pending" | "suspended";
         };
+        /**
+         * OutdoorAreaDetail
+         * @description Detail response for `GET /outdoor/areas/{id}` — adds ancestors
+         *     breadcrumb (root → parent inclusive, NOT including self) + structured
+         *     location audit nested object so FE renders one fetch's worth of data.
+         */
+        OutdoorAreaDetail: {
+            /** Ancestors */
+            ancestors: components["schemas"]["AncestorBreadcrumb"][];
+            /** Approach */
+            approach?: string | null;
+            /**
+             * Computed Kind
+             * @enum {string}
+             */
+            computed_kind: "country" | "state" | "region" | "area" | "crag" | "wall";
+            /** Cover Url */
+            cover_url?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Depth */
+            depth: number;
+            /** Description */
+            description?: string | null;
+            /** Direct Child Count */
+            direct_child_count: number;
+            /** Direct Route Count */
+            direct_route_count: number;
+            /**
+             * Display Kind
+             * @enum {string}
+             */
+            display_kind: "country" | "state" | "region" | "area" | "crag" | "wall";
+            /** Display Kind Locked */
+            display_kind_locked: boolean;
+            /** Has Routes */
+            has_routes: boolean;
+            /** Has Subareas */
+            has_subareas: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lng */
+            lng?: number | null;
+            location_audit: components["schemas"]["LocationAuditOut"];
+            /** Location Confidence */
+            location_confidence?: ("high" | "medium" | "low") | null;
+            /** Location Method */
+            location_method?: string | null;
+            /** Location Source */
+            location_source?: string | null;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Path Ids */
+            path_ids: string[];
+            /** Source */
+            source: string;
+            /** Source External Id */
+            source_external_id?: string | null;
+            /** Status */
+            status: string;
+            /** Subtree Route Count */
+            subtree_route_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** OutdoorListCreateIn */
         OutdoorListCreateIn: {
             /** Description */
@@ -9695,7 +10040,7 @@ export interface components {
             /** Target Id */
             target_id?: string | null;
             /** Target Type */
-            target_type?: ("route" | "region" | "area" | "crag") | null;
+            target_type?: ("region" | "area" | "crag" | "route" | "outdoor_area") | null;
         };
         /** OutdoorListItemOut */
         OutdoorListItemOut: {
@@ -9732,7 +10077,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "route" | "region" | "area" | "crag";
+            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
             /** Wall Lat */
             wall_lat?: number | null;
             /** Wall Lng */
@@ -11132,7 +11477,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "region" | "area" | "crag" | "route";
+            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
         };
         /**
          * SavedSpotOut
@@ -11160,7 +11505,7 @@ export interface components {
              * Target Type
              * @enum {string}
              */
-            target_type: "region" | "area" | "crag" | "route";
+            target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
         };
         /** SavedSpotsListOut */
         SavedSpotsListOut: {
@@ -11216,6 +11561,13 @@ export interface components {
              * @enum {string}
              */
             type: "region" | "area" | "crag" | "wall" | "route";
+        };
+        /** SearchResultOut */
+        SearchResultOut: {
+            /** Items */
+            items: components["schemas"]["AreaListItem"][];
+            /** Total */
+            total: number;
         };
         /** SessionBank */
         SessionBank: {
@@ -21022,6 +21374,112 @@ export interface operations {
             };
         };
     };
+    list_outdoor_areas_bbox_outdoor_areas_get: {
+        parameters: {
+            query: {
+                /** @description bbox south (min lat) */
+                south: number;
+                /** @description bbox west (min lng) */
+                west: number;
+                /** @description bbox north (max lat) */
+                north: number;
+                /** @description bbox east (max lng) */
+                east: number;
+                /** @description Multi-value display_kind filter. Pass as repeated query param: ?display_kinds=country&display_kinds=state. Empty → all kinds. */
+                display_kinds?: string[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_outdoor_areas_outdoor_areas_search_get: {
+        parameters: {
+            query: {
+                /** @description Search query (min 2 chars) */
+                q: string;
+                display_kinds?: string[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outdoor_area_outdoor_areas__area_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutdoorAreaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_area_outdoor_areas__area_id__patch: {
         parameters: {
             query?: never;
@@ -21054,6 +21512,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    list_outdoor_area_children_outdoor_areas__area_id__children_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outdoor_area_coverage_outdoor_areas__area_id__coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageOut"];
+                };
+            };
+            /** @description coverage_too_broad | subtree_too_large | bbox_invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21110,6 +21630,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CragOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_outdoor_area_routes_outdoor_areas__area_id__routes_get: {
+        parameters: {
+            query?: {
+                include_descendants?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -21393,6 +21948,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WallOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    legacy_crag_alias_v2_outdoor_crags__old_id__v2_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                old_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyAliasOut"];
                 };
             };
             /** @description Validation Error */
@@ -21704,6 +22290,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoutePinsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    legacy_region_alias_v2_outdoor_regions__old_id__v2_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                old_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyAliasOut"];
                 };
             };
             /** @description Validation Error */
@@ -22173,7 +22790,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                target_type: "region" | "area" | "crag" | "route";
+                target_type: "region" | "area" | "crag" | "route" | "outdoor_area";
                 target_id: string;
             };
             cookie?: never;
@@ -22220,6 +22837,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    legacy_wall_alias_v2_outdoor_walls__old_id__v2_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                old_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyAliasOut"];
                 };
             };
             /** @description Validation Error */
