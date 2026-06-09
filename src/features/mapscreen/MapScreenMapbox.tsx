@@ -88,7 +88,8 @@ import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 import { useCragsOverview } from './useCragsOverview';
 import TrailLayer from '../outdoor/components/TrailLayer';
-import CragPolygonOverlay from '../outdoor/components/CragPolygonOverlay';
+// CA Phase 5.3 — server-driven coverage replaces the local hull.
+import AreaCoverageOverlay from '../outdoor/components/AreaCoverageOverlay';
 import { getDevTrailFallback } from '../outdoor/devTrailFixture';
 import { FilterChipsBar } from './components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../store/useOutdoorMapFiltersStore';
@@ -1636,25 +1637,19 @@ export default function MapScreenMapbox({
                 enterArea, or directly via GymsSavedSpotsRow / search
                 hit. Once inside area mode the bbox follows the camera
                 so users can pan within the focused Region. */}
-            {/* BU 2026-06-07 — crag boundary polygon overlay for crag-browse
-                sub-state. **Z-order**: mounted BEFORE RoutePinCluster /
-                MapPinCluster / TrailLayer so wall pins + numbers paint ON
-                TOP of the polygon. Mapbox-RN add order = paint order;
-                later JSX children render above earlier ones.
-                visible-gate ensures we ONLY render when the fetched
-                focusedCragDetail belongs to the currently browsing crag
-                (avoids stale polygon during async detail re-fetch on
-                cross-crag wall tap). Pre-BV legacy crags with NULL wall
-                coords gracefully render no polygon (computeCragPolygon
-                returns null). */}
-            <CragPolygonOverlay
-              walls={focusedCragDetail?.walls}
-              visible={
-                !!browsingCrag &&
-                !!focusedCragDetail &&
-                focusedCragDetail.id === browsingCrag.crag_id
-              }
-            />
+            {/* CA Phase 5.3 — server-driven AreaCoverageOverlay (replaced
+                BU 2026-06-07 client-side CragPolygonOverlay). BE's monotone-
+                chain hull is computed from the full subtree route fan-out
+                (vs the old hull which only saw the focused crag's walls).
+                Z-order: mounted BEFORE RoutePinCluster / MapPinCluster /
+                TrailLayer so wall pins + numbers paint ON TOP of the
+                polygon. Mapbox-RN add order = paint order; later JSX
+                children render above earlier ones. Gated on browsingCrag
+                so the hook stays dormant until a crag is focused; the
+                overlay silently hides on null polygon (<3 route points)
+                or 422 errors (coverage_too_broad / subtree_too_large) so
+                transient drift doesn't surface as UI noise. */}
+            <AreaCoverageOverlay areaId={browsingCrag?.crag_id ?? null} />
 
             {mode.kind === 'area' && (
               <RoutePinCluster
