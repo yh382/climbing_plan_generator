@@ -41,6 +41,7 @@ import RoutesLibrarySheet, { type RoutesLibrarySheetHandle } from './RoutesLibra
 // CA Phase 4b — unified outdoor area sheet replaces CragInfo/AreaInfo/RegionInfo.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
+  areaListItemToSeed,
 } from './OutdoorAreaInfoSheet';
 import { AreaCoverImage } from './AreaCoverImage';
 import type { Area } from '../../outdoor/types';
@@ -399,6 +400,9 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
           pathname: '/outdoor/outdoor-route-detail' as any,
           params: { id: r.id },
         });
+      }}
+      onChildTap={(c) => {
+        void outdoorAreaSheetRef.current?.present(areaListItemToSeed(c));
       }}
     />
     </>

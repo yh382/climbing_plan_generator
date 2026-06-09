@@ -28,6 +28,7 @@ import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outd
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
   type AreaSeedInput,
+  areaListItemToSeed,
 } from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
@@ -899,6 +900,7 @@ export default function OutdoorRouteDetailPage() {
             params: { id: r.id },
           });
         }}
+        onChildTap={(c) => presentArea(areaListItemToSeed(c))}
       />
 
       {/* Pure share-beta flow now lives at app/outdoor-beta-share.tsx

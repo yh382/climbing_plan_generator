@@ -50,6 +50,7 @@ import CragMenuSheet, { type CragMenuSheetHandle } from './components/CragMenuSh
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
   type AreaSeedInput,
+  areaListItemToSeed,
 } from './components/OutdoorAreaInfoSheet';
 import MyListSheet, { type MyListSheetHandle } from './components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from './components/ReportsSheet';
@@ -2026,6 +2027,7 @@ export default function MapScreenMapbox({
         onPresented={() => setAreaInfoOpen(true)}
         onDismissed={() => setAreaInfoOpen(false)}
         onRouteTap={(r) => navigateToRoute(r.id)}
+        onChildTap={(c) => presentArea(areaListItemToSeed(c))}
       />
       {/* Crag menu sheet (stacked) — spawned from the sheet-header
           hamburger tap. Hosts Crag header card + climb-type segment +

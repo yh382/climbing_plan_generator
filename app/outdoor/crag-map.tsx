@@ -55,6 +55,7 @@ import CragMenuSheet, { type CragMenuSheetHandle } from '../../src/features/maps
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
   type AreaSeedInput,
+  areaListItemToSeed,
 } from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
 import { FilterChipsBar } from '../../src/features/mapscreen/components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../src/store/useOutdoorMapFiltersStore';
@@ -939,6 +940,7 @@ export default function CragMapPage() {
             params: { id: r.id },
           });
         }}
+        onChildTap={(c) => presentArea(areaListItemToSeed(c))}
       />
 
       {/* Crag menu sheet (stacked) — BR Track D Day 5e: now properly
