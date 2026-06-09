@@ -1,14 +1,14 @@
 // src/features/outdoor/savedSpotsApi.ts
-// BR Track D D-4 — polymorphic Saved Spots wrapper (Region/Area/Crag/Route).
+// Polymorphic Saved Spots wrapper. Target types: region / area / crag /
+// route / outdoor_area (Phase 5.2 widened the Literal).
 //
-// Wraps the polymorphic outdoor_list_items table shipped in Track C.
-// BE-side a per-user `__saved_spots__` sentinel list is auto-provisioned
-// on first save; FE never sees that detail.
+// Wraps the polymorphic outdoor_list_items table. BE-side a per-user
+// `__saved_spots__` sentinel list is auto-provisioned on first save;
+// FE never sees that detail.
 //
-// Replaces FE-side legacy:
-//   - outdoorApi.favoriteRegion(id) / unfavoriteRegion(id) / listFavoriteRegions()
-//   - useFavoriteRegionsStore
-// Legacy region endpoints stay live during compat (BR-Track-D-FU drops them).
+// Replaced (CA Phase 6.1) the legacy region-only favorite store +
+// `/regions/{id}/favorite` endpoints. Region bookmarks now flow through
+// this same wrapper with target_type='region'.
 
 import { api } from "../../lib/apiClient";
 import type {

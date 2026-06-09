@@ -5459,23 +5459,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/regions/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Favorite Regions */
-        get: operations["list_favorite_regions_regions_favorites_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/regions/nearby": {
         parameters: {
             query?: never;
@@ -5523,24 +5506,6 @@ export interface paths {
         /** Approve Region */
         post: operations["approve_region_regions__region_id__approve_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions/{region_id}/favorite": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Favorite Region */
-        post: operations["favorite_region_regions__region_id__favorite_post"];
-        /** Unfavorite Region */
-        delete: operations["unfavorite_region_regions__region_id__favorite_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -24833,26 +24798,6 @@ export interface operations {
             };
         };
     };
-    list_favorite_regions_regions_favorites_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionListOut"][];
-                };
-            };
-        };
-    };
     nearby_regions_regions_nearby_get: {
         parameters: {
             query: {
@@ -24954,68 +24899,6 @@ export interface operations {
         };
     };
     approve_region_regions__region_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    favorite_region_regions__region_id__favorite_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                region_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unfavorite_region_regions__region_id__favorite_delete: {
         parameters: {
             query?: never;
             header?: never;

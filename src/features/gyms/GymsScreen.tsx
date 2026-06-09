@@ -295,12 +295,19 @@ export default function GymsScreen() {
   // Item 1 (KAYA): area card in the sheet list → navigate straight to crag-map.
   // Area pin on the map still opens AreaDetailCard via onSelectCrag (unchanged)
   // — the detail card has its own "View Route Map" CTA.
-  const onSelectAreaFromList = useCallback((area: Area) => {
-    router.push({
-      pathname: "/outdoor/crag-map" as any,
-      params: { areaId: area.id, areaName: area.name },
-    });
-  }, []);
+  const onSelectAreaFromList = useCallback(
+    (target: { id: string; name: string }) => {
+      // CA Phase 6.1 — broadened from (area: Area) to {id, name} so
+      // SavedSpot-typed callers (GymsSavedSpotsRow onSelectArea) and
+      // Area-typed callers (GymList onSelectArea) both type-check
+      // without a synthesizing wrapper.
+      router.push({
+        pathname: "/outdoor/crag-map" as any,
+        params: { areaId: target.id, areaName: target.name },
+      });
+    },
+    [router],
+  );
 
   // Distance from current user → each area (meters), for mixed-list sort + display.
   const areaDistances = useMemo<Record<string, number>>(() => {
@@ -434,7 +441,11 @@ export default function GymsScreen() {
           row leaks behind the home indicator.
         */}
         <View style={[styles.sheetContent, { paddingBottom: insets.bottom }]}>
-          <GymsSavedSpotsRow onSelectArea={onSelectAreaFromList} />
+          <GymsSavedSpotsRow
+            onSelectArea={(spot) =>
+              onSelectAreaFromList({ id: spot.target_id, name: spot.target_name })
+            }
+          />
           <GymList
             gyms={gyms}
             areas={areas}

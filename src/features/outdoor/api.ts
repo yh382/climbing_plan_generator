@@ -75,20 +75,11 @@ export const outdoorApi = {
     return api.get<Region[]>(`/regions/nearby?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`);
   },
 
-  favoriteRegion: async (id: string) => {
-    if (USE_MOCK) return { ok: true };
-    return api.post<{ ok: boolean }>(`/regions/${id}/favorite`);
-  },
-
-  unfavoriteRegion: async (id: string) => {
-    if (USE_MOCK) return { ok: true };
-    return api.del<{ ok: boolean }>(`/regions/${id}/favorite`);
-  },
-
-  listFavoriteRegions: async (): Promise<Region[]> => {
-    if (USE_MOCK) return [];
-    return api.get<Region[]>(`/regions/favorites`);
-  },
+  // CA Phase 6.1 — favoriteRegion / unfavoriteRegion / listFavoriteRegions
+  // removed. Region bookmarks now live in the polymorphic saved-spots
+  // store (`savedSpotsApi` with target_type='region', Phase 5.2). The
+  // `user_favorite_regions` table is dropped by alembic
+  // `phase61_drop_user_favorite_regions`.
 
   // ---- Hierarchy ----
   getAreas: async (regionId: string): Promise<Area[]> => {

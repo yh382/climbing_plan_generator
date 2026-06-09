@@ -3,22 +3,20 @@
 // sheet content (both overseas MapScreenMapbox and CN GymsScreen). Each
 // item = rounded-square cover avatar + name below (single line).
 //
-// BR Track D Day 6 (PLAN §11 + BR-FU-saved-spots-混合 merge):
-//   The strip is now polymorphic. Item types in display order:
-//     1. Gym favorites (`useFavoriteGyms`)
-//     2. Region favorites (`useFavoriteRegionsStore` — legacy, still
-//        backed by `/regions/{id}/favorite` until BR-Track-D-FU-cleanup)
-//     3. Outdoor saved spots — area + crag + route (`useSavedSpots`,
-//        polymorphic `/outdoor/saved-spots`; we filter out Region entries
-//        to avoid duplicates with the legacy region source above)
-//   Each tile carries a small icon discriminator so the user can tell
-//   gym vs region vs area vs crag vs route at a glance.
-//   Tap dispatches per type via callbacks owned by the parent screen.
+// CA Phase 6.1 — single-source migration: the strip now reads exclusively
+// from the polymorphic `/outdoor/saved-spots` table (region + area + crag
+// + route target types) + the gym favorites source. The legacy region
+// store (`useFavoriteRegionsStore`) is gone; region bookmarks land here
+// via `target_type='region'` (Phase 5.2 widened the BE Literal).
+//
+// Each tile carries a small icon discriminator so the user can tell
+// gym vs region vs area vs crag vs route at a glance.
+// Tap dispatches per type via callbacks owned by the parent screen.
 //
 // Sort priority: `highlightAreaId` (from `useMapSavedSpotHighlightStore`,
-// set by the home `SavedSpotsCarousel` tap) → favorited → alphabetic.
+// set by the home `SavedSpotsCarousel` tap) → alphabetic.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -32,8 +30,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
-import type { Region, SavedSpot } from '../../outdoor/types';
-import useFavoriteRegionsStore from '../../../store/useFavoriteRegionsStore';
+import type { SavedSpot } from '../../outdoor/types';
 import useMapSavedSpotHighlightStore from '../../../store/useMapSavedSpotHighlightStore';
 import { useFavoriteGyms } from '../../gyms/hooks';
 import { useSavedSpots } from '../../outdoor/useSavedSpots';
@@ -49,20 +46,24 @@ const AVATAR_RADIUS = 18;
 /** Unified tile shape for the strip. */
 type SpotItem =
   | { kind: 'gym'; gym: GymSummary }
-  | { kind: 'region'; region: Region }
-  | { kind: 'area' | 'crag' | 'route'; spot: SavedSpot };
+  | { kind: 'region' | 'area' | 'crag' | 'route'; spot: SavedSpot };
 
 interface GymsSavedSpotsRowProps {
-  /** Legacy Region-typed callback (kept for backward compat with the
-   *  Day 5d API). Fires when the user taps a Region tile. */
-  onSelectArea: (region: Region) => void;
-  /** Day 6 — tap an Area-typed saved spot. Caller presents AreaInfoSheet. */
+  /** Tap a Region-typed saved spot. Caller transitions into area mode for
+   *  the tapped region. CA Phase 6.1 — signature is the polymorphic
+   *  SavedSpot now (was: full Region). The legacy Region-shape callback
+   *  shape is gone; callers synthesize `{id, name}` from `spot.target_id
+   *  + spot.target_name`. */
+  onSelectArea: (spot: SavedSpot) => void;
+  /** Tap an Area-typed saved spot. Caller presents the unified
+   *  OutdoorAreaInfoSheet. */
   onSelectArea4?: (spot: SavedSpot) => void;
-  /** Day 6 — tap a Crag-typed saved spot. Caller presents CragInfoSheet. */
+  /** Tap a Crag-typed saved spot. Caller presents the unified
+   *  OutdoorAreaInfoSheet. */
   onSelectCrag?: (spot: SavedSpot) => void;
-  /** Day 6 — tap a Route-typed saved spot. Caller navigates to route detail. */
+  /** Tap a Route-typed saved spot. Caller navigates to route detail. */
   onSelectRoute?: (spot: SavedSpot) => void;
-  /** Day 6 — tap a favorited gym tile. */
+  /** Tap a favorited gym tile. */
   onSelectGym?: (gymId: string, gymName: string) => void;
 }
 
@@ -77,19 +78,12 @@ export function GymsSavedSpotsRow({
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const highlightAreaId = useMapSavedSpotHighlightStore((s) => s.highlightAreaId);
-  // Region source: legacy `/regions/favorites` — kept until the BE
-  // dual-write to `/outdoor/saved-spots` lands.
-  const regions = useFavoriteRegionsStore((s) => s.regions);
-  const hydrateRegions = useFavoriteRegionsStore((s) => s.hydrate);
-  // Polymorphic source: outdoor_list_items polymorphic table.
+  // Polymorphic source: outdoor_list_items table. Includes region target
+  // type since CA Phase 5.2 widened the Literal.
   const { items: spotsRaw } = useSavedSpots();
   // Gym source: legacy `/gyms/favorites` — gyms aren't in the polymorphic
   // saved_spots table.
   const { favorites: gymFavorites } = useFavoriteGyms();
-
-  useEffect(() => {
-    void hydrateRegions();
-  }, [hydrateRegions]);
 
   // Combined + sorted strip items.
   const items = useMemo<SpotItem[]>(() => {
@@ -97,14 +91,7 @@ export function GymsSavedSpotsRow({
     for (const g of gymFavorites) {
       tiles.push({ kind: 'gym', gym: g });
     }
-    for (const r of regions) {
-      tiles.push({ kind: 'region', region: r });
-    }
-    // Filter polymorphic source to non-region rows so we don't double-list
-    // Regions that landed via the legacy /regions/favorite endpoint
-    // (still the active write path on RegionInfoSheet — see hook docstring).
     for (const s of spotsRaw) {
-      if (s.target_type === 'region') continue;
       tiles.push({ kind: s.target_type, spot: s });
     }
     // Stable sort: highlighted regions float first, otherwise alpha.
@@ -112,15 +99,15 @@ export function GymsSavedSpotsRow({
       const aName = labelOf(a);
       const bName = labelOf(b);
       if (highlightAreaId) {
-        const aHi = a.kind === 'region' && a.region.id === highlightAreaId;
-        const bHi = b.kind === 'region' && b.region.id === highlightAreaId;
+        const aHi = a.kind === 'region' && a.spot.target_id === highlightAreaId;
+        const bHi = b.kind === 'region' && b.spot.target_id === highlightAreaId;
         if (aHi && !bHi) return -1;
         if (bHi && !aHi) return 1;
       }
       return aName.localeCompare(bName);
     });
     return tiles.slice(0, MAX_SPOTS);
-  }, [gymFavorites, regions, spotsRaw, highlightAreaId]);
+  }, [gymFavorites, spotsRaw, highlightAreaId]);
 
   const helpRef = useRef<SaveAreaHelpSheetHandle>(null);
 
@@ -130,7 +117,7 @@ export function GymsSavedSpotsRow({
         onSelectGym?.(item.gym.gym_id, item.gym.name);
         break;
       case 'region':
-        onSelectArea(item.region);
+        onSelectArea(item.spot);
         break;
       case 'area':
         onSelectArea4?.(item.spot);
@@ -178,22 +165,13 @@ export function GymsSavedSpotsRow({
 }
 
 function tileKey(item: SpotItem): string {
-  switch (item.kind) {
-    case 'gym': return `gym:${item.gym.gym_id}`;
-    case 'region': return `region:${item.region.id}`;
-    case 'area':
-    case 'crag':
-    case 'route':
-      return `${item.kind}:${item.spot.target_id}`;
-  }
+  if (item.kind === 'gym') return `gym:${item.gym.gym_id}`;
+  return `${item.kind}:${item.spot.target_id}`;
 }
 
 function labelOf(item: SpotItem): string {
-  switch (item.kind) {
-    case 'gym': return item.gym.name ?? '';
-    case 'region': return item.region.name ?? '';
-    default: return item.spot.target_name ?? '';
-  }
+  if (item.kind === 'gym') return item.gym.name ?? '';
+  return item.spot.target_name ?? '';
 }
 
 function SaveAreaPlaceholder({
@@ -251,10 +229,13 @@ function SpotAvatar({
   const [remoteFailed, setRemoteFailed] = useState(false);
   const [bundledFailed, setBundledFailed] = useState(false);
 
-  // Pick a remote cover when one exists; the Gym/SavedSpot types
-  // don't carry a cover_url yet, so they always fall through to the
-  // bundled placeholder. Region is the only kind with `cover_url` today.
-  const coverUrl = item.kind === 'region' ? item.region.cover_url : undefined;
+  // Neither Gym nor SavedSpot carry a cover_url in the strip payload
+  // today — all tiles fall through to the bundled hero placeholder.
+  // (CA Phase 6.1 dropped Region.cover_url surfaceing here when the
+  //  legacy region store went away; not restored because /outdoor/
+  //  saved-spots doesn't denormalize cover yet — a future BE
+  //  enhancement would add it.)
+  const coverUrl: string | undefined = undefined;
   const useRemote = !remoteFailed && !!coverUrl;
   const useBundled = !useRemote && !bundledFailed;
   const name = labelOf(item);

@@ -1,19 +1,16 @@
 // src/features/outdoor/useSavedSpots.ts
-// BR Track D Day 6 — polymorphic saved-spots hook (PLAN §11).
+// Polymorphic saved-spots hook (PLAN §11).
 //
-// Wraps `savedSpotsApi.list()` (Day 0 BE) so callers get a hydrated
-// SavedSpot[] without each component running its own fetch. The hook
-// is intentionally not a zustand store — there's only one consumer
-// today (GymsSavedSpotsRow) and the data is read-mostly. Future writes
-// from CragInfoSheet / AreaInfoSheet trigger a manual `refresh()`.
+// Wraps `savedSpotsApi.list()` so callers get a hydrated SavedSpot[]
+// without each component running its own fetch. Intentionally not a
+// zustand store — read-mostly with a single consumer (GymsSavedSpotsRow).
+// Writes from the unified OutdoorAreaInfoSheet trigger `refresh()`.
 //
-// Note (Day 6 transition): Region favorites today still flow through
-// the legacy `/regions/{id}/favorite` endpoint via `useFavoriteRegionsStore`.
-// Day 0 BE seeded the saved-spots table from `user_favorite_regions` once,
-// but new region toggles don't dual-write. Callers should union
-// `useFavoriteRegionsStore.regions` (Region source) with `useSavedSpots`
-// filtered to NON-region target_types until BR-Track-D-FU-cleanup drops
-// the legacy region favorites endpoint.
+// CA Phase 6.1 cleaned up the prior dual-source dance: region bookmarks
+// used to flow through a separate `useFavoriteRegionsStore` + the
+// `/regions/{id}/favorite` endpoint. That store + endpoint are gone; all
+// target types (region / area / crag / route / outdoor_area) now flow
+// through this single hook.
 
 import { useCallback, useEffect, useState } from "react";
 

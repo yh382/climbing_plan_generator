@@ -1221,11 +1221,13 @@ export default function MapScreenMapbox({
   }, []);
 
   const onSelectAreaFromList = useCallback(
-    (area: Area) => {
+    (target: { id: string; name: string }) => {
       // Single entry path to area mode — also used by the gyms-sheet
       // Saved Spots row (`GymsSavedSpotsRow`). Transitions on the same
       // MapView; back button (chevron.left) reverts to gyms in place.
-      enterArea(area.id, area.name);
+      // CA Phase 6.1 — broadened to {id, name} so SavedSpot-typed callers
+      // (target_id + target_name) don't need to synthesize a full Area.
+      enterArea(target.id, target.name);
     },
     [enterArea],
   );
@@ -1826,7 +1828,9 @@ export default function MapScreenMapbox({
         {mode.kind === 'explore' ? (
           <View style={[styles.gymsSheetContent, { paddingBottom: getMapSheetBottomInset(insets) }]}>
             <GymsSavedSpotsRow
-              onSelectArea={onSelectAreaFromList}
+              onSelectArea={(spot) =>
+                onSelectAreaFromList({ id: spot.target_id, name: spot.target_name })
+              }
               onSelectArea4={(spot) => {
                 // CA Phase 4b — Area-typed saved spot tap → unified sheet.
                 if (mode.kind !== 'explore') return;
