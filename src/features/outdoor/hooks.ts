@@ -109,29 +109,32 @@ function useFetchOnce<T>(
   return { ...state, refetch: run };
 }
 
-/** GET /outdoor/areas/{id}. */
+/** GET /outdoor/areas/{id}. Returns {data: null, loading: false} when areaId is null/undefined. */
 export function useAreaDetail(areaId: string | null | undefined) {
-  return useFetchOnce<OutdoorAreaDetail>(
-    () => outdoorApi.getArea(areaId!),
+  return useFetchOnce<OutdoorAreaDetail | null>(
+    () => areaId ? outdoorApi.getArea(areaId) : Promise.resolve(null),
     [areaId],
   );
 }
 
-/** GET /outdoor/areas/{id}/children. */
+/** GET /outdoor/areas/{id}/children. No-op when areaId is null/undefined. */
 export function useAreaChildren(
   areaId: string | null | undefined,
   opts?: { limit?: number },
 ) {
   return useFetchOnce<OutdoorAreaListItem[]>(
-    () => outdoorApi.listAreaChildren(areaId!, opts),
+    () => areaId
+      ? outdoorApi.listAreaChildren(areaId, opts)
+      : Promise.resolve([]),
     [areaId, opts?.limit],
   );
 }
 
-/** GET /outdoor/areas/{id}/coverage. Hard rule 4 errors surface via state.error. */
+/** GET /outdoor/areas/{id}/coverage. Hard rule 4 errors surface via state.error.
+ *  No-op when areaId is null/undefined. */
 export function useAreaCoverage(areaId: string | null | undefined) {
-  return useFetchOnce<CoverageResponse>(
-    () => outdoorApi.getAreaCoverage(areaId!),
+  return useFetchOnce<CoverageResponse | null>(
+    () => areaId ? outdoorApi.getAreaCoverage(areaId) : Promise.resolve(null),
     [areaId],
   );
 }
