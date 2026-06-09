@@ -38,9 +38,10 @@ import { TopFadeMaskView } from '../../../components/shared/TopFadeMaskView';
 import { useUserStore } from '../../../store/useUserStore';
 import { NativeSegmentedControl } from '../../../components/ui/NativeSegmentedControl';
 import RoutesLibrarySheet, { type RoutesLibrarySheetHandle } from './RoutesLibrarySheet';
-import CragInfoSheet, { type CragInfoSheetHandle } from './CragInfoSheet';
-import AreaInfoSheet, { type AreaInfoSheetHandle } from './AreaInfoSheet';
-import RegionInfoSheet, { type RegionInfoSheetHandle } from './RegionInfoSheet';
+// CA Phase 4b — unified outdoor area sheet replaces CragInfo/AreaInfo/RegionInfo.
+import OutdoorAreaInfoSheet, {
+  type OutdoorAreaInfoSheetHandle,
+} from './OutdoorAreaInfoSheet';
 import { AreaCoverImage } from './AreaCoverImage';
 import type { Area } from '../../outdoor/types';
 
@@ -99,9 +100,8 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
   const user = useUserStore((s) => s.user);
   const sheetRef = useRef<TrueSheet>(null);
   const routesLibrarySheetRef = useRef<RoutesLibrarySheetHandle>(null);
-  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
-  const areaInfoSheetRef = useRef<AreaInfoSheetHandle>(null);
-  const regionInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
+  // CA Phase 4b — single unified ref. Replaces 3 separate sheet refs.
+  const outdoorAreaSheetRef = useRef<OutdoorAreaInfoSheetHandle>(null);
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   useImperativeHandle(ref, () => ({
@@ -133,7 +133,15 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
 
   const presentCragInfo = () => {
     if (!props.crag?.id) return;
-    cragInfoSheetRef.current?.present();
+    void outdoorAreaSheetRef.current?.present({
+      id: props.crag.id,
+      name: props.crag.name,
+      display_kind: 'crag',
+      lat: props.crag.lat ?? null,
+      lng: props.crag.lng ?? null,
+      cover_url: props.crag.cover_url ?? null,
+      parent_name_hint: props.crag.area_name ?? null,
+    });
   };
 
   const pressInfoRouteMap = () => {
@@ -257,7 +265,14 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
               `关于 ${props.parentArea.name}（岩区）`,
               `About ${props.parentArea.name} (Area)`,
             )}
-            onPress={() => areaInfoSheetRef.current?.present()}
+            onPress={() => {
+              if (!props.parentArea) return;
+              void outdoorAreaSheetRef.current?.present({
+                id: props.parentArea.id,
+                name: props.parentArea.name,
+                display_kind: 'area',
+              });
+            }}
             colors={colors}
           />
         ) : null}
@@ -268,7 +283,14 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
               `关于 ${props.crag.region_name}（大区）`,
               `About ${props.crag.region_name} (Region)`,
             )}
-            onPress={() => regionInfoSheetRef.current?.present()}
+            onPress={() => {
+              if (!props.crag?.region_id || !props.crag?.region_name) return;
+              void outdoorAreaSheetRef.current?.present({
+                id: props.crag.region_id,
+                name: props.crag.region_name,
+                display_kind: 'region',
+              });
+            }}
             colors={colors}
           />
         ) : null}
@@ -365,53 +387,20 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
       <RoutesLibrarySheet ref={routesLibrarySheetRef} areaId={props.crag.id} />
     ) : null}
 
-    {/* Stacked Crag info sheet — opens on top when the user taps the
-        header card or the "Crag Info & Approach" menu row. */}
-    {props.crag?.id ? (
-      <CragInfoSheet
-        ref={cragInfoSheetRef}
-        cragId={props.crag.id}
-        context="cragMenu"
-        seedCrag={{
-          id: props.crag.id,
-          name: props.crag.name,
-          cover_url: props.crag.cover_url,
-          area_name: props.crag.area_name,
-          lat: props.crag.lat,
-          lng: props.crag.lng,
-          wall_count: props.crag.wall_count,
-          route_count: props.crag.route_count,
-        }}
-      />
-    ) : null}
-
-    {/* Stacked Area info sheet — opens from the "Browse Up · About {Area}"
-        menu row. Caller passes the hydrated Area record so this sheet can
-        run its own child-crag list fetch without an extra lookup. */}
-    {props.parentArea ? (
-      <AreaInfoSheet
-        ref={areaInfoSheetRef}
-        area={props.parentArea}
-        regionName={props.crag?.region_name ?? null}
-        context="fromCragMenu"
-      />
-    ) : null}
-
-    {/* Stacked Region info sheet — opens from the "Browse Up · About
-        {Region}" menu row. Uses the existing canonical RegionInfoSheet
-        (re-loaded by id). */}
-    {props.crag?.region_id ? (
-      <RegionInfoSheet
-        ref={regionInfoSheetRef}
-        regionId={props.crag.region_id}
-        context="areaMenu"
-        seedRegion={{
-          id: props.crag.region_id,
-          name: props.crag.region_name ?? '',
-        }}
-        onPressRouteMap={pressInfoRouteMap}
-      />
-    ) : null}
+    {/* CA Phase 4b — single unified outdoor area sheet, replaces the trio
+        of stacked CragInfoSheet / AreaInfoSheet / RegionInfoSheet. The
+        sheet's seed is set by each menu row at tap time (see presentCragInfo
+        and the inline parentArea/region MenuRow onPress handlers above). */}
+    <OutdoorAreaInfoSheet
+      ref={outdoorAreaSheetRef}
+      onRouteTap={(r) => {
+        void outdoorAreaSheetRef.current?.dismiss();
+        router.push({
+          pathname: '/outdoor/outdoor-route-detail' as any,
+          params: { id: r.id },
+        });
+      }}
+    />
     </>
   );
 });

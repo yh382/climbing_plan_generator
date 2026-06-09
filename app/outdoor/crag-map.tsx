@@ -51,11 +51,11 @@ import { MapSearchBar } from '../../src/features/mapscreen/components/MapSearchB
 import { useMapSheetState, DETENT_COLLAPSED, DETENT_MEDIUM, DETENT_LARGE } from '../../src/features/mapscreen/hooks/useMapSheetState';
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
 import CragMenuSheet, { type CragMenuSheetHandle } from '../../src/features/mapscreen/components/CragMenuSheet';
-import RegionInfoSheet, { type RegionInfoSheetHandle } from '../../src/features/mapscreen/components/RegionInfoSheet';
-import CragInfoSheet, {
-  type CragInfoSheetHandle,
-  type CragInfoSeed,
-} from '../../src/features/mapscreen/components/CragInfoSheet';
+// CA Phase 4b — unified outdoor area sheet replaces RegionInfoSheet + CragInfoSheet.
+import OutdoorAreaInfoSheet, {
+  type OutdoorAreaInfoSheetHandle,
+  type AreaSeedInput,
+} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
 import { FilterChipsBar } from '../../src/features/mapscreen/components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../src/store/useOutdoorMapFiltersStore';
 import MyListSheet, { type MyListSheetHandle } from '../../src/features/mapscreen/components/MyListSheet';
@@ -159,10 +159,12 @@ export default function CragMapPage() {
   // to 2-row mode (Crag subtitle + Wall title, PLAN §3.2) and `walls`
   // contains only the focused wall. Cleared on areaId change.
   const [focusedWall, setFocusedWall] = useState<WallPinContext | null>(null);
-  // BR Track D Day 5e — CragInfoSheet seed/id state.
-  const [cragInfoCragId, setCragInfoCragId] = useState<string | null>(null);
-  const [cragInfoSeed, setCragInfoSeed] = useState<CragInfoSeed | null>(null);
-  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
+  // CA Phase 4b — unified outdoor area info sheet (replaces RegionInfoSheet
+  // + CragInfoSheet). One ref, one mount; seed swaps area-vs-crag context.
+  const outdoorAreaSheetRef = useRef<OutdoorAreaInfoSheetHandle>(null);
+  const presentArea = useCallback((seed: AreaSeedInput) => {
+    void outdoorAreaSheetRef.current?.present(seed);
+  }, []);
 
   // Sheet content
   const [sheetTitle, setSheetTitle] = useState('');
@@ -221,28 +223,37 @@ export default function CragMapPage() {
   // Area info is presented as a stacked TrueSheet (Apple Maps POI pattern),
   // not an inline accordion in the list header — lets the user pan/scroll
   // through full area detail without losing the map context.
-  const areaInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
   const openRegionInfo = useCallback(() => {
-    areaInfoSheetRef.current?.present();
-  }, []);
+    if (!areaId) return;
+    presentArea({
+      id: areaId,
+      name: area?.name ?? areaName ?? '',
+      // crag-map area-mode is seeded from `outdoorApi.getRegion(areaId)` —
+      // semantically this surface owns a Region. display_kind drives the
+      // Hero badge during seed→detail hydration.
+      display_kind: 'region',
+      lat: area?.lat ?? null,
+      lng: area?.lng ?? null,
+      cover_url: area?.cover_url ?? null,
+    });
+  }, [presentArea, areaId, area, areaName]);
   // BR Track D Day 5e — title-tap routing (PLAN §3.2):
-  //   focusedWall set → present CragInfoSheet (subtitle is Crag name)
-  //   focusedWall unset → present RegionInfoSheet (legacy "info" tap)
+  //   focusedWall set → present unified sheet with Crag seed
+  //   focusedWall unset → present unified sheet with Area seed
   const openCragOrAreaInfo = useCallback(() => {
     if (focusedWall) {
-      setCragInfoCragId(focusedWall.crag_id);
-      setCragInfoSeed({
+      presentArea({
         id: focusedWall.crag_id,
         name: focusedWall.crag_name,
-        area_name: focusedWall.area_name,
+        display_kind: 'crag',
         lat: focusedWall.lat,
         lng: focusedWall.lng,
+        parent_name_hint: focusedWall.area_name,
       });
-      cragInfoSheetRef.current?.present();
       return;
     }
     openRegionInfo();
-  }, [focusedWall, openRegionInfo]);
+  }, [focusedWall, openRegionInfo, presentArea]);
 
   // Load data: area-mode loads the Region only (no pin fan-out — that
   // was the legacy `getMapPins` flow, removed in Day 5e). Pin discovery
@@ -916,49 +927,18 @@ export default function CragMapPage() {
         </ScrollView>
       </TrueSheet>
 
-      {/* Canonical area info sheet — stacked on top of the main crag-map
-          sheet (Apple Maps POI pattern). Presented on info-pill tap;
-          dismissible via grabber/swipe-down. CN has no offline maps
-          (no mapbox adapter) so the Offline shortcut surfaces a
-          coming-soon alert. */}
-      {areaId ? (
-        <RegionInfoSheet
-          ref={areaInfoSheetRef}
-          regionId={areaId}
-          context="crag"
-          seedRegion={
-            area
-              ? {
-                  id: area.id,
-                  name: area.name,
-                  cover_url: area.cover_url,
-                  region: area.region,
-                  country: area.country,
-                  // BR Track A: Region.area_count = top-level children count.
-                  crag_count: area.area_count,
-                  route_count: area.route_count,
-                  boulder_count: area.boulder_count,
-                }
-              : { id: areaId, name: areaName ?? '' }
-          }
-          onPressRouteMap={() => {
-            // CN has no separate RoutesLibrarySheet wired at this
-            // screen level (AreaMenuSheet still offers it via its own
-            // stacked instance). Dismissing here returns the user to
-            // the main list, which is already the route map surface.
-            areaInfoSheetRef.current?.dismiss();
-          }}
-        />
-      ) : null}
-
-      {/* BR Track D Day 5e — CragInfoSheet (Crag L5 detail) mounted at
-          root, presented from the RoutesListSheet 2-row Crag subtitle
-          tap when a Wall is focused. */}
-      <CragInfoSheet
-        ref={cragInfoSheetRef}
-        cragId={cragInfoCragId}
-        context="pinTap"
-        seedCrag={cragInfoSeed}
+      {/* CA Phase 4b — unified OutdoorAreaInfoSheet (Apple Maps POI pattern).
+          One mount serves both area-mode info-pill taps and crag-mode
+          subtitle taps; seed kind drives the rendering. */}
+      <OutdoorAreaInfoSheet
+        ref={outdoorAreaSheetRef}
+        onRouteTap={(r) => {
+          void outdoorAreaSheetRef.current?.dismiss();
+          router.push({
+            pathname: '/outdoor/outdoor-route-detail' as any,
+            params: { id: r.id },
+          });
+        }}
       />
 
       {/* Crag menu sheet (stacked) — BR Track D Day 5e: now properly

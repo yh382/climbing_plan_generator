@@ -20,7 +20,9 @@ type Props = {
   lng?: number | null;
   saved: boolean;
   saveLoading?: boolean;
-  onToggleSave: () => void | Promise<void>;
+  /** Optional. When absent the Save action is omitted (parents that don't
+   *  own bookmark wiring shouldn't show a no-op button). */
+  onToggleSave?: () => void | Promise<void>;
 };
 
 export function AreaActions({
@@ -29,28 +31,31 @@ export function AreaActions({
   const { tr } = useSettings();
 
   const actions = useMemo<PlaceSheetAction[]>(() => {
-    const list: PlaceSheetAction[] = [
-      {
+    const list: PlaceSheetAction[] = [];
+
+    if (onToggleSave) {
+      list.push({
         icon: saved ? 'bookmark' : 'bookmark-outline',
         label: saved ? sheetLabels.saved(tr) : sheetLabels.save(tr),
         onPress: () => { void onToggleSave(); },
         loading: saveLoading,
         active: saved,
+      });
+    }
+
+    list.push({
+      icon: 'share-outline',
+      label: sheetLabels.share(tr),
+      onPress: () => {
+        void Share.share({
+          title: areaName,
+          message: tr(
+            `${areaName} · ClimMate`,
+            `${areaName} on ClimMate`,
+          ),
+        });
       },
-      {
-        icon: 'share-outline',
-        label: sheetLabels.share(tr),
-        onPress: () => {
-          void Share.share({
-            title: areaName,
-            message: tr(
-              `${areaName} · ClimMate`,
-              `${areaName} on ClimMate`,
-            ),
-          });
-        },
-      },
-    ];
+    });
 
     if (lat != null && lng != null) {
       list.push({

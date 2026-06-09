@@ -23,17 +23,12 @@ import { theme } from '../../src/lib/theme';
 import { outdoorApi } from '../../src/features/outdoor/api';
 import type { OutdoorRoute, RouteAscent, PhotoItem } from '../../src/features/outdoor/types';
 import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outdoor/sendSheet/OutdoorSendSheet';
-import RegionInfoSheet, {
-  type RegionInfoSheetHandle,
-  type RegionInfoSeed,
-} from '../../src/features/mapscreen/components/RegionInfoSheet';
-import AreaInfoSheet, {
-  type AreaInfoSheetHandle,
-} from '../../src/features/mapscreen/components/AreaInfoSheet';
-import CragInfoSheet, {
-  type CragInfoSheetHandle,
-  type CragInfoSeed,
-} from '../../src/features/mapscreen/components/CragInfoSheet';
+// CA Phase 4b — unified outdoor area sheet replaces RegionInfoSheet +
+// AreaInfoSheet + CragInfoSheet trio. One mount serves region/area/crag.
+import OutdoorAreaInfoSheet, {
+  type OutdoorAreaInfoSheetHandle,
+  type AreaSeedInput,
+} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
@@ -125,21 +120,13 @@ export default function OutdoorRouteDetailPage() {
   // Add-to-list sheet
   const [addToListOpen, setAddToListOpen] = useState(false);
 
-  // BR Track D Day 7 — breadcrumb-tap InfoSheet refs (PLAN §5).
-  // Each segment of the RouteBreadcrumb spawns the matching info sheet
-  // stacked on top of the route detail. Seed state mirrors the
-  // MapScreenMapbox pattern so first paint is instant before the
-  // sheet's own load fires.
-  const regionInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
-  const [regionInfoId, setRegionInfoId] = useState<string | null>(null);
-  const [regionInfoSeed, setRegionInfoSeed] = useState<RegionInfoSeed | null>(null);
-  const areaInfoSheetRef = useRef<AreaInfoSheetHandle>(null);
-  const [areaInfoArea, setAreaInfoArea] = useState<
-    import('../../src/features/outdoor/types').Area | null
-  >(null);
-  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
-  const [cragInfoCragId, setCragInfoCragId] = useState<string | null>(null);
-  const [cragInfoSeed, setCragInfoSeed] = useState<CragInfoSeed | null>(null);
+  // CA Phase 4b — unified OutdoorAreaInfoSheet replaces the 3 legacy
+  // breadcrumb sheets (Region/Area/Crag). One ref, one mount; the seed's
+  // display_kind drives section ordering inside the sheet.
+  const outdoorAreaSheetRef = useRef<OutdoorAreaInfoSheetHandle>(null);
+  const presentArea = useCallback((seed: AreaSeedInput) => {
+    void outdoorAreaSheetRef.current?.present(seed);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -207,14 +194,13 @@ export default function OutdoorRouteDetailPage() {
   // BR-Track-D-FU-wall-search-deep-link).
   const presentCragSheet = useCallback(() => {
     if (!route?.crag_id) return;
-    setCragInfoCragId(route.crag_id);
-    setCragInfoSeed({
+    presentArea({
       id: route.crag_id,
       name: route.crag_name ?? '',
-      area_name: route.area_name ?? null,
+      display_kind: 'crag',
+      parent_name_hint: route.area_name ?? null,
     });
-    cragInfoSheetRef.current?.present();
-  }, [route?.crag_id, route?.crag_name, route?.area_name]);
+  }, [presentArea, route?.crag_id, route?.crag_name, route?.area_name]);
 
   // Attempt: +1 locally, persist to backend (B2 first-time wiring), haptic.
   // The auto-startSession path inside enqueueRouteAttemptLog opens an outdoor
@@ -669,22 +655,20 @@ export default function OutdoorRouteDetailPage() {
             colors={colors}
             onPressRegion={() => {
               if (!route.region_id) return;
-              setRegionInfoId(route.region_id);
-              setRegionInfoSeed({
+              presentArea({
                 id: route.region_id,
                 name: route.region_name ?? '',
+                display_kind: 'region',
               });
-              regionInfoSheetRef.current?.present();
             }}
             onPressArea={() => {
-              if (!route.area_id || !route.region_id) return;
-              setAreaInfoArea({
+              if (!route.area_id) return;
+              presentArea({
                 id: route.area_id,
-                region_id: route.region_id,
                 name: route.area_name ?? '',
-                status: 'approved',
+                display_kind: 'area',
+                parent_name_hint: route.region_name ?? null,
               });
-              areaInfoSheetRef.current?.present();
             }}
             onPressCrag={presentCragSheet}
             // PLAN §5: Wall tap falls back to parent Crag's info sheet
@@ -904,28 +888,17 @@ export default function OutdoorRouteDetailPage() {
         routeName={route.name}
       />
 
-      {/* BR Track D Day 7 — breadcrumb-tap InfoSheets stacked on top of
-          the route detail. Each load effect short-circuits on null id /
-          null area, so the unconditional mount is safe. */}
-      <RegionInfoSheet
-        ref={regionInfoSheetRef}
-        regionId={regionInfoId}
-        context="crag"
-        seedRegion={regionInfoSeed}
-        onPressRouteMap={() => {
-          regionInfoSheetRef.current?.dismiss();
+      {/* CA Phase 4b — unified OutdoorAreaInfoSheet stacked on top of the
+          route detail. Breadcrumb taps swap the seed (kind drives layout). */}
+      <OutdoorAreaInfoSheet
+        ref={outdoorAreaSheetRef}
+        onRouteTap={(r) => {
+          void outdoorAreaSheetRef.current?.dismiss();
+          router.push({
+            pathname: '/outdoor/outdoor-route-detail' as any,
+            params: { id: r.id },
+          });
         }}
-      />
-      <AreaInfoSheet
-        ref={areaInfoSheetRef}
-        area={areaInfoArea}
-        context="pinTap"
-      />
-      <CragInfoSheet
-        ref={cragInfoSheetRef}
-        cragId={cragInfoCragId}
-        context="pinTap"
-        seedCrag={cragInfoSeed}
       />
 
       {/* Pure share-beta flow now lives at app/outdoor-beta-share.tsx

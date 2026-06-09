@@ -34,11 +34,34 @@ import {
   useAreaDetail,
 } from '../../outdoor/hooks';
 import type {
-  OutdoorArea,
+  DisplayKind,
   OutdoorAreaDetail,
   OutdoorAreaListItem,
   OutdoorRoute,
 } from '../../outdoor/types';
+
+/**
+ * Minimal seed for instant-paint Hero before useAreaDetail lands.
+ * Required: id + name + display_kind. Everything else fills sensible
+ * defaults (so callers from search/saved-spots/pin-tap don't need to
+ * construct a full OutdoorArea object).
+ */
+export type AreaSeedInput = {
+  id: string;
+  name: string;
+  display_kind: DisplayKind;
+  name_en?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  cover_url?: string | null;
+  /** When known (e.g. from CragOverview), surfaces as parent badge below
+   *  the title until ancestors breadcrumb hydrates from detail. */
+  parent_name_hint?: string | null;
+  /** Coarse pin-time hints; replaced by detail once it loads. */
+  direct_route_count?: number;
+  subtree_route_count?: number;
+  direct_child_count?: number;
+};
 
 import { AreaActions } from './outdoor-area-sheet/AreaActions';
 import { AreaChildrenList } from './outdoor-area-sheet/AreaChildrenList';
@@ -48,7 +71,7 @@ import { AreaRoutesPreview } from './outdoor-area-sheet/AreaRoutesPreview';
 import { AreaStats } from './outdoor-area-sheet/AreaStats';
 
 export type OutdoorAreaInfoSheetHandle = {
-  present: (area: OutdoorArea | OutdoorAreaListItem) => Promise<void>;
+  present: (seed: AreaSeedInput) => Promise<void>;
   dismiss: () => Promise<void>;
 };
 
@@ -63,6 +86,11 @@ export type OutdoorAreaInfoSheetProps = {
   isSaved?: (areaId: string) => boolean;
   onToggleSave?: (area: OutdoorAreaDetail) => void | Promise<void>;
   saveLoading?: boolean;
+  /** Fired right after `present()` resolves. Parents can mirror the
+   *  open state to back-button handlers (Apple Maps POI pattern). */
+  onPresented?: () => void;
+  /** Fired when TrueSheet dismisses (drag-down / programmatic). */
+  onDismissed?: () => void;
 };
 
 const OutdoorAreaInfoSheet = forwardRef<
@@ -70,21 +98,23 @@ const OutdoorAreaInfoSheet = forwardRef<
   OutdoorAreaInfoSheetProps
 >(({
   onChildTap, onRouteTap, isSaved, onToggleSave, saveLoading,
+  onPresented, onDismissed,
 }, ref) => {
   const colors = useThemeColors();
   const sheetRef = useRef<TrueSheet>(null);
 
-  // Seed area (instant paint header). null when sheet closed.
-  const [seed, setSeed] = useState<OutdoorArea | OutdoorAreaListItem | null>(null);
+  // Minimal seed for instant-paint header. null when sheet closed.
+  const [seed, setSeed] = useState<AreaSeedInput | null>(null);
   // Routes lazy fetch — sheet doesn't request until area has direct routes.
   const [routes, setRoutes] = useState<OutdoorRoute[] | null>(null);
   const [routesLoading, setRoutesLoading] = useState(false);
 
   useImperativeHandle(ref, () => ({
-    present: async (area) => {
-      setSeed(area);
+    present: async (s) => {
+      setSeed(s);
       setRoutes(null);
       await sheetRef.current?.present();
+      onPresented?.();
     },
     dismiss: async () => {
       await sheetRef.current?.dismiss();
@@ -111,23 +141,56 @@ const OutdoorAreaInfoSheet = forwardRef<
     return () => { cancelled = true; };
   }, [seedId, detail?.has_routes]);
 
-  // Section ordering: caller can decide which sections to render based
-  // on flags. We render conditionally and always end with Actions +
-  // Metadata regardless of flags (per plan v8 ordering table).
+  // Detail takes precedence for full rendering; seed is instant-paint
+  // header only (id + name + display_kind). Counts/flags from detail
+  // when present, otherwise from seed hints, otherwise default to 0/false.
   const display = useMemo(() => {
-    // detail (full) takes precedence; seed used for instant paint only.
-    const area: (OutdoorArea | OutdoorAreaDetail | OutdoorAreaListItem | null) =
-      detail ?? seed;
-    if (!area) return null;
-    return area;
+    if (detail) {
+      return {
+        kind: 'detail' as const,
+        id: detail.id,
+        name: detail.name,
+        name_en: detail.name_en,
+        display_kind: detail.display_kind,
+        lat: detail.lat,
+        lng: detail.lng,
+        cover_url: detail.cover_url,
+        direct_route_count: detail.direct_route_count,
+        subtree_route_count: detail.subtree_route_count,
+        direct_child_count: detail.direct_child_count,
+        has_routes: detail.has_routes,
+        has_subareas: detail.has_subareas,
+      };
+    }
+    if (seed) {
+      const direct = seed.direct_route_count ?? 0;
+      const subtree = seed.subtree_route_count ?? direct;
+      const children = seed.direct_child_count ?? 0;
+      return {
+        kind: 'seed' as const,
+        id: seed.id,
+        name: seed.name,
+        name_en: seed.name_en ?? null,
+        display_kind: seed.display_kind,
+        lat: seed.lat ?? null,
+        lng: seed.lng ?? null,
+        cover_url: seed.cover_url ?? null,
+        direct_route_count: direct,
+        subtree_route_count: subtree,
+        direct_child_count: children,
+        has_routes: direct > 0,
+        has_subareas: children > 0,
+      };
+    }
+    return null;
   }, [detail, seed]);
 
   const parentName = useMemo(() => {
     if (detail?.ancestors && detail.ancestors.length > 0) {
       return detail.ancestors[detail.ancestors.length - 1].name;
     }
-    return null;
-  }, [detail]);
+    return seed?.parent_name_hint ?? null;
+  }, [detail, seed]);
 
   const saved = display && isSaved ? isSaved(display.id) : false;
 
@@ -139,6 +202,7 @@ const OutdoorAreaInfoSheet = forwardRef<
       onDidDismiss={() => {
         setSeed(null);
         setRoutes(null);
+        onDismissed?.();
       }}
       backgroundColor={colors.sheetBackground}
     >
@@ -151,9 +215,9 @@ const OutdoorAreaInfoSheet = forwardRef<
           <>
             <AreaHero
               name={display.name}
-              nameEn={(display as OutdoorArea).name_en ?? null}
+              nameEn={display.name_en}
               displayKind={display.display_kind}
-              coverUrl={(display as OutdoorArea).cover_url ?? null}
+              coverUrl={display.cover_url}
               parentName={parentName}
             />
 
@@ -183,15 +247,18 @@ const OutdoorAreaInfoSheet = forwardRef<
             <AreaActions
               areaId={display.id}
               areaName={display.name}
-              lat={(display as OutdoorArea).lat ?? null}
-              lng={(display as OutdoorArea).lng ?? null}
+              lat={display.lat}
+              lng={display.lng}
               saved={saved}
               saveLoading={saveLoading}
-              onToggleSave={() => {
-                if (detail && onToggleSave) {
-                  return onToggleSave(detail);
-                }
-              }}
+              // Forward only when the parent wired bookmark + detail is
+              // hydrated. AreaActions hides the Save row when this prop
+              // is undefined, so callers without a saved-store stay clean.
+              onToggleSave={
+                onToggleSave && detail
+                  ? () => onToggleSave(detail)
+                  : undefined
+              }
             />
 
             {detail ? (

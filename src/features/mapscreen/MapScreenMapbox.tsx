@@ -45,18 +45,12 @@ import { useTodaySendsButton } from '../dailysummary/useTodaySendsButton';
 
 import { useGymsStore } from '../../store/useGymsStore';
 import CragMenuSheet, { type CragMenuSheetHandle } from './components/CragMenuSheet';
-import RegionInfoSheet, {
-  type RegionInfoSheetHandle,
-  type RegionInfoContext,
-  type RegionInfoSeed,
-} from './components/RegionInfoSheet';
-import CragInfoSheet, {
-  type CragInfoSheetHandle,
-  type CragInfoSeed,
-} from './components/CragInfoSheet';
-import AreaInfoSheet, {
-  type AreaInfoSheetHandle,
-} from './components/AreaInfoSheet';
+// CA Phase 4b — single unified sheet replaces RegionInfoSheet / AreaInfoSheet /
+// CragInfoSheet. Display kind is derived from the OutdoorArea, not the route.
+import OutdoorAreaInfoSheet, {
+  type OutdoorAreaInfoSheetHandle,
+  type AreaSeedInput,
+} from './components/OutdoorAreaInfoSheet';
 import MyListSheet, { type MyListSheetHandle } from './components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from './components/ReportsSheet';
 import OfflineMapsSheet, {
@@ -253,28 +247,15 @@ export default function MapScreenMapbox({
     }, []),
   });
   const detailSheetRef = useRef<TrueSheet>(null);
-  const areaInfoSheetRef = useRef<RegionInfoSheetHandle>(null);
-  const [areaInfoContext, setAreaInfoContext] = useState<RegionInfoContext>('crag');
-  const [areaInfoSeed, setAreaInfoSeed] = useState<RegionInfoSeed | null>(null);
-  const [areaInfoId, setAreaInfoId] = useState<string | null>(null);
-  // BK: track AreaInfoSheet presented state so the top-bar back button
+  // CA Phase 4b — unified sheet ref. Replaces 3 separate refs (areaInfoSheetRef
+  // for Region, cragInfoSheetRef for Crag, areaInfoFromSpotsSheetRef for Area).
+  // Sheet looks up by area_id and derives layout from display_kind.
+  const outdoorAreaSheetRef = useRef<OutdoorAreaInfoSheetHandle>(null);
+  // BK: track area info sheet presented state so the top-bar back button
   // dismisses the sheet first (Apple Maps pattern) instead of returning
   // to the previous tab when an info sheet is on top of the gyms sheet.
   const [areaInfoOpen, setAreaInfoOpen] = useState(false);
   const cragMenuSheetRef = useRef<CragMenuSheetHandle>(null);
-  // BR Track D Day 5d — CragInfoSheet (Crag L5 detail) is presented when
-  // the user taps a focused Crag subtitle in the RoutesListSheet header.
-  const cragInfoSheetRef = useRef<CragInfoSheetHandle>(null);
-  const [cragInfoCragId, setCragInfoCragId] = useState<string | null>(null);
-  const [cragInfoSeed, setCragInfoSeed] = useState<CragInfoSeed | null>(null);
-  // BR Track D Day 6 — AreaInfoSheet stacked from saved-spots row (PLAN §11).
-  // The Day 5d existing AreaInfoSheet usage was inside CragMenuSheet's
-  // Browse Up section; Day 6 also presents it from the gyms sheet when
-  // the user taps an Area-typed saved spot.
-  const areaInfoFromSpotsSheetRef = useRef<AreaInfoSheetHandle>(null);
-  const [areaInfoFromSpotsArea, setAreaInfoFromSpotsArea] = useState<
-    import('../outdoor/types').Area | null
-  >(null);
   const myListSheetRef = useRef<MyListSheetHandle>(null);
   const reportsSheetRef = useRef<ReportsSheetHandle>(null);
   const offlineMapsSheetRef = useRef<OfflineMapsSheetHandle>(null);
@@ -696,7 +677,7 @@ export default function MapScreenMapbox({
     backToExplore();
     // Close any stacked sheets
     detailSheetRef.current?.dismiss().catch(() => {});
-    areaInfoSheetRef.current?.dismiss();
+    outdoorAreaSheetRef.current?.dismiss();
     setDetailGym(null);
     setFocusedWall(null);
     useGymsStore.getState().setSelectedGym(null);
@@ -1135,13 +1116,22 @@ export default function MapScreenMapbox({
     sheet.safeResize(DETENT_COLLAPSED);
   }, [sheet]);
 
+  // CA Phase 4b — unified area-sheet present helper. Replaces 3 legacy
+  // sheet helpers (openRegionInfo / cragInfoSheetRef.present / etc).
+  // Caller passes minimal seed; the sheet hydrates the full detail via
+  // useAreaDetail. display_kind drives section ordering.
+  const presentArea = useCallback((seed: AreaSeedInput) => {
+    void outdoorAreaSheetRef.current?.present(seed);
+  }, []);
+
   const openRegionInfo = useCallback(() => {
     if (mode.kind !== 'area') return;
-    setAreaInfoContext('crag');
-    setAreaInfoSeed(null);
-    setAreaInfoId(mode.areaId);
-    areaInfoSheetRef.current?.present();
-  }, [mode]);
+    presentArea({
+      id: mode.areaId,
+      name: mode.areaName ?? '',
+      display_kind: 'region',
+    });
+  }, [mode, presentArea]);
 
   // PLAN §3.2 + BS-FU-A — RoutesListSheet title tap routes by focus state:
   //   - focusedWall set → present Crag info (parent of the focused Wall)
@@ -1151,32 +1141,31 @@ export default function MapScreenMapbox({
   //   - both unset → present Region info (legacy behavior)
   const openCragOrAreaInfo = useCallback(() => {
     if (focusedWall) {
-      setCragInfoCragId(focusedWall.crag_id);
-      setCragInfoSeed({
+      presentArea({
         id: focusedWall.crag_id,
         name: focusedWall.crag_name,
-        area_name: focusedWall.area_name,
+        display_kind: 'crag',
         lat: focusedWall.lat,
         lng: focusedWall.lng,
+        parent_name_hint: focusedWall.area_name ?? null,
       });
-      cragInfoSheetRef.current?.present();
       return;
     }
     if (browsingCrag) {
-      setCragInfoCragId(browsingCrag.crag_id);
-      setCragInfoSeed({
+      presentArea({
         id: browsingCrag.crag_id,
         name: browsingCrag.crag_name,
-        area_name: browsingCrag.region_name,
+        display_kind: 'crag',
         lat: browsingCrag.lat,
         lng: browsingCrag.lng,
-        route_count: browsingCrag.route_count,
+        parent_name_hint: browsingCrag.region_name ?? null,
+        direct_route_count: browsingCrag.route_count ?? undefined,
+        subtree_route_count: browsingCrag.route_count ?? undefined,
       });
-      cragInfoSheetRef.current?.present();
       return;
     }
     openRegionInfo();
-  }, [focusedWall, browsingCrag, openRegionInfo]);
+  }, [focusedWall, browsingCrag, openRegionInfo, presentArea]);
 
   // ---- Navigations / actions ----
   const navigateToRoute = useCallback(
@@ -1259,22 +1248,19 @@ export default function MapScreenMapbox({
           enterArea(hit.id, hit.name);
           return;
         case 'area':
-          setAreaInfoFromSpotsArea({
+          presentArea({
             id: hit.id,
-            region_id: '',
             name: hit.name,
-            status: 'approved',
+            display_kind: 'area',
           });
-          areaInfoFromSpotsSheetRef.current?.present();
           return;
         case 'crag':
-          setCragInfoCragId(hit.id);
-          setCragInfoSeed({
+          presentArea({
             id: hit.id,
             name: hit.name,
-            area_name: hit.area_name ?? null,
+            display_kind: 'crag',
+            parent_name_hint: hit.area_name ?? null,
           });
-          cragInfoSheetRef.current?.present();
           return;
         case 'wall':
           // No standalone Wall sheet — the natural fit is to drop the
@@ -1286,7 +1272,7 @@ export default function MapScreenMapbox({
           return;
       }
     },
-    [router, enterArea],
+    [router, enterArea, presentArea],
   );
 
   // Shared map-view control buttons (style / 3D / location). Used by the
@@ -1403,7 +1389,7 @@ export default function MapScreenMapbox({
       return;
     }
     if (areaInfoOpen) {
-      areaInfoSheetRef.current?.dismiss();
+      outdoorAreaSheetRef.current?.dismiss();
       return;
     }
     goToPreviousTab();
@@ -1846,28 +1832,23 @@ export default function MapScreenMapbox({
             <GymsSavedSpotsRow
               onSelectArea={onSelectAreaFromList}
               onSelectArea4={(spot) => {
-                // Day 6 — Area-typed saved spot tap → AreaInfoSheet stacked.
-                // Use a minimum-fields Area stub; AreaInfoSheet's child-crag
-                // loader only reads `area.id`.
+                // CA Phase 4b — Area-typed saved spot tap → unified sheet.
                 if (mode.kind !== 'explore') return;
-                setAreaInfoFromSpotsArea({
+                presentArea({
                   id: spot.target_id,
-                  region_id: '',
                   name: spot.target_name,
-                  status: 'approved',
+                  display_kind: 'area',
                 });
-                areaInfoFromSpotsSheetRef.current?.present();
               }}
               onSelectCrag={(spot) => {
                 if (mode.kind !== 'explore') return;
-                setCragInfoCragId(spot.target_id);
-                setCragInfoSeed({
+                presentArea({
                   id: spot.target_id,
                   name: spot.target_name,
-                  lat: spot.lat ?? undefined,
-                  lng: spot.lng ?? undefined,
+                  display_kind: 'crag',
+                  lat: spot.lat ?? null,
+                  lng: spot.lng ?? null,
                 });
-                cragInfoSheetRef.current?.present();
               }}
               onSelectRoute={(spot) => {
                 router.push({
@@ -2036,41 +2017,15 @@ export default function MapScreenMapbox({
         </ScrollView>
       </TrueSheet>
 
-      {/* Canonical region info sheet — presented from gyms-mode outdoor pin,
-          crag-mode region name tap, and AreaMenuSheet. Track D Day 4 rename
-          from AreaInfoSheet (was rendering Region all along). Local var
-          names kept as `areaInfo*` for minimum-diff; Day 5 rewrite renames. */}
-      <RegionInfoSheet
-        ref={areaInfoSheetRef}
-        regionId={areaInfoId}
-        context={areaInfoContext}
-        seedRegion={areaInfoSeed}
+      {/* CA Phase 4b — unified outdoor area info sheet. Replaces
+          RegionInfoSheet / CragInfoSheet / AreaInfoSheet trio. The sheet
+          derives layout from the area's display_kind + has_subareas/
+          has_routes flags (plan v8 §Phase 4 ordering table). */}
+      <OutdoorAreaInfoSheet
+        ref={outdoorAreaSheetRef}
         onPresented={() => setAreaInfoOpen(true)}
-        onDismiss={() => setAreaInfoOpen(false)}
-        onPressRouteMap={() => {
-          if (areaInfoContext === 'explore' && areaInfoSeed) {
-            areaInfoSheetRef.current?.dismiss();
-            enterArea(areaInfoSeed.id, areaInfoSeed.name);
-          }
-        }}
-      />
-      {/* BR Track D Day 5d — CragInfoSheet (Crag L5 detail). Stacked
-          from RoutesListSheet title tap when a Wall is focused. The
-          subtitle in 2-row mode is the Crag name, so tapping there
-          drills into the Crag's full detail. */}
-      <CragInfoSheet
-        ref={cragInfoSheetRef}
-        cragId={cragInfoCragId}
-        context="pinTap"
-        seedCrag={cragInfoSeed}
-      />
-      {/* BR Track D Day 6 — AreaInfoSheet stacked from gyms-sheet
-          saved-spots row (Area-typed tile tap). Mounted unconditionally
-          at root; the sheet load effect short-circuits on `area: null`. */}
-      <AreaInfoSheet
-        ref={areaInfoFromSpotsSheetRef}
-        area={areaInfoFromSpotsArea}
-        context="pinTap"
+        onDismissed={() => setAreaInfoOpen(false)}
+        onRouteTap={(r) => navigateToRoute(r.id)}
       />
       {/* Crag menu sheet (stacked) — spawned from the sheet-header
           hamburger tap. Hosts Crag header card + climb-type segment +
