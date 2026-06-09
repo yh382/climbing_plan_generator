@@ -8,6 +8,9 @@ import type {
   Region, Area, Crag, Wall, OutdoorRoute,
   RouteRating, RouteAscent,
   RoutePinsResponse, CragDetail, CragOverview, SearchResult,
+  // CA Phase 3 — outdoor_areas single tree
+  OutdoorAreaDetail, OutdoorAreaListItem, CoverageResponse,
+  AreaSearchResponse, LegacyAliasResponse, DisplayKind,
 } from './types';
 import {
   MOCK_REGIONS, MOCK_AREAS, MOCK_CRAGS, MOCK_WALLS, MOCK_ROUTES,
@@ -232,4 +235,101 @@ export const outdoorApi = {
   // The legacy multi-level pre-aggregated pin source `/outdoor/regions/{id}/pins`
   // is gone. New flow: `listPins` (bbox) drives RoutePinCluster, and Wall pin
   // tap → caller-local `focusOnWall` fetches that wall's routes via `getRoutes`.
+
+  // ════════════════════════════════════════════════════════════════
+  //  CA Phase 3 — outdoor_areas single-tree endpoints (BE Phase 2)
+  //  These replace the 5-layer Region/Area/Crag/Wall queries.
+  //  Plan v8 §Phase 3: route through api.ts ONLY (never inline fetch).
+  //  Legacy aliases /v2 are 7-14d bridge — Phase 6 deletes them.
+  // ════════════════════════════════════════════════════════════════
+
+  /** Detail + ancestors breadcrumb + location_audit (single fetch). */
+  getArea: async (areaId: string): Promise<OutdoorAreaDetail> => {
+    return api.get<OutdoorAreaDetail>(`/outdoor/areas/${areaId}`);
+  },
+
+  /** Direct children, sorted by subtree_route_count desc (children-first UX). */
+  listAreaChildren: async (
+    areaId: string,
+    opts?: { limit?: number },
+  ): Promise<OutdoorAreaListItem[]> => {
+    const qs = new URLSearchParams();
+    if (opts?.limit) qs.set('limit', String(opts.limit));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return api.get<OutdoorAreaListItem[]>(
+      `/outdoor/areas/${areaId}/children${suffix}`,
+    );
+  },
+
+  /** Routes attached to area. include_descendants=true walks subtree. */
+  listAreaRoutes: async (
+    areaId: string,
+    opts?: { includeDescendants?: boolean; limit?: number; offset?: number },
+  ): Promise<OutdoorRoute[]> => {
+    const qs = new URLSearchParams();
+    if (opts?.includeDescendants) qs.set('include_descendants', 'true');
+    if (opts?.limit) qs.set('limit', String(opts.limit));
+    if (opts?.offset) qs.set('offset', String(opts.offset));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return api.get<OutdoorRoute[]>(
+      `/outdoor/areas/${areaId}/routes${suffix}`,
+    );
+  },
+
+  /** Coverage polygon (convex hull). Hard rule 4: 422 on country/state +
+   *  >5000-route subtree; null polygon when <3 route points. */
+  getAreaCoverage: async (areaId: string): Promise<CoverageResponse> => {
+    return api.get<CoverageResponse>(`/outdoor/areas/${areaId}/coverage`);
+  },
+
+  /** Zoom-aware pin source. display_kinds filters which tier surfaces. */
+  listAreasInBbox: async (params: {
+    bbox: { south: number; west: number; north: number; east: number };
+    displayKinds?: DisplayKind[];
+    limit?: number;
+  }): Promise<OutdoorAreaListItem[]> => {
+    const { south, west, north, east } = params.bbox;
+    const qs = new URLSearchParams({
+      south: String(south),
+      west: String(west),
+      north: String(north),
+      east: String(east),
+    });
+    for (const k of params.displayKinds ?? []) {
+      qs.append('display_kinds', k);
+    }
+    if (params.limit) qs.set('limit', String(params.limit));
+    return api.get<OutdoorAreaListItem[]>(`/outdoor/areas?${qs}`);
+  },
+
+  /** Area name search. Min 2 chars (BE returns 422 below). */
+  searchAreas: async (params: {
+    q: string;
+    displayKinds?: DisplayKind[];
+    limit?: number;
+  }): Promise<AreaSearchResponse> => {
+    const qs = new URLSearchParams({ q: params.q });
+    for (const k of params.displayKinds ?? []) {
+      qs.append('display_kinds', k);
+    }
+    if (params.limit) qs.set('limit', String(params.limit));
+    return api.get<AreaSearchResponse>(`/outdoor/areas/search?${qs}`);
+  },
+
+  // ---- Legacy 7-14d aliases (Phase 6 deletes these calls) ----
+
+  /** Legacy /outdoor/crags/{old_id} bridge. Wraps detail in deprecation envelope. */
+  legacyCragAlias: async (oldId: string): Promise<LegacyAliasResponse> => {
+    return api.get<LegacyAliasResponse>(`/outdoor/crags/${oldId}/v2`);
+  },
+
+  /** Legacy /outdoor/regions/{old_id} bridge. */
+  legacyRegionAlias: async (oldId: string): Promise<LegacyAliasResponse> => {
+    return api.get<LegacyAliasResponse>(`/outdoor/regions/${oldId}/v2`);
+  },
+
+  /** Legacy /outdoor/walls/{old_id} bridge. */
+  legacyWallAlias: async (oldId: string): Promise<LegacyAliasResponse> => {
+    return api.get<LegacyAliasResponse>(`/outdoor/walls/${oldId}/v2`);
+  },
 };

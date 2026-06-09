@@ -465,3 +465,151 @@ export type RouteContainment = {
   list_id: string;
   item_id: string;
 };
+
+// ---- CA Phase 3: outdoor_areas single self-referencing tree ----
+//
+// Replaces the 5-layer Region/Area/Crag/Wall hierarchy with one shape.
+// Mirrors backend schemas/outdoor_areas.py (OutdoorAreaOut + OutdoorAreaDetail).
+// Phase 6 will delete Region / Area / Crag / Wall types from this file.
+
+export type DisplayKind =
+  | 'country'
+  | 'state'
+  | 'region'
+  | 'area'
+  | 'crag'
+  | 'wall';
+
+export type LocationConfidence = 'high' | 'medium' | 'low';
+
+export type AncestorBreadcrumb = {
+  id: string;
+  name: string;
+  display_kind: DisplayKind;
+  depth: number;
+};
+
+// LocationAudit is already declared above (BS-P1-γ — line ~321). Its
+// shape is fully compatible with what CA Phase 2 returns, so we reuse it
+// rather than defining a duplicate.
+
+export type OutdoorArea = {
+  id: string;
+  source: string;
+  source_external_id?: string | null;
+
+  // Tree shape
+  parent_id?: string | null;
+  path_ids: string[];
+  depth: number;
+
+  // Naming
+  name: string;
+  name_en?: string | null;
+
+  // Geo
+  lat?: number | null;
+  lng?: number | null;
+
+  // Kind
+  computed_kind: DisplayKind;
+  display_kind: DisplayKind;
+  display_kind_locked: boolean;
+
+  // Cached counts (DB-trigger maintained)
+  direct_route_count: number;
+  subtree_route_count: number;
+  direct_child_count: number;
+  has_routes: boolean;
+  has_subareas: boolean;
+
+  // Content
+  cover_url?: string | null;
+  description?: string | null;
+  approach?: string | null;
+
+  // Location audit (flat — kept for back-compat with adapter pattern)
+  location_source?: string | null;
+  location_method?: string | null;
+  location_confidence?: LocationConfidence | null;
+
+  // Workflow
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Detail response — adds ancestors breadcrumb + structured location_audit.
+// FE renders breadcrumb + audit pill from a single fetch.
+export type OutdoorAreaDetail = OutdoorArea & {
+  ancestors: AncestorBreadcrumb[];
+  location_audit: LocationAudit;
+};
+
+// Lightweight projection for /children / /areas?bbox / /search responses.
+// Skips ancestors / description / approach to save payload.
+export type OutdoorAreaListItem = {
+  id: string;
+  name: string;
+  name_en?: string | null;
+  display_kind: DisplayKind;
+  depth: number;
+  parent_id?: string | null;
+
+  lat?: number | null;
+  lng?: number | null;
+
+  direct_route_count: number;
+  subtree_route_count: number;
+  direct_child_count: number;
+  has_routes: boolean;
+  has_subareas: boolean;
+
+  cover_url?: string | null;
+};
+
+// Coverage polygon: convex hull GeoJSON + bbox.
+// polygon === null when fewer than 3 distinct route points exist.
+export type BBox = {
+  sw_lat: number;
+  sw_lng: number;
+  ne_lat: number;
+  ne_lng: number;
+};
+
+export type CoverageResponse = {
+  polygon: GeoJSON.Feature<GeoJSON.Polygon> | null;
+  point_count: number;
+  bbox: BBox | null;
+};
+
+// Coverage 422 error shape (FE matches on `error` field).
+export type CoverageErrorTooBroad = {
+  error: 'coverage_too_broad';
+  message: string;
+  min_display_kind: DisplayKind;
+  current_display_kind: DisplayKind;
+};
+
+export type CoverageErrorSubtreeTooLarge = {
+  error: 'subtree_too_large';
+  message: string;
+  subtree_route_count: number;
+};
+
+export type CoverageErrorBboxInvalid = {
+  error: 'bbox_invalid';
+  message: string;
+};
+
+export type AreaSearchResponse = {
+  items: OutdoorAreaListItem[];
+  total: number;
+};
+
+// Legacy alias envelope (7-14d bridge) — FE can show deprecation hint.
+export type LegacyAliasResponse = {
+  deprecated: boolean;
+  canonical_url: string;
+  area: OutdoorAreaDetail;
+};
