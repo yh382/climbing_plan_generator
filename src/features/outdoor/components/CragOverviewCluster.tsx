@@ -81,11 +81,12 @@ export function getMinRoutesForZoom(zoom: number): number {
   return 0;
 }
 
-const DEFAULT_MAX_ZOOM = 13;
-/** PLAN §3.2 — clusters dissolve before our crag pins themselves go
- *  away. At zoom 11+ individual Crag dots are visible; at 13+ user
- *  should drill into area mode via tap. */
-const CLUSTER_MAX_ZOOM_LEVEL = 11;
+const DEFAULT_MAX_ZOOM = 16;
+/** CA-FU — raised 11 → 14 for the 35k dataset. Dense areas (e.g. a campus
+ *  with ~35 crags packed together) kept exploding into overlapping pins at
+ *  zoom 12; clustering through zoom 14 keeps them as one sized bubble until
+ *  you're zoomed in enough that individual pins don't collide. */
+const CLUSTER_MAX_ZOOM_LEVEL = 14;
 const CLUSTER_RADIUS = 50;
 
 /** Adaptive cluster bubble size — denser climbing regions render bigger
@@ -426,7 +427,10 @@ export default function CragOverviewCluster({
           route-count-scaled pin radius (up to 24px). */}
       <MapboxGL.SymbolLayer
         id="crag-overview-single-labels"
-        filter={['!', ['has', 'point_count']]}
+        // CA-FU — only crags with >5 routes get a name label; smaller crags
+        // render as pin-only. With 35k crags this is the legibility + perf
+        // fix: a dense campus stops piling ~35 overlapping labels.
+        filter={['all', ['!', ['has', 'point_count']], ['>', ['get', 'route_count'], 5]]}
         style={{
           textField: ['get', 'crag_name'] as any,
           // BS-P1-η label visual system — softer outdoor palette,
@@ -445,8 +449,12 @@ export default function CragOverviewCluster({
           textAnchor: 'top',
           // Offset clears the route-count-scaled pin (radius up to 24px).
           textOffset: [0, 2.4],
-          textAllowOverlap: true,
-          textIgnorePlacement: true,
+          // CA-FU — false (was true) so Mapbox culls overlapping labels
+          // instead of stacking them all. Combined with the >5-route filter
+          // above, dense areas stay readable.
+          textAllowOverlap: false,
+          textIgnorePlacement: false,
+          textOptional: true,
           textMaxWidth: 10,
           symbolZOrder: 'auto',
         }}

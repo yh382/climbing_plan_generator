@@ -26,6 +26,7 @@ import { NativeSegmentedControl } from '../../../../components/ui/NativeSegmente
 import { useThemeColors } from '../../../../lib/useThemeColors';
 import { useSettings } from '../../../../contexts/SettingsContext';
 import type { OutdoorRoute } from '../../../outdoor/types';
+import RouteListCard from '../../../outdoor/components/RouteListCard';
 import { sheetLabels, type ThemeColors } from './shared';
 
 type Discipline = 'all' | 'boulder' | 'rope' | 'other';
@@ -37,10 +38,13 @@ type Props = {
   onRouteTap: (route: OutdoorRoute) => void;
   /** Optional element pinned above the search row (scrolls with the list). */
   ListHeaderComponent?: React.ReactElement | null;
+  /** When false, the search box + discipline filter are hidden (the parent
+   *  owns a search toggle button in its header). Default true. */
+  showControls?: boolean;
 };
 
 export function AreaRoutesBrowser({
-  routes, loading, onRouteTap, ListHeaderComponent,
+  routes, loading, onRouteTap, ListHeaderComponent, showControls = true,
 }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
@@ -68,26 +72,28 @@ export function AreaRoutesBrowser({
   const header = (
     <View>
       {ListHeaderComponent}
-      <View style={styles.controls}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={16} color={colors.textTertiary} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={tr('在该岩点内搜索路线', 'Search routes in this crag')}
-            placeholderTextColor={colors.textTertiary}
-            style={styles.searchInput}
-            autoCorrect={false}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
+      {showControls ? (
+        <View style={styles.controls}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={16} color={colors.textTertiary} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={tr('在该岩点内搜索路线', 'Search routes in this crag')}
+              placeholderTextColor={colors.textTertiary}
+              style={styles.searchInput}
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+          </View>
+          <NativeSegmentedControl
+            options={disciplineLabels}
+            selectedIndex={disciplineIdx}
+            onSelect={setDisciplineIdx}
           />
         </View>
-        <NativeSegmentedControl
-          options={disciplineLabels}
-          selectedIndex={disciplineIdx}
-          onSelect={setDisciplineIdx}
-        />
-      </View>
+      ) : null}
     </View>
   );
 
@@ -119,43 +125,15 @@ export function AreaRoutesBrowser({
         </Text>
       }
       renderItem={({ item }) => (
-        <RouteRow route={item} colors={colors} onPress={() => onRouteTap(item)} />
+        <View style={styles.cardWrap}>
+          <RouteListCard
+            route={item}
+            onPress={() => onRouteTap(item)}
+            hideLocation
+          />
+        </View>
       )}
     />
-  );
-}
-
-function RouteRow({
-  route, colors, onPress,
-}: {
-  route: OutdoorRoute;
-  colors: ThemeColors;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        rowStyles.row,
-        { backgroundColor: pressed ? colors.backgroundSecondary : 'transparent' },
-      ]}
-    >
-      <Text style={[rowStyles.grade, { color: colors.textSecondary }]} numberOfLines={1}>
-        {route.grade_text}
-      </Text>
-      <Text style={[rowStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>
-        {route.name}
-      </Text>
-      {typeof route.stars === 'number' ? (
-        <View style={rowStyles.stars}>
-          <Ionicons name="star" size={12} color={colors.accent} />
-          <Text style={[rowStyles.starsText, { color: colors.textSecondary }]}>
-            {route.stars.toFixed(1)}
-          </Text>
-        </View>
-      ) : null}
-      <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
-    </Pressable>
   );
 }
 
@@ -183,6 +161,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: 0,
   },
   listContent: { paddingBottom: 24 },
+  cardWrap: { paddingHorizontal: 14, paddingVertical: 3 },
   empty: {
     fontSize: 13,
     fontWeight: '500',
@@ -190,23 +169,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
-});
-
-const rowStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    gap: 12,
-  },
-  grade: {
-    fontSize: 12,
-    fontWeight: '600',
-    minWidth: 52,
-    fontVariant: ['tabular-nums'],
-  },
-  name: { flex: 1, fontSize: 15, fontWeight: '500' },
-  stars: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  starsText: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

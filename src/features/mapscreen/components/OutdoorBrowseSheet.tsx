@@ -17,18 +17,17 @@
 // outdoor→mapscreen import direction one-way (it reuses mapscreen's
 // outdoor-area-sheet/* subcomponents).
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
+import { HeaderButton } from '../../../components/ui/HeaderButton';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import {
@@ -62,13 +61,28 @@ export function OutdoorBrowseSheet({
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const { data: detail, loading: detailLoading } = useAreaDetail(areaId);
   const { data: children, loading: childrenLoading } = useAreaChildren(areaId);
   const { data: routes, loading: routesLoading } = useAreaRoutes(areaId);
 
+  // Header mirrors RoutesListSheet: native glass search button (left),
+  // title (center), native glass hamburger (right). Search toggles the
+  // in-list search box + discipline filter (AreaRoutesBrowser showControls).
+  const isCrag = (detail?.has_routes ?? false) && !(detail?.has_subareas ?? false);
   const header = (
-    <View style={[styles.header, { paddingTop: 8 }]}>
+    <View style={styles.header}>
+      <View style={styles.headerSide}>
+        {isCrag ? (
+          <HeaderButton
+            icon="magnifyingglass"
+            variant="glass"
+            size={44}
+            onPress={() => setSearchOpen((v) => !v)}
+          />
+        ) : null}
+      </View>
       <View style={styles.headerText}>
         <Text style={styles.title} numberOfLines={1}>
           {detail?.name ?? tr('加载中…', 'Loading…')}
@@ -79,17 +93,14 @@ export function OutdoorBrowseSheet({
           </Text>
         ) : null}
       </View>
-      <Pressable
-        onPress={onPressHamburger}
-        hitSlop={10}
-        style={({ pressed }) => [
-          styles.hamburger,
-          { backgroundColor: pressed ? colors.backgroundSecondary : 'transparent' },
-        ]}
-        accessibilityLabel={tr('更多', 'More')}
-      >
-        <Ionicons name="menu" size={22} color={colors.textPrimary} />
-      </Pressable>
+      <View style={styles.headerSide}>
+        <HeaderButton
+          icon="line.3.horizontal"
+          variant="glass"
+          size={44}
+          onPress={onPressHamburger}
+        />
+      </View>
     </View>
   );
 
@@ -126,6 +137,7 @@ export function OutdoorBrowseSheet({
           loading={routesLoading}
           onRouteTap={onPressRoute}
           ListHeaderComponent={header}
+          showControls={searchOpen}
         />
       </View>
     );
@@ -186,23 +198,28 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingBottom: 6,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 10,
   },
-  headerText: { flex: 1, minWidth: 0 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  hamburger: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  headerSide: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerText: { flex: 1, minWidth: 0, alignItems: 'center' },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    marginTop: 1,
   },
 });

@@ -450,6 +450,10 @@ export default function MapScreenMapbox({
   // other crags' walls (RoutePinCluster bbox follows the camera). Cleared
   // on area change / wall focus / back to explore.
   const [browsingCrag, setBrowsingCrag] = useState<CragPinContext | null>(null);
+  // CA-FU Phase C.4 — the crag tapped in explore mode. Drives CragMenuSheet
+  // (the OutdoorBrowseSheet hamburger target). Replaces the legacy
+  // focusedWall-derived crag context.
+  const [browsedCrag, setBrowsedCrag] = useState<CragPin | null>(null);
   const primaryDiscipline = useSettingsStore((s) => s.primaryDiscipline);
   const [areaModeIndex, setAreaModeIndex] = useState(
     primaryDiscipline === "boulder" ? 1 : 0,
@@ -935,6 +939,7 @@ export default function MapScreenMapbox({
       // camera effect (which fires as areaData resolves) skips its zoom-10
       // region-centroid override and keeps our zoom-15 crag framing.
       selfFramedAreaRef.current = crag.id;
+      setBrowsedCrag(crag); // drives CragMenuSheet (OutdoorBrowseSheet hamburger)
       enterArea(crag.id, crag.name);
       try {
         markProgrammaticMove(600);
@@ -1681,7 +1686,10 @@ export default function MapScreenMapbox({
                 styleReady={styleReady}
                 onCragPress={onCragPinTap}
                 onClusterPress={onClusterBubblePress}
-                minRoutes={cragMinRoutes}
+                // CA-FU — minRoutes importance filter dropped: with it on, low-
+                // route crags vanished at zoom-out leaving sparse scattered
+                // clusters. All 35k now feed the static source so Mapbox
+                // aggregates them into proper size-varying bubbles at every zoom.
               />
             )}
 
@@ -2082,31 +2090,23 @@ export default function MapScreenMapbox({
           Crag Tools + Browse Up + My Tools + Share. Crag-scoped, so the
           mount is gated on `focusedWall` — the user reaches a Crag only
           via a Wall pin tap (PLAN §3.5). */}
-      {mode.kind === 'area' && focusedWall ? (
+      {/* CA-FU Phase C.4 — CragMenuSheet is the OutdoorBrowseSheet hamburger
+          target. Mounted whenever a crag is being browsed (was gated on the
+          dead focusedWall, which is why the hamburger did nothing). Fed from
+          the tapped CragPin; parentArea omitted (the area tree's Browse-Up
+          wiring lands in Phase D). */}
+      {mode.kind === 'area' && browsedCrag ? (
         <CragMenuSheet
           ref={cragMenuSheetRef}
           crag={{
-            id: focusedWall.crag_id,
-            name: focusedWall.crag_name,
+            id: browsedCrag.id,
+            name: browsedCrag.name,
             cover_url: null,
-            area_id: focusedWall.area_id,
-            area_name: focusedWall.area_name,
-            region_id: focusedWall.region_id,
-            region_name: focusedWall.region_name,
-            lat: focusedWall.lat,
-            lng: focusedWall.lng,
-            // wall_count: at least 1 (the focused wall); the BE CragDetail
-            // load inside CragInfoSheet hydrates the precise count for
-            // any downstream stats. PLAN §3.5 is fine with a per-tap seed.
-            wall_count: 1,
-            route_count: focusedWall.route_count,
-            boulder_count: 0,
-          }}
-          parentArea={{
-            id: focusedWall.area_id,
-            region_id: focusedWall.region_id,
-            name: focusedWall.area_name,
-            status: 'approved',
+            lat: browsedCrag.lat,
+            lng: browsedCrag.lng,
+            wall_count: 0,
+            route_count: browsedCrag.route_count,
+            boulder_count: browsedCrag.discipline_counts.boulder,
           }}
           areaModeIndex={areaModeIndex}
           setAreaModeIndex={setAreaModeIndex}
