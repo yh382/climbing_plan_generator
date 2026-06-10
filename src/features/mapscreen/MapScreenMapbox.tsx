@@ -1328,19 +1328,14 @@ export default function MapScreenMapbox({
           enterArea(hit.id, hit.name);
           return;
         case 'area':
-          presentArea({
-            id: hit.id,
-            name: hit.name,
-            display_kind: 'area',
-          });
+          // Intermediate area → enter browse mode (OutdoorBrowseSheet renders
+          // children-first). CA-FU: was a stacked OutdoorAreaInfoSheet.
+          enterArea(hit.id, hit.name);
           return;
         case 'crag':
-          presentArea({
-            id: hit.id,
-            name: hit.name,
-            display_kind: 'crag',
-            parent_name_hint: hit.area_name ?? null,
-          });
+          // CA-FU — crag → primary browse (OutdoorBrowseSheet routes list),
+          // NOT the stacked info sheet. Matches the crag-pin-tap flow.
+          enterArea(hit.id, hit.name);
           return;
         case 'wall':
           // No standalone Wall sheet — the natural fit is to drop the
@@ -2114,19 +2109,38 @@ export default function MapScreenMapbox({
           dead focusedWall, which is why the hamburger did nothing). Fed from
           the tapped CragPin; parentArea omitted (the area tree's Browse-Up
           wiring lands in Phase D). */}
-      {mode.kind === 'area' && browsedCrag ? (
+      {mode.kind === 'area' ? (
         <CragMenuSheet
           ref={cragMenuSheetRef}
-          crag={{
-            id: browsedCrag.id,
-            name: browsedCrag.name,
-            cover_url: null,
-            lat: browsedCrag.lat,
-            lng: browsedCrag.lng,
-            wall_count: 0,
-            route_count: browsedCrag.route_count,
-            boulder_count: browsedCrag.discipline_counts.boulder,
-          }}
+          crag={
+            browsedCrag
+              ? {
+                  // Crag-pin tap: full counts from the CragPin.
+                  id: browsedCrag.id,
+                  name: browsedCrag.name,
+                  cover_url: null,
+                  lat: browsedCrag.lat,
+                  lng: browsedCrag.lng,
+                  wall_count: 0,
+                  route_count: browsedCrag.route_count,
+                  boulder_count: browsedCrag.discipline_counts.boulder,
+                }
+              : areaData.area
+              ? {
+                  // Saved-spot / search entry to area mode: no CragPin, so
+                  // seed from the area record (counts unknown → 0; the menu
+                  // actions still work, Info hydrates the rest).
+                  id: areaData.area.id,
+                  name: areaData.area.name,
+                  cover_url: areaData.area.cover_url ?? null,
+                  lat: areaData.area.lat ?? null,
+                  lng: areaData.area.lng ?? null,
+                  wall_count: 0,
+                  route_count: 0,
+                  boulder_count: 0,
+                }
+              : null
+          }
           areaModeIndex={areaModeIndex}
           setAreaModeIndex={setAreaModeIndex}
           onPressMyList={() => myListSheetRef.current?.present()}
