@@ -61,7 +61,7 @@ import { FilterChipsBar } from '../../src/features/mapscreen/components/FilterCh
 import useOutdoorMapFiltersStore from '../../src/store/useOutdoorMapFiltersStore';
 import MyListSheet, { type MyListSheetHandle } from '../../src/features/mapscreen/components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from '../../src/features/mapscreen/components/ReportsSheet';
-import AddRouteSheet, { type AddRouteSheetHandle } from '../../src/features/outdoor/components/AddRouteSheet';
+// CA-FU Phase E — AddRouteSheet deleted.
 import { Host, Button } from '@expo/ui/swift-ui';
 import {
   buttonStyle,
@@ -138,9 +138,7 @@ export default function CragMapPage() {
   const areaMenuSheetRef = useRef<CragMenuSheetHandle>(null);
   const myListSheetRef = useRef<MyListSheetHandle>(null);
   const reportsSheetRef = useRef<ReportsSheetHandle>(null);
-  const addRouteSheetRef = useRef<AddRouteSheetHandle>(null);
-  const [pinPickMode, setPinPickMode] = useState(false);
-  const prePinPickDetentRef = useRef<number>(DETENT_COLLAPSED);
+  // CA-FU Phase E — AddRouteSheet / pin-pick removed.
 
   // Data state
   const [area, setArea] = useState<OutdoorAreaDetail | null>(null);
@@ -451,7 +449,7 @@ export default function CragMapPage() {
     });
   }, [router, areaId, area]);
 
-  const topBarHidden = sheet.currentDetentIndex === DETENT_LARGE || pinPickMode;
+  const topBarHidden = sheet.currentDetentIndex === DETENT_LARGE;
   // B1 — dismiss + re-present mirrors MapScreenMapbox; see that file for
   // the iOS modal-sheet rationale. CN-only file kept in lock-step.
   const dismissCragSheet = useCallback(() => {
@@ -628,60 +626,7 @@ export default function CragMapPage() {
           </View>
         )}
 
-        {/* AddRouteSheet pin-pick overlay (pan + confirm) — see MapScreenMapbox. */}
-        {pinPickMode ? (
-          <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-            <View style={styles.pinPickCrosshair} pointerEvents="none">
-              <Ionicons name="add" size={44} color={colors.accent} />
-            </View>
-            <View style={[styles.pinPickHint, { top: insets.top + 12 }]}>
-              <Text style={styles.pinPickHintText}>
-                {tr('拖动地图对准路线位置', 'Pan the map to position the pin')}
-              </Text>
-            </View>
-            <View style={[styles.pinPickActions, { bottom: insets.bottom + 24 }]}>
-              <Host style={styles.pinPickCancelHost}>
-                <Button
-                  label={tr('取消', 'Cancel')}
-                  onPress={() => {
-                    setPinPickMode(false);
-                    sheet.sheetRef.current
-                      ?.present(prePinPickDetentRef.current)
-                      .catch(() => {});
-                    setTimeout(() => addRouteSheetRef.current?.present(), 180);
-                  }}
-                  modifiers={[
-                    buttonStyle('glass'),
-                    controlSize('large'),
-                    frame({ maxWidth: 9999, height: 48 }),
-                  ]}
-                />
-              </Host>
-              <Host style={styles.pinPickConfirmHost}>
-                <Button
-                  label={tr('确认位置', 'Confirm')}
-                  systemImage={'checkmark' as any}
-                  onPress={() => {
-                    const c = mapCenterRef.current;
-                    if (!c) return;
-                    setPinPickMode(false);
-                    addRouteSheetRef.current?.setCoords([c.lng, c.lat]);
-                    sheet.sheetRef.current
-                      ?.present(prePinPickDetentRef.current)
-                      .catch(() => {});
-                    setTimeout(() => addRouteSheetRef.current?.present(), 180);
-                  }}
-                  modifiers={[
-                    buttonStyle('glassProminent'),
-                    controlSize('large'),
-                    tint(colors.accent),
-                    frame({ maxWidth: 9999, height: 48 }),
-                  ]}
-                />
-              </Host>
-            </View>
-          </View>
-        ) : null}
+        {/* CA-FU Phase E — pin-pick overlay removed with AddRouteSheet. */}
       </View>
 
       {/* Top bar — map-interaction only. CN gets just the recenter button;
@@ -976,9 +921,6 @@ export default function CragMapPage() {
           areaModeIndex={modeIndex}
           setAreaModeIndex={setModeIndex}
           onPressMyList={() => myListSheetRef.current?.present()}
-          onPressAddRoute={
-            areaId ? () => addRouteSheetRef.current?.present() : undefined
-          }
           onPressReports={() => reportsSheetRef.current?.present()}
         />
       ) : null}
@@ -989,18 +931,7 @@ export default function CragMapPage() {
       {/* Reports sheet (stacked on top of the profile sheet). */}
       <ReportsSheet ref={reportsSheetRef} />
 
-      {/* Add Route sheet — area mode only. */}
-      {mode === 'area' && areaId ? (
-        <AddRouteSheet
-          ref={addRouteSheetRef}
-          areaId={areaId}
-          onRequestPinOnMap={() => {
-            prePinPickDetentRef.current = sheet.currentDetentIndex;
-            sheet.sheetRef.current?.dismiss().catch(() => {});
-            setPinPickMode(true);
-          }}
-        />
-      ) : null}
+      {/* CA-FU Phase E — AddRouteSheet removed. */}
     </View>
   );
 }
@@ -1015,40 +946,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       justifyContent: 'center',
       backgroundColor: 'rgba(0,0,0,0.1)',
     },
-    pinPickCrosshair: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    pinPickHint: {
-      position: 'absolute',
-      alignSelf: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.pill,
-      backgroundColor: 'rgba(0,0,0,0.7)',
-    },
-    pinPickHintText: {
-      fontFamily: theme.fonts.medium,
-      fontSize: 14,
-      color: '#fff',
-      textAlign: 'center',
-    },
-    pinPickActions: {
-      position: 'absolute',
-      left: 16,
-      right: 16,
-      flexDirection: 'row',
-      gap: 12,
-      alignItems: 'center',
-    },
-    // Symmetric pair: both Hosts flex: 1 (see MapScreenMapbox).
-    pinPickCancelHost: { flex: 1, height: 48 },
-    pinPickConfirmHost: { flex: 1, height: 48 },
+    // CA-FU Phase E — pin-pick overlay styles removed with AddRouteSheet.
     // Sheet header — collapsed row with icon + segment + info.
     // Generous paddingTop (Fix 1) so icons breathe under the sheet grabber
     // (grabber topMargin 6 + height 3 = 9pt; we add another ~14pt on top).

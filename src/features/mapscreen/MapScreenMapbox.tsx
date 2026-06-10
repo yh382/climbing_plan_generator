@@ -57,7 +57,7 @@ import ReportsSheet, { type ReportsSheetHandle } from './components/ReportsSheet
 import OfflineMapsSheet, {
   type OfflineMapsSheetHandle,
 } from './components/OfflineMapsSheet';
-import AddRouteSheet, { type AddRouteSheetHandle } from '../outdoor/components/AddRouteSheet';
+// CA-FU Phase E — AddRouteSheet deleted (route submission → 6.FU-2 admin writer).
 import { Host, Button } from '@expo/ui/swift-ui';
 import {
   buttonStyle,
@@ -272,16 +272,8 @@ export default function MapScreenMapbox({
   const myListSheetRef = useRef<MyListSheetHandle>(null);
   const reportsSheetRef = useRef<ReportsSheetHandle>(null);
   const offlineMapsSheetRef = useRef<OfflineMapsSheetHandle>(null);
-  const addRouteSheetRef = useRef<AddRouteSheetHandle>(null);
-  // Pin-pick mode: when true, the map shows a crosshair overlay and the
-  // next tap is captured as the new route's coords (dispatched back to
-  // AddRouteSheet via ref.setCoords + ref.present).
-  const [pinPickMode, setPinPickMode] = useState(false);
-  // Detent snapshot to restore the primary sheet to after pin-pick
-  // ends. Dismissing the sheet while picking gives the user an
-  // uncluttered map; we then re-present at whatever detent they had
-  // before (usually MEDIUM, since that's what area mode lands at).
-  const prePinPickDetentRef = useRef<number>(DETENT_COLLAPSED);
+  // CA-FU Phase E — addRouteSheetRef / pinPickMode / prePinPickDetentRef
+  // removed with AddRouteSheet.
   const detailSheetPresentedRef = useRef(false);
 
   // Camera padding when flying to a tapped pin. The primary/detail sheet
@@ -1481,7 +1473,7 @@ export default function MapScreenMapbox({
         ...mapViewControlButtons,
         ...(todaySendsBtn ? [todaySendsBtn] : []),
       ]}
-      hidden={anySheetFull || pinPickMode}
+      hidden={anySheetFull}
     />
   );
 
@@ -1821,66 +1813,8 @@ export default function MapScreenMapbox({
           </View>
         ) : null}
 
-        {/* Pin-pick overlay (pan + confirm). Action bar sits 16pt above
-            the 76pt COLLAPSED primary sheet so it doesn't get clipped.
-            Buttons use native SwiftUI Button styles (.bordered /
-            .borderedProminent + .controlSize("extraLarge")) for an
-            iOS-native feel. */}
-        {pinPickMode ? (
-          <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-            <View style={styles.pinPickCrosshair} pointerEvents="none">
-              <Ionicons name="add" size={44} color={colors.accent} />
-            </View>
-            <View style={[styles.pinPickHint, { top: insets.top + 12 }]}>
-              <Text style={styles.pinPickHintText}>
-                {tr('拖动地图对准路线位置', 'Pan the map to position the pin')}
-              </Text>
-            </View>
-            <View style={[styles.pinPickActions, { bottom: insets.bottom + 24 }]}>
-              <Host style={styles.pinPickCancelHost}>
-                <Button
-                  label={tr('取消', 'Cancel')}
-                  onPress={() => {
-                    setPinPickMode(false);
-                    // Restore primary sheet to where the user left it,
-                    // then re-present AddRouteSheet on top.
-                    sheet.sheetRef.current
-                      ?.present(prePinPickDetentRef.current)
-                      .catch(() => {});
-                    setTimeout(() => addRouteSheetRef.current?.present(), 180);
-                  }}
-                  modifiers={[
-                    buttonStyle('glass'),
-                    controlSize('large'),
-                    frame({ maxWidth: 9999, height: 48 }),
-                  ]}
-                />
-              </Host>
-              <Host style={styles.pinPickConfirmHost}>
-                <Button
-                  label={tr('确认位置', 'Confirm')}
-                  systemImage={'checkmark' as any}
-                  onPress={() => {
-                    const c = mapCenterRef.current;
-                    if (!c) return;
-                    setPinPickMode(false);
-                    addRouteSheetRef.current?.setCoords([c.lng, c.lat]);
-                    sheet.sheetRef.current
-                      ?.present(prePinPickDetentRef.current)
-                      .catch(() => {});
-                    setTimeout(() => addRouteSheetRef.current?.present(), 180);
-                  }}
-                  modifiers={[
-                    buttonStyle('glassProminent'),
-                    controlSize('large'),
-                    tint(colors.accent),
-                    frame({ maxWidth: 9999, height: 48 }),
-                  ]}
-                />
-              </Host>
-            </View>
-          </View>
-        ) : null}
+        {/* CA-FU Phase E — pin-pick overlay removed with AddRouteSheet
+            (route submission moves to the 6.FU-2 admin writer). */}
       </View>
 
       {topBar}
@@ -2144,7 +2078,6 @@ export default function MapScreenMapbox({
           areaModeIndex={areaModeIndex}
           setAreaModeIndex={setAreaModeIndex}
           onPressMyList={() => myListSheetRef.current?.present()}
-          onPressAddRoute={() => addRouteSheetRef.current?.present()}
           onPressReports={() => reportsSheetRef.current?.present()}
           onPressOfflineMaps={() => offlineMapsSheetRef.current?.present()}
         />
@@ -2160,24 +2093,8 @@ export default function MapScreenMapbox({
           app/outdoor/crag-map.tsx intentionally doesn't mount this. */}
       <OfflineMapsSheet ref={offlineMapsSheetRef} currentStyleId={styleId} />
 
-      {/* Add Route sheet — only meaningful in area mode (submissions are
-          scoped to an area). In other modes the AreaMenuSheet entry is
-          suppressed. */}
-      {mode.kind === 'area' ? (
-        <AddRouteSheet
-          ref={addRouteSheetRef}
-          areaId={mode.areaId}
-          onRequestPinOnMap={() => {
-            // AddRouteSheet dismissed itself already. Snapshot the
-            // primary sheet's detent, dismiss it for a clean map view,
-            // then enter pin-pick mode. Cancel/Confirm restore the
-            // sheet to the saved detent and re-present AddRouteSheet.
-            prePinPickDetentRef.current = sheet.currentDetentIndex;
-            sheet.sheetRef.current?.dismiss().catch(() => {});
-            setPinPickMode(true);
-          }}
-        />
-      ) : null}
+      {/* CA-FU Phase E — AddRouteSheet removed; route submission moves to the
+          6.FU-2 admin writer window. */}
     </View>
   );
 }
@@ -2227,45 +2144,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     // ScrollView paddingTop here — that would push the hero down and
     // break the concentric layout.
     detailScrollContent: { paddingTop: 0 },
-    // AddRouteSheet pin-pick overlay (pan + confirm).
-    pinPickCrosshair: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    pinPickHint: {
-      position: 'absolute',
-      alignSelf: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: theme.borderRadius.pill,
-      backgroundColor: 'rgba(0,0,0,0.7)',
-    },
-    pinPickHintText: {
-      fontFamily: theme.fonts.medium,
-      fontSize: 14,
-      color: '#fff',
-      textAlign: 'center',
-    },
-    pinPickActions: {
-      position: 'absolute',
-      left: 16,
-      right: 16,
-      flexDirection: 'row',
-      gap: 12,
-      alignItems: 'center',
-    },
-    // Symmetric pair: both Hosts flex: 1 so Cancel + Confirm take
-    // equal width. Explicit height prevents SwiftUI's intrinsic
-    // content measurement from collapsing a label-only .bordered
-    // button to a dot. Matching `frame({ maxWidth: 9999 })` on each
-    // button expands the SwiftUI content to fill the Host.
-    pinPickCancelHost: { flex: 1, height: 48 },
-    pinPickConfirmHost: { flex: 1, height: 48 },
+    // CA-FU Phase E — pin-pick overlay styles removed with AddRouteSheet.
   });
 
 // area-mode sheet styles — mirror crag-map.tsx's createStyles so visuals stay identical.

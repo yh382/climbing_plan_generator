@@ -112,21 +112,8 @@ export const outdoorApi = {
     return api.post<{ ok: boolean }>(`/outdoor/routes/${routeId}/rate`, data);
   },
 
-  // ---- User-submitted route ----
-  /** Submit a new route for admin review. (Phase E deletes this along with
-   *  AddRouteSheet — the submit flow moves to the 6.FU-2 admin writer.) */
-  submitRoute: async (payload: {
-    region_id: string;
-    style: 'sport' | 'trad' | 'boulder' | 'multi-pitch';
-    name: string;
-    grade_text: string;
-    grade_system: 'yds' | 'vscale';
-    lat: number;
-    lng: number;
-    photo_urls: string[];
-  }): Promise<{ id: string; status: string }> => {
-    return api.post<{ id: string; status: string }>('/outdoor/routes/submit', payload);
-  },
+  // CA-FU Phase E — submitRoute deleted with AddRouteSheet (route submission
+  // moves to the 6.FU-2 admin writer window).
 
   // ---- Search ----
   // NOTE (CA-FU): `/outdoor/search` 404s post-6.2. This route-search-in-area
