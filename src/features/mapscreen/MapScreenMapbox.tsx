@@ -1229,11 +1229,30 @@ export default function MapScreenMapbox({
   // ---- Navigations / actions ----
   const navigateToRoute = useCallback(
     (routeId: string) => {
-      // Dismiss the outdoor sheet before pushing — iOS otherwise presents
-      // the new screen behind a half-open modal sheet. Fire-and-forget so
-      // the dismiss animation overlaps with the push transition.
-      sheet.sheetRef.current?.dismiss().catch(() => {});
-      router.push({ pathname: '/outdoor/outdoor-route-detail' as any, params: { id: routeId } });
+      const go = () =>
+        router.push({
+          pathname: '/outdoor/outdoor-route-detail' as any,
+          params: { id: routeId },
+        });
+      const ref = sheet.sheetRef.current;
+      if (!ref) {
+        go();
+        return;
+      }
+      // CA-FU fix — await the dismiss BEFORE pushing. The old fire-and-forget
+      // dismissed the sheet *during* the push transition; dismissing a modal
+      // mid-navigation-transition corrupts UIKit's presentation stack and
+      // leaves EVERY sheet unpresentable after you return from route detail
+      // (repro'd in area mode, where CragMenuSheet is a 2nd mounted sheet).
+      // The 400ms fallback guards against dismiss() never resolving.
+      let navigated = false;
+      const once = () => {
+        if (navigated) return;
+        navigated = true;
+        go();
+      };
+      ref.dismiss().then(once).catch(once);
+      setTimeout(once, 400);
     },
     [router, sheet],
   );
