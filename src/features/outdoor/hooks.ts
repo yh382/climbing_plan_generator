@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { outdoorApi } from './api';
 import type {
   AreaSearchResponse, CoverageResponse, DisplayKind,
-  OutdoorAreaDetail, OutdoorAreaListItem, SearchResult,
+  OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
 } from './types';
 
 // CA Phase 6.1 — `useAreaFavoriteToggle` removed. The legacy region-only
@@ -103,6 +103,26 @@ export function useAreaChildren(
   return useFetchOnce<OutdoorAreaListItem[]>(
     () => areaId
       ? outdoorApi.listAreaChildren(areaId, opts)
+      : Promise.resolve([]),
+    [areaId, opts?.limit],
+  );
+}
+
+/** GET /outdoor/areas/{id}/routes (direct only). BE returns them in the
+ *  CA-FU Q4 default order (stars DESC NULLS LAST, send_count DESC,
+ *  grade_score ASC) — consumers render as-is, no client re-sort.
+ *  includeDescendants is intentionally NOT exposed: browse is children-first,
+ *  a crag is a leaf, and pulling the whole subtree here is a footgun. */
+export function useAreaRoutes(
+  areaId: string | null | undefined,
+  opts?: { limit?: number },
+) {
+  return useFetchOnce<OutdoorRoute[]>(
+    () => areaId
+      ? outdoorApi.listAreaRoutes(areaId, {
+          includeDescendants: false,
+          limit: opts?.limit,
+        })
       : Promise.resolve([]),
     [areaId, opts?.limit],
   );
