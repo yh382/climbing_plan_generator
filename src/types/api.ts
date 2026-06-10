@@ -3834,6 +3834,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/areas/crags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preload-friendly compact list of all crag-tier areas (USA only v1)
+         * @description v1 是 USA 单地区 preload，scope 没有跨 country。CA Phase 1 import 只跑了
+         *     USA；6.FU-6 扩 Canada/EU/China 时再加 `country` 查询参数 + filter + test。
+         *
+         *     Public (`get_optional_user`) — preload must not be auth-gated. Edge-cached
+         *     5 min + 1d SWR window to shed repeated sha1 recompute on the origin.
+         *     Rate-limited 60/min/IP (SlowAPI) as an abuse backstop on the 35k-row
+         *     per-request sha1; edge cache means honest clients rarely reach origin.
+         */
+        get: operations["list_all_crags_outdoor_areas_crags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/areas/search": {
         parameters: {
             query?: never;
@@ -7385,6 +7411,41 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** CragPinOut */
+        CragPinOut: {
+            discipline_counts: components["schemas"]["DisciplineCounts"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Route Count */
+            route_count: number;
+        };
+        /**
+         * CragPinsOut
+         * @description Preload-friendly compact list of all crag-tier areas (USA v1).
+         *
+         *     Intentionally unpaginated (~35k items): Mapbox client clustering needs a
+         *     stable static source, and paginated + SWR reassembly breaks cluster
+         *     geometry stability. Compression (gzip/brotli) is handled by the reverse
+         *     proxy (Railway default gzip) → cleartext ~5MB compresses to ~1.5-2MB,
+         *     ship gate < 3MB gzipped.
+         */
+        CragPinsOut: {
+            /** Count */
+            count: number;
+            /** Data Version */
+            data_version: string;
+            /** Items */
+            items: components["schemas"]["CragPinOut"][];
+        };
         /** DailySummaryOut */
         DailySummaryOut: {
             /** Best Grade */
@@ -7400,6 +7461,32 @@ export interface components {
             duration_minutes: number | null;
             /** Sends */
             sends: number;
+        };
+        /**
+         * DisciplineCounts
+         * @description Three-bucket aggregation aligned with OutdoorRoute.discipline +
+         *     /outdoor/pins contract (boulder / rope / other).
+         *
+         *     DO NOT split sport/trad — those are styles, not disciplines. Mixing
+         *     dimensions creates silent leaks (toprope, multi-pitch, aid would
+         *     incorrectly land in 'other' if we used style buckets).
+         */
+        DisciplineCounts: {
+            /**
+             * Boulder
+             * @default 0
+             */
+            boulder: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+            /**
+             * Rope
+             * @default 0
+             */
+            rope: number;
         };
         /** EdgeGradeStatOut */
         EdgeGradeStatOut: {
@@ -10186,10 +10273,14 @@ export interface components {
              * Format: date-time
              */
             added_at: string;
+            /** Display Kind */
+            display_kind?: string | null;
             /** Lat */
             lat?: number | null;
             /** Lng */
             lng?: number | null;
+            /** Status */
+            status?: string | null;
             /**
              * Target Id
              * Format: uuid
@@ -19790,6 +19881,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_crags_outdoor_areas_crags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CragPinsOut"];
                 };
             };
         };

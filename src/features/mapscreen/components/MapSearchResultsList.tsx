@@ -1,10 +1,10 @@
 // src/features/mapscreen/components/MapSearchResultsList.tsx
 // BR Track D Day 6 — cross-level outdoor search results list (PLAN §6).
 //
-// Consumes `outdoorApi.searchOutdoor({ q })` (BE Track C) which returns a
-// flat `SearchResult[]` with a 5-way `type` discriminator: region | area
-// | crag | wall | route. We render each hit as a typed row + dispatch
-// tap by type back to the caller.
+// CA-FU Phase B — consumes `outdoorApi.searchAreas({ q, displayKinds })`
+// (`/outdoor/areas/search`) and adapts each AreaListItem to the SearchResult
+// row shape (type = display_kind, region/area/crag only). We render each hit
+// as a typed row + dispatch tap by type back to the caller.
 //
 // Owner side (MapScreenMapbox):
 //   - Owns the query text + the expand/collapse of MapSearchBar
@@ -34,9 +34,26 @@ import { useThemeColors } from "../../../lib/useThemeColors";
 import { theme } from "../../../lib/theme";
 import { outdoorApi } from "../../outdoor/api";
 import { getSearchHitMetaLabel } from "../../outdoor/hooks";
-import type { SearchResult } from "../../outdoor/types";
+import type { OutdoorAreaListItem, SearchResult } from "../../outdoor/types";
 
 type TR = (zh: string, en: string) => string;
+
+// CA-FU Phase B — `/outdoor/search` (mixed regions/areas/crags/walls/routes)
+// 404s post-6.2. The map search now goes through `/outdoor/areas/search`
+// (area names only, region/area/crag tiers) and adapts each AreaListItem to
+// the existing SearchResult row shape so ResultRow + getSearchHitMetaLabel +
+// the caller's typed onPressHit dispatch keep working unchanged. Walls/routes
+// no longer surface in search (intentional — tap a crag to browse routes).
+function areaItemToSearchResult(item: OutdoorAreaListItem): SearchResult {
+  return {
+    // displayKinds is filtered to region/area/crag below, so this narrows safely.
+    type: item.display_kind as SearchResult["type"],
+    id: item.id,
+    name: item.name,
+    name_en: item.name_en,
+    route_count: item.subtree_route_count,
+  };
+}
 
 export interface MapSearchResultsListProps {
   /** Free-text query. Empty / whitespace → empty list (no fetch). */
@@ -82,10 +99,12 @@ export function MapSearchResultsList({
       setLoading(true);
       setError(null);
       outdoorApi
-        .searchOutdoor({ q: trimmed, region_id: regionId })
-        .then((items) => {
+        // regionId no longer scopes — area search is global (CA-FU). Prop
+        // kept for caller compat; revisit if scoped area search is added.
+        .searchAreas({ q: trimmed, displayKinds: ["region", "area", "crag"] })
+        .then((res) => {
           if (fetchSeq !== seqRef.current) return;
-          setResults(items);
+          setResults(res.items.map(areaItemToSearchResult));
         })
         .catch((err) => {
           if (fetchSeq !== seqRef.current) return;
@@ -106,7 +125,7 @@ export function MapSearchResultsList({
     return (
       <View style={styles.emptyWrap}>
         <Text style={styles.hint}>
-          {tr("输入关键字搜索路线、岩点、岩壁…", "Search routes, crags, walls…")}
+          {tr("输入关键字搜索大区、岩区、岩点…", "Search regions, areas, crags…")}
         </Text>
       </View>
     );

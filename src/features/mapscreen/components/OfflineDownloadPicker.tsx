@@ -128,8 +128,10 @@ const OfflineDownloadPicker = forwardRef<
         return;
       }
 
-      // Fetch crags for bbox derivation.
-      const crags = await outdoorApi.getCrags(area.id);
+      // Fetch crag-tier children for bbox derivation (CA single tree).
+      const crags = await outdoorApi.listAreaChildren(area.id, {
+        displayKinds: ['crag'],
+      });
       const bbox = deriveBboxFromCrags(crags);
       if (!bbox) {
         Alert.alert(

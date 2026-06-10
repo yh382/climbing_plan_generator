@@ -51,17 +51,16 @@ export const betaApi = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return api.get<BetaOut[]>(`/outdoor/routes/${routeId}/beta${suffix}`);
   },
-  /** BR Track A: endpoint moved from /outdoor/areas/{area_id}/beta to
-   *  /outdoor/regions/{region_id}/beta. Param name + method name kept as
-   *  `…ForArea`/`areaId` for caller minimum-diff — the value passed is
-   *  the top-level entity id (was Area, now Region). Track D will rename
-   *  the method + caller chain when the community surface is rewritten. */
+  /** Betas for an outdoor_area (CA single tree). CA-FU Phase B: the BE
+   *  endpoint is `/outdoor/areas/{area_id}/beta` — the legacy
+   *  `/outdoor/regions/{id}/beta` path 404s post-6.2. `areaId` is the
+   *  canonical outdoor_area id. */
   listForArea(areaId: string, params: { limit?: number; offset?: number } = {}) {
     const qs = new URLSearchParams();
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return api.get<BetaOut[]>(`/outdoor/regions/${areaId}/beta${suffix}`);
+    return api.get<BetaOut[]>(`/outdoor/areas/${areaId}/beta${suffix}`);
   },
   deleteOwn(betaId: string) {
     return api.del(`/outdoor/beta/${betaId}`);

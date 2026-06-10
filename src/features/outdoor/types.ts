@@ -606,6 +606,33 @@ export type AreaSearchResponse = {
   total: number;
 };
 
+// ---- CA-FU Phase B — compact crag preload (GET /outdoor/areas/crags) ----
+
+/** Three-bucket discipline rollup, aligned with OutdoorRoute.discipline. */
+export type DisciplineCounts = {
+  boulder: number;
+  rope: number;
+  other: number;
+};
+
+/** One crag-tier pin in the preload source. */
+export type CragPin = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  route_count: number;
+  discipline_counts: DisciplineCounts;
+};
+
+/** Full preload payload. data_version is a content hash for SWR cache
+ *  validation (stable across identical data, changes on any field/route). */
+export type CragPinsResponse = {
+  items: CragPin[];
+  count: number;
+  data_version: string;
+};
+
 // Legacy alias envelope (7-14d bridge) — FE can show deprecation hint.
 export type LegacyAliasResponse = {
   deprecated: boolean;
