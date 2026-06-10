@@ -200,6 +200,12 @@ export default function MapScreenMapbox({
   // ---- Refs ----
   const mapRef = useRef<MapboxGL.MapView>(null);
   const camRef = useRef<MapboxGL.Camera>(null);
+  // CA-FU Phase C.4 — set to a crag's areaId by onCragPinTap, which already
+  // frames the camera at zoom 15. The area-mode camera effect reads this to
+  // SKIP its zoom-10 region-centroid framing for that area (so the per-tap
+  // crag framing wins). Direct enterArea paths (saved-spot / search / deep
+  // link) leave it untouched, so they still get region framing.
+  const selfFramedAreaRef = useRef<string | null>(null);
   const sheetScrollRef = useRef<ScrollView>(null);
   const itemOffsetsRef = useRef<Record<string, number>>({});
 
@@ -611,11 +617,17 @@ export default function MapScreenMapbox({
       // via drag-down.
       sheet.safeResize(DETENT_MEDIUM);
       // BR Track D Day 5e — area-mode camera centers on the Region only.
-      // Legacy fitBounds-to-crag-pins was the `getMapPins` pre-aggregated
-      // flow (removed Day 5e); RoutePinCluster now streams pins via
-      // bbox queries that follow the camera, so the initial framing is
-      // the Region centroid + a comfortable zoom 10.
-      if (areaData.area?.lat != null && areaData.area?.lng != null) {
+      // CA-FU Phase C.4 — but NOT when onCragPinTap already framed this area
+      // at zoom 15 (selfFramedAreaRef): otherwise the zoom-10 region centroid
+      // would snap the user back out from the crag they tapped. Direct-enter
+      // paths (saved-spot / search / deep link) don't set the ref → region
+      // framing still applies.
+      const selfFramed = selfFramedAreaRef.current === areaId;
+      if (
+        !selfFramed &&
+        areaData.area?.lat != null &&
+        areaData.area?.lng != null
+      ) {
         markProgrammaticMove(600);
         try {
           camRef.current.setCamera({
@@ -919,6 +931,10 @@ export default function MapScreenMapbox({
   // removed in Phase D.
   const onCragPinTap = useCallback(
     (crag: CragPin) => {
+      // Mark this area as self-framed BEFORE enterArea so the area-mode
+      // camera effect (which fires as areaData resolves) skips its zoom-10
+      // region-centroid override and keeps our zoom-15 crag framing.
+      selfFramedAreaRef.current = crag.id;
       enterArea(crag.id, crag.name);
       try {
         markProgrammaticMove(600);
