@@ -19,7 +19,13 @@
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 import { useThemeColors } from '../../../lib/useThemeColors';
-import type { CragOverview } from '../types';
+// CA-FU Phase C.2 — source switched from the legacy CragOverview (region-
+// scoped, ~15k) to CragPin: the BE-classified crag-tier nodes from the 35k
+// /outdoor/areas/crags preload (useAllCrags). discipline_counts.{boulder,
+// rope,other} feed the same boulder_count/rope_count/unknown_count feature
+// props the Mapbox expressions already read, so the whole cluster visual
+// config below is unchanged.
+import type { CragPin } from '../types';
 
 /** Per-crag context attached to features so a tap surfaces full info
  *  without a second fetch.
@@ -43,9 +49,9 @@ export type CragPinContext = {
 };
 
 export type CragOverviewClusterProps = {
-  crags: CragOverview[];
+  crags: CragPin[];
   styleReady: boolean;
-  onCragPress: (ctx: CragPinContext) => void;
+  onCragPress: (crag: CragPin) => void;
   /** Tap cluster bubble → caller flies camera in (e.g. +2 zoom). */
   onClusterPress: (coords: [number, number]) => void;
   /** Switch off at zoom ≥ this to avoid stacking with the area-mode
@@ -145,30 +151,25 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-function toGeoJSON(crags: CragOverview[]): GeoJSON.FeatureCollection {
+function toGeoJSON(crags: CragPin[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: crags.map((c) => ({
       type: 'Feature',
       id: c.id,
       properties: {
-        crag_id: c.id,
+        // CA-FU: `area_id` is the canonical outdoor_area id (tap → area mode).
+        area_id: c.id,
         crag_name: c.name,
-        region_id: c.region_id,
-        region_name: c.region_name,
         route_count: c.route_count,
-        boulder_count: c.boulder_count,
-        // BS-P1-β data plumbing — emitted now so BS-P1-ζ Boulder/Rope
-        // composition ring can read at Mapbox expression time without
-        // re-touching toGeoJSON.
-        rope_count: c.rope_count,
-        unknown_count: c.unknown_count,
-        // BS-P1-α (2026-06-06) — pre-computed display strings in JS
-        // rather than deeply nested Mapbox expressions (Mapbox RN
-        // silently drops case+concat+round+division textField — see
-        // handoff §10). `count_label` goes INSIDE the single-pin
-        // circle (cluster-bubble-like visual), `crag_name` is shown
-        // below the pin (existing name label).
+        // discipline_counts {boulder, rope, other} map onto the existing
+        // boulder/rope/unknown feature props the cluster expressions read
+        // ('other' takes the old 'unknown' slot for the dominance ratios).
+        boulder_count: c.discipline_counts.boulder,
+        rope_count: c.discipline_counts.rope,
+        unknown_count: c.discipline_counts.other,
+        // BS-P1-α — count label baked in JS (Mapbox RN drops nested
+        // case+concat+round textField); shown INSIDE the single pin.
         count_label: c.route_count > 0 ? formatCount(c.route_count) : '',
       },
       geometry: {
@@ -204,7 +205,7 @@ export default function CragOverviewCluster({
   // filter (BS-P1-ε) hid it from the source. Don't "optimize" by
   // reusing the filtered shape.
   const cragLookup = useMemo(() => {
-    const map = new Map<string, CragOverview>();
+    const map = new Map<string, CragPin>();
     for (const c of crags) map.set(c.id, c);
     return map;
   }, [crags]);
@@ -225,20 +226,11 @@ export default function CragOverviewCluster({
         }
         return;
       }
-      const cragId = props.crag_id as string | undefined;
+      const cragId = props.area_id as string | undefined;
       if (!cragId) return;
       const crag = cragLookup.get(cragId);
       if (!crag) return;
-      onCragPress({
-        crag_id: crag.id,
-        crag_name: crag.name,
-        region_id: crag.region_id,
-        region_name: crag.region_name,
-        lat: crag.lat,
-        lng: crag.lng,
-        route_count: crag.route_count,
-        boulder_count: crag.boulder_count,
-      });
+      onCragPress(crag);
     },
     [cragLookup, onCragPress, onClusterPress],
   );
