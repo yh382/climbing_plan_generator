@@ -29,11 +29,29 @@ precise execution guide for the remaining **device-verified** surgery.
 `main.py`). Apply per-IP limits via `@limiter.limit("60/minute")` + a
 `request: Request` param.
 
-## 🌿 On this branch `ca-fu-map-redesign` (UNVERIFIED on device)
+## 🌿 On this branch `ca-fu-map-redesign` — Phase C DONE (UNVERIFIED on device)
 
 | Commit | What |
 |---|---|
-| `phase-c.1` | `src/features/outdoor/useAllCrags.ts` — AsyncStorage SWR + data_version hot-swap. tsc 0. Not wired yet. |
+| `phase-c.1` | `useAllCrags.ts` — AsyncStorage SWR + data_version hot-swap. |
+| `phase-c prereq` (BE main `67d4ee3`) | `/outdoor/areas/{id}/routes` + stars/send_count/grade_score + Q4 3-key sort. |
+| `phase-c.3` | `OutdoorBrowseSheet` + `AreaRoutesBrowser` (FlatList+search+discipline) + `useAreaRoutes`. |
+| `phase-c.2+c.4` | `CragOverviewCluster` → CragPin; MapScreenMapbox wired (useAllCrags cluster, onCragPinTap → area mode → OutdoorBrowseSheet, RoutesListSheet list-only). |
+| `phase-c.4 fix` | camera double-move fix (selfFramedAreaRef) — arch-reviewer finding. |
+
+Reviewers: frontend-reviewer **0 alive**; architecture-reviewer found **1 alive** (camera double-move) → **fixed**. tsc 0 throughout. Legacy `browsingCrag`/`focusedWall`/`onCragOverviewPress`/`useCragsOverview`/RoutesListSheet-area machinery left **dead** for Phase D.
+
+### ▶ Phase C device-verify checklist (do this first, then D/E)
+1. App launch → explore → **35k crag cluster** renders (first LTE load <6s; cache hit instant).
+2. Pan at various zooms → cluster **stable, no jitter** (if it jitters → drop the kept `minRoutes`/`getMinRoutesForZoom` importance filter in CragOverviewCluster; it's the one source-mutating-by-zoom thing left).
+3. Tap cluster → camera zoom-in, **no sheet**.
+4. Tap single crag pin → **area mode**, camera lands ~zoom 15 on the crag (NOT snapping back to zoom 10 — that's the bug just fixed; verify the fix holds), OutdoorBrowseSheet shows the routes, **AreaCoverageOverlay polygon appears**.
+5. Routes default order = **stars-first** (BE-sorted); local search filters; discipline chips (all/boulder/rope/other) filter.
+6. Tap Stone Fort (357 routes) → FlatList scrolls smoothly (if janky → memoize RouteRow / swap to FlashList).
+7. Intermediate area (has children) → children-first list; tapping a child drills in (note: child-drill currently triggers the zoom-10 region framing — tune if jarring).
+8. Hamburger in OutdoorBrowseSheet → CragMenuSheet presents.
+9. RoutePinCluster (route pins) still mounts in area mode — confirm that's desired alongside the list.
+10. list mode (saved routes) still works via RoutesListSheet.
 
 ---
 
