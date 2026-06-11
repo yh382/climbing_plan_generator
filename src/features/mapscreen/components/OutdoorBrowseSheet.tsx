@@ -60,6 +60,10 @@ export type OutdoorBrowseSheetProps = {
   onClearFocus?: () => void;
   /** CB #3 — card locate button → fly camera to the route's pin + highlight. */
   onLocateRoute?: (route: OutdoorRoute) => void;
+  /** CB 点2 — controlled discipline segment for the nearby browse list, lifted
+   *  to MapScreenMapbox so the map pins dim to it + a pin tap can switch it. */
+  browseDiscipline?: 'boulder' | 'rope';
+  onBrowseDiscipline?: (d: 'boulder' | 'rope') => void;
   insets: EdgeInsets;
   onPressRoute: (route: OutdoorRoute) => void;
   onPressChildArea: (child: OutdoorAreaListItem) => void;
@@ -77,6 +81,8 @@ export function OutdoorBrowseSheet({
   focusedCragId,
   onClearFocus,
   onLocateRoute,
+  browseDiscipline,
+  onBrowseDiscipline,
   insets,
   onPressRoute,
   onPressChildArea,
@@ -152,6 +158,8 @@ export function OutdoorBrowseSheet({
           focusedCragId={focusedCragId}
           onClearFocus={onClearFocus}
           onLocateRoute={onLocateRoute}
+          discipline={browseDiscipline}
+          onDiscipline={onBrowseDiscipline}
         />
       </View>
     );

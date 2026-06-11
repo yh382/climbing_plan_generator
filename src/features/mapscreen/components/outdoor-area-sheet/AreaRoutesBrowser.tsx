@@ -51,6 +51,11 @@ type Props = {
   onClearFocus?: () => void;
   /** CB #3 — locate button on each card. */
   onLocateRoute?: (route: OutdoorRoute) => void;
+  /** CB 点2 — controlled discipline segment. When both are provided the segment
+   *  is owned by the parent (MapScreenMapbox) so the map pins can dim to it and
+   *  a pin tap can switch it. Omitted → internal state (crag-drilldown path). */
+  discipline?: RouteDiscipline;
+  onDiscipline?: (d: RouteDiscipline) => void;
 };
 
 export function AreaRoutesBrowser({
@@ -61,6 +66,8 @@ export function AreaRoutesBrowser({
   focusedCragId,
   onClearFocus,
   onLocateRoute,
+  discipline: controlledDiscipline,
+  onDiscipline: onControlledDiscipline,
 }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
@@ -83,7 +90,10 @@ export function AreaRoutesBrowser({
     );
     return boulders > routes.length - boulders ? 'boulder' : 'rope';
   }, [routes]);
-  const discipline = disciplineOverride ?? autoDiscipline;
+  // Controlled (parent owns it, for the map-dim/pin-switch coupling) takes
+  // precedence; otherwise fall back to the internal override / auto default.
+  const discipline = controlledDiscipline ?? disciplineOverride ?? autoDiscipline;
+  const setDiscipline = onControlledDiscipline ?? setDisciplineOverride;
 
   const visible = useMemo(() => {
     if (!routes) return [];
@@ -155,7 +165,7 @@ export function AreaRoutesBrowser({
       sortKey={sortKey}
       onSortKey={setSortKey}
       discipline={discipline}
-      onDiscipline={setDisciplineOverride}
+      onDiscipline={setDiscipline}
       search={search}
       onSearch={setSearch}
       subSport={subSport}

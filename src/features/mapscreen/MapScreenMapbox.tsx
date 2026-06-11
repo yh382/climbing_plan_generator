@@ -456,6 +456,19 @@ export default function MapScreenMapbox({
   // draws that pin's map halo.
   const [focusedCragId, setFocusedCragId] = useState<string | null>(null);
   const [highlightedAreaId, setHighlightedAreaId] = useState<string | null>(null);
+  // CB 点2 — browse-mode discipline segment, lifted from the sheet's
+  // AreaRoutesBrowser so (a) the map pins dim to it and (b) a pin tap can
+  // switch it. Override is sticky until the user changes it or browse mode
+  // exits; otherwise it follows the nearby set's majority discipline.
+  const [browseDisciplineOverride, setBrowseDisciplineOverride] =
+    useState<'boulder' | 'rope' | null>(null);
+  const browseAutoDiscipline = useMemo<'boulder' | 'rope'>(() => {
+    const rows = browseNearby.data;
+    if (!rows || rows.length === 0) return 'rope';
+    const b = rows.reduce((n, r) => n + (r.discipline === 'boulder' ? 1 : 0), 0);
+    return b > rows.length - b ? 'boulder' : 'rope';
+  }, [browseNearby.data]);
+  const browseDiscipline = browseDisciplineOverride ?? browseAutoDiscipline;
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -736,7 +749,17 @@ export default function MapScreenMapbox({
   const onAreaPinPress = useCallback((ctx: AreaPinContext) => {
     setFocusedCragId(ctx.area_id);
     setHighlightedAreaId(ctx.area_id);
-  }, []);
+    // CB 点2 — if the tapped crag has nothing in the current segment, switch
+    // segments so its pinned routes actually show (e.g. tapped a routes-only
+    // pin while the sheet is on Boulder). Uses the per-area discipline counts
+    // already carried on the pin context.
+    const ropeCount = ctx.route_count - ctx.boulder_count;
+    if (browseDiscipline === 'boulder' && ctx.boulder_count === 0 && ropeCount > 0) {
+      setBrowseDisciplineOverride('rope');
+    } else if (browseDiscipline === 'rope' && ropeCount === 0 && ctx.boulder_count > 0) {
+      setBrowseDisciplineOverride('boulder');
+    }
+  }, [browseDiscipline]);
 
   // CB #3 — card locate button: fly to the route's pin (the one intended
   // camera move), highlight it, and pin its crag to the sheet top.
@@ -766,6 +789,7 @@ export default function MapScreenMapbox({
     if (mode.kind !== 'area') {
       setFocusedCragId(null);
       setHighlightedAreaId(null);
+      setBrowseDisciplineOverride(null);
     }
   }, [mode.kind]);
 
@@ -1483,6 +1507,7 @@ export default function MapScreenMapbox({
                 pins={browsePins}
                 styleReady={styleReady}
                 highlightedAreaId={highlightedAreaId}
+                disciplineFilter={browseDiscipline}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
@@ -1686,6 +1711,8 @@ export default function MapScreenMapbox({
               setHighlightedAreaId(null);
             }}
             onLocateRoute={onLocateRoute}
+            browseDiscipline={browseDiscipline}
+            onBrowseDiscipline={setBrowseDisciplineOverride}
             insets={insets}
             onPressRoute={(route) => navigateToRoute(route.id)}
             onPressChildArea={(child) => enterArea(child.id, child.name)}

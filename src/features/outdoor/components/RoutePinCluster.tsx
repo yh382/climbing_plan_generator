@@ -59,6 +59,10 @@ export type RoutePinClusterProps = {
   /** CB 点3b — area_id of the focused crag; its single pin gets a highlight
    *  halo so the user can find it after tapping its card / pin. */
   highlightedAreaId?: string | null;
+  /** CB 点2 (dim) — the sheet's active discipline segment. Pins with NO routes
+   *  of this discipline are dimmed (grey + low opacity) so the map emphasizes
+   *  the same discipline the list is showing. null = no dim. */
+  disciplineFilter?: 'boulder' | 'rope' | null;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -88,6 +92,12 @@ const CLUSTER_RADIUS_EXPRESSION = [
 ] as const;
 
 const AREA_PIN_RADIUS = 6; // CB点4 — 8→6, smaller browse-mode pins
+
+/** CB 点2 (dim) — pins not matching the active discipline segment fade to a
+ *  neutral grey at low opacity: de-emphasized but still visible (not "broken").
+ *  Device-tune the opacity against the live map background. */
+const DIM_FILL = '#9AA0A6';
+const DIM_OPACITY = 0.35;
 
 /** Pre-group RoutePin[] by area_id. Output is one Feature per area,
  *  with the area context attached as properties so tap handlers can
@@ -133,10 +143,22 @@ function groupByArea(pins: RoutePin[]): AreaPinContext[] {
 function toGeoJSON(
   areas: AreaPinContext[],
   highlightedAreaId?: string | null,
+  disciplineFilter?: 'boulder' | 'rope' | null,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: areas.map((a) => ({
+    features: areas.map((a) => {
+      // CB 点2 (dim) — does this area have ANY route of the active discipline?
+      // boulder → boulder_count>0; rope → non-boulder count>0. No filter → not
+      // dimmed.
+      const ropeCount = a.route_count - a.boulder_count;
+      const dimmed =
+        disciplineFilter === 'boulder'
+          ? a.boulder_count === 0
+          : disciplineFilter === 'rope'
+            ? ropeCount === 0
+            : false;
+      return {
       type: 'Feature',
       id: a.area_id,
       properties: {
@@ -147,13 +169,15 @@ function toGeoJSON(
         // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
         // "Routes"). Drives the single-pin fill color.
         dominant_boulder: a.boulder_count * 2 > a.route_count,
+        dimmed,
         highlighted: a.area_id === highlightedAreaId,
       },
       geometry: {
         type: 'Point',
         coordinates: [a.lng, a.lat],
       },
-    })),
+      };
+    }),
   };
 }
 
@@ -161,14 +185,15 @@ export default function RoutePinCluster({
   pins,
   styleReady,
   highlightedAreaId,
+  disciplineFilter,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId),
-    [areaContexts, highlightedAreaId],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter),
+    [areaContexts, highlightedAreaId, disciplineFilter],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -247,20 +272,27 @@ export default function RoutePinCluster({
       />
       {/* Single area pin — visible at zoom ≥15+ when clusters dissolve.
           CB 点2 — 2-color fill by dominant discipline: sandstone for
-          boulder-dominant areas, teal-blue ("Routes") otherwise. */}
+          boulder-dominant areas, teal-blue ("Routes") otherwise. Pins that
+          don't match the active discipline segment are dimmed: grey fill (去色)
+          + low opacity (降透明), so the map emphasizes the same discipline the
+          list shows. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-single"
         filter={['!', ['has', 'point_count']]}
         style={{
           circleColor: [
             'case',
-            ['get', 'dominant_boulder'],
-            theme.colors.outdoorMarkerFill,
-            theme.colors.routesMarkerFill,
+            ['get', 'dimmed'],
+            DIM_FILL,
+            ['case', ['get', 'dominant_boulder'],
+              theme.colors.outdoorMarkerFill,
+              theme.colors.routesMarkerFill],
           ] as any,
+          circleOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
           circleRadius: AREA_PIN_RADIUS,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,
+          circleStrokeOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
         }}
       />
     </MapboxGL.ShapeSource>
