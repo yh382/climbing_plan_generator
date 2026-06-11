@@ -17,7 +17,7 @@
 // outdoor→mapscreen import direction one-way (it reuses mapscreen's
 // outdoor-area-sheet/* subcomponents).
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -61,28 +61,17 @@ export function OutdoorBrowseSheet({
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const { data: detail, loading: detailLoading } = useAreaDetail(areaId);
   const { data: children, loading: childrenLoading } = useAreaChildren(areaId);
   const { data: routes, loading: routesLoading } = useAreaRoutes(areaId);
 
-  // Header mirrors RoutesListSheet: native glass search button (left),
-  // title (center), native glass hamburger (right). Search toggles the
-  // in-list search box + discipline filter (AreaRoutesBrowser showControls).
-  const isCrag = (detail?.has_routes ?? false) && !(detail?.has_subareas ?? false);
+  // CB 点7 — title left-aligned (gives the dynamic 点6 region label room to
+  // breathe), search demoted into BrowseFilterBar, so the header is just
+  // title + hamburger. (点6 will later swap detail.name → the viewport
+  // region label from /outdoor/region-label.)
   const header = (
     <View style={styles.header}>
-      <View style={styles.headerSide}>
-        {isCrag ? (
-          <HeaderButton
-            icon="magnifyingglass"
-            variant="glass"
-            size={44}
-            onPress={() => setSearchOpen((v) => !v)}
-          />
-        ) : null}
-      </View>
       <View style={styles.headerText}>
         <Text style={styles.title} numberOfLines={1}>
           {detail?.name ?? tr('加载中…', 'Loading…')}
@@ -93,14 +82,12 @@ export function OutdoorBrowseSheet({
           </Text>
         ) : null}
       </View>
-      <View style={styles.headerSide}>
-        <HeaderButton
-          icon="line.3.horizontal"
-          variant="glass"
-          size={44}
-          onPress={onPressHamburger}
-        />
-      </View>
+      <HeaderButton
+        icon="line.3.horizontal"
+        variant="glass"
+        size={44}
+        onPress={onPressHamburger}
+      />
     </View>
   );
 
@@ -128,16 +115,17 @@ export function OutdoorBrowseSheet({
   const hasSubareas = detail?.has_subareas ?? false;
   const hasRoutes = detail?.has_routes ?? false;
 
-  // Crag (leaf-with-routes): routes are primary → FlatList browser.
+  // Crag (leaf-with-routes): routes are primary. Title header is PINNED above
+  // the browser, which pins its own filter bar above the scrolling FlatList.
   if (hasRoutes && !hasSubareas) {
     return (
       <View style={styles.fill}>
+        {header}
         <AreaRoutesBrowser
+          key={areaId}
           routes={routes}
           loading={routesLoading}
           onRouteTap={onPressRoute}
-          ListHeaderComponent={header}
-          showControls={searchOpen}
         />
       </View>
     );
@@ -203,21 +191,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 8,
     gap: 10,
   },
-  headerSide: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerText: { flex: 1, minWidth: 0, alignItems: 'center' },
+  headerText: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   title: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.textPrimary,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
     marginTop: 1,
