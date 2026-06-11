@@ -81,6 +81,7 @@ export function BrowseFilterBar({
 
         <MenuPill
           variant="labeled"
+          glass
           label={sortLabels[sortKey]}
           accessibilityLabel={tr('排序', 'Sort')}
           options={[

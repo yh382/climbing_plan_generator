@@ -42,6 +42,7 @@ import {
   fixedSize,
   foregroundStyle,
   frame,
+  glassEffect,
   padding,
   shapes,
 } from "@expo/ui/swift-ui/modifiers";
@@ -78,6 +79,9 @@ interface LabeledProps extends CommonProps {
    *  chevron. Use inside an already-bordered row (e.g. the white
    *  settings-row card) so the trigger doesn't paint a pill-in-a-pill. */
   chromeless?: boolean;
+  /** Use an iOS-26 Liquid Glass capsule instead of the solid
+   *  backgroundSecondary capsule — for placement on glass surfaces. */
+  glass?: boolean;
 }
 
 export type MenuPillProps = DotsProps | LabeledProps;
@@ -151,11 +155,20 @@ export function MenuPill(props: MenuPillProps) {
   //      layout.)
   const labeledModifiers = props.chromeless
     ? [fixedSize()]
-    : [
-        fixedSize(),
-        padding({ horizontal: 12, vertical: 6 }),
-        background(colors.backgroundSecondary as string, shapes.capsule()),
-      ];
+    : props.glass
+      ? [
+          fixedSize(),
+          padding({ horizontal: 12, vertical: 6 }),
+          glassEffect({
+            glass: { variant: "regular", interactive: true },
+            shape: "capsule",
+          }),
+        ]
+      : [
+          fixedSize(),
+          padding({ horizontal: 12, vertical: 6 }),
+          background(colors.backgroundSecondary as string, shapes.capsule()),
+        ];
 
   return (
     <Host matchContents style={[styles.host, props.style]}>
