@@ -34,7 +34,6 @@ import {
   useAreaChildren,
   useAreaDetail,
   useAreaRoutes,
-  useNearbyRoutes,
 } from '../../outdoor/hooks';
 import type { DisplayKind, OutdoorAreaListItem, OutdoorRoute } from '../../outdoor/types';
 import { AreaChildrenList } from './outdoor-area-sheet/AreaChildrenList';
@@ -52,6 +51,10 @@ export type OutdoorBrowseSheetProps = {
   /** CB 点3 — camera center for the nearby-radius browse list. When set, the
    *  sheet shows routes within radius of this point (not the tapped crag's). */
   nearbyCenter?: { lat: number; lng: number } | null;
+  /** CB 点3 — nearby routes lifted from MapScreenMapbox (shared with the map
+   *  pins so the list + pins are one synced dataset). */
+  nearbyRoutes?: OutdoorRoute[] | null;
+  nearbyLoading?: boolean;
   /** CB 点3b — the crag whose routes are pinned to the top section. */
   focusedCragId?: string | null;
   onClearFocus?: () => void;
@@ -69,6 +72,8 @@ export function OutdoorBrowseSheet({
   title,
   titleKind,
   nearbyCenter,
+  nearbyRoutes,
+  nearbyLoading,
   focusedCragId,
   onClearFocus,
   onLocateRoute,
@@ -91,8 +96,6 @@ export function OutdoorBrowseSheet({
   const { data: routes, loading: routesLoading } = useAreaRoutes(
     nearbyCenter ? null : areaId,
   );
-  // CB 点3 — nearby browse: routes within radius of the camera center.
-  const nearby = useNearbyRoutes(nearbyCenter ?? null, { enabled: !!nearbyCenter });
 
   // CB 点6 — when the camera-tracked region label is present, the subtitle
   // shows ITS kind (e.g. "Area"), not the tapped crag's kind.
@@ -142,8 +145,8 @@ export function OutdoorBrowseSheet({
       <View style={styles.fill}>
         {header}
         <AreaRoutesBrowser
-          routes={nearby.data}
-          loading={nearby.loading}
+          routes={nearbyRoutes ?? null}
+          loading={nearbyLoading ?? false}
           onRouteTap={onPressRoute}
           showLocation
           focusedCragId={focusedCragId}

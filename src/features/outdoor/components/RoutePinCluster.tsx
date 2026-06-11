@@ -59,16 +59,15 @@ export type RoutePinClusterProps = {
   onClusterPress: (coords: [number, number]) => void;
 };
 
-/** CB点4 — lowered 14→13 so single pins persist one extra zoom level
- *  out (clusters dissolve at 14+ now, not 15+). Mapbox semantics:
- *  cluster at zoom ≤ this value, individual above. Lower = cluster
- *  LATER = pins stay legible longer (user: "真看不清才聚"). Device-tune
- *  against dense areas (Bishop/Red River). */
-const CLUSTER_MAX_ZOOM_LEVEL = 13;
-/** Pixel radius for cluster aggregation. CB点4 — 50→32 so pins only
- *  merge when nearly overlapping ("真看不清才聚"), fewer premature
- *  clusters in mid-dense areas. */
-const CLUSTER_RADIUS = 32;
+/** CB点4 (FU) — lowered 14→13→10: browse pins stay individual across all
+ *  normal browse zooms and only cluster when zoomed WAY out (≤10), which
+ *  also doubles as a clear "you're in browse mode" signal vs the discover
+ *  crag-count bubbles. Mapbox semantics: cluster at zoom ≤ this value,
+ *  individual above. Device-tune against the very densest areas. */
+const CLUSTER_MAX_ZOOM_LEVEL = 10;
+/** Pixel radius for cluster aggregation. CB点4 — 50→32→26: only merge when
+ *  pins are nearly on top of each other (mostly relevant at the ≤10 zooms). */
+const CLUSTER_RADIUS = 26;
 
 /** Adaptive size for the cluster circle so dense areas read as visually
  *  weightier without overwhelming the map. */

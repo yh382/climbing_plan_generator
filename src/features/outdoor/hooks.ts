@@ -215,22 +215,57 @@ export function useRegionLabel(
  * browse sheet's camera-radius list. Keeps the previous results while
  * refetching (no blank flash mid-pan). Returns {data, loading}.
  */
+function _distMi(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const R = 3958.8; // earth radius, miles
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 export function useNearbyRoutes(
   center: { lat: number; lng: number } | null,
-  opts?: { radiusMi?: number; enabled?: boolean; debounceMs?: number },
+  opts?: {
+    radiusMi?: number;
+    enabled?: boolean;
+    debounceMs?: number;
+    limit?: number;
+    /** Don't refetch until the camera moves this far from the last fetch
+     *  center (the data already covers a `radiusMi` area). Default radiusMi/3. */
+    refetchThresholdMi?: number;
+  },
 ): { data: OutdoorRoute[] | null; loading: boolean } {
-  const { radiusMi = 10, enabled = true, debounceMs = 350 } = opts ?? {};
+  const { radiusMi = 10, enabled = true, debounceMs = 350, limit } = opts ?? {};
+  const threshold = opts?.refetchThresholdMi ?? radiusMi / 3;
   const [data, setData] = useState<OutdoorRoute[] | null>(null);
   const [loading, setLoading] = useState(false);
   const seqRef = useRef(0);
+  const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (!enabled || !center) return;
+    // Preload: while the camera stays within `threshold` of the last fetched
+    // center, reuse the cached `radiusMi` data instead of refetching — small
+    // pans don't trigger the multi-second pin reload.
+    if (
+      lastCenterRef.current &&
+      _distMi(lastCenterRef.current, center) < threshold
+    ) {
+      return;
+    }
     const timer = setTimeout(() => {
       const seq = ++seqRef.current;
       setLoading(true);
+      lastCenterRef.current = center;
       outdoorApi
-        .listNearbyRoutes({ lat: center.lat, lng: center.lng, radiusMi })
+        .listNearbyRoutes({ lat: center.lat, lng: center.lng, radiusMi, limit })
         .then((rows) => {
           if (seq !== seqRef.current) return;
           setData(rows);
@@ -241,7 +276,7 @@ export function useNearbyRoutes(
         });
     }, debounceMs);
     return () => clearTimeout(timer);
-  }, [center?.lat, center?.lng, radiusMi, enabled, debounceMs]);
+  }, [center?.lat, center?.lng, radiusMi, limit, threshold, enabled, debounceMs]);
 
   return { data, loading };
 }

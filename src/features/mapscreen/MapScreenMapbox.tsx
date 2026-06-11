@@ -81,11 +81,11 @@ import RoutePinCluster, {
   type AreaPinContext,
 } from '../outdoor/components/RoutePinCluster';
 import CragOverviewCluster from '../outdoor/components/CragOverviewCluster';
-import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
+import { type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
-import { useAreaDetail, useRegionLabel } from '../outdoor/hooks';
+import { useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
@@ -103,6 +103,7 @@ import type {
   Region as Area,
   MapPin,
   OutdoorRoute,
+  RoutePin,
   SearchResult,
   CragPin,
 } from '../outdoor/types';
@@ -327,11 +328,9 @@ export default function MapScreenMapbox({
     if (mapFilter === 'boulder') return { discipline: 'boulder' as const };
     return {};
   }, [mapFilter]);
-  const viewportPins = useViewportPins(bbox, {
-    enabled: (mode.kind === 'explore' || mode.kind === 'area') && styleReady,
-    style: mapFilterParams.style,
-    discipline: mapFilterParams.discipline,
-  });
+  // CB 点3 — browse pins now come from the lifted nearby dataset (browsePins
+  // below), shared with the sheet list; the old per-bbox useViewportPins fetch
+  // is gone (it was the source of the multi-second pin reload on every pan).
   // CB 点6 — viewport region label drives the browse-sheet title (camera-
   // tracked, not the tapped pin). Degrades to null when the endpoint is
   // unavailable / viewport has no areas → sheet falls back to the area name.
@@ -345,6 +344,33 @@ export default function MapScreenMapbox({
         : null,
     [bbox?.south, bbox?.north, bbox?.west, bbox?.east],
   );
+  // CB 点3 + preload — own the nearby fetch here so the sheet list AND the map
+  // pins share ONE 10mi dataset (synced), and the hook's distance threshold
+  // means small pans reuse it instead of waiting on a fresh fetch.
+  const browseNearby = useNearbyRoutes(browseCenter, {
+    enabled: mode.kind === 'area' && styleReady,
+    radiusMi: 10,
+    limit: 500,
+  });
+  const browsePins = useMemo<RoutePin[]>(() => {
+    const rows = browseNearby.data;
+    if (!rows) return [];
+    const out: RoutePin[] = [];
+    for (const r of rows) {
+      if (r.lat == null || r.lng == null || !r.area_id) continue;
+      out.push({
+        route_id: r.id,
+        lat: r.lat,
+        lng: r.lng,
+        area_id: r.area_id,
+        area_name: r.crag_name ?? '',
+        display_kind: r.crag_display_kind ?? 'crag',
+        discipline: r.discipline,
+        style: r.style,
+      });
+    }
+    return out;
+  }, [browseNearby.data]);
   const mapStyleURL = useMemo(() => {
     if (styleId === 'satellite') return 'mapbox://styles/mapbox/satellite-streets-v12';
     return scheme === 'dark'
@@ -1454,7 +1480,7 @@ export default function MapScreenMapbox({
 
             {mode.kind === 'area' && (
               <RoutePinCluster
-                pins={viewportPins.pins}
+                pins={browsePins}
                 styleReady={styleReady}
                 highlightedAreaId={highlightedAreaId}
                 onAreaPress={onAreaPinPress}
@@ -1652,6 +1678,8 @@ export default function MapScreenMapbox({
             title={regionLabel?.name ?? undefined}
             titleKind={regionLabel?.display_kind ?? undefined}
             nearbyCenter={browseCenter}
+            nearbyRoutes={browseNearby.data}
+            nearbyLoading={browseNearby.loading}
             focusedCragId={focusedCragId}
             onClearFocus={() => {
               setFocusedCragId(null);
