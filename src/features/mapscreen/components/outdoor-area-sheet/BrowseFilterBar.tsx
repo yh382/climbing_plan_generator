@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 
 import { MenuPill } from '../../../../components/ui/MenuPill';
@@ -65,11 +66,12 @@ export function BrowseFilterBar({
     <View style={styles.bar}>
       <View style={styles.row}>
         <Pressable
-          style={[styles.iconBtn, searchOpen && styles.iconBtnActive]}
+          style={styles.iconBtn}
           onPress={() => setSearchOpen((v) => !v)}
           hitSlop={8}
           accessibilityLabel={tr('搜索', 'Search')}
         >
+          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
           <Ionicons
             name="search"
             size={17}
@@ -100,6 +102,7 @@ export function BrowseFilterBar({
 
       {searchOpen ? (
         <View style={styles.searchBox}>
+          <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
           <Ionicons name="search" size={15} color={colors.textTertiary} />
           <TextInput
             value={search}
@@ -132,15 +135,14 @@ const createStyles = (colors: ThemeColors) =>
     iconBtn: {
       width: 32, height: 32, borderRadius: 16,
       alignItems: 'center', justifyContent: 'center',
-      backgroundColor: colors.backgroundSecondary,
+      overflow: 'hidden',
     },
-    iconBtnActive: { backgroundColor: colors.border },
     spacer: { flex: 1 },
     segment: { minWidth: 150 },
     searchBox: {
       flexDirection: 'row', alignItems: 'center', gap: 8,
-      paddingHorizontal: 12, height: 38, borderRadius: 10,
-      backgroundColor: colors.backgroundSecondary,
+      paddingHorizontal: 12, height: 38, borderRadius: 12,
+      overflow: 'hidden',
     },
     searchInput: {
       flex: 1, fontSize: 15, color: colors.textPrimary, padding: 0,
