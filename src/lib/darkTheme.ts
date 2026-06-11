@@ -58,7 +58,7 @@ export const darkColors: ThemeColors = {
   gymMarkerFill: '#44847E',
   gymMarkerStroke: '#5BA39C',
   // (no gymMarkerText — see theme.ts)
-  markerOpacity: '0.74',
+  markerOpacity: '0.92',  // CB点2 — 同 light，pins 太透明降透明度
   trailReference: '#6B7280',
   // BU crag boundary polygon — slightly lighter pink for dark-mode contrast
   // (light fill at 0.08 opacity on dark Mapbox basemap would be near-invisible

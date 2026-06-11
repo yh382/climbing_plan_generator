@@ -77,7 +77,7 @@ export const theme = {
     // (no gymMarkerText — gym label uses `gymLabelText` for dark teal
     // text below the pin; gym pin has no in-circle text like cluster
     // bubbles have.)
-    markerOpacity: '0.74',                           // shared for outdoor + gym
+    markerOpacity: '0.92',                           // shared for outdoor + gym — CB点2: 0.74→0.92 (pins 太透明)
     // Trail provenance — `trail` (above) is the curated approach color;
     // OSM reference trails use this neutral gray to communicate "not
     // verified".

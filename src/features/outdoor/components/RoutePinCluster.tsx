@@ -11,8 +11,11 @@
  *  - Pin tap surfaces `AreaPinContext.area_id` to the caller; caller
  *    hydrates ancestor breadcrumb via `/outdoor/areas/{id}` if needed.
  *
- * Single ShapeSource with `cluster:true`; uniform `theme.colors.accent`
- * orange (filter chips do discipline segmentation, not color).
+ * Single ShapeSource with `cluster:true`; uniform sandstone fill
+ * (`theme.colors.outdoorMarkerFill`) matching the discover-mode crag
+ * pins. CB点3: was `theme.colors.accent` (teal) — the old "orange"
+ * comment was always wrong; user wants brown to match crag pins, not
+ * a separate accent color. (filter chips do discipline segmentation.)
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
@@ -53,12 +56,16 @@ export type RoutePinClusterProps = {
   onClusterPress: (coords: [number, number]) => void;
 };
 
-/** PLAN §2.2: clusters dissolve at 15+. clusterMaxZoomLevel is the
- *  correct Mapbox v10 prop name on @rnmapbox/maps@10.1.45. */
-const CLUSTER_MAX_ZOOM_LEVEL = 14;
-/** Pixel radius for cluster aggregation — 50px gives comfortable density
- *  on iPhone screens without over-collapsing distinct walls. */
-const CLUSTER_RADIUS = 50;
+/** CB点4 — lowered 14→13 so single pins persist one extra zoom level
+ *  out (clusters dissolve at 14+ now, not 15+). Mapbox semantics:
+ *  cluster at zoom ≤ this value, individual above. Lower = cluster
+ *  LATER = pins stay legible longer (user: "真看不清才聚"). Device-tune
+ *  against dense areas (Bishop/Red River). */
+const CLUSTER_MAX_ZOOM_LEVEL = 13;
+/** Pixel radius for cluster aggregation. CB点4 — 50→32 so pins only
+ *  merge when nearly overlapping ("真看不清才聚"), fewer premature
+ *  clusters in mid-dense areas. */
+const CLUSTER_RADIUS = 32;
 
 /** Adaptive size for the cluster circle so dense areas read as visually
  *  weightier without overwhelming the map. */
@@ -72,7 +79,7 @@ const CLUSTER_RADIUS_EXPRESSION = [
   1000, 34, // ≥ 1000
 ] as const;
 
-const AREA_PIN_RADIUS = 8;
+const AREA_PIN_RADIUS = 6; // CB点4 — 8→6, smaller browse-mode pins
 
 /** Pre-group RoutePin[] by area_id. Output is one Feature per area,
  *  with the area context attached as properties so tap handlers can
@@ -185,7 +192,7 @@ export default function RoutePinCluster({
         id="outdoor-route-pins-clusters"
         filter={['has', 'point_count']}
         style={{
-          circleColor: theme.colors.accent,
+          circleColor: theme.colors.outdoorMarkerFill,
           circleRadius: CLUSTER_RADIUS_EXPRESSION,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.4,
@@ -208,7 +215,7 @@ export default function RoutePinCluster({
         id="outdoor-route-pins-single"
         filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: theme.colors.accent,
+          circleColor: theme.colors.outdoorMarkerFill,
           circleRadius: AREA_PIN_RADIUS,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,
