@@ -22,10 +22,8 @@ export interface UseAreaDataResult {
    *  `useRegionData` is fine but low ROI now. */
   area: Region | null;
   loading: boolean;
-  /** Region-scoped search across all 5 levels — kept as a thin wrapper
-   *  over `outdoorApi.search(q, regionId)` for now. Day 6 may switch to
-   *  `searchOutdoor({ q, region_id })` for the typed-discriminator shape. */
-  search: (query: string) => Promise<import('../outdoor/types').OutdoorRoute[]>;
+  // CA-FU Phase D — `search` removed (it wrapped the deleted
+  // outdoorApi.search; OutdoorBrowseSheet owns in-area search now).
 }
 
 export function useAreaData(areaId: string | undefined): UseAreaDataResult {
@@ -47,13 +45,5 @@ export function useAreaData(areaId: string | undefined): UseAreaDataResult {
       .finally(() => setLoading(false));
   }, [areaId]);
 
-  const search = useCallback(
-    async (query: string) => {
-      if (!areaId || !query.trim()) return [];
-      return outdoorApi.search(query.trim(), areaId);
-    },
-    [areaId],
-  );
-
-  return { area, loading, search };
+  return { area, loading };
 }

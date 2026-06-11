@@ -83,8 +83,7 @@ interface CragMenuSheetProps {
   areaModeIndex: number;
   setAreaModeIndex: (i: number) => void;
   onPressMyList: () => void;
-  /** Opens the AddRouteSheet (AE). Omit on hosts without AE wired. */
-  onPressAddRoute?: () => void;
+  // CA-FU Phase E — onPressAddRoute removed with AddRouteSheet.
   /** Opens the ReportsSheet (AF). Omit on hosts without AF wired. */
   onPressReports?: () => void;
   /** Opens the OfflineMapsSheet (AG, Mapbox only). Omit on CN. */
@@ -304,18 +303,8 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
           onPress={withAuth(props.onPressMyList)}
           colors={colors}
         />
-        <MenuRow
-          icon="add-circle-outline"
-          label={tr('添加路线', 'Add a Route')}
-          onPress={withAuth(() => {
-            if (props.onPressAddRoute) {
-              props.onPressAddRoute();
-            } else {
-              comingSoon();
-            }
-          })}
-          colors={colors}
-        />
+        {/* CA-FU Phase E — "Add a Route" row removed with AddRouteSheet
+            (route submission moves to the 6.FU-2 admin writer). */}
         <MenuRow
           icon="flag-outline"
           label={tr('报告', 'Reports')}

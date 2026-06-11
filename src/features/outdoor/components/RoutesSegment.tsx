@@ -49,8 +49,10 @@ export default function RoutesSegment({ areaId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // CA-FU Phase D — was outdoorApi.search("", areaId) (the /outdoor/search
+    // 404 post-6.2). List the area's routes (subtree) directly.
     outdoorApi
-      .search("", areaId)
+      .listAreaRoutes(areaId, { includeDescendants: true, limit: 2000 })
       .then((data) => {
         if (!cancelled) setRoutes(data);
       })

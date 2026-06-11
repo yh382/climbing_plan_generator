@@ -13,7 +13,7 @@ import { api } from '../../lib/apiClient';
 import type {
   Region, OutdoorRoute,
   RouteRating, RouteAscent,
-  RoutePinsResponse, CragOverview, CragDetail,
+  RoutePinsResponse, CragDetail,
   // CA Phase 3 — outdoor_areas single tree
   OutdoorAreaDetail, OutdoorAreaListItem, CoverageResponse,
   AreaSearchResponse, DisplayKind,
@@ -112,67 +112,13 @@ export const outdoorApi = {
     return api.post<{ ok: boolean }>(`/outdoor/routes/${routeId}/rate`, data);
   },
 
-  // ---- User-submitted route ----
-  /** Submit a new route for admin review. (Phase E deletes this along with
-   *  AddRouteSheet — the submit flow moves to the 6.FU-2 admin writer.) */
-  submitRoute: async (payload: {
-    region_id: string;
-    style: 'sport' | 'trad' | 'boulder' | 'multi-pitch';
-    name: string;
-    grade_text: string;
-    grade_system: 'yds' | 'vscale';
-    lat: number;
-    lng: number;
-    photo_urls: string[];
-  }): Promise<{ id: string; status: string }> => {
-    return api.post<{ id: string; status: string }>('/outdoor/routes/submit', payload);
-  },
+  // CA-FU Phase E — submitRoute deleted with AddRouteSheet (route submission
+  // moves to the 6.FU-2 admin writer window).
 
-  // ---- Search ----
-  // NOTE (CA-FU): `/outdoor/search` 404s post-6.2. This route-search-in-area
-  // method + its 3 live callers (useAreaData / crag-map / RoutesSegment)
-  // are migrated to area-scoped browse on the ca-fu-map-redesign branch
-  // (Phase C/D rewrites those files). Kept here only so those files still
-  // type-check until that lands.
-  search: async (q: string, regionId?: string): Promise<OutdoorRoute[]> => {
-    if (USE_MOCK) {
-      const lower = q.toLowerCase();
-      return allMockRoutes().filter(
-        (r) =>
-          r.name.toLowerCase().includes(lower) ||
-          r.grade_text.toLowerCase().includes(lower) ||
-          (r.crag_name ?? '').toLowerCase().includes(lower) ||
-          (r.wall_name ?? '').toLowerCase().includes(lower),
-      );
-    }
-    const qs = new URLSearchParams({ q });
-    if (regionId) qs.set('region_id', regionId);
-    return api.get<OutdoorRoute[]>(`/outdoor/search?${qs}`);
-  },
-
-  // ---- BR Track D Day 7 follow-up — tier-1 Crag overview ----
-  //
-  // Lightweight per-crag projection for the explore-mode cluster source.
-  // CA Phase 6.2 stubbed the BE endpoint; CA-FU Phase C replaces this with
-  // `listAllCrags` + useAllCrags (Phase D.4 deletes this stub).
-  listCragsOverview: async (_params?: {
-    status?: string;
-    min_routes?: number;
-    limit?: number;
-  }): Promise<CragOverview[]> => {
-    // Stub returns empty (CA Phase 6.2). Superseded by listAllCrags.
-    return [];
-  },
-
-  // ---- BR Track D — Crag detail (legacy CragInfoSheet source) ----
-  // NOTE (CA-FU): `/outdoor/crags/{id}` 404s post-6.2. Still called by the
-  // legacy focusedWall/browsingCrag state machine in MapScreenMapbox, which
-  // Phase D.2/D.3 retires on the ca-fu-map-redesign branch — this method is
-  // deleted there together with its caller. Kept now only so MapScreenMapbox
-  // type-checks until that lands.
-  getCragDetail: async (cragId: string): Promise<CragDetail> => {
-    return api.get<CragDetail>(`/outdoor/crags/${encodeURIComponent(cragId)}`);
-  },
+  // CA-FU Phase D — `search` (/outdoor/search 404) deleted; callers migrated
+  // to listAreaRoutes / searchAreas. `listCragsOverview` stub deleted
+  // (superseded by listAllCrags). `getCragDetail` (/outdoor/crags/{id} 404)
+  // deleted with the legacy wall/crag state machine.
 
   // ---- BR Track D — Bbox climb-coord cluster source (PLAN §2.1) ----
   //
