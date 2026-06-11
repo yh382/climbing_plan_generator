@@ -10,8 +10,8 @@
 //   (replaces the old header magnifier + searchOpen→showControls mechanism).
 // - Grade-range picker is intentionally NOT here yet — it lands in 点7b.
 
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { MenuPill } from '../../../../components/ui/MenuPill';
@@ -41,6 +41,18 @@ export function BrowseFilterBar({
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Keep the search box in sync with the keyboard: when the keyboard is
+  // dismissed by ANY route (dragging the sheet/list down, return key, tap-
+  // away) collapse the box too, instead of leaving an orphaned unfocused
+  // input behind. Subscribe only while open.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const sub = Keyboard.addListener('keyboardDidHide', () =>
+      setSearchOpen(false),
+    );
+    return () => sub.remove();
+  }, [searchOpen]);
 
   const sortLabels: Record<RouteSortKey, string> = {
     classic: tr('经典', 'Classic'),
