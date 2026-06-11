@@ -25,7 +25,7 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded }
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const cardBg = expanded ? colors.background : colors.backgroundSecondary;
+  const cardBg = expanded ? colors.background : colors.sheetCardBackground;
   const thumb = route.photos?.[0]?.thumb_url ?? route.photos?.[0]?.url;
   // CB 点5 — subtitle = the route's two parent levels (crag · nearest area).
   // Prefers the B1 breadcrumb fields; falls back to the legacy wall pairing
@@ -99,7 +99,9 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded }
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     card: {
-      backgroundColor: c.backgroundSecondary,
+      backgroundColor: c.sheetCardBackground,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
       marginBottom: 8,
       borderRadius: 14,
       flexDirection: 'row',
