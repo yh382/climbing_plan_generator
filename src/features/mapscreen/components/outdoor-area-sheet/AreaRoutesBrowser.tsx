@@ -144,6 +144,7 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap }: Props) {
               route={item}
               onPress={() => onRouteTap(item)}
               hideLocation
+              glass
             />
           </View>
         )}

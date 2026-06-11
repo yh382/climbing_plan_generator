@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
+import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
@@ -19,13 +20,21 @@ type RouteListCardProps = {
    *  parent sheet is in its expanded detent (sheet material reads lighter,
    *  so grey cards need to flip to white for contrast). */
   expanded?: boolean;
+  /** CB — render as iOS-26 Liquid Glass (GlassView + bigger concentric radius,
+   *  no hard border) to match the glass browse sheet. Off by default so the
+   *  solid-screen usages (gym/outdoor segments) keep the opaque card. */
+  glass?: boolean;
 };
 
-export default function RouteListCard({ route, onPress, hideLocation, expanded }: RouteListCardProps) {
+export default function RouteListCard({ route, onPress, hideLocation, expanded, glass }: RouteListCardProps) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const cardBg = expanded ? colors.background : colors.sheetCardBackground;
+  const cardBg = glass
+    ? 'transparent'
+    : expanded
+      ? colors.background
+      : colors.sheetCardBackground;
   const thumb = route.photos?.[0]?.thumb_url ?? route.photos?.[0]?.url;
   // CB 点5 — subtitle = the route's two parent levels (crag · nearest area).
   // Prefers the B1 breadcrumb fields; falls back to the legacy wall pairing
@@ -39,13 +48,20 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded }
   const hasAscents = route.send_count != null && route.send_count > 0;
 
   return (
-    <TouchableOpacity style={[styles.card, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.card, glass && styles.cardGlass, { backgroundColor: cardBg }]}
+      onPress={onPress}
+      activeOpacity={glass ? 0.85 : 0.7}
+    >
+      {glass ? (
+        <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
+      ) : null}
       {/* Thumbnail */}
       <View style={styles.thumbContainer}>
         {thumb ? (
           <Image source={{ uri: thumb }} style={styles.thumb} contentFit="cover" />
         ) : (
-          <View style={styles.thumbPlaceholder}>
+          <View style={[styles.thumbPlaceholder, glass && styles.thumbPlaceholderGlass]}>
             <Ionicons name="image-outline" size={22} color={colors.textTertiary} />
           </View>
         )}
@@ -108,6 +124,9 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       alignItems: 'center',
       overflow: 'hidden',
     },
+    // CB — glass variant: bigger concentric radius + no hard border (the
+    // GlassView supplies the surface; bg is set to transparent inline).
+    cardGlass: { borderRadius: 18, borderWidth: 0 },
     thumbContainer: { width: 72, height: 72 },
     thumb: { width: 72, height: 72 },
     thumbPlaceholder: {
@@ -115,6 +134,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       backgroundColor: c.cardBackground,
       alignItems: 'center', justifyContent: 'center',
     },
+    thumbPlaceholderGlass: { backgroundColor: 'transparent' },
     content: {
       flex: 1,
       paddingVertical: 12,
