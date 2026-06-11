@@ -104,9 +104,6 @@ export function AreaRoutesBrowser({
       if (needle && !r.name.toLowerCase().includes(needle)) return false;
       return true;
     });
-    if (sortKey === 'ascents') {
-      return [...list].sort((a, b) => (b.send_count ?? 0) - (a.send_count ?? 0));
-    }
     if (sortKey === 'grade') {
       const big = Number.MAX_SAFE_INTEGER;
       return [...list].sort(

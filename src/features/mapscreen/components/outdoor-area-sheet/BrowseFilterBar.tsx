@@ -1,28 +1,27 @@
 // src/features/mapscreen/components/outdoor-area-sheet/BrowseFilterBar.tsx
 // CB 点7 — persistent filter capsule for the browse route list. Pinned by the
 // parent (AreaRoutesBrowser) ABOVE the FlatList so it does NOT scroll with the
-// route cards. Row: [🔍 search] [Sort ▾] … [Boulder | Routes].
+// route cards. Row: [🔍 search] [Sort/Type ▾] … [Boulder | Routes].
 //
-// - Sort uses MenuPill (native UIMenu) per CLAUDE.md "inline option menus".
-// - Segment is 2-way Boulder|Routes (Routes = non-boulder = rope + other, so
-//   nothing is hidden). Default selection is owned by the parent.
-// - Search is a compact icon that expands an inline TextInput on its own row
-//   (replaces the old header magnifier + searchOpen→showControls mechanism).
-// - Grade-range picker is intentionally NOT here yet — it lands in 点7b.
+// - Sort + the Routes→Sport/Trad sub-filter live in ONE glass menu
+//   (BrowseSortMenu): a Sort section + a Type section (Routes only), with the
+//   menu staying open across multi-toggles.
+// - Segment is 2-way Boulder|Routes (Routes = non-boulder, so nothing hidden).
+// - Search is a compact icon that expands an inline TextInput on its own row.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 
-import { MenuPill } from '../../../../components/ui/MenuPill';
 import { NativeSegmentedControl } from '../../../../components/ui/NativeSegmentedControl';
 import { useThemeColors } from '../../../../lib/useThemeColors';
 import { useSettings } from '../../../../contexts/SettingsContext';
 import { theme } from '../../../../lib/theme';
 import type { ThemeColors } from './shared';
+import { BrowseSortMenu } from './BrowseSortMenu';
 
-export type RouteSortKey = 'classic' | 'ascents' | 'grade';
+export type RouteSortKey = 'classic' | 'grade';
 export type RouteDiscipline = 'boulder' | 'rope';
 
 type Props = {
@@ -33,11 +32,11 @@ type Props = {
   onDiscipline: (d: RouteDiscipline) => void;
   search: string;
   onSearch: (s: string) => void;
-  /** CB — Routes sub-filter (Sport/Trad), shown only when discipline==='rope'.
-   *  Multi-select; both on = no narrowing. */
-  subSport?: boolean;
-  subTrad?: boolean;
-  onToggleSub?: (k: 'sport' | 'trad') => void;
+  /** CB — Routes sub-filter (Sport/Trad), surfaced inside the sort menu when
+   *  discipline==='rope'. Multi-select; both on = no narrowing. */
+  subSport: boolean;
+  subTrad: boolean;
+  onToggleSub: (k: 'sport' | 'trad') => void;
 };
 
 export function BrowseFilterBar({
@@ -49,23 +48,14 @@ export function BrowseFilterBar({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Keep the search box in sync with the keyboard: when the keyboard is
-  // dismissed by ANY route (dragging the sheet/list down, return key, tap-
-  // away) collapse the box too, instead of leaving an orphaned unfocused
-  // input behind. Subscribe only while open.
+  // Keep the search box in sync with the keyboard — dismissing the keyboard
+  // (drag, return key, tap-away) collapses the box too.
   useEffect(() => {
     if (!searchOpen) return;
-    const sub = Keyboard.addListener('keyboardDidHide', () =>
-      setSearchOpen(false),
-    );
+    const sub = Keyboard.addListener('keyboardDidHide', () => setSearchOpen(false));
     return () => sub.remove();
   }, [searchOpen]);
 
-  const sortLabels: Record<RouteSortKey, string> = {
-    classic: tr('经典', 'Classic'),
-    ascents: tr('完成数', 'Most ascents'),
-    grade: tr('难度', 'Grade'),
-  };
   const disciplineIdx = discipline === 'boulder' ? 0 : 1;
 
   return (
@@ -85,16 +75,13 @@ export function BrowseFilterBar({
           />
         </Pressable>
 
-        <MenuPill
-          variant="labeled"
-          glass
-          label={sortLabels[sortKey]}
-          accessibilityLabel={tr('排序', 'Sort')}
-          options={[
-            { label: sortLabels.classic, onPress: () => onSortKey('classic') },
-            { label: sortLabels.ascents, onPress: () => onSortKey('ascents') },
-            { label: sortLabels.grade, onPress: () => onSortKey('grade') },
-          ]}
+        <BrowseSortMenu
+          sortKey={sortKey}
+          onSortKey={onSortKey}
+          discipline={discipline}
+          subSport={subSport}
+          subTrad={subTrad}
+          onToggleSub={onToggleSub}
         />
 
         <View style={styles.spacer} />
@@ -106,29 +93,6 @@ export function BrowseFilterBar({
           style={styles.segment}
         />
       </View>
-
-      {discipline === 'rope' && onToggleSub ? (
-        <View style={styles.subRow}>
-          {(
-            [
-              ['sport', tr('运动', 'Sport'), !!subSport],
-              ['trad', tr('传统', 'Trad'), !!subTrad],
-            ] as const
-          ).map(([k, label, active]) => (
-            <Pressable
-              key={k}
-              onPress={() => onToggleSub(k)}
-              style={[styles.subChip, active && styles.subChipActive]}
-            >
-              <Text
-                style={[styles.subChipText, active && styles.subChipTextActive]}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
 
       {searchOpen ? (
         <View style={styles.searchBox}>
@@ -178,14 +142,4 @@ const createStyles = (colors: ThemeColors) =>
       flex: 1, fontSize: 15, color: colors.textPrimary, padding: 0,
       fontFamily: theme.fonts.regular,
     },
-    subRow: { flexDirection: 'row', gap: 8, paddingLeft: 2 },
-    subChip: {
-      paddingHorizontal: 13, paddingVertical: 5, borderRadius: 14,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    subChipActive: { backgroundColor: colors.accent },
-    subChipText: {
-      fontSize: 12, fontFamily: theme.fonts.medium, color: colors.textSecondary,
-    },
-    subChipTextActive: { color: '#FFFFFF' },
   });
