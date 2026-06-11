@@ -907,25 +907,8 @@ export default function MapScreenMapbox({
   // a wall by tapping its pin, not by dragging the sheet up.
   manualOpenHandlerRef.current = () => {};
 
-  // ---- Area-mode search ----
-  const handleAreaSearch = useCallback(async () => {
-    if (!areaSearchQuery.trim() || mode.kind !== 'area') return;
-    setLoadingSheet(true);
-    const results = await areaData.search(areaSearchQuery.trim());
-    setAreaSearchResults(results);
-    setSheetTitle(tr('搜索结果', 'Search Results'));
-    setLoadingSheet(false);
-  }, [areaSearchQuery, mode.kind, areaData, tr]);
-
-  const openAreaSearch = useCallback(() => {
-    setSearchExpanded(true);
-    sheet.safeResize(DETENT_LARGE);
-  }, [sheet]);
-
-  const closeAreaSearch = useCallback(() => {
-    setSearchExpanded(false);
-    sheet.safeResize(DETENT_COLLAPSED);
-  }, [sheet]);
+  // CA-FU Phase D — area-mode search (handleAreaSearch / openAreaSearch /
+  // closeAreaSearch + areaData.search) removed; OutdoorBrowseSheet owns it.
 
   // CA Phase 4b — unified area-sheet present helper. Replaces 3 legacy
   // sheet helpers (openRegionInfo / cragInfoSheetRef.present / etc).
@@ -1252,29 +1235,8 @@ export default function MapScreenMapbox({
         </View>
       );
     }
-    // area mode
-    // Pinned header:
-    //   - searchExpanded=true  → MapSearchBar (user is typing a search)
-    //   - searchExpanded=false → no pinned header (undefined)
-    // When not searching, the icons row (🔍/segment/info) lives at the
-    // top of the scroll body instead. This matters for drag: RN
-    // TouchableOpacity + native UISegmentedControl capture touches in
-    // the pinned header slot, blocking TrueSheet's sheet pan. Inside
-    // the scroll body, TrueSheet's `prefersScrollingExpandsWhenScrolledToEdge`
-    // links scroll drag to sheet detent, so up-drag anywhere in the
-    // content reliably expands the sheet — same way explore mode works.
-    if (searchExpanded) {
-      return (
-        <MapSearchBar
-          query={areaSearchQuery}
-          onChangeText={setAreaSearchQuery}
-          onSubmitSearch={handleAreaSearch}
-          onCancel={closeAreaSearch}
-          autoFocus
-          placeholder={tr('搜索路线名、等级...', 'Search routes, grades...')}
-        />
-      );
-    }
+    // CA-FU Phase D — area mode is OutdoorBrowseSheet (owns its own search +
+    // header); the old area-mode MapSearchBar pinned header is gone.
     return undefined;
   })();
 

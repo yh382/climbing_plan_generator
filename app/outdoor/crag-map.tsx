@@ -417,8 +417,14 @@ export default function CragMapPage() {
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || !areaId) return;
     setLoadingSheet(true);
-    const results = await outdoorApi.search(searchQuery.trim(), areaId);
-    setSearchResults(results);
+    // CA-FU Phase D — was outdoorApi.search (the /outdoor/search 404). List
+    // the area's routes and filter by name client-side.
+    const all = await outdoorApi.listAreaRoutes(areaId, {
+      includeDescendants: true,
+      limit: 2000,
+    });
+    const q = searchQuery.trim().toLowerCase();
+    setSearchResults(all.filter((r) => r.name.toLowerCase().includes(q)));
     setSheetTitle(tr('搜索结果', 'Search Results'));
     setLoadingSheet(false);
   }, [searchQuery, areaId, tr]);
