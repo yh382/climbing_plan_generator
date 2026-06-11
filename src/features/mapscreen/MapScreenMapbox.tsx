@@ -93,17 +93,14 @@ import { getDevTrailFallback } from '../outdoor/devTrailFixture';
 import { FilterChipsBar } from './components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../store/useOutdoorMapFiltersStore';
 import { MapSearchResultsList } from './components/MapSearchResultsList';
-// WallGroup + RouteListCard moved into RoutesListSheet (Day 2 extraction).
-import RoutesListSheet, {
-  type RoutesListSheetMode,
-  type BrowsingCragSummary,
-} from './components/RoutesListSheet';
+// CA-FU Phase D — RoutesListSheet (area + list) retired; list mode → the
+// extracted SavedRoutesListSheet, area mode → OutdoorBrowseSheet.
+import SavedRoutesListSheet from './components/SavedRoutesListSheet';
 // BR Track A: top-level outdoor entity is now Region. Alias kept for
 // caller minimum-diff — Track D will rename across this file.
 import type {
   Region as Area,
   MapPin,
-  Wall,
   OutdoorRoute,
   SearchResult,
   CragPin,
@@ -407,11 +404,9 @@ export default function MapScreenMapbox({
   // without re-running the resolve.
   const [detailGymId, setDetailGymId] = useState<string | null>(null);
 
-  // Area-mode sheet content (walls / search)
+  // CA-FU Phase D — walls / areaSearchResults / areaSearchQuery removed
+  // (the retired area-mode sheet body). sheetTitle/loadingSheet kept.
   const [sheetTitle, setSheetTitle] = useState('');
-  const [walls, setWalls] = useState<Wall[]>([]);
-  const [areaSearchResults, setAreaSearchResults] = useState<OutdoorRoute[] | null>(null);
-  const [areaSearchQuery, setAreaSearchQuery] = useState('');
   const [loadingSheet, setLoadingSheet] = useState(false);
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
@@ -480,9 +475,6 @@ export default function MapScreenMapbox({
   // same reason — it's reset by its own crag_id-driven effect.
   useEffect(() => {
     setSheetTitle('');
-    setWalls([]);
-    setAreaSearchResults(null);
-    setAreaSearchQuery('');
     setSearchExpanded(false);
   }, [areaId]);
 
@@ -1109,26 +1101,8 @@ export default function MapScreenMapbox({
     [styleId, is3D, isAtUser, userLoc, markProgrammaticMove],
   );
 
-  const filteredWalls = useMemo(() => {
-    // BR Track D Day 6 — FilterChipsBar local filter is composed AFTER
-    // the climb-type segment (areaModeIndex 0=Routes, 1=Boulder). When
-    // boulder chip is selected the climb-type segment is moot (already
-    // boulder-only), so we just narrow further by style if Sport/Trad
-    // is chosen on top of Routes view.
-    const byDiscipline = areaModeIndex === 0
-      ? walls.map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style !== 'boulder') }))
-      : walls.map((w) => ({ ...w, routes: (w.routes ?? []).filter((r) => r.style === 'boulder') }));
-    const byChip = byDiscipline.map((w) => {
-      const filtered = (() => {
-        if (mapFilter === 'sport') return (w.routes ?? []).filter((r) => r.style === 'sport');
-        if (mapFilter === 'trad') return (w.routes ?? []).filter((r) => r.style === 'trad');
-        if (mapFilter === 'boulder') return (w.routes ?? []).filter((r) => r.style === 'boulder');
-        return w.routes ?? [];
-      })();
-      return { ...w, routes: filtered };
-    });
-    return byChip.filter((w) => (w.routes?.length ?? 0) > 0);
-  }, [walls, areaModeIndex, mapFilter]);
+  // CA-FU Phase D — filteredWalls memo removed (the area-mode wall list is
+  // gone; OutdoorBrowseSheet owns area-mode route filtering).
 
   // ---- Top bar ----
   // Same buttons across gyms / area / list — only the back button differs.
@@ -1639,27 +1613,17 @@ export default function MapScreenMapbox({
             onPressHamburger={() => cragMenuSheetRef.current?.present()}
           />
         ) : (
-          /* BR Track D Day 2 — RoutesListSheet extracted to own component.
-             MapScreenMapbox keeps ownership of data + refs + mode state;
-             RoutesListSheet only handles the JSX. (List mode only now.) */
-          <RoutesListSheet
-            mode={{ kind: 'list', listDetail: listData.listDetail } as RoutesListSheetMode}
+          /* CA-FU Phase D — list mode renders the extracted, list-only
+             SavedRoutesListSheet (the saved route list's cards). */
+          <SavedRoutesListSheet
+            listDetail={listData.listDetail}
             scrollRef={sheetScrollRef}
             itemOffsets={itemOffsetsRef}
             insets={insets}
             tr={tr}
             loading={loadingSheet || listData.loading}
             focusedItemId={focusedItemId}
-            onPressHamburger={() => cragMenuSheetRef.current?.present()}
-            onPressTitle={openCragOrAreaInfo}
             onPressRoute={navigateToRoute}
-            // CA-FU Phase D — RoutesListSheet is list-only now (OutdoorBrowseSheet
-            // owns area mode). The area-mode props below are inert stubs until
-            // the RoutesListSheet area body + WallGroup are gutted (next step).
-            walls={[]}
-            searchExpanded={false}
-            onPressSearch={() => {}}
-            onPressCommunity={() => {}}
           />
         )}
       </TrueSheet>
