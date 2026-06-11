@@ -526,6 +526,9 @@ export type OutdoorArea = {
   cover_url?: string | null;
   description?: string | null;
   approach?: string | null;
+  // CA-FU-1 — approach trail GeoJSON (re-exposed on /outdoor/areas/{id}).
+  trail_geojson?: TrailFeatureCollection | null;
+  trail_source?: TrailSource | null;
 
   // Location audit (flat — kept for back-compat with adapter pattern)
   location_source?: string | null;

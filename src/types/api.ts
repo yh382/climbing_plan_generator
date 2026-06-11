@@ -9053,6 +9053,12 @@ export interface components {
             status: string;
             /** Subtree Route Count */
             subtree_route_count: number;
+            /** Trail Geojson */
+            trail_geojson?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trail Source */
+            trail_source?: string | null;
             /**
              * Updated At
              * Format: date-time

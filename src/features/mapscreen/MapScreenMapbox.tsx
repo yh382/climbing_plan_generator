@@ -85,6 +85,7 @@ import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
+import { useAreaDetail } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
@@ -380,6 +381,9 @@ export default function MapScreenMapbox({
   const allCrags = useAllCrags();
   const areaId = mode.kind === 'area' ? mode.areaId : undefined;
   const areaData = useAreaData(areaId);
+  // CA-FU-1 — full area detail (carries trail_geojson for TrailLayer; the
+  // useAreaData Region shim drops it).
+  const areaDetail = useAreaDetail(areaId);
   const listId = mode.kind === 'list' ? mode.listId : undefined;
   const listData = useListData(listId);
 
@@ -1433,16 +1437,14 @@ export default function MapScreenMapbox({
                 Only renders when a Wall is focused (so we know which
                 Crag's trail to show); without focus, no trail. List
                 mode skips entirely — a list may span multiple crags. */}
-            {/* CA-FU Phase D — TrailLayer's data came from the deleted
-                getCragDetail (focusedCragDetail). The area detail endpoint
-                does NOT yet expose trail_geojson, so the trail renders empty
-                until a follow-up adds trail_geojson to OutdoorAreaDetail +
-                wires it via useAreaDetail here. (Trails were already empty in
-                the Phase C flow — focusedCragDetail was never set.) Dev
-                fixture fallback below preserves the trail look in __DEV__. */}
+            {/* CA-FU-1 — TrailLayer sourced from the area detail's
+                trail_geojson (re-exposed on /outdoor/areas/{id} after
+                getCragDetail was deleted). __DEV__ fixture fallback keeps the
+                trail look when prod data is still null (OSM backfill pending,
+                BR-Track-C-FU-(c)). */}
             {mode.kind === 'area' && styleLoaded && (() => {
               const devFallback =
-                __DEV__ && browsedCrag
+                __DEV__ && !areaDetail.data?.trail_geojson && browsedCrag
                   ? getDevTrailFallback({
                       name: browsedCrag.name,
                       lat: browsedCrag.lat,
@@ -1451,8 +1453,8 @@ export default function MapScreenMapbox({
                   : null;
               return (
                 <TrailLayer
-                  trailGeoJSON={devFallback?.geojson ?? null}
-                  trailSource={devFallback?.source ?? null}
+                  trailGeoJSON={areaDetail.data?.trail_geojson ?? devFallback?.geojson ?? null}
+                  trailSource={areaDetail.data?.trail_source ?? devFallback?.source ?? null}
                 />
               );
             })()}
