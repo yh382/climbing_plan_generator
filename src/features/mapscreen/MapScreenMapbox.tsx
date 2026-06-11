@@ -336,6 +336,15 @@ export default function MapScreenMapbox({
   // tracked, not the tapped pin). Degrades to null when the endpoint is
   // unavailable / viewport has no areas → sheet falls back to the area name.
   const regionLabel = useRegionLabel(bbox, mode.kind === 'area' && styleReady);
+  // CB 点3 — camera center (bbox midpoint) drives the browse sheet's
+  // nearby-radius route list (routes within ~10mi of where you're looking).
+  const browseCenter = useMemo(
+    () =>
+      bbox
+        ? { lat: (bbox.south + bbox.north) / 2, lng: (bbox.west + bbox.east) / 2 }
+        : null,
+    [bbox?.south, bbox?.north, bbox?.west, bbox?.east],
+  );
   const mapStyleURL = useMemo(() => {
     if (styleId === 'satellite') return 'mapbox://styles/mapbox/satellite-streets-v12';
     return scheme === 'dark'
@@ -1615,6 +1624,7 @@ export default function MapScreenMapbox({
             areaId={mode.areaId}
             title={regionLabel?.name ?? undefined}
             titleKind={regionLabel?.display_kind ?? undefined}
+            nearbyCenter={browseCenter}
             insets={insets}
             onPressRoute={(route) => navigateToRoute(route.id)}
             onPressChildArea={(child) => enterArea(child.id, child.name)}

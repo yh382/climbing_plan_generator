@@ -23,20 +23,25 @@ import {
   type RouteSortKey,
 } from './BrowseFilterBar';
 
-// 点8 — fixed row height so snapToInterval + getItemLayout are exact. Tuned
-// for the current 2-line card (hideLocation on): thumbnail 72 + the card's own
-// ~8px marginBottom = the visible row gap. 80 is the tight floor — going lower
-// clips the 72px thumbnail. When 点3 turns on the crag·area subtitle (3rd
-// line) this must grow back to ~92 or the card clips.
-const ROW_HEIGHT = 80;
+// 点8 — fixed row height so snapToInterval + getItemLayout are exact. COMPACT
+// = the 2-line card (hideLocation): thumbnail 72 + the card's own ~8px gap;
+// 80 is the tight floor — lower clips the 72px thumbnail. FULL = the 3-line
+// card (点3 nearby browse shows the crag·area subtitle), which needs the
+// extra line or the card clips.
+const ROW_HEIGHT_COMPACT = 80;
+const ROW_HEIGHT_FULL = 92;
 
 type Props = {
   routes: OutdoorRoute[] | null;
   loading: boolean;
   onRouteTap: (route: OutdoorRoute) => void;
+  /** CB 点3 — show the crag·area subtitle on each card (nearby browse pulls
+   *  routes from many crags, so location matters). Off for single-crag. */
+  showLocation?: boolean;
 };
 
-export function AreaRoutesBrowser({ routes, loading, onRouteTap }: Props) {
+export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }: Props) {
+  const rowHeight = showLocation ? ROW_HEIGHT_FULL : ROW_HEIGHT_COMPACT;
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -120,12 +125,12 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap }: Props) {
         windowSize={11}
         removeClippedSubviews
         // 点8 — snap each card to the top of the list, picker-style.
-        snapToInterval={ROW_HEIGHT}
+        snapToInterval={rowHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         getItemLayout={(_, index) => ({
-          length: ROW_HEIGHT,
-          offset: ROW_HEIGHT * index,
+          length: rowHeight,
+          offset: rowHeight * index,
           index,
         })}
         contentContainerStyle={styles.listContent}
@@ -139,11 +144,11 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap }: Props) {
           </Text>
         }
         renderItem={({ item }) => (
-          <View style={styles.cardWrap}>
+          <View style={[styles.cardWrap, { height: rowHeight }]}>
             <RouteListCard
               route={item}
               onPress={() => onRouteTap(item)}
-              hideLocation
+              hideLocation={!showLocation}
               glass
             />
           </View>
@@ -163,7 +168,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingVertical: 24,
     },
     listContent: { paddingTop: 6, paddingBottom: 24 },
-    cardWrap: { height: ROW_HEIGHT, paddingHorizontal: 14, justifyContent: 'center' },
+    cardWrap: { paddingHorizontal: 14, justifyContent: 'center' },
     empty: {
       fontSize: 13,
       fontWeight: '500',

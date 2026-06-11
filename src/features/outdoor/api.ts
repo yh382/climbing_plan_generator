@@ -206,6 +206,22 @@ export const outdoorApi = {
     return api.get<RegionLabel>(`/outdoor/region-label?${qs}`);
   },
 
+  /** CB 点3 — routes within radius of a center point (camera-radius browse).
+   *  Same row shape + crag·area breadcrumb as listAreaRoutes. */
+  listNearbyRoutes: async (params: {
+    lat: number; lng: number; radiusMi?: number;
+    style?: string; discipline?: 'boulder' | 'rope' | 'other'; limit?: number;
+  }): Promise<OutdoorRoute[]> => {
+    const qs = new URLSearchParams({
+      lat: String(params.lat), lng: String(params.lng),
+    });
+    if (params.radiusMi) qs.set('radius_mi', String(params.radiusMi));
+    if (params.style) qs.set('style', params.style);
+    if (params.discipline) qs.set('discipline', params.discipline);
+    if (params.limit) qs.set('limit', String(params.limit));
+    return api.get<OutdoorRoute[]>(`/outdoor/routes/nearby?${qs}`);
+  },
+
   /** Zoom-aware pin source. display_kinds filters which tier surfaces. */
   listAreasInBbox: async (params: {
     bbox: { south: number; west: number; north: number; east: number };

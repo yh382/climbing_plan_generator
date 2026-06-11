@@ -209,3 +209,39 @@ export function useRegionLabel(
 
   return label;
 }
+
+/**
+ * CB 点3 — debounced routes within `radiusMi` of a camera center, for the
+ * browse sheet's camera-radius list. Keeps the previous results while
+ * refetching (no blank flash mid-pan). Returns {data, loading}.
+ */
+export function useNearbyRoutes(
+  center: { lat: number; lng: number } | null,
+  opts?: { radiusMi?: number; enabled?: boolean; debounceMs?: number },
+): { data: OutdoorRoute[] | null; loading: boolean } {
+  const { radiusMi = 10, enabled = true, debounceMs = 350 } = opts ?? {};
+  const [data, setData] = useState<OutdoorRoute[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    if (!enabled || !center) return;
+    const timer = setTimeout(() => {
+      const seq = ++seqRef.current;
+      setLoading(true);
+      outdoorApi
+        .listNearbyRoutes({ lat: center.lat, lng: center.lng, radiusMi })
+        .then((rows) => {
+          if (seq !== seqRef.current) return;
+          setData(rows);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (seq === seqRef.current) setLoading(false);
+        });
+    }, debounceMs);
+    return () => clearTimeout(timer);
+  }, [center?.lat, center?.lng, radiusMi, enabled, debounceMs]);
+
+  return { data, loading };
+}

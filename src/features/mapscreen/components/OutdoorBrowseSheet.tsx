@@ -34,6 +34,7 @@ import {
   useAreaChildren,
   useAreaDetail,
   useAreaRoutes,
+  useNearbyRoutes,
 } from '../../outdoor/hooks';
 import type { DisplayKind, OutdoorAreaListItem, OutdoorRoute } from '../../outdoor/types';
 import { AreaChildrenList } from './outdoor-area-sheet/AreaChildrenList';
@@ -48,6 +49,9 @@ export type OutdoorBrowseSheetProps = {
    *  name + display_kind as the sheet title when present. */
   title?: string;
   titleKind?: DisplayKind;
+  /** CB 点3 — camera center for the nearby-radius browse list. When set, the
+   *  sheet shows routes within radius of this point (not the tapped crag's). */
+  nearbyCenter?: { lat: number; lng: number } | null;
   insets: EdgeInsets;
   onPressRoute: (route: OutdoorRoute) => void;
   onPressChildArea: (child: OutdoorAreaListItem) => void;
@@ -59,6 +63,7 @@ export function OutdoorBrowseSheet({
   areaId,
   title,
   titleKind,
+  nearbyCenter,
   insets,
   onPressRoute,
   onPressChildArea,
@@ -71,6 +76,8 @@ export function OutdoorBrowseSheet({
   const { data: detail, loading: detailLoading } = useAreaDetail(areaId);
   const { data: children, loading: childrenLoading } = useAreaChildren(areaId);
   const { data: routes, loading: routesLoading } = useAreaRoutes(areaId);
+  // CB 点3 — nearby browse: routes within radius of the camera center.
+  const nearby = useNearbyRoutes(nearbyCenter ?? null, { enabled: !!nearbyCenter });
 
   // CB 点6 — when the camera-tracked region label is present, the subtitle
   // shows ITS kind (e.g. "Area"), not the tapped crag's kind.
@@ -107,6 +114,24 @@ export function OutdoorBrowseSheet({
         <Text style={styles.placeholder}>
           {tr('点击地图上的岩点查看路线', 'Tap a crag on the map to view routes')}
         </Text>
+      </View>
+    );
+  }
+
+  // CB 点3 — nearby browse: when a camera center is provided, the list is
+  // routes within radius of the camera (not the tapped crag's routes).
+  // Independent of the entry crag's detail; title comes from the region label
+  // (点6); subtitle shown since routes span many crags.
+  if (nearbyCenter) {
+    return (
+      <View style={styles.fill}>
+        {header}
+        <AreaRoutesBrowser
+          routes={nearby.data}
+          loading={nearby.loading}
+          onRouteTap={onPressRoute}
+          showLocation
+        />
       </View>
     );
   }
