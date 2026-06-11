@@ -2,7 +2,7 @@
 // Larger route card: 72×72 thumb, 16px title, bigger padding.
 
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,9 +24,12 @@ type RouteListCardProps = {
    *  no hard border) to match the glass browse sheet. Off by default so the
    *  solid-screen usages (gym/outdoor segments) keep the opaque card. */
   glass?: boolean;
+  /** CB #3 — when set, render a locate button that flies the camera to this
+   *  route's pin + highlights it. */
+  onLocate?: () => void;
 };
 
-export default function RouteListCard({ route, onPress, hideLocation, expanded, glass }: RouteListCardProps) {
+export default function RouteListCard({ route, onPress, hideLocation, expanded, glass, onLocate }: RouteListCardProps) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -105,9 +108,20 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded, 
         </View>
       </View>
 
-      <View style={styles.chevron}>
-        <Text style={{ color: colors.textTertiary, fontSize: 16 }}>›</Text>
-      </View>
+      {onLocate ? (
+        <Pressable
+          style={styles.locateBtn}
+          onPress={onLocate}
+          hitSlop={8}
+          accessibilityLabel="Locate on map"
+        >
+          <Ionicons name="locate" size={18} color={colors.textSecondary} />
+        </Pressable>
+      ) : (
+        <View style={styles.chevron}>
+          <Text style={{ color: colors.textTertiary, fontSize: 16 }}>›</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -166,5 +180,11 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     chevron: {
       paddingRight: 14,
       justifyContent: 'center',
+    },
+    locateBtn: {
+      paddingRight: 14,
+      paddingLeft: 4,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });

@@ -1,19 +1,27 @@
 // src/features/mapscreen/components/outdoor-area-sheet/AreaRoutesBrowser.tsx
-// CA-FU Phase C.3 — full routes browser for a crag (leaf-with-routes).
-//
-// CB 点7/点8 — the filter capsule (BrowseFilterBar) is now PINNED above the
-// FlatList (does not scroll), the discipline filter is a 2-way Boulder|Routes
-// segment, and sort (Classic / Most ascents / Grade) is applied client-side.
-// Routes still arrive PRE-SORTED from the BE in the CA-FU Q4 marquee order
-// ('classic' keeps that order); only 'ascents'/'grade' re-sort locally. The
-// list snaps to each card (点8). Single-crag flow keeps the card subtitle
-// hidden (hideLocation) — it surfaces once the nearby-radius flow (点3) lands.
+// CA-FU Phase C.3 — full routes browser. CB 点3/点7/点8:
+//  - pinned filter capsule (BrowseFilterBar) above a snap-to-card FlatList
+//  - 点3 nearby browse shows the crag·area subtitle (showLocation)
+//  - 点3b: tapping a crag pin pins THAT crag's routes to a top section
+//    ("📍 crag" + ✕ to clear), above a "Nearby" section with the rest.
+//  - #3: each card carries a locate button (onLocateRoute).
+// Snap uses snapToOffsets (computed per row) so it stays correct across the
+// non-uniform section headers.
 
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useThemeColors } from '../../../../lib/useThemeColors';
 import { useSettings } from '../../../../contexts/SettingsContext';
+import { theme } from '../../../../lib/theme';
 import type { OutdoorRoute } from '../../../outdoor/types';
 import RouteListCard from '../../../outdoor/components/RouteListCard';
 import { sheetLabels, type ThemeColors } from './shared';
@@ -23,34 +31,44 @@ import {
   type RouteSortKey,
 } from './BrowseFilterBar';
 
-// 点8 — fixed row height so snapToInterval + getItemLayout are exact. COMPACT
-// = the 2-line card (hideLocation): thumbnail 72 + the card's own ~8px gap;
-// 80 is the tight floor — lower clips the 72px thumbnail. FULL = the 3-line
-// card (点3 nearby browse shows the crag·area subtitle), which needs the
-// extra line or the card clips.
-const ROW_HEIGHT_COMPACT = 80;
-const ROW_HEIGHT_FULL = 92;
+const ROW_HEIGHT_COMPACT = 80; // 2-line card (single-crag, hideLocation)
+const ROW_HEIGHT_FULL = 92; // 3-line card (nearby, crag·area subtitle shown)
+const HEADER_H = 40; // section header row (点3b)
+
+type ListItem =
+  | { kind: 'header'; key: string; label: string; pinned: boolean }
+  | { kind: 'route'; key: string; route: OutdoorRoute };
 
 type Props = {
   routes: OutdoorRoute[] | null;
   loading: boolean;
   onRouteTap: (route: OutdoorRoute) => void;
-  /** CB 点3 — show the crag·area subtitle on each card (nearby browse pulls
-   *  routes from many crags, so location matters). Off for single-crag. */
+  /** CB 点3 — show the crag·area subtitle on each card. */
   showLocation?: boolean;
+  /** CB 点3b — pin this crag's routes to a top section. */
+  focusedCragId?: string | null;
+  onClearFocus?: () => void;
+  /** CB #3 — locate button on each card. */
+  onLocateRoute?: (route: OutdoorRoute) => void;
 };
 
-export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }: Props) {
-  const rowHeight = showLocation ? ROW_HEIGHT_FULL : ROW_HEIGHT_COMPACT;
+export function AreaRoutesBrowser({
+  routes,
+  loading,
+  onRouteTap,
+  showLocation,
+  focusedCragId,
+  onClearFocus,
+  onLocateRoute,
+}: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const rowHeight = showLocation ? ROW_HEIGHT_FULL : ROW_HEIGHT_COMPACT;
 
   const [sortKey, setSortKey] = useState<RouteSortKey>('classic');
   const [search, setSearch] = useState('');
-  // 2-way segment has no "all"; default to the discipline that dominates this
-  // area so a boulder-only crag doesn't open to an empty "Routes" tab. User
-  // override (if any) wins.
+  // 2-way segment defaults to the area's majority discipline (no empty default).
   const [disciplineOverride, setDisciplineOverride] =
     useState<RouteDiscipline | null>(null);
   const autoDiscipline = useMemo<RouteDiscipline>(() => {
@@ -82,8 +100,45 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }:
         (a, b) => (a.grade_score ?? big) - (b.grade_score ?? big),
       );
     }
-    return list; // 'classic' — keep the BE marquee order untouched
+    return list; // 'classic' — keep the BE marquee order
   }, [routes, discipline, search, sortKey]);
+
+  // 点3b — split into pinned (focused crag) + nearby sections, then flatten to
+  // a typed item list with per-row layout offsets (so snapToOffsets stays
+  // correct across the shorter section headers).
+  const { listItems, layouts, snapOffsets } = useMemo(() => {
+    const pinned = focusedCragId
+      ? visible.filter((r) => r.area_id === focusedCragId)
+      : [];
+    const items: ListItem[] = [];
+    if (pinned.length > 0) {
+      const cragName = pinned[0].crag_name ?? tr('已选岩点', 'Selected crag');
+      items.push({ kind: 'header', key: '__pinned', label: cragName, pinned: true });
+      for (const r of pinned) items.push({ kind: 'route', key: r.id, route: r });
+      items.push({
+        kind: 'header',
+        key: '__nearby',
+        label: tr('附近', 'Nearby'),
+        pinned: false,
+      });
+      for (const r of visible) {
+        if (r.area_id !== focusedCragId) items.push({ kind: 'route', key: r.id, route: r });
+      }
+    } else {
+      for (const r of visible) items.push({ kind: 'route', key: r.id, route: r });
+    }
+
+    const lays: { length: number; offset: number }[] = [];
+    const snaps: number[] = [];
+    let off = 0;
+    for (const it of items) {
+      const len = it.kind === 'header' ? HEADER_H : rowHeight;
+      lays.push({ length: len, offset: off });
+      if (it.kind === 'route') snaps.push(off);
+      off += len;
+    }
+    return { listItems: items, layouts: lays, snapOffsets: snaps };
+  }, [visible, focusedCragId, rowHeight, tr]);
 
   const bar = (
     <BrowseFilterBar
@@ -96,11 +151,6 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }:
     />
   );
 
-  // Returned as a Fragment (not wrapped in another View) so the FlatList stays
-  // within TrueSheet's 2-level findScrollView reach: parent OutdoorBrowseSheet
-  // renders <View fill>{header}{this}</View>, so bar + FlatList become direct
-  // children of that one wrapper (FlatList at native L2). Wrapping here would
-  // push it to L3 and break sheet-drag↔list-scroll coordination.
   if (loading && !routes) {
     return (
       <>
@@ -117,20 +167,19 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }:
       {bar}
       <FlatList
         style={styles.fill}
-        data={visible}
-        keyExtractor={(r) => r.id}
+        data={listItems}
+        keyExtractor={(it) => it.key}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         initialNumToRender={20}
         windowSize={11}
         removeClippedSubviews
-        // 点8 — snap each card to the top of the list, picker-style.
-        snapToInterval={rowHeight}
+        snapToOffsets={snapOffsets}
         snapToAlignment="start"
         decelerationRate="fast"
         getItemLayout={(_, index) => ({
-          length: rowHeight,
-          offset: rowHeight * index,
+          length: layouts[index].length,
+          offset: layouts[index].offset,
           index,
         })}
         contentContainerStyle={styles.listContent}
@@ -143,16 +192,32 @@ export function AreaRoutesBrowser({ routes, loading, onRouteTap, showLocation }:
                 : sheetLabels.emptyRoutes(tr)}
           </Text>
         }
-        renderItem={({ item }) => (
-          <View style={[styles.cardWrap, { height: rowHeight }]}>
-            <RouteListCard
-              route={item}
-              onPress={() => onRouteTap(item)}
-              hideLocation={!showLocation}
-              glass
-            />
-          </View>
-        )}
+        renderItem={({ item }) =>
+          item.kind === 'header' ? (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText} numberOfLines={1}>
+                {item.pinned ? `📍 ${item.label}` : item.label}
+              </Text>
+              {item.pinned && onClearFocus ? (
+                <Pressable onPress={onClearFocus} hitSlop={10}>
+                  <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={[styles.cardWrap, { height: rowHeight }]}>
+              <RouteListCard
+                route={item.route}
+                onPress={() => onRouteTap(item.route)}
+                hideLocation={!showLocation}
+                glass
+                onLocate={
+                  onLocateRoute ? () => onLocateRoute(item.route) : undefined
+                }
+              />
+            </View>
+          )
+        }
       />
     </>
   );
@@ -167,8 +232,21 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       paddingVertical: 24,
     },
-    listContent: { paddingTop: 6, paddingBottom: 24 },
+    listContent: { paddingBottom: 24 },
     cardWrap: { paddingHorizontal: 14, justifyContent: 'center' },
+    sectionHeader: {
+      height: HEADER_H,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+    },
+    sectionHeaderText: {
+      flex: 1,
+      fontFamily: theme.fonts.bold,
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
     empty: {
       fontSize: 13,
       fontWeight: '500',

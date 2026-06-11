@@ -425,6 +425,11 @@ export default function MapScreenMapbox({
   // (the retired area-mode sheet body). sheetTitle/loadingSheet kept.
   const [sheetTitle, setSheetTitle] = useState('');
   const [loadingSheet, setLoadingSheet] = useState(false);
+  // CB 点3b — the crag whose routes are pinned to the top of the browse sheet
+  // (set by tapping its pin / a card's locate button); highlightedAreaId
+  // draws that pin's map halo.
+  const [focusedCragId, setFocusedCragId] = useState<string | null>(null);
+  const [highlightedAreaId, setHighlightedAreaId] = useState<string | null>(null);
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -698,24 +703,45 @@ export default function MapScreenMapbox({
   // CA-FU Phase D — focusOnWall + onPressBrowseWall (the wall-focus / crag-
   // browse-walls handlers) removed with the wall state machine.
 
-  // CA-FU Phase D — a route-pin group tap (RoutePinCluster groups routes by
-  // their area_id) simply browses that area. Replaces the legacy
-  // focusedWall / browsingCrag / focusOnWall wall-focus machinery.
-  const onAreaPinPress = useCallback(
-    (ctx: AreaPinContext) => {
-      enterArea(ctx.area_id, ctx.area_name);
-      try {
-        markProgrammaticMove(500);
-        camRef.current?.setCamera({
-          centerCoordinate: [ctx.lng, ctx.lat],
-          zoomLevel: 15,
-          animationDuration: 500,
-          padding: pinFocusPadding,
-        });
-      } catch {}
+  // CB 点3b/#1 — a route-pin group tap (RoutePinCluster groups routes by
+  // area_id) pins that crag's routes to the TOP of the browse sheet and
+  // highlights the pin. No camera fly + no areaId change (the nearby list is
+  // already camera-centred). Replaces the old enterArea + zoom-15 re-frame.
+  const onAreaPinPress = useCallback((ctx: AreaPinContext) => {
+    setFocusedCragId(ctx.area_id);
+    setHighlightedAreaId(ctx.area_id);
+  }, []);
+
+  // CB #3 — card locate button: fly to the route's pin (the one intended
+  // camera move), highlight it, and pin its crag to the sheet top.
+  const onLocateRoute = useCallback(
+    (route: OutdoorRoute) => {
+      if (route.area_id) {
+        setFocusedCragId(route.area_id);
+        setHighlightedAreaId(route.area_id);
+      }
+      if (route.lat != null && route.lng != null) {
+        try {
+          markProgrammaticMove(600);
+          camRef.current?.setCamera({
+            centerCoordinate: [route.lng, route.lat],
+            zoomLevel: 15,
+            animationDuration: 600,
+            padding: pinFocusPadding,
+          });
+        } catch {}
+      }
     },
-    [enterArea, markProgrammaticMove, pinFocusPadding],
+    [markProgrammaticMove, pinFocusPadding],
   );
+
+  // CB 点3b — clear the pinned crag + highlight when leaving browse mode.
+  useEffect(() => {
+    if (mode.kind !== 'area') {
+      setFocusedCragId(null);
+      setHighlightedAreaId(null);
+    }
+  }, [mode.kind]);
 
   // CA-FU Phase C.4 — tier-1 crag pin tap. Direct primary-sheet swap into
   // area mode (NO stacked CragInfoSheet popup). areaId becomes the crag's
@@ -1430,6 +1456,7 @@ export default function MapScreenMapbox({
               <RoutePinCluster
                 pins={viewportPins.pins}
                 styleReady={styleReady}
+                highlightedAreaId={highlightedAreaId}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
@@ -1625,6 +1652,12 @@ export default function MapScreenMapbox({
             title={regionLabel?.name ?? undefined}
             titleKind={regionLabel?.display_kind ?? undefined}
             nearbyCenter={browseCenter}
+            focusedCragId={focusedCragId}
+            onClearFocus={() => {
+              setFocusedCragId(null);
+              setHighlightedAreaId(null);
+            }}
+            onLocateRoute={onLocateRoute}
             insets={insets}
             onPressRoute={(route) => navigateToRoute(route.id)}
             onPressChildArea={(child) => enterArea(child.id, child.name)}

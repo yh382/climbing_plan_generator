@@ -52,6 +52,11 @@ export type OutdoorBrowseSheetProps = {
   /** CB 点3 — camera center for the nearby-radius browse list. When set, the
    *  sheet shows routes within radius of this point (not the tapped crag's). */
   nearbyCenter?: { lat: number; lng: number } | null;
+  /** CB 点3b — the crag whose routes are pinned to the top section. */
+  focusedCragId?: string | null;
+  onClearFocus?: () => void;
+  /** CB #3 — card locate button → fly camera to the route's pin + highlight. */
+  onLocateRoute?: (route: OutdoorRoute) => void;
   insets: EdgeInsets;
   onPressRoute: (route: OutdoorRoute) => void;
   onPressChildArea: (child: OutdoorAreaListItem) => void;
@@ -64,6 +69,9 @@ export function OutdoorBrowseSheet({
   title,
   titleKind,
   nearbyCenter,
+  focusedCragId,
+  onClearFocus,
+  onLocateRoute,
   insets,
   onPressRoute,
   onPressChildArea,
@@ -131,6 +139,9 @@ export function OutdoorBrowseSheet({
           loading={nearby.loading}
           onRouteTap={onPressRoute}
           showLocation
+          focusedCragId={focusedCragId}
+          onClearFocus={onClearFocus}
+          onLocateRoute={onLocateRoute}
         />
       </View>
     );

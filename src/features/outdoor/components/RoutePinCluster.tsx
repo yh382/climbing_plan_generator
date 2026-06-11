@@ -50,6 +50,9 @@ export type AreaPinContext = {
 export type RoutePinClusterProps = {
   pins: RoutePin[];
   styleReady: boolean;
+  /** CB 点3b — area_id of the focused crag; its single pin gets a highlight
+   *  halo so the user can find it after tapping its card / pin. */
+  highlightedAreaId?: string | null;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -118,7 +121,10 @@ function groupByArea(pins: RoutePin[]): AreaPinContext[] {
   return out;
 }
 
-function toGeoJSON(areas: AreaPinContext[]): GeoJSON.FeatureCollection {
+function toGeoJSON(
+  areas: AreaPinContext[],
+  highlightedAreaId?: string | null,
+): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: areas.map((a) => ({
@@ -129,6 +135,7 @@ function toGeoJSON(areas: AreaPinContext[]): GeoJSON.FeatureCollection {
         area_name: a.area_name,
         display_kind: a.display_kind,
         route_count: a.route_count,
+        highlighted: a.area_id === highlightedAreaId,
       },
       geometry: {
         type: 'Point',
@@ -141,12 +148,16 @@ function toGeoJSON(areas: AreaPinContext[]): GeoJSON.FeatureCollection {
 export default function RoutePinCluster({
   pins,
   styleReady,
+  highlightedAreaId,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
-  const shape = useMemo(() => toGeoJSON(areaContexts), [areaContexts]);
+  const shape = useMemo(
+    () => toGeoJSON(areaContexts, highlightedAreaId),
+    [areaContexts, highlightedAreaId],
+  );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
     for (const a of areaContexts) map.set(a.area_id, a);
@@ -208,6 +219,18 @@ export default function RoutePinCluster({
           textFont: ['DIN Pro Medium', 'Arial Unicode MS Regular'],
           textAllowOverlap: true,
           textIgnorePlacement: true,
+        }}
+      />
+      {/* CB 点3b — highlight halo behind the focused crag's single pin. */}
+      <MapboxGL.CircleLayer
+        id="outdoor-route-pins-highlight"
+        filter={['all', ['!', ['has', 'point_count']], ['==', ['get', 'highlighted'], true]] as any}
+        style={{
+          circleColor: theme.colors.accent,
+          circleOpacity: 0.22,
+          circleRadius: AREA_PIN_RADIUS + 11,
+          circleStrokeColor: theme.colors.accent,
+          circleStrokeWidth: 2,
         }}
       />
       {/* Single area pin — visible at zoom ≥15+ when clusters dissolve. */}
