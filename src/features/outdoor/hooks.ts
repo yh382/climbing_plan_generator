@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { outdoorApi } from './api';
+import { outdoorApi, type RegionLabel } from './api';
 import type {
   AreaSearchResponse, CoverageResponse, DisplayKind,
   OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
@@ -169,4 +169,43 @@ export function useAreaSearch(params: {
       : Promise.resolve({ items: [], total: 0 }),
     [q, kindKey, limit, enabled],
   );
+}
+
+/**
+ * CB 点6 — debounced viewport region label for the browse-sheet title.
+ *
+ * Tracks the camera (not a tapped pin). Hysteresis: only swaps the title when
+ * a real label arrives, so transient null results (empty viewport mid-pan)
+ * keep the previous title instead of flickering. Resets to null when disabled
+ * (leaving browse mode) and degrades to null on error → the caller falls back
+ * to the area name.
+ */
+export function useRegionLabel(
+  bbox: { south: number; west: number; north: number; east: number } | null,
+  enabled: boolean,
+): RegionLabel | null {
+  const [label, setLabel] = useState<RegionLabel | null>(null);
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    if (!enabled) {
+      setLabel(null);
+      return;
+    }
+    if (!bbox) return;
+    const timer = setTimeout(() => {
+      const seq = ++seqRef.current;
+      outdoorApi
+        .getRegionLabel(bbox)
+        .then((res) => {
+          if (seq !== seqRef.current) return;
+          if (res && res.name) setLabel(res); // hysteresis — ignore null blips
+        })
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bbox?.south, bbox?.west, bbox?.north, bbox?.east, enabled]);
+
+  return label;
 }

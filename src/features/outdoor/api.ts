@@ -32,6 +32,14 @@ export type ListPinsParams = {
   limit?: number;
 };
 
+/** CB 点6 — viewport browse-sheet title (representative 'area' node).
+ *  All-null when the viewport has no route-bearing areas. */
+export type RegionLabel = {
+  id: string | null;
+  name: string | null;
+  display_kind: DisplayKind | null;
+};
+
 // BK: flipped off — real OpenBeta data now lives in prod DB. Keeping the
 // `if (USE_MOCK)` branches as escape hatch if we ever need to demo
 // offline; flip back to `__DEV__` temporarily for that case.
@@ -183,6 +191,19 @@ export const outdoorApi = {
    *  >5000-route subtree; null polygon when <3 route points. */
   getAreaCoverage: async (areaId: string): Promise<CoverageResponse> => {
     return api.get<CoverageResponse>(`/outdoor/areas/${areaId}/coverage`);
+  },
+
+  /** CB 点6 — representative 'area' label for the camera viewport, for the
+   *  browse-sheet title (tracks the camera, not a tapped pin). */
+  getRegionLabel: async (bbox: {
+    south: number; west: number; north: number; east: number;
+  }): Promise<RegionLabel> => {
+    const { south, west, north, east } = bbox;
+    const qs = new URLSearchParams({
+      south: String(south), west: String(west),
+      north: String(north), east: String(east),
+    });
+    return api.get<RegionLabel>(`/outdoor/region-label?${qs}`);
   },
 
   /** Zoom-aware pin source. display_kinds filters which tier surfaces. */

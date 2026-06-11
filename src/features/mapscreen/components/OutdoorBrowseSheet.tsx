@@ -35,7 +35,7 @@ import {
   useAreaDetail,
   useAreaRoutes,
 } from '../../outdoor/hooks';
-import type { OutdoorAreaListItem, OutdoorRoute } from '../../outdoor/types';
+import type { DisplayKind, OutdoorAreaListItem, OutdoorRoute } from '../../outdoor/types';
 import { AreaChildrenList } from './outdoor-area-sheet/AreaChildrenList';
 import { AreaRoutesPreview } from './outdoor-area-sheet/AreaRoutesPreview';
 import { AreaRoutesBrowser } from './outdoor-area-sheet/AreaRoutesBrowser';
@@ -44,6 +44,10 @@ import { displayKindLabel, type ThemeColors } from './outdoor-area-sheet/shared'
 export type OutdoorBrowseSheetProps = {
   /** null = no browse target (empty placeholder). */
   areaId: string | null;
+  /** CB 点6 — camera-tracked viewport region label. Overrides the area
+   *  name + display_kind as the sheet title when present. */
+  title?: string;
+  titleKind?: DisplayKind;
   insets: EdgeInsets;
   onPressRoute: (route: OutdoorRoute) => void;
   onPressChildArea: (child: OutdoorAreaListItem) => void;
@@ -53,6 +57,8 @@ export type OutdoorBrowseSheetProps = {
 
 export function OutdoorBrowseSheet({
   areaId,
+  title,
+  titleKind,
   insets,
   onPressRoute,
   onPressChildArea,
@@ -66,6 +72,10 @@ export function OutdoorBrowseSheet({
   const { data: children, loading: childrenLoading } = useAreaChildren(areaId);
   const { data: routes, loading: routesLoading } = useAreaRoutes(areaId);
 
+  // CB 点6 — when the camera-tracked region label is present, the subtitle
+  // shows ITS kind (e.g. "Area"), not the tapped crag's kind.
+  const headerKind = title ? titleKind : detail?.display_kind;
+
   // CB 点7 — title left-aligned (gives the dynamic 点6 region label room to
   // breathe), search demoted into BrowseFilterBar, so the header is just
   // title + hamburger. (点6 will later swap detail.name → the viewport
@@ -74,11 +84,11 @@ export function OutdoorBrowseSheet({
     <View style={styles.header}>
       <View style={styles.headerText}>
         <Text style={styles.title} numberOfLines={1}>
-          {detail?.name ?? tr('加载中…', 'Loading…')}
+          {title ?? detail?.name ?? tr('加载中…', 'Loading…')}
         </Text>
-        {detail ? (
+        {headerKind ? (
           <Text style={styles.subtitle} numberOfLines={1}>
-            {displayKindLabel(detail.display_kind, tr)}
+            {displayKindLabel(headerKind, tr)}
           </Text>
         ) : null}
       </View>

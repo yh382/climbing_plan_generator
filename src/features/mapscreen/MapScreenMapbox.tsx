@@ -85,7 +85,7 @@ import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
-import { useAreaDetail } from '../outdoor/hooks';
+import { useAreaDetail, useRegionLabel } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
@@ -332,6 +332,10 @@ export default function MapScreenMapbox({
     style: mapFilterParams.style,
     discipline: mapFilterParams.discipline,
   });
+  // CB 点6 — viewport region label drives the browse-sheet title (camera-
+  // tracked, not the tapped pin). Degrades to null when the endpoint is
+  // unavailable / viewport has no areas → sheet falls back to the area name.
+  const regionLabel = useRegionLabel(bbox, mode.kind === 'area' && styleReady);
   const mapStyleURL = useMemo(() => {
     if (styleId === 'satellite') return 'mapbox://styles/mapbox/satellite-streets-v12';
     return scheme === 'dark'
@@ -1609,6 +1613,8 @@ export default function MapScreenMapbox({
              mode below until D.2 splits out SavedRoutesListSheet. */
           <OutdoorBrowseSheet
             areaId={mode.areaId}
+            title={regionLabel?.name ?? undefined}
+            titleKind={regionLabel?.display_kind ?? undefined}
             insets={insets}
             onPressRoute={(route) => navigateToRoute(route.id)}
             onPressChildArea={(child) => enterArea(child.id, child.name)}
