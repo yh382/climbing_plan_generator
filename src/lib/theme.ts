@@ -72,6 +72,11 @@ export const theme = {
     // (don't mislead with shifted color when data is sparse).
     outdoorMarkerFillBoulder: '#8B6F5C',             // cooler brown (boulder-dominant)
     outdoorMarkerFillMixed: '#A87560',               // midpoint blend
+    // CB 点2 — browse-mode 2-color: boulder pins keep the sandstone
+    // `outdoorMarkerFill`; rope-dominant ("Routes") pins get this teal-blue so
+    // discipline reads at a glance. Bluer than gymMarkerFill (#44847E) to stay
+    // distinct from gym pins. (Phase F upgrades this to a per-pin ratio ring.)
+    routesMarkerFill: '#2E6F8E',                     // muted teal-blue (rope-dominant)
     gymMarkerFill: '#44847E',                        // muted teal (solid)
     gymMarkerStroke: '#2F6F6A',
     // (no gymMarkerText — gym label uses `gymLabelText` for dark teal

@@ -11,11 +11,13 @@
  *  - Pin tap surfaces `AreaPinContext.area_id` to the caller; caller
  *    hydrates ancestor breadcrumb via `/outdoor/areas/{id}` if needed.
  *
- * Single ShapeSource with `cluster:true`; uniform sandstone fill
- * (`theme.colors.outdoorMarkerFill`) matching the discover-mode crag
- * pins. CB点3: was `theme.colors.accent` (teal) — the old "orange"
- * comment was always wrong; user wants brown to match crag pins, not
- * a separate accent color. (filter chips do discipline segmentation.)
+ * Single ShapeSource with `cluster:true`. CB 点2 — single pins are now
+ * 2-color by dominant discipline: sandstone (`outdoorMarkerFill`) for
+ * boulder-dominant areas, teal-blue (`routesMarkerFill`) for rope-dominant
+ * ("Routes") areas, so discipline reads at a glance. Cluster bubbles (only
+ * at zoom ≤10, far out) stay sandstone — they aggregate many areas, so a
+ * single 2-color verdict isn't meaningful there. (Phase F upgrades the
+ * single pin to a boulder/sport/trad ratio ring.)
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
@@ -42,6 +44,10 @@ export type AreaPinContext = {
   lng: number;
   /** Number of routes attached to this area in the current bbox. */
   route_count: number;
+  /** How many of those are boulders. CB 点2 — drives the 2-color fill
+   *  (boulder-dominant → sandstone, else teal-blue "Routes"). Phase F will
+   *  carry the full sport/trad split here for the ratio ring. */
+  boulder_count: number;
 };
 // CA-FU Phase D — the 6 legacy ancestor aliases (wall_id / crag_id /
 // region_id + names) + the WallPinContext alias removed; no caller reads
@@ -88,18 +94,21 @@ const AREA_PIN_RADIUS = 6; // CB点4 — 8→6, smaller browse-mode pins
  *  recover canonical UUID + label. Lat/lng = centroid of the grouped
  *  routes. */
 function groupByArea(pins: RoutePin[]): AreaPinContext[] {
-  const buckets = new Map<string, { sumLat: number; sumLng: number; count: number; ctx: Omit<AreaPinContext, 'lat' | 'lng' | 'route_count'> }>();
+  const buckets = new Map<string, { sumLat: number; sumLng: number; count: number; boulders: number; ctx: Omit<AreaPinContext, 'lat' | 'lng' | 'route_count' | 'boulder_count'> }>();
   for (const p of pins) {
+    const isBoulder = p.discipline === 'boulder' ? 1 : 0;
     const existing = buckets.get(p.area_id);
     if (existing) {
       existing.sumLat += p.lat;
       existing.sumLng += p.lng;
       existing.count += 1;
+      existing.boulders += isBoulder;
     } else {
       buckets.set(p.area_id, {
         sumLat: p.lat,
         sumLng: p.lng,
         count: 1,
+        boulders: isBoulder,
         ctx: {
           area_id: p.area_id,
           area_name: p.area_name,
@@ -109,12 +118,13 @@ function groupByArea(pins: RoutePin[]): AreaPinContext[] {
     }
   }
   const out: AreaPinContext[] = [];
-  for (const { sumLat, sumLng, count, ctx } of buckets.values()) {
+  for (const { sumLat, sumLng, count, boulders, ctx } of buckets.values()) {
     out.push({
       ...ctx,
       lat: sumLat / count,
       lng: sumLng / count,
       route_count: count,
+      boulder_count: boulders,
     });
   }
   return out;
@@ -134,6 +144,9 @@ function toGeoJSON(
         area_name: a.area_name,
         display_kind: a.display_kind,
         route_count: a.route_count,
+        // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
+        // "Routes"). Drives the single-pin fill color.
+        dominant_boulder: a.boulder_count * 2 > a.route_count,
         highlighted: a.area_id === highlightedAreaId,
       },
       geometry: {
@@ -232,12 +245,19 @@ export default function RoutePinCluster({
           circleStrokeWidth: 2,
         }}
       />
-      {/* Single area pin — visible at zoom ≥15+ when clusters dissolve. */}
+      {/* Single area pin — visible at zoom ≥15+ when clusters dissolve.
+          CB 点2 — 2-color fill by dominant discipline: sandstone for
+          boulder-dominant areas, teal-blue ("Routes") otherwise. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-single"
         filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: theme.colors.outdoorMarkerFill,
+          circleColor: [
+            'case',
+            ['get', 'dominant_boulder'],
+            theme.colors.outdoorMarkerFill,
+            theme.colors.routesMarkerFill,
+          ] as any,
           circleRadius: AREA_PIN_RADIUS,
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,

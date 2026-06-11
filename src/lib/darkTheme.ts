@@ -55,6 +55,7 @@ export const darkColors: ThemeColors = {
   outdoorMarkerText: '#FFFFFF',
   outdoorMarkerFillBoulder: '#9B7E68',
   outdoorMarkerFillMixed: '#B58668',
+  routesMarkerFill: '#3E86A8',  // CB点2 — 青蓝(rope-dominant)，dark 下提亮
   gymMarkerFill: '#44847E',
   gymMarkerStroke: '#5BA39C',
   // (no gymMarkerText — see theme.ts)
