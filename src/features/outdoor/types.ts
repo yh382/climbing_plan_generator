@@ -187,6 +187,11 @@ export type OutdoorRoute = {
   wall_name?: string;
   crag_name?: string;
   area_name?: string;
+  /** CB 点5 — browse-card breadcrumb from /outdoor/areas/{id}/routes (B1).
+   *  crag_display_kind = the route's direct node kind; parent_area_name =
+   *  nearest display_kind='area' ancestor → card subtitle "crag · area". */
+  crag_display_kind?: string;
+  parent_area_name?: string;
   region_name?: string;
   wall_topo_url?: string;
   // BR Track D Day 6 — optional GPS surfaced by BE on detail. Used by the

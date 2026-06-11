@@ -6,6 +6,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/useThemeColors';
+import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import type { OutdoorRoute } from '../types';
 
@@ -20,22 +21,22 @@ type RouteListCardProps = {
   expanded?: boolean;
 };
 
-export function gradeColor(score: number | undefined): string {
-  if (!score || score <= 90) return '#34C759';
-  if (score <= 110) return '#FFD60A';
-  if (score <= 125) return '#FF9500';
-  return '#FF3B30';
-}
-
 export default function RouteListCard({ route, onPress, hideLocation, expanded }: RouteListCardProps) {
   const colors = useThemeColors();
+  const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const cardBg = expanded ? colors.background : colors.backgroundSecondary;
-  const gc = gradeColor(route.grade_score);
   const thumb = route.photos?.[0]?.thumb_url ?? route.photos?.[0]?.url;
-  const breadcrumb = !hideLocation
-    ? [route.crag_name, route.wall_name].filter(Boolean).join(' · ')
+  // CB 点5 — subtitle = the route's two parent levels (crag · nearest area).
+  // Prefers the B1 breadcrumb fields; falls back to the legacy wall pairing
+  // so it degrades gracefully before the backend B1 change is deployed.
+  const subtitle = !hideLocation
+    ? [route.crag_name, route.parent_area_name ?? route.area_name ?? route.wall_name]
+        .filter(Boolean)
+        .join(' · ')
     : '';
+  const hasStars = route.stars != null && route.stars > 0;
+  const hasAscents = route.send_count != null && route.send_count > 0;
 
   return (
     <TouchableOpacity style={[styles.card, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.7}>
@@ -50,33 +51,42 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded }
         )}
       </View>
 
-      {/* Content */}
+      {/* Content — 3 fixed lines (name+grade / subtitle / meta) keep the row
+          height deterministic for the future snap-to-card list (CB 点8). */}
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>{route.name}</Text>
-
-        <View style={styles.subtitleRow}>
-          <View style={[styles.gradeDot, { backgroundColor: gc }]} />
-          <Text style={styles.gradeText}>{route.grade_text}</Text>
-          <Text style={styles.separator}>·</Text>
-          <Text style={styles.metaText}>{route.style}</Text>
-          {route.length_m ? (
-            <>
-              <Text style={styles.separator}>·</Text>
-              <Text style={styles.metaText}>{route.length_m}m</Text>
-            </>
-          ) : null}
-          {route.stars != null && route.stars > 0 ? (
-            <>
-              <Text style={styles.separator}>·</Text>
-              <Ionicons name="star" size={12} color="#FFD60A" style={{ marginRight: 2 }} />
-              <Text style={styles.metaText}>{route.stars.toFixed(1)}</Text>
-            </>
-          ) : null}
+        {/* Line 1: name + grade */}
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>{route.name}</Text>
+          <View style={styles.gradeBadge}>
+            <View style={[styles.gradeDot, { backgroundColor: colors.textPrimary }]} />
+            <Text style={styles.gradeText}>{route.grade_text}</Text>
+          </View>
         </View>
 
-        {breadcrumb ? (
-          <Text style={styles.breadcrumbText} numberOfLines={1}>{breadcrumb}</Text>
+        {/* Line 2: subtitle — crag · nearest area */}
+        {subtitle ? (
+          <Text style={styles.breadcrumbText} numberOfLines={1}>{subtitle}</Text>
         ) : null}
+
+        {/* Line 3: meta — ★ rating · N ascents · style */}
+        <View style={styles.metaRow}>
+          {hasStars ? (
+            <>
+              <Ionicons name="star" size={12} color={colors.textPrimary} style={{ marginRight: 2 }} />
+              <Text style={styles.metaText}>{route.stars!.toFixed(1)}</Text>
+              <Text style={styles.separator}>·</Text>
+            </>
+          ) : null}
+          {hasAscents ? (
+            <>
+              <Text style={styles.metaText}>
+                {tr(`${route.send_count} 次完成`, `${route.send_count} ascents`)}
+              </Text>
+              <Text style={styles.separator}>·</Text>
+            </>
+          ) : null}
+          <Text style={styles.metaText} numberOfLines={1}>{route.style}</Text>
+        </View>
       </View>
 
       <View style={styles.chevron}>
@@ -110,11 +120,14 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       gap: 4,
     },
     title: {
+      flex: 1,
       fontFamily: theme.fonts.bold,
       fontSize: 16,
       color: c.textPrimary,
     },
-    subtitleRow: { flexDirection: 'row', alignItems: 'center' },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    gradeBadge: { flexDirection: 'row', alignItems: 'center' },
+    metaRow: { flexDirection: 'row', alignItems: 'center' },
     gradeDot: { width: 7, height: 7, borderRadius: 3.5, marginRight: 6 },
     gradeText: {
       fontFamily: theme.fonts.medium,
