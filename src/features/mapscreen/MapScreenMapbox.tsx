@@ -78,17 +78,12 @@ import { useGymsColors } from '../gyms/useGymsColors';
 
 import MapPinCluster from '../outdoor/components/MapPinCluster';
 import RoutePinCluster, {
-  type WallPinContext,
+  type AreaPinContext,
 } from '../outdoor/components/RoutePinCluster';
-import CragOverviewCluster, {
-  getMinRoutesForZoom,
-  type CragPinContext,
-} from '../outdoor/components/CragOverviewCluster';
+import CragOverviewCluster from '../outdoor/components/CragOverviewCluster';
 import { useViewportPins, type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
-// useCragsOverview (kept until D.4 so a phase-C revert is self-contained).
-import { useCragsOverview } from './useCragsOverview';
 import { useAllCrags } from '../outdoor/useAllCrags';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
@@ -217,10 +212,8 @@ export default function MapScreenMapbox({
   // position after MapView key-bump remount on AppState background→
   // active recovery (otherwise Mapbox resets to [0,0] default).
   const lastCameraSnapshotRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
-  // BS-P1-ε — Importance-by-zoom tier for outdoor crag overview.
-  // Only re-renders the cluster source when the tier crosses a
-  // boundary (zoom 6 / 8 / 10 / 12) rather than every camera frame.
-  const [cragMinRoutes, setCragMinRoutes] = useState(() => getMinRoutesForZoom(0));
+  // CA-FU Phase D — cragMinRoutes / getMinRoutesForZoom removed (the 35k
+  // static cluster no longer uses the importance-by-zoom filter).
   // rnmapbox only lets the touch-start event bubble to RN (onTouchMove /
   // onTouchEnd are swallowed by Mapbox's UIGestureRecognizer — see
   // rnmapbox issues #3019, #1667). We work around the missing onTouchMove
@@ -383,10 +376,7 @@ export default function MapScreenMapbox({
   // ---- Data hooks ----
   const gymsEnabled = mode.kind === 'explore';
   const gymsData = useGymsData(gymsEnabled);
-  // BR Track D Day 7 follow-up — tier-1 Crag overview source (~15k crags,
-  // loaded once + cached at module level). Drives the gyms-mode
-  // `CragOverviewCluster` ShapeSource. PLAN §3.2 redesign.
-  const cragsOverview = useCragsOverview(gymsEnabled);
+  // CA-FU Phase D — useCragsOverview removed (superseded by useAllCrags).
   // CA-FU Phase C — the real explore-mode cluster source: all 35k crag-tier
   // areas, AsyncStorage-cached + data_version hot-swapped. Static (not
   // viewport-driven) so Mapbox supercluster geometry stays stable on pan.
@@ -427,21 +417,9 @@ export default function MapScreenMapbox({
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
   // mode change so a fresh area entry starts in default state.
-  const [focusedWall, setFocusedWall] = useState<WallPinContext | null>(null);
-  // BR Track D Day 7 — focused Crag's full detail, fetched on focusedWall
-  // change. Used by TrailLayer (PLAN §9.1 — trail_geojson lives on Crag,
-  // not Region post-Track-A). null when no wall focused; null
-  // trail_geojson on the response is also expected (OSM Overpass backfill
-  // BR-Track-C-FU-(c) hasn't run for most crags).
-  const [focusedCragDetail, setFocusedCragDetail] = useState<
-    import('../outdoor/types').CragDetail | null
-  >(null);
-  // BS-FU-A — crag-browse sub-state. Set on tier-1 crag pin tap (without
-  // focusing a wall). RoutesListSheet then renders the Crag's walls list
-  // sorted by route_count desc, and the user can pan the map to discover
-  // other crags' walls (RoutePinCluster bbox follows the camera). Cleared
-  // on area change / wall focus / back to explore.
-  const [browsingCrag, setBrowsingCrag] = useState<CragPinContext | null>(null);
+  // CA-FU Phase D — focusedWall / focusedCragDetail / browsingCrag removed
+  // (the legacy wall/crag-browse state machine; superseded by the
+  // browsedCrag + OutdoorBrowseSheet area-mode flow).
   // CA-FU Phase C.4 — the crag tapped in explore mode. Drives CragMenuSheet
   // (the OutdoorBrowseSheet hamburger target). Replaces the legacy
   // focusedWall-derived crag context.
@@ -479,29 +457,8 @@ export default function MapScreenMapbox({
     primaryDiscipline,
   ]);
 
-  // BS-FU-A — crag-browse derived: synthesize summary for the mini snapshot
-  // (seeds from CragPinContext for instant render, refined when
-  // focusedCragDetail lands). Walls list reused from focusedCragDetail.walls
-  // sorted by route_count desc.
-  const browsingCragSummary: BrowsingCragSummary | null = useMemo(() => {
-    if (!browsingCrag) return null;
-    return {
-      id: browsingCrag.crag_id,
-      name: browsingCrag.crag_name,
-      region_name: browsingCrag.region_name,
-      cover_url: focusedCragDetail?.cover_url ?? null,
-      wall_count: focusedCragDetail?.walls?.length ?? undefined,
-      route_count: focusedCragDetail?.route_count ?? browsingCrag.route_count,
-      boulder_count: browsingCrag.boulder_count,
-    };
-  }, [browsingCrag, focusedCragDetail]);
-
-  const browsingCragWalls = useMemo(() => {
-    if (!browsingCrag) return null;
-    const walls = focusedCragDetail?.walls;
-    if (!walls) return null;
-    return [...walls].sort((a, b) => (b.route_count ?? 0) - (a.route_count ?? 0));
-  }, [browsingCrag, focusedCragDetail]);
+  // CA-FU Phase D — browsingCragSummary / browsingCragWalls memos removed
+  // (fed the retired RoutesListSheet crag-browse sub-state).
 
   const [searchExpanded, setSearchExpanded] = useState(false);
   // Route id that the user tapped on the map — forwarded to WallGroup so
@@ -527,49 +484,11 @@ export default function MapScreenMapbox({
     setAreaSearchResults(null);
     setAreaSearchQuery('');
     setSearchExpanded(false);
-    setFocusedWall(null);
   }, [areaId]);
 
-  // BS-FU-A — clear crag-browse sub-state when leaving area mode.
-  useEffect(() => {
-    if (mode.kind !== 'area') {
-      setBrowsingCrag(null);
-      setFocusedCragDetail(null);
-    }
-  }, [mode.kind]);
-
-  // BR Track D Day 7 — when a Wall is focused, lazy-fetch its parent
-  // Crag's full detail (PLAN §9.1 trail_geojson lives on Crag). Cached
-  // by crag_id so flipping between walls on the same crag is a no-op.
-  // Same crag's detail also seeds CragInfoSheet — but that sheet runs
-  // its own fetch on present(); we accept the duplicate cost as small
-  // (response is light, BE cache is hot).
-  useEffect(() => {
-    // BS-FU-A: also fires for browsingCrag (crag-browse sub-state) — the
-    // RoutesListSheet needs the same CragDetail.walls list to render the
-    // sorted walls overview. focusedWall takes precedence when both set.
-    const cragId = focusedWall?.crag_id ?? browsingCrag?.crag_id;
-    if (!cragId) {
-      setFocusedCragDetail(null);
-      return;
-    }
-    if (focusedCragDetail?.id === cragId) return;
-    let cancelled = false;
-    outdoorApi
-      .getCragDetail(cragId)
-      .then((detail) => {
-        if (cancelled) return;
-        setFocusedCragDetail(detail);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setFocusedCragDetail(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedWall?.crag_id, browsingCrag?.crag_id]);
+  // CA-FU Phase D — removed: the leave-area-mode crag-browse reset + the
+  // focusedWall/browsingCrag → getCragDetail lazy-fetch effect (the wall/
+  // crag-browse state machine + getCragDetail are gone).
 
   // BR Track D Day 5e — legacy autoLoadedAreaRef effect REMOVED.
   // It used `areaData.pins.filter('crag')` + `areaData.loadWallsForPin`
@@ -606,7 +525,7 @@ export default function MapScreenMapbox({
   //     normally (zoom 10 region overview is the right framing here).
   useEffect(() => {
     if (!styleReady || !mapReady || !camRef.current) return;
-    if (mode.kind === 'area' && !browsingCrag) {
+    if (mode.kind === 'area') {
       // Area mode lands at MEDIUM — the user navigated here to browse
       // the crag's routes, not to stare at the map, so default to
       // showing a useful chunk of list. COLLAPSED is still reachable
@@ -659,15 +578,7 @@ export default function MapScreenMapbox({
     // drives the initial camera via store.userLoc. We handle the explicit
     // "back to gyms" fly-to separately in onBackToExplore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // BU dep: `browsingCrag` is read in the area-mode gate. Without it in
-    // deps, the effect doesn't re-evaluate when browsingCrag changes —
-    // exhaustive-deps would complain, but the gate would never re-evaluate
-    // on subsequent crag-pin taps even though the effect IS supposed to
-    // run on mode/area transitions. Effect identity is fine: when a NEW
-    // crag is browsed (focusedWall cleared, browsingCrag flipped), we
-    // already rely on the per-tap onCragOverviewPress flyTo, not this
-    // effect. So the dep is conservative — it just gates correctness.
-  }, [mode.kind, areaId, listId, areaData.area, listData.pins, styleReady, mapReady, browsingCrag]);
+  }, [mode.kind, areaId, listId, areaData.area, listData.pins, styleReady, mapReady]);
 
   // explore mode: when user location first arrives, snap the camera to it.
   // Map + style must both be ready — otherwise setCamera can be eaten by
@@ -698,7 +609,7 @@ export default function MapScreenMapbox({
     detailSheetRef.current?.dismiss().catch(() => {});
     outdoorAreaSheetRef.current?.dismiss();
     setDetailGym(null);
-    setFocusedWall(null);
+    setBrowsedCrag(null);
     useGymsStore.getState().setSelectedGym(null);
 
     const target = prevCamera ?? (userLoc ? { center: [userLoc.lng, userLoc.lat] as [number, number], zoom: 11 } : null);
@@ -775,148 +686,26 @@ export default function MapScreenMapbox({
     [mode.kind, gymsData],
   );
 
-  // Wall pin tap handler — fires when the user taps a single Wall pin
-  // (zoom ≥15 in the bbox cluster source). PLAN §3.2:
-  //   - explore mode → enter the wall's parent Region first, then focus the
-  //     wall once area mode is active. We set focusedWall up-front so the
-  //     area-mode mount effect (autoLoadedAreaRef guard) can short-circuit
-  //     to a single-wall load instead of fanning the entire region.
-  //   - area mode → just focus the wall + load its routes inline.
-  const focusOnWall = useCallback(
-    async (ctx: WallPinContext) => {
-      setFocusedWall(ctx);
-      setHighlightedRouteId(null);
-      setAreaSearchResults(null);
-      setSheetTitle('');
-      setLoadingSheet(true);
-      try {
-        const routes = await outdoorApi.listAreaRoutes(ctx.area_id);
-        const wall: Wall = {
-          id: ctx.wall_id,
-          crag_id: ctx.crag_id,
-          name: ctx.wall_name,
-          lat: ctx.lat,
-          lng: ctx.lng,
-          sort_order: 0,
-          status: 'approved',
-          route_count: routes.length,
-          routes,
-        };
-        setWalls([wall]);
-      } finally {
-        setLoadingSheet(false);
-      }
+  // CA-FU Phase D — focusOnWall + onPressBrowseWall (the wall-focus / crag-
+  // browse-walls handlers) removed with the wall state machine.
+
+  // CA-FU Phase D — a route-pin group tap (RoutePinCluster groups routes by
+  // their area_id) simply browses that area. Replaces the legacy
+  // focusedWall / browsingCrag / focusOnWall wall-focus machinery.
+  const onAreaPinPress = useCallback(
+    (ctx: AreaPinContext) => {
+      enterArea(ctx.area_id, ctx.area_name);
       try {
         markProgrammaticMove(500);
         camRef.current?.setCamera({
           centerCoordinate: [ctx.lng, ctx.lat],
-          zoomLevel: 16,
+          zoomLevel: 15,
           animationDuration: 500,
           padding: pinFocusPadding,
         });
       } catch {}
-      sheet.safeResize(DETENT_MEDIUM);
-      sheetScrollRef.current?.scrollTo({ y: 0, animated: false });
     },
-    [markProgrammaticMove, pinFocusPadding, sheet],
-  );
-
-  // BS-FU-A — crag-browse wall row tap. Synthesizes a WallPinContext from
-  // the Wall + browsingCrag (the tier-1 overview only projects Region, so
-  // area_id/area_name are left empty; CragMenuSheet Browse Up → Area row
-  // degrades gracefully). Routes through focusOnWall for unified state
-  // (camera fly + sheet detent + routes fetch).
-  const onPressBrowseWall = useCallback(
-    (wall: Wall) => {
-      if (!browsingCrag) return;
-      const ctx: WallPinContext = {
-        // CA Phase 6.2 — area_id is the canonical UUID; legacy aliases
-        // (wall_id / crag_id / region_id and name pairs) all carry the
-        // same value so the state machine continues to read meaningful
-        // ancestor refs.
-        area_id: wall.id,
-        area_name: wall.name,
-        display_kind: 'wall',
-        wall_id: wall.id,
-        wall_name: wall.name,
-        crag_id: browsingCrag.crag_id,
-        crag_name: browsingCrag.crag_name,
-        region_id: browsingCrag.region_id,
-        region_name: browsingCrag.region_name,
-        lat: wall.lat ?? browsingCrag.lat,
-        lng: wall.lng ?? browsingCrag.lng,
-        route_count: wall.route_count ?? 0,
-      };
-      void focusOnWall(ctx);
-    },
-    [browsingCrag, focusOnWall],
-  );
-
-  const onWallPinPress = useCallback(
-    (ctx: WallPinContext) => {
-      if (mode.kind === 'explore') {
-        // Transition into area mode first; the area-mode mount effect picks
-        // up `focusedWall` to short-circuit the all-pins fan-out. We set
-        // focusedWall BEFORE enterArea so the autoLoadedAreaRef branch sees
-        // it on first run.
-        setFocusedWall(ctx);
-        enterArea(ctx.region_id, ctx.region_name);
-        // Defer the route fetch + camera fly to the next tick so area mode's
-        // own camera choreography (fitBounds on region pins) doesn't race
-        // ahead. focusOnWall re-centers tighter on the wall after that.
-        setTimeout(() => {
-          void focusOnWall(ctx);
-        }, 700);
-        return;
-      }
-      if (mode.kind === 'area') {
-        // BU 2026-06-07 — cross-crag wall tap in crag-browse sub-state.
-        // If the tapped wall belongs to a DIFFERENT crag than the current
-        // browsing crag, switch browse focus to that wall's crag (looking
-        // up its full overview from the in-memory cragsOverview cache
-        // when available). Otherwise (same crag, or no browsing crag),
-        // fall through to the legacy focusOnWall.
-        if (browsingCrag && ctx.crag_id !== browsingCrag.crag_id) {
-          const overview = cragsOverview.crags.find((c) => c.id === ctx.crag_id);
-          const nextCrag: CragPinContext = overview
-            ? {
-                crag_id: overview.id,
-                crag_name: overview.name,
-                region_id: overview.region_id,
-                region_name: overview.region_name,
-                lat: overview.lat,
-                lng: overview.lng,
-                route_count: overview.route_count,
-                boulder_count: overview.boulder_count,
-              }
-            : {
-                // Cache miss (rare — overview is module-cached at explore-
-                // mode load). Synthesize from wall pin metadata; counts
-                // stay undefined and consumers fall back to `?? 0`.
-                crag_id: ctx.crag_id,
-                crag_name: ctx.crag_name,
-                region_id: ctx.region_id,
-                region_name: ctx.region_name,
-                lat: ctx.lat,
-                lng: ctx.lng,
-              };
-          setFocusedWall(null);
-          setBrowsingCrag(nextCrag);
-          try {
-            markProgrammaticMove(500);
-            camRef.current?.setCamera({
-              centerCoordinate: [nextCrag.lng, nextCrag.lat],
-              zoomLevel: 14,
-              animationDuration: 500,
-              padding: pinFocusPadding,
-            });
-          } catch {}
-          return;
-        }
-        void focusOnWall(ctx);
-      }
-    },
-    [mode.kind, enterArea, focusOnWall, browsingCrag, cragsOverview.crags, markProgrammaticMove, pinFocusPadding],
+    [enterArea, markProgrammaticMove, pinFocusPadding],
   );
 
   // CA-FU Phase C.4 — tier-1 crag pin tap. Direct primary-sheet swap into
@@ -946,30 +735,7 @@ export default function MapScreenMapbox({
     [enterArea, markProgrammaticMove, pinFocusPadding],
   );
 
-  // BS-FU-A — tier-1 Crag pin tap. Earlier BR Track D Day 7 behavior was
-  // to present CragInfoSheet (a dead end with no entry into area mode).
-  // New flow: enter area mode + set crag-browse sub-state + fly the camera
-  // to the crag. RoutesListSheet then renders the crag's walls list, and
-  // the bbox-scoped RoutePinCluster lets the user pan to discover walls
-  // at neighboring crags. CragInfoSheet stays reachable from the sheet's
-  // ⓘ button (mounted in the browsing-crag header).
-  const onCragOverviewPress = useCallback(
-    (ctx: CragPinContext) => {
-      setFocusedWall(null);
-      setBrowsingCrag(ctx);
-      enterArea(ctx.region_id, ctx.region_name);
-      try {
-        markProgrammaticMove(500);
-        camRef.current?.setCamera({
-          centerCoordinate: [ctx.lng, ctx.lat],
-          zoomLevel: 14,
-          animationDuration: 500,
-          padding: pinFocusPadding,
-        });
-      } catch {}
-    },
-    [enterArea, markProgrammaticMove, pinFocusPadding],
-  );
+  // CA-FU Phase D — onCragOverviewPress removed (superseded by onCragPinTap).
 
   const onClusterBubblePress = useCallback(
     async (coords: [number, number]) => {
@@ -1004,12 +770,6 @@ export default function MapScreenMapbox({
       mapCenterRef.current = { lat: currentLat, lng: currentLng };
       lastCameraSnapshotRef.current = { center: [currentLng, currentLat], zoom };
       observeCamera({ center: [currentLng, currentLat], zoom });
-      // BS-P1-ε — recompute importance tier; setState short-circuits
-      // when value unchanged so this is cheap per camera frame.
-      const nextMinRoutes = getMinRoutesForZoom(zoom);
-      if (nextMinRoutes !== cragMinRoutes) {
-        setCragMinRoutes(nextMinRoutes);
-      }
 
       // Programmatic flyTo — don't let it poison the lat-delta tracking.
       if (programmaticMoveRef.current) {
@@ -1047,7 +807,7 @@ export default function MapScreenMapbox({
 
       if (shouldCollapse) sheet.collapseSheet();
     },
-    [observeCamera, sheet, windowHeight, cragMinRoutes],
+    [observeCamera, sheet, windowHeight],
   );
 
   // ---- Gyms-mode pin presses ----
@@ -1191,32 +951,22 @@ export default function MapScreenMapbox({
   //     crag-browse sub-state)
   //   - both unset → present Region info (legacy behavior)
   const openCragOrAreaInfo = useCallback(() => {
-    if (focusedWall) {
+    // CA-FU Phase D — was a focusedWall/browsingCrag router; now presents the
+    // browsed crag's info (or the area-mode region for non-crag entries).
+    if (browsedCrag) {
       presentArea({
-        id: focusedWall.crag_id,
-        name: focusedWall.crag_name,
+        id: browsedCrag.id,
+        name: browsedCrag.name,
         display_kind: 'crag',
-        lat: focusedWall.lat,
-        lng: focusedWall.lng,
-        parent_name_hint: focusedWall.area_name ?? null,
-      });
-      return;
-    }
-    if (browsingCrag) {
-      presentArea({
-        id: browsingCrag.crag_id,
-        name: browsingCrag.crag_name,
-        display_kind: 'crag',
-        lat: browsingCrag.lat,
-        lng: browsingCrag.lng,
-        parent_name_hint: browsingCrag.region_name ?? null,
-        direct_route_count: browsingCrag.route_count ?? undefined,
-        subtree_route_count: browsingCrag.route_count ?? undefined,
+        lat: browsedCrag.lat,
+        lng: browsedCrag.lng,
+        direct_route_count: browsedCrag.route_count,
+        subtree_route_count: browsedCrag.route_count,
       });
       return;
     }
     openRegionInfo();
-  }, [focusedWall, browsingCrag, openRegionInfo, presentArea]);
+  }, [browsedCrag, openRegionInfo, presentArea]);
 
   // ---- Navigations / actions ----
   const navigateToRoute = useCallback(
@@ -1727,7 +1477,7 @@ export default function MapScreenMapbox({
               <RoutePinCluster
                 pins={viewportPins.pins}
                 styleReady={styleReady}
-                onWallPress={onWallPinPress}
+                onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
             )}
@@ -1747,33 +1497,26 @@ export default function MapScreenMapbox({
                 Only renders when a Wall is focused (so we know which
                 Crag's trail to show); without focus, no trail. List
                 mode skips entirely — a list may span multiple crags. */}
+            {/* CA-FU Phase D — TrailLayer's data came from the deleted
+                getCragDetail (focusedCragDetail). The area detail endpoint
+                does NOT yet expose trail_geojson, so the trail renders empty
+                until a follow-up adds trail_geojson to OutdoorAreaDetail +
+                wires it via useAreaDetail here. (Trails were already empty in
+                the Phase C flow — focusedCragDetail was never set.) Dev
+                fixture fallback below preserves the trail look in __DEV__. */}
             {mode.kind === 'area' && styleLoaded && (() => {
-              // BS Track B (2026-06-06) — dev-only fallback: when real
-              // trail data is missing (prod ~100% null until OSM
-              // Overpass backfill runs), inject a fixture trail
-              // generated around the focused crag's lat/lng. Use
-              // focusedWall's lat/lng as the anchor since BE's
-              // CragDetailOut may return null lat/lng (column-level
-              // null in prod) while focusedWall always has it (it's
-              // populated by the pin tap context). Toggles 'osm' vs
-              // 'user' by crag name length parity. Strict __DEV__
-              // guard → prod never reaches fixture path.
               const devFallback =
-                __DEV__ && !focusedCragDetail?.trail_geojson && focusedWall
+                __DEV__ && browsedCrag
                   ? getDevTrailFallback({
-                      name: focusedCragDetail?.name ?? focusedWall.crag_name,
-                      lat: focusedCragDetail?.lat ?? focusedWall.lat,
-                      lng: focusedCragDetail?.lng ?? focusedWall.lng,
+                      name: browsedCrag.name,
+                      lat: browsedCrag.lat,
+                      lng: browsedCrag.lng,
                     })
                   : null;
               return (
                 <TrailLayer
-                  trailGeoJSON={
-                    focusedCragDetail?.trail_geojson ?? devFallback?.geojson ?? null
-                  }
-                  trailSource={
-                    focusedCragDetail?.trail_source ?? devFallback?.source ?? null
-                  }
+                  trailGeoJSON={devFallback?.geojson ?? null}
+                  trailSource={devFallback?.source ?? null}
                 />
               );
             })()}
@@ -1944,30 +1687,17 @@ export default function MapScreenMapbox({
             insets={insets}
             tr={tr}
             loading={loadingSheet || listData.loading}
-            searchResults={areaSearchResults}
-            walls={filteredWalls}
-            highlightedRouteId={highlightedRouteId}
             focusedItemId={focusedItemId}
-            wallName={focusedWall?.wall_name}
-            searchExpanded={searchExpanded}
-            onPressSearch={openAreaSearch}
-            onPressCommunity={navigateToCommunity}
             onPressHamburger={() => cragMenuSheetRef.current?.present()}
             onPressTitle={openCragOrAreaInfo}
             onPressRoute={navigateToRoute}
-            // BR Track D Day 6 — FilterChipsBar mounts only in area mode
-            // (list mode shows pre-selected saved routes, no chip filter).
-            // BU 2026-06-07 — hidden when browsingCrag is active. In crag-
-            // browse sub-state the wall list itself surfaces per-wall
-            // discipline breakdown (X boulder · Y sport · Z trad), making
-            // the region-level filter chips redundant + visually cluttering.
-            filterChipsSlot={undefined}
-            // BS-FU-A — crag-browse sub-state. Active when user tapped a
-            // tier-1 Crag pin (no focusedWall, no list mode). Renders mini
-            // snapshot + walls list sorted by route_count desc.
-            browsingCrag={browsingCragSummary}
-            browsingCragWalls={browsingCragWalls}
-            onPressBrowseWall={onPressBrowseWall}
+            // CA-FU Phase D — RoutesListSheet is list-only now (OutdoorBrowseSheet
+            // owns area mode). The area-mode props below are inert stubs until
+            // the RoutesListSheet area body + WallGroup are gutted (next step).
+            walls={[]}
+            searchExpanded={false}
+            onPressSearch={() => {}}
+            onPressCommunity={() => {}}
           />
         )}
       </TrueSheet>

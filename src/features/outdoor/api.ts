@@ -13,7 +13,7 @@ import { api } from '../../lib/apiClient';
 import type {
   Region, OutdoorRoute,
   RouteRating, RouteAscent,
-  RoutePinsResponse, CragOverview, CragDetail,
+  RoutePinsResponse, CragDetail,
   // CA Phase 3 — outdoor_areas single tree
   OutdoorAreaDetail, OutdoorAreaListItem, CoverageResponse,
   AreaSearchResponse, DisplayKind,
@@ -137,19 +137,8 @@ export const outdoorApi = {
     return api.get<OutdoorRoute[]>(`/outdoor/search?${qs}`);
   },
 
-  // ---- BR Track D Day 7 follow-up — tier-1 Crag overview ----
-  //
-  // Lightweight per-crag projection for the explore-mode cluster source.
-  // CA Phase 6.2 stubbed the BE endpoint; CA-FU Phase C replaces this with
-  // `listAllCrags` + useAllCrags (Phase D.4 deletes this stub).
-  listCragsOverview: async (_params?: {
-    status?: string;
-    min_routes?: number;
-    limit?: number;
-  }): Promise<CragOverview[]> => {
-    // Stub returns empty (CA Phase 6.2). Superseded by listAllCrags.
-    return [];
-  },
+  // CA-FU Phase D — listCragsOverview stub deleted (superseded by
+  // listAllCrags + useAllCrags).
 
   // ---- BR Track D — Crag detail (legacy CragInfoSheet source) ----
   // NOTE (CA-FU): `/outdoor/crags/{id}` 404s post-6.2. Still called by the
