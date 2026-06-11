@@ -10,6 +10,7 @@ import { useThemeColors } from '../../../lib/useThemeColors';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { theme } from '../../../lib/theme';
 import type { OutdoorRoute } from '../types';
+import { isTopRopeRoute } from '../discipline';
 
 type RouteListCardProps = {
   route: OutdoorRoute;
@@ -107,6 +108,11 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded, 
             </>
           ) : null}
           <Text style={styles.metaText} numberOfLines={1}>{route.style}</Text>
+          {isTopRopeRoute(route) ? (
+            <View style={styles.trBadge}>
+              <Text style={styles.trBadgeText}>TR</Text>
+            </View>
+          ) : null}
         </View>
       </View>
       </Pressable>
@@ -177,6 +183,19 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     },
     separator: { fontSize: 13, color: c.textTertiary, marginHorizontal: 5 },
     metaText: { fontFamily: theme.fonts.regular, fontSize: 13, color: c.textSecondary },
+    trBadge: {
+      marginLeft: 6,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+      borderRadius: 4,
+      backgroundColor: c.backgroundSecondary,
+    },
+    trBadgeText: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 10,
+      color: c.textSecondary,
+      letterSpacing: 0.3,
+    },
     breadcrumbText: {
       fontFamily: theme.fonts.regular,
       fontSize: 12,

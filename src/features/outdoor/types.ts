@@ -156,6 +156,22 @@ export type Wall = {
 
 // ---- Level 5: Route (路线, e.g. 鸭子 5.11b) ----
 
+/** OpenBeta `type` flags (independent booleans; a line can be several). The
+ *  `_status` sentinel marks rows the backfill couldn't resolve. */
+export type RouteDisciplines = {
+  trad?: boolean | null;
+  sport?: boolean | null;
+  bouldering?: boolean | null;
+  tr?: boolean | null;
+  aid?: boolean | null;
+  mixed?: boolean | null;
+  ice?: boolean | null;
+  alpine?: boolean | null;
+  snow?: boolean | null;
+  deepwatersolo?: boolean | null;
+  _status?: string;
+};
+
 export type OutdoorRoute = {
   id: string;
   wall_id: string;
@@ -192,6 +208,10 @@ export type OutdoorRoute = {
    *  nearest display_kind='area' ancestor → card subtitle "crag · area". */
   crag_display_kind?: string;
   parent_area_name?: string;
+  /** CB — full OpenBeta type flags (CC backfill). Powers the Sport/Trad
+   *  sub-filter (inclusive: a sport+trad line is both) + the TR card badge.
+   *  null/absent for not-yet-backfilled rows → fall back to `style`. */
+  disciplines?: RouteDisciplines | null;
   region_name?: string;
   wall_topo_url?: string;
   // BR Track D Day 6 — optional GPS surfaced by BE on detail. Used by the

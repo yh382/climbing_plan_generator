@@ -11,7 +11,7 @@
 // - Grade-range picker is intentionally NOT here yet — it lands in 点7b.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -33,10 +33,16 @@ type Props = {
   onDiscipline: (d: RouteDiscipline) => void;
   search: string;
   onSearch: (s: string) => void;
+  /** CB — Routes sub-filter (Sport/Trad), shown only when discipline==='rope'.
+   *  Multi-select; both on = no narrowing. */
+  subSport?: boolean;
+  subTrad?: boolean;
+  onToggleSub?: (k: 'sport' | 'trad') => void;
 };
 
 export function BrowseFilterBar({
   sortKey, onSortKey, discipline, onDiscipline, search, onSearch,
+  subSport, subTrad, onToggleSub,
 }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
@@ -101,6 +107,29 @@ export function BrowseFilterBar({
         />
       </View>
 
+      {discipline === 'rope' && onToggleSub ? (
+        <View style={styles.subRow}>
+          {(
+            [
+              ['sport', tr('运动', 'Sport'), !!subSport],
+              ['trad', tr('传统', 'Trad'), !!subTrad],
+            ] as const
+          ).map(([k, label, active]) => (
+            <Pressable
+              key={k}
+              onPress={() => onToggleSub(k)}
+              style={[styles.subChip, active && styles.subChipActive]}
+            >
+              <Text
+                style={[styles.subChipText, active && styles.subChipTextActive]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {searchOpen ? (
         <View style={styles.searchBox}>
           <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
@@ -149,4 +178,14 @@ const createStyles = (colors: ThemeColors) =>
       flex: 1, fontSize: 15, color: colors.textPrimary, padding: 0,
       fontFamily: theme.fonts.regular,
     },
+    subRow: { flexDirection: 'row', gap: 8, paddingLeft: 2 },
+    subChip: {
+      paddingHorizontal: 13, paddingVertical: 5, borderRadius: 14,
+      backgroundColor: colors.backgroundSecondary,
+    },
+    subChipActive: { backgroundColor: colors.accent },
+    subChipText: {
+      fontSize: 12, fontFamily: theme.fonts.medium, color: colors.textSecondary,
+    },
+    subChipTextActive: { color: '#FFFFFF' },
   });

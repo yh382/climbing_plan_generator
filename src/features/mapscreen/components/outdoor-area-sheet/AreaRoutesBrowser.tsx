@@ -23,6 +23,7 @@ import { useThemeColors } from '../../../../lib/useThemeColors';
 import { useSettings } from '../../../../contexts/SettingsContext';
 import { theme } from '../../../../lib/theme';
 import type { OutdoorRoute } from '../../../outdoor/types';
+import { isSportRoute, isTradRoute } from '../../../outdoor/discipline';
 import RouteListCard from '../../../outdoor/components/RouteListCard';
 import { sheetLabels, type ThemeColors } from './shared';
 import {
@@ -68,6 +69,9 @@ export function AreaRoutesBrowser({
 
   const [sortKey, setSortKey] = useState<RouteSortKey>('classic');
   const [search, setSearch] = useState('');
+  // CB — Routes sub-filter (Sport/Trad). Both on = no narrowing; multi-select.
+  const [subSport, setSubSport] = useState(true);
+  const [subTrad, setSubTrad] = useState(true);
   // 2-way segment defaults to the area's majority discipline (no empty default).
   const [disciplineOverride, setDisciplineOverride] =
     useState<RouteDiscipline | null>(null);
@@ -84,10 +88,19 @@ export function AreaRoutesBrowser({
   const visible = useMemo(() => {
     if (!routes) return [];
     const needle = search.trim().toLowerCase();
+    // sub-filter narrows only when exactly one of Sport/Trad is active.
+    const narrowSub = discipline === 'rope' && subSport !== subTrad;
     const list = routes.filter((r) => {
       const isBoulder = r.discipline === 'boulder';
-      if (discipline === 'boulder' && !isBoulder) return false;
-      if (discipline === 'rope' && isBoulder) return false; // Routes = non-boulder
+      if (discipline === 'boulder') {
+        if (!isBoulder) return false;
+      } else {
+        if (isBoulder) return false; // Routes = non-boulder
+        if (narrowSub) {
+          if (subSport && !isSportRoute(r)) return false;
+          if (subTrad && !isTradRoute(r)) return false;
+        }
+      }
       if (needle && !r.name.toLowerCase().includes(needle)) return false;
       return true;
     });
@@ -101,7 +114,7 @@ export function AreaRoutesBrowser({
       );
     }
     return list; // 'classic' — keep the BE marquee order
-  }, [routes, discipline, search, sortKey]);
+  }, [routes, discipline, search, sortKey, subSport, subTrad]);
 
   // 点3b — split into pinned (focused crag) + nearby sections, then flatten to
   // a typed item list with per-row layout offsets (so snapToOffsets stays
@@ -148,6 +161,11 @@ export function AreaRoutesBrowser({
       onDiscipline={setDisciplineOverride}
       search={search}
       onSearch={setSearch}
+      subSport={subSport}
+      subTrad={subTrad}
+      onToggleSub={(k) =>
+        k === 'sport' ? setSubSport((v) => !v) : setSubTrad((v) => !v)
+      }
     />
   );
 
