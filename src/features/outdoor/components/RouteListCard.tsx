@@ -2,7 +2,7 @@
 // Larger route card: 72×72 thumb, 16px title, bigger padding.
 
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { GlassView } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,14 +51,16 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded, 
   const hasAscents = route.send_count != null && route.send_count > 0;
 
   return (
-    <TouchableOpacity
-      style={[styles.card, glass && styles.cardGlass, { backgroundColor: cardBg }]}
-      onPress={onPress}
-      activeOpacity={glass ? 0.85 : 0.7}
-    >
+    <View style={[styles.card, glass && styles.cardGlass, { backgroundColor: cardBg }]}>
       {glass ? (
         <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
       ) : null}
+      {/* Tappable navigate area — a SIBLING of the locate button (not nested),
+          so a locate tap doesn't also fire onPress. */}
+      <Pressable
+        style={({ pressed }) => [styles.tapArea, pressed && styles.tapAreaPressed]}
+        onPress={onPress}
+      >
       {/* Thumbnail */}
       <View style={styles.thumbContainer}>
         {thumb ? (
@@ -107,6 +109,7 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded, 
           <Text style={styles.metaText} numberOfLines={1}>{route.style}</Text>
         </View>
       </View>
+      </Pressable>
 
       {onLocate ? (
         <Pressable
@@ -122,7 +125,7 @@ export default function RouteListCard({ route, onPress, hideLocation, expanded, 
           <Text style={{ color: colors.textTertiary, fontSize: 16 }}>›</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -141,6 +144,8 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     // CB — glass variant: bigger concentric radius + no hard border (the
     // GlassView supplies the surface; bg is set to transparent inline).
     cardGlass: { borderRadius: 18, borderWidth: 0 },
+    tapArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    tapAreaPressed: { opacity: 0.7 },
     thumbContainer: { width: 72, height: 72 },
     thumb: { width: 72, height: 72 },
     thumbPlaceholder: {

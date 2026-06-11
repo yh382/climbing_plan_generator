@@ -177,11 +177,12 @@ export function AreaRoutesBrowser({
         snapToOffsets={snapOffsets}
         snapToAlignment="start"
         decelerationRate="fast"
-        getItemLayout={(_, index) => ({
-          length: layouts[index].length,
-          offset: layouts[index].offset,
-          index,
-        })}
+        getItemLayout={(_, index) => {
+          // Guard the transient window where the virtualizer asks for an index
+          // from a previous (longer) data set before re-render.
+          const l = layouts[index] ?? { length: rowHeight, offset: 0 };
+          return { length: l.length, offset: l.offset, index };
+        }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <Text style={styles.empty}>

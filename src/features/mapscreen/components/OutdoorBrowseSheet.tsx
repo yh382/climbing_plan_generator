@@ -82,8 +82,15 @@ export function OutdoorBrowseSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: detail, loading: detailLoading } = useAreaDetail(areaId);
-  const { data: children, loading: childrenLoading } = useAreaChildren(areaId);
-  const { data: routes, loading: routesLoading } = useAreaRoutes(areaId);
+  // CB 点3 — gated off in nearby mode (the nearby path doesn't read them) to
+  // avoid wasted fetches per area entry. useAreaDetail stays for the title
+  // fallback before the region label loads.
+  const { data: children, loading: childrenLoading } = useAreaChildren(
+    nearbyCenter ? null : areaId,
+  );
+  const { data: routes, loading: routesLoading } = useAreaRoutes(
+    nearbyCenter ? null : areaId,
+  );
   // CB 点3 — nearby browse: routes within radius of the camera center.
   const nearby = useNearbyRoutes(nearbyCenter ?? null, { enabled: !!nearbyCenter });
 
