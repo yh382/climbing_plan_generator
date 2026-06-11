@@ -39,24 +39,15 @@ export type AreaPinContext = {
   lng: number;
   /** Number of routes attached to this area in the current bbox. */
   route_count: number;
-  /** Legacy aliases — all populated with the area_id / area_name. */
-  wall_id: string;
-  wall_name: string;
-  crag_id: string;
-  crag_name: string;
-  region_id: string;
-  region_name: string;
 };
-/** Backward-compat alias for callers still importing the legacy name. */
-export type WallPinContext = AreaPinContext;
+// CA-FU Phase D — the 6 legacy ancestor aliases (wall_id / crag_id /
+// region_id + names) + the WallPinContext alias removed; no caller reads
+// them post wall-state-machine removal.
 
 export type RoutePinClusterProps = {
   pins: RoutePin[];
   styleReady: boolean;
-  /** Renamed in CA Phase 6.2 from `onWallPress`. Legacy callers can
-   *  continue passing `onWallPress` for backward compat. */
   onAreaPress?: (ctx: AreaPinContext) => void;
-  onWallPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
   onClusterPress: (coords: [number, number]) => void;
@@ -104,16 +95,6 @@ function groupByArea(pins: RoutePin[]): AreaPinContext[] {
           area_id: p.area_id,
           area_name: p.area_name,
           display_kind: p.display_kind,
-          // Legacy aliases: same UUID + name across the legacy chain so
-          // the state machine's `ctx.wall_id` / `.crag_id` / `.region_id`
-          // reads keep returning a meaningful value (= the canonical
-          // outdoor_area UUID).
-          wall_id: p.area_id,
-          wall_name: p.area_name,
-          crag_id: p.area_id,
-          crag_name: p.area_name,
-          region_id: p.area_id,
-          region_name: p.area_name,
         },
       });
     }
@@ -154,10 +135,9 @@ export default function RoutePinCluster({
   pins,
   styleReady,
   onAreaPress,
-  onWallPress,
   onClusterPress,
 }: RoutePinClusterProps) {
-  const tapHandler = onAreaPress ?? onWallPress;
+  const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(() => toGeoJSON(areaContexts), [areaContexts]);
   const areaLookup = useMemo(() => {
