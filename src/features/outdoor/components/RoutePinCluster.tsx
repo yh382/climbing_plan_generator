@@ -63,6 +63,11 @@ export type RoutePinClusterProps = {
    *  of this discipline are dimmed (grey + low opacity) so the map emphasizes
    *  the same discipline the list is showing. null = no dim. */
   disciplineFilter?: 'boulder' | 'rope' | null;
+  /** CB Phase F (F2) — area_id → TRUE total route count (from the all-crags
+   *  preload). The browse sample only carries an area's top ~2 routes, so this
+   *  is the only honest per-pin count. Falls back to the sample count when an
+   *  area isn't in the preload. */
+  areaTotals?: Record<string, number>;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -144,6 +149,7 @@ function toGeoJSON(
   areas: AreaPinContext[],
   highlightedAreaId?: string | null,
   disciplineFilter?: 'boulder' | 'rope' | null,
+  areaTotals?: Record<string, number>,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -170,6 +176,9 @@ function toGeoJSON(
         // "Routes"). Drives the single-pin fill color.
         dominant_boulder: a.boulder_count * 2 > a.route_count,
         dimmed,
+        // CB Phase F (F2) — TRUE total (preload) for the per-pin number; the
+        // grouped sample count is the fallback when the area isn't preloaded.
+        count: areaTotals?.[a.area_id] ?? a.route_count,
         highlighted: a.area_id === highlightedAreaId,
       },
       geometry: {
@@ -186,14 +195,15 @@ export default function RoutePinCluster({
   styleReady,
   highlightedAreaId,
   disciplineFilter,
+  areaTotals,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter),
-    [areaContexts, highlightedAreaId, disciplineFilter],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals),
+    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -258,16 +268,21 @@ export default function RoutePinCluster({
           textIgnorePlacement: true,
         }}
       />
-      {/* CB 点3b — highlight halo behind the focused crag's single pin. */}
+      {/* CB Phase F (F3) — selected pin base: a clean white "lifted" disc so
+          the focused pin reads as a white-bordered selected dot. Replaces the
+          old translucent-teal halo. The real selected treatment is the donut
+          MarkerView (mounted by MapScreenMapbox on top of this); this base is
+          the immediate tap feedback + the fallback while the donut's
+          composition loads / if it fails. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-highlight"
         filter={['all', ['!', ['has', 'point_count']], ['==', ['get', 'highlighted'], true]] as any}
         style={{
-          circleColor: theme.colors.accent,
-          circleOpacity: 0.22,
-          circleRadius: AREA_PIN_RADIUS + 11,
-          circleStrokeColor: theme.colors.accent,
-          circleStrokeWidth: 2,
+          circleColor: '#FFFFFF',
+          circleOpacity: 0.95,
+          circleRadius: AREA_PIN_RADIUS + 5,
+          circleStrokeColor: 'rgba(0,0,0,0.12)',
+          circleStrokeWidth: 1,
         }}
       />
       {/* Single area pin — visible at zoom ≥15+ when clusters dissolve.
@@ -293,6 +308,29 @@ export default function RoutePinCluster({
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,
           circleStrokeOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
+        }}
+      />
+      {/* CB Phase F (F2) — per-pin route count below the dot. SymbolLayer text
+          is GPU + auto-collides (textAllowOverlap defaults false), so it thins
+          out where pins crowd. Hidden on the selected pin (its donut shows the
+          count in the hole) and on dimmed pins (de-emphasized). */}
+      <MapboxGL.SymbolLayer
+        id="outdoor-route-pins-count"
+        filter={['all',
+          ['!', ['has', 'point_count']],
+          ['!=', ['get', 'highlighted'], true],
+          ['!=', ['get', 'dimmed'], true],
+          ['>', ['get', 'count'], 0],
+        ] as any}
+        style={{
+          textField: ['to-string', ['get', 'count']] as any,
+          textSize: 10,
+          textColor: theme.colors.textPrimary,
+          textHaloColor: '#FFFFFF',
+          textHaloWidth: 1.2,
+          textFont: ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          textAnchor: 'top',
+          textOffset: [0, 0.7],
         }}
       />
     </MapboxGL.ShapeSource>

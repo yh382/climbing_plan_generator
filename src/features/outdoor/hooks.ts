@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { outdoorApi, type RegionLabel } from './api';
 import type {
-  AreaSearchResponse, CoverageResponse, DisplayKind,
+  AreaComposition, AreaSearchResponse, CoverageResponse, DisplayKind,
   OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
 } from './types';
 
@@ -133,6 +133,17 @@ export function useAreaRoutes(
 export function useAreaCoverage(areaId: string | null | undefined) {
   return useFetchOnce<CoverageResponse | null>(
     () => areaId ? outdoorApi.getAreaCoverage(areaId) : Promise.resolve(null),
+    [areaId],
+  );
+}
+
+/** CB Phase F — GET /outdoor/areas/{id}/discipline-composition for the
+ *  selected-pin ratio ring. No-op (data: null) when areaId is null. Fetched
+ *  per tap (1 area) — the donut renders once data resolves; the pin's white
+ *  base disc is the meanwhile / on-error fallback. */
+export function useAreaComposition(areaId: string | null | undefined) {
+  return useFetchOnce<AreaComposition | null>(
+    () => areaId ? outdoorApi.getAreaComposition(areaId) : Promise.resolve(null),
     [areaId],
   );
 }
