@@ -1,11 +1,12 @@
 // src/features/outdoor/components/RoutePinDonut.tsx
-// CB Phase F (F3) — the SELECTED pin's ratio donut. Four style arcs
-// (boulder/sport/trad/other) proportional to the area's composition, the total
-// route count in the center hole, a soft drop shadow, and a spring scale-in.
+// CB Phase F — a ratio donut: four style arcs (boulder/sport/trad/other)
+// proportional to the area's composition. Two uses, both as Mapbox MarkerView
+// children:
+//   - selected pin → large (54), count in the hole, gentle scale+fade-in
+//   - F4 mix-pin rings → small (26), no count, static (no animation)
 //
-// Rendered as the child of a Mapbox MarkerView — only the selected pin mounts
-// one, so the (otherwise perf-heavy) RN-view-on-map cost is a single instance.
-// Replaces the old translucent-teal highlight halo as the selected treatment.
+// Colors come from the shared STYLE_COLORS (RoutePinCluster) so dots, rings,
+// donut and the legend all match.
 
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -19,36 +20,36 @@ import Animated, {
 
 import { theme } from '../../../lib/theme';
 import type { AreaComposition } from '../types';
+import { STYLE_COLORS } from './RoutePinCluster';
 
-const SIZE = 54;
-const STROKE = 9;
-const R = (SIZE - STROKE) / 2;
-const CX = SIZE / 2;
-const CIRC = 2 * Math.PI * R;
-
-// 4-bucket palette: boulder/sport reuse the pin colors; trad gets a muted green
-// (distinct from sandstone-orange + teal-blue); other is neutral grey. trad
-// color is device-tunable.
-const BUCKET_COLORS: Record<string, string> = {
-  boulder: theme.colors.outdoorMarkerFill, // sandstone
-  sport: theme.colors.routesMarkerFill, // teal-blue
-  trad: '#5E8C61', // muted green
-  other: '#9AA0A6', // grey
+type Props = {
+  composition: AreaComposition;
+  /** Outer diameter in px (default 54 = selected). */
+  size?: number;
+  /** Show the total in the center hole (default true). */
+  showCount?: boolean;
+  /** Scale+fade entrance (default true). Off for the static F4 rings. */
+  animate?: boolean;
 };
 
 export default function RoutePinDonut({
   composition,
-}: {
-  composition: AreaComposition;
-}) {
-  // Gentle scale-up + fade-in, then it settles dead still — withTiming (no
-  // spring) so there's zero post-appearance wobble.
-  const scale = useSharedValue(0.85);
-  const opacity = useSharedValue(0);
+  size = 54,
+  showCount = true,
+  animate = true,
+}: Props) {
+  const stroke = Math.max(4, Math.round(size * 0.17));
+  const r = (size - stroke) / 2;
+  const c = size / 2;
+  const circ = 2 * Math.PI * r;
+
+  const scale = useSharedValue(animate ? 0.85 : 1);
+  const opacity = useSharedValue(animate ? 0 : 1);
   useEffect(() => {
+    if (!animate) return;
     scale.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) });
     opacity.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.quad) });
-  }, [scale, opacity]);
+  }, [animate, scale, opacity]);
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
@@ -66,27 +67,28 @@ export default function RoutePinDonut({
 
   let offset = 0;
   return (
-    <Animated.View style={[styles.wrap, animStyle]}>
-      <Svg width={SIZE} height={SIZE}>
-        {/* White base disc so the hole reads as a clean center for the count. */}
-        <Circle cx={CX} cy={CX} r={R} fill="#FFFFFF" />
+    <Animated.View
+      style={[styles.wrap, { width: size, height: size }, animStyle]}
+    >
+      <Svg width={size} height={size}>
+        <Circle cx={c} cy={c} r={r} fill="#FFFFFF" />
         {total > 0 && segments.length > 0 ? (
           segments.map(([key, v]) => {
-            const len = (v / total) * CIRC;
+            const len = (v / total) * circ;
             const el = (
               <Circle
                 key={key}
-                cx={CX}
-                cy={CX}
-                r={R}
+                cx={c}
+                cy={c}
+                r={r}
                 fill="none"
-                stroke={BUCKET_COLORS[key]}
-                strokeWidth={STROKE}
-                strokeDasharray={[len, CIRC - len]}
+                stroke={STYLE_COLORS[key]}
+                strokeWidth={stroke}
+                strokeDasharray={[len, circ - len]}
                 strokeDashoffset={-offset}
                 rotation={-90}
-                originX={CX}
-                originY={CX}
+                originX={c}
+                originY={c}
               />
             );
             offset += len;
@@ -94,26 +96,28 @@ export default function RoutePinDonut({
           })
         ) : (
           <Circle
-            cx={CX}
-            cy={CX}
-            r={R}
+            cx={c}
+            cy={c}
+            r={r}
             fill="none"
-            stroke={BUCKET_COLORS.other}
-            strokeWidth={STROKE}
+            stroke={STYLE_COLORS.other}
+            strokeWidth={stroke}
           />
         )}
       </Svg>
-      <View style={styles.center} pointerEvents="none">
-        <Text style={styles.count}>{total}</Text>
-      </View>
+      {showCount ? (
+        <View style={styles.center} pointerEvents="none">
+          <Text style={[styles.count, { fontSize: Math.round(size * 0.26) }]}>
+            {total}
+          </Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    width: SIZE,
-    height: SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -129,7 +133,6 @@ const styles = StyleSheet.create({
   },
   count: {
     fontFamily: theme.fonts.bold,
-    fontSize: 14,
     color: theme.colors.textPrimary,
   },
 });

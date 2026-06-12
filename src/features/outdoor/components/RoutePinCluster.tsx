@@ -50,7 +50,7 @@ function dominantStyle(c: AreaComposition): StyleBucket {
 }
 
 /** ≥2 non-empty buckets → the area is "mixed" and warrants a ratio ring. */
-function isMix(c: AreaComposition): boolean {
+export function isMix(c: AreaComposition): boolean {
   return (
     (c.boulder > 0 ? 1 : 0) +
       (c.sport > 0 ? 1 : 0) +
@@ -148,7 +148,7 @@ const DIM_OPACITY = 0.35;
  *  with the area context attached as properties so tap handlers can
  *  recover canonical UUID + label. Lat/lng = centroid of the grouped
  *  routes. */
-function groupByArea(pins: RoutePin[]): AreaPinContext[] {
+export function groupByArea(pins: RoutePin[]): AreaPinContext[] {
   const buckets = new Map<string, { sumLat: number; sumLng: number; count: number; boulders: number; ctx: Omit<AreaPinContext, 'lat' | 'lng' | 'route_count' | 'boulder_count'> }>();
   for (const p of pins) {
     const isBoulder = p.discipline === 'boulder' ? 1 : 0;
@@ -348,7 +348,14 @@ export default function RoutePinCluster({
           list shows. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-single"
-        filter={['!', ['has', 'point_count']]}
+        filter={['all',
+          ['!', ['has', 'point_count']],
+          ['!=', ['get', 'highlighted'], true],
+          // CB Phase F — non-dimmed mix pins render as a ratio ring (MarkerView,
+          // mounted by MapScreenMapbox) instead of a dot. Dimmed mix pins still
+          // get a (grey) dot — de-emphasized, no ring.
+          ['any', ['!=', ['get', 'is_mix'], true], ['==', ['get', 'dimmed'], true]],
+        ] as any}
         style={{
           circleColor: [
             'case',
@@ -378,6 +385,7 @@ export default function RoutePinCluster({
           ['!', ['has', 'point_count']],
           ['!=', ['get', 'highlighted'], true],
           ['!=', ['get', 'dimmed'], true],
+          ['!=', ['get', 'is_mix'], true],
           ['>', ['get', 'count'], 0],
         ] as any}
         style={{

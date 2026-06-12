@@ -79,6 +79,8 @@ import { useGymsColors } from '../gyms/useGymsColors';
 import MapPinCluster from '../outdoor/components/MapPinCluster';
 import RoutePinCluster, {
   type AreaPinContext,
+  groupByArea,
+  isMix,
 } from '../outdoor/components/RoutePinCluster';
 import CragOverviewCluster from '../outdoor/components/CragOverviewCluster';
 import { type ViewportBbox } from '../outdoor/useViewportPins';
@@ -107,6 +109,7 @@ import type {
   RoutePin,
   SearchResult,
   CragPin,
+  AreaComposition,
 } from '../outdoor/types';
 
 import { MapTopBar } from './components/MapTopBar';
@@ -506,6 +509,30 @@ export default function MapScreenMapbox({
     : null;
   const selectedComp = selectedPrefetched ?? selectedComposition.data;
   const selectedCompLoading = !selectedPrefetched && selectedComposition.loading;
+  // CB Phase F (F4 preview) — mix pins (≥2 style buckets) render as a small
+  // static ratio ring instead of a dot. Excludes the selected pin (gets the
+  // big donut) + dimmed pins (filtered-out → grey dot, not a ring). Capped for
+  // the MarkerView perf preview (densest viewport ≈ 58 mix pins); biggest crags
+  // win the cap. If this is smooth on device we lift the cap / add a zoom gate.
+  const MIX_RING_CAP = 60;
+  const mixRingPins = useMemo(() => {
+    if (browseComposition.map.size === 0) return [];
+    const out: { area_id: string; lng: number; lat: number; comp: AreaComposition }[] = [];
+    for (const ctx of groupByArea(browsePins)) {
+      if (ctx.area_id === highlightedAreaId) continue;
+      const comp = browseComposition.map.get(ctx.area_id);
+      if (!comp || !isMix(comp)) continue;
+      const rope = ctx.route_count - ctx.boulder_count;
+      const dimmed =
+        browseDiscipline === 'boulder'
+          ? ctx.boulder_count === 0
+          : rope === 0;
+      if (dimmed) continue;
+      out.push({ area_id: ctx.area_id, lng: ctx.lng, lat: ctx.lat, comp });
+    }
+    out.sort((a, b) => b.comp.total - a.comp.total);
+    return out.slice(0, MIX_RING_CAP);
+  }, [browsePins, browseComposition.map, highlightedAreaId, browseDiscipline]);
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -1558,6 +1585,27 @@ export default function MapScreenMapbox({
                 onClusterPress={onClusterBubblePress}
               />
             )}
+
+            {/* CB Phase F (F4 preview) — static ratio rings on mix pins. One
+                MarkerView each, capped at MIX_RING_CAP. Static (no entrance
+                animation) so panning doesn't re-trigger dozens of springs. */}
+            {mode.kind === 'area'
+              ? mixRingPins.map((p) => (
+                  <MapboxGL.MarkerView
+                    key={p.area_id}
+                    coordinate={[p.lng, p.lat]}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    allowOverlap
+                  >
+                    <RoutePinDonut
+                      composition={p.comp}
+                      size={26}
+                      showCount={false}
+                      animate={false}
+                    />
+                  </MapboxGL.MarkerView>
+                ))
+              : null}
 
             {/* CB Phase F (F3) — selected pin's ratio donut. One MarkerView,
                 only while a pin is selected + its composition has loaded; the

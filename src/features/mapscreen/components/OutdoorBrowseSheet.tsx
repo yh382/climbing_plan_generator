@@ -36,6 +36,7 @@ import {
   useAreaRoutes,
 } from '../../outdoor/hooks';
 import type { DisplayKind, OutdoorAreaListItem, OutdoorRoute } from '../../outdoor/types';
+import { BrowseLegend } from './BrowseLegend';
 import { AreaChildrenList } from './outdoor-area-sheet/AreaChildrenList';
 import { AreaRoutesPreview } from './outdoor-area-sheet/AreaRoutesPreview';
 import { AreaRoutesBrowser } from './outdoor-area-sheet/AreaRoutesBrowser';
@@ -150,6 +151,7 @@ export function OutdoorBrowseSheet({
     return (
       <View style={styles.fill}>
         {header}
+        <BrowseLegend />
         <AreaRoutesBrowser
           routes={nearbyRoutes ?? null}
           loading={nearbyLoading ?? false}
