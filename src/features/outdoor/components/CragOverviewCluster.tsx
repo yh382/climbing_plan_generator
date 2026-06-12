@@ -20,7 +20,7 @@ import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 import Svg, { Circle } from 'react-native-svg';
 import { useThemeColors } from '../../../lib/useThemeColors';
-import { STYLE_COLORS, SplitDotIcon } from './RoutePinCluster';
+import { STYLE_COLORS } from './RoutePinCluster';
 // CA-FU Phase C.2 — source switched from the legacy CragOverview (region-
 // scoped, ~15k) to CragPin: the BE-classified crag-tier nodes from the 35k
 // /outdoor/areas/crags preload (useAllCrags). discipline_counts.{boulder,
@@ -227,6 +227,28 @@ const RING_SIZE_EXPR = [
   10000, 24 / 23,
 ] as const;
 
+// Single-crag pin versions of the ring expressions — same ring images, driven
+// by the per-feature counts (not the cluster _sum aggregates), so a single crag
+// reads as a "ring of one" consistent with the cluster bubbles.
+const RING_FRACTION_SINGLE = [
+  '/',
+  ['get', 'boulder_count'],
+  ['max', 1, ['+', ['get', 'boulder_count'], ['get', 'rope_count']]],
+] as const;
+const RING_IMAGE_SINGLE: any = ['step', RING_FRACTION_SINGLE, 'crag-ring-0'];
+for (let i = 1; i <= RING_BUCKETS; i++) {
+  RING_IMAGE_SINGLE.push((i * 10 - 5) / 100, `crag-ring-${i}`);
+}
+const RING_SIZE_SINGLE = [
+  'step',
+  ['get', 'route_count'],
+  8 / 23,
+  100, 12 / 23,
+  500, 16 / 23,
+  2000, 20 / 23,
+  10000, 24 / 23,
+] as const;
+
 function toGeoJSON(crags: CragPin[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -244,10 +266,6 @@ function toGeoJSON(crags: CragPin[]): GeoJSON.FeatureCollection {
         boulder_count: c.discipline_counts.boulder,
         rope_count: c.discipline_counts.rope,
         unknown_count: c.discipline_counts.other,
-        // CB Phase F — single-pin 2-color (STYLE_COLORS) + boulder+rope split,
-        // consistent with browse. dom_boulder picks brown vs teal-blue.
-        dom_boulder: c.discipline_counts.boulder > c.discipline_counts.rope,
-        split: c.discipline_counts.boulder > 0 && c.discipline_counts.rope > 0,
         // BS-P1-α — count label baked in JS (Mapbox RN drops nested
         // case+concat+round textField); shown INSIDE the single pin.
         count_label: c.route_count > 0 ? formatCount(c.route_count) : '',
@@ -319,17 +337,14 @@ export default function CragOverviewCluster({
 
   return (
     <>
-    {/* CB Phase F — register the 11 quantized composition-ring images (cluster
-        bubbles) + the half/half split dot (boulder+rope single crags). */}
+    {/* CB Phase F — register the 11 quantized composition-ring images, shared
+        by the cluster bubbles AND the single crag pins. */}
     <MapboxGL.Images>
       {RING_INDEXES.map((i) => (
         <MapboxGL.Image key={i} name={`crag-ring-${i}`}>
           <RingIcon boulderFraction={i / RING_BUCKETS} />
         </MapboxGL.Image>
       ))}
-      <MapboxGL.Image name="route-pin-split">
-        <SplitDotIcon />
-      </MapboxGL.Image>
     </MapboxGL.Images>
     <MapboxGL.ShapeSource
       id="crag-overview-src"
@@ -449,45 +464,43 @@ export default function CragOverviewCluster({
           sizes at a glance after zooming out of a parent cluster). */}
       {/* CB Phase F — single crag pins use STYLE_COLORS (boulder sandstone /
           routes teal-blue), consistent with browse + the cluster ring (the old
-          light/dark-brown dominant shading is gone). boulder+rope crags render
-          the half/half split icon below instead of a dot. */}
+          light/dark-brown dominant shading is gone). CB Phase F — single crags
+          now render the SAME composition ring as the cluster bubbles (a "ring
+          of one"): white base + ring iconImage + dark count, for a unified
+          look. */}
       <MapboxGL.CircleLayer
         id="crag-overview-single-pins"
-        filter={['all',
-          ['!', ['has', 'point_count']],
-          ['!=', ['get', 'split'], true],
-        ] as any}
+        filter={['!', ['has', 'point_count']]}
         style={{
-          circleColor: ['case', ['get', 'dom_boulder'],
-            STYLE_COLORS.boulder, STYLE_COLORS.sport] as any,
-          circleOpacity: Number(colors.markerOpacity),
+          circleColor: '#FFFFFF',
+          circleOpacity: 0.96,
           circleRadius: SINGLE_PIN_RADIUS_EXPRESSION as any,
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 1.5,
+          circleStrokeColor: colors.outdoorMarkerStroke,
+          circleStrokeWidth: 1,
         }}
       />
-      {/* CB Phase F — boulder+rope single crags: half/half split icon. Sized
-          to the route-count pin radius (image circle ø20 → /20 of the radius). */}
+      {/* CB Phase F — composition ring on the single crag pin (boulder/rope). */}
       <MapboxGL.SymbolLayer
-        id="crag-overview-single-split"
-        filter={['all', ['!', ['has', 'point_count']], ['==', ['get', 'split'], true]] as any}
+        id="crag-overview-single-ring"
+        filter={['!', ['has', 'point_count']]}
         style={{
-          iconImage: 'route-pin-split',
-          iconSize: ['step', ['get', 'route_count'],
-            8 / 10, 100, 12 / 10, 500, 16 / 10, 2000, 20 / 10, 10000, 24 / 10] as any,
+          iconImage: RING_IMAGE_SINGLE,
+          iconSize: RING_SIZE_SINGLE as any,
           iconAllowOverlap: true,
           iconIgnorePlacement: true,
         }}
       />
-      {/* Route count INSIDE the single crag pin. Mirrors cluster bubble's
-          count label. */}
+      {/* Route count in the white center of the single crag pin (dark, like the
+          cluster bubble). */}
       <MapboxGL.SymbolLayer
         id="crag-overview-single-counts"
         filter={['!', ['has', 'point_count']]}
         style={{
           textField: ['get', 'count_label'] as any,
           textSize: SINGLE_TEXT_SIZE_EXPRESSION as any,
-          textColor: colors.outdoorMarkerText,
+          textColor: colors.textPrimary,
+          textHaloColor: '#FFFFFF',
+          textHaloWidth: 1.2,
           textAllowOverlap: true,
           textIgnorePlacement: true,
         }}
