@@ -105,9 +105,13 @@ export type RoutePinClusterProps = {
    *  area isn't in the preload. */
   areaTotals?: Record<string, number>;
   /** CB Phase F — area_id → prefetched 4-bucket composition. Drives the
-   *  dominant-style pin color + the `is_mix` flag. Falls back to the 2-color
-   *  boulder/routes split for areas not yet prefetched. */
+   *  dominant-style pin color. Falls back to the 2-color boulder/routes split
+   *  for areas not yet prefetched. */
   compositionMap?: Map<string, AreaComposition>;
+  /** CB Phase F (F4) — area_ids that render a ratio ring (MarkerView, mounted
+   *  by MapScreenMapbox). Those pins hide their dot + number (the ring replaces
+   *  them); everything else (pure, dimmed, or over the ring cap) keeps a dot. */
+  ringAreaIds?: Set<string>;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -191,6 +195,7 @@ function toGeoJSON(
   disciplineFilter?: 'boulder' | 'rope' | null,
   areaTotals?: Record<string, number>,
   compositionMap?: Map<string, AreaComposition>,
+  ringAreaIds?: Set<string>,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -214,7 +219,10 @@ function toGeoJSON(
         : a.boulder_count * 2 > a.route_count
           ? 'boulder'
           : 'sport';
-      const mix = comp ? isMix(comp) : false;
+      // has_ring is the single source of truth for "this pin shows a ring, not
+      // a dot" — already excludes dimmed pins + respects the ring cap (computed
+      // in MapScreenMapbox), so over-cap mix pins correctly fall back to a dot.
+      const hasRing = ringAreaIds?.has(a.area_id) ?? false;
       return {
       type: 'Feature',
       id: a.area_id,
@@ -226,9 +234,9 @@ function toGeoJSON(
         // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
         // "Routes"). Kept as the 2-color fallback flag.
         dominant_boulder: a.boulder_count * 2 > a.route_count,
-        // CB Phase F — dominant style (4-color) + mix flag.
+        // CB Phase F — dominant style (4-color) + whether a ring replaces it.
         dom,
-        is_mix: mix,
+        has_ring: hasRing,
         dimmed,
         // CB Phase F (F2) — TRUE total (preload) for the per-pin number; the
         // grouped sample count is the fallback when the area isn't preloaded.
@@ -251,14 +259,15 @@ export default function RoutePinCluster({
   disciplineFilter,
   areaTotals,
   compositionMap,
+  ringAreaIds,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap),
-    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap, ringAreaIds),
+    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap, ringAreaIds],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -351,10 +360,9 @@ export default function RoutePinCluster({
         filter={['all',
           ['!', ['has', 'point_count']],
           ['!=', ['get', 'highlighted'], true],
-          // CB Phase F — non-dimmed mix pins render as a ratio ring (MarkerView,
-          // mounted by MapScreenMapbox) instead of a dot. Dimmed mix pins still
-          // get a (grey) dot — de-emphasized, no ring.
-          ['any', ['!=', ['get', 'is_mix'], true], ['==', ['get', 'dimmed'], true]],
+          // CB Phase F — pins that render a ring (has_ring) hide their dot; all
+          // others (pure / dimmed / over-cap mix) keep one.
+          ['!=', ['get', 'has_ring'], true],
         ] as any}
         style={{
           circleColor: [
@@ -385,7 +393,7 @@ export default function RoutePinCluster({
           ['!', ['has', 'point_count']],
           ['!=', ['get', 'highlighted'], true],
           ['!=', ['get', 'dimmed'], true],
-          ['!=', ['get', 'is_mix'], true],
+          ['!=', ['get', 'has_ring'], true],
           ['>', ['get', 'count'], 0],
         ] as any}
         style={{

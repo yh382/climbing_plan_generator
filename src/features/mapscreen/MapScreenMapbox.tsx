@@ -533,6 +533,13 @@ export default function MapScreenMapbox({
     out.sort((a, b) => b.comp.total - a.comp.total);
     return out.slice(0, MIX_RING_CAP);
   }, [browsePins, browseComposition.map, highlightedAreaId, browseDiscipline]);
+  // area_ids that actually get a ring → those pins hide their dot in
+  // RoutePinCluster. Mix pins beyond the cap aren't here, so they keep a dot
+  // (never invisible).
+  const ringAreaIds = useMemo(
+    () => new Set(mixRingPins.map((p) => p.area_id)),
+    [mixRingPins],
+  );
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -1581,6 +1588,7 @@ export default function MapScreenMapbox({
                 disciplineFilter={browseDiscipline}
                 areaTotals={areaTotals}
                 compositionMap={browseComposition.map}
+                ringAreaIds={ringAreaIds}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
