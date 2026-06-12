@@ -643,18 +643,6 @@ export type DisciplineCounts = {
   other: number;
 };
 
-/** CB Phase F — single-area STYLE-level 4-bucket composition for the selected-
- *  pin ratio ring. boulder+sport+trad+other == total (a partition), so the
- *  donut always fills 360°. `other` = toprope/aid/mixed/alpine/etc. */
-export type AreaComposition = {
-  total: number;
-  boulder: number;
-  sport: number;
-  trad: number;
-  other: number;
-};
-
-
 /** One crag-tier pin in the preload source. */
 export type CragPin = {
   id: string;

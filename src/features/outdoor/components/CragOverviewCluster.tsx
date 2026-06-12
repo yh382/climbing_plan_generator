@@ -203,12 +203,13 @@ function RingIcon({ boulderFraction }: { boulderFraction: number }) {
 const RING_INDEXES = Array.from({ length: RING_BUCKETS + 1 }, (_, i) => i);
 
 // iconImage: pick the ring bucket from the cluster's boulder fraction
-// (boulder / (boulder+rope), guarded against /0). Step thresholds at the
-// bucket midpoints (0.05, 0.15, …) round to the nearest 10%.
+// (boulder / TOTAL — `other` folds into the rope/blue arc, so a crag with lots
+// of toprope/aid doesn't over-read as boulder; guarded against /0). Step
+// thresholds at the bucket midpoints (0.05, 0.15, …) round to the nearest 10%.
 const RING_FRACTION_EXPR = [
   '/',
   ['get', 'boulder_count_sum'],
-  ['max', 1, ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']]],
+  ['max', 1, ['get', 'route_count_sum']],
 ] as const;
 const RING_IMAGE_EXPR: any = ['step', RING_FRACTION_EXPR, 'crag-ring-0'];
 for (let i = 1; i <= RING_BUCKETS; i++) {
@@ -233,7 +234,7 @@ const RING_SIZE_EXPR = [
 const RING_FRACTION_SINGLE = [
   '/',
   ['get', 'boulder_count'],
-  ['max', 1, ['+', ['get', 'boulder_count'], ['get', 'rope_count']]],
+  ['max', 1, ['get', 'route_count']],
 ] as const;
 const RING_IMAGE_SINGLE: any = ['step', RING_FRACTION_SINGLE, 'crag-ring-0'];
 for (let i = 1; i <= RING_BUCKETS; i++) {

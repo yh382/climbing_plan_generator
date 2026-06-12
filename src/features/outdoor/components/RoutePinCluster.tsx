@@ -23,19 +23,17 @@ import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
-import type { AreaComposition, RoutePin } from '../types';
+import type { RoutePin } from '../types';
 
-/** CB Phase F — 4-bucket style palette, shared with the donut so dots, rings,
- *  and the legend all read the same. Boulder/sport reuse the pin colors; trad
- *  green + other grey are device-tunable. */
+/** CB Phase F — 4-bucket style palette, shared with the discover cluster rings
+ *  + legend so dots, rings, and the legend all read the same. Boulder/sport
+ *  reuse the pin colors; trad green + other grey are device-tunable. */
 export const STYLE_COLORS = {
   boulder: theme.colors.outdoorMarkerFill, // sandstone
   sport: theme.colors.routesMarkerFill, // teal-blue
   trad: '#5E8C61', // muted green
   other: '#9AA0A6', // grey
 } as const;
-
-type StyleBucket = keyof typeof STYLE_COLORS;
 
 /** CB Phase F — half/half split dot for boulder+rope-mixed pins (left brown =
  *  boulder, right blue = routes). Registered once via MapboxGL.Images and
@@ -55,30 +53,6 @@ export function SplitDotIcon() {
       <Path d={rightHalf} fill={STYLE_COLORS.sport} />
       <Circle cx={c} cy={c} r={r} fill="none" stroke="#FFFFFF" strokeWidth={2} />
     </Svg>
-  );
-}
-
-/** Dominant style bucket (argmax; ties resolve boulder>sport>trad>other). */
-export function dominantStyle(c: AreaComposition): StyleBucket {
-  const entries: [StyleBucket, number][] = [
-    ['boulder', c.boulder],
-    ['sport', c.sport],
-    ['trad', c.trad],
-    ['other', c.other],
-  ];
-  let best = entries[0];
-  for (const e of entries) if (e[1] > best[1]) best = e;
-  return best[0];
-}
-
-/** ≥2 non-empty buckets → the area is "mixed" and warrants a ratio ring. */
-export function isMix(c: AreaComposition): boolean {
-  return (
-    (c.boulder > 0 ? 1 : 0) +
-      (c.sport > 0 ? 1 : 0) +
-      (c.trad > 0 ? 1 : 0) +
-      (c.other > 0 ? 1 : 0) >=
-    2
   );
 }
 
@@ -348,12 +322,9 @@ export default function RoutePinCluster({
           textIgnorePlacement: true,
         }}
       />
-      {/* CB Phase F (F3) — selected pin base: a clean white "lifted" disc so
-          the focused pin reads as a white-bordered selected dot. Replaces the
-          old translucent-teal halo. The real selected treatment is the donut
-          MarkerView (mounted by MapScreenMapbox on top of this); this base is
-          the immediate tap feedback + the fallback while the donut's
-          composition loads / if it fails. */}
+      {/* CB Phase F — selected pin: a clean white "lifted" disc so the focused
+          pin reads as a white-bordered selected dot (replaces the old
+          translucent-teal halo). The colored dot paints on top of this. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-highlight"
         filter={['all', ['!', ['has', 'point_count']], ['==', ['get', 'highlighted'], true]] as any}
@@ -417,8 +388,7 @@ export default function RoutePinCluster({
       />
       {/* CB Phase F (F2) — per-pin route count below the dot. SymbolLayer text
           is GPU + auto-collides (textAllowOverlap defaults false), so it thins
-          out where pins crowd. Hidden on the selected pin (its donut shows the
-          count in the hole) and on dimmed pins (de-emphasized). */}
+          out where pins crowd. Hidden on dimmed pins (de-emphasized). */}
       <MapboxGL.SymbolLayer
         id="outdoor-route-pins-count"
         filter={['all',
