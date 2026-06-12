@@ -475,10 +475,17 @@ export default function MapScreenMapbox({
   const browseDiscipline = browseDisciplineOverride ?? browseAutoDiscipline;
   // CB Phase F (F2) — area_id → TRUE total route count, from the all-crags
   // preload (the browse sample only carries an area's top ~2 routes, so it
-  // can't supply an honest per-pin number).
+  // can't supply an honest per-pin number). Use the APPROVED-only sum of the
+  // preload's discipline_counts (not `route_count` = direct_route_count, which
+  // is status-agnostic) so the pin number always equals the selected donut's
+  // total (F1 is approved-only). Today all routes are approved so they match;
+  // this keeps them aligned once non-approved submissions exist.
   const areaTotals = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const c of allCrags.crags) m[c.id] = c.route_count;
+    for (const c of allCrags.crags) {
+      const d = c.discipline_counts;
+      m[c.id] = d.boulder + d.rope + d.other;
+    }
     return m;
   }, [allCrags.crags]);
   // CB Phase F (F3) — 4-bucket composition for the selected pin's donut.
@@ -782,8 +789,10 @@ export default function MapScreenMapbox({
     (route: OutdoorRoute) => {
       if (route.area_id) {
         setFocusedCragId(route.area_id);
-        setHighlightedAreaId(route.area_id);
+        // Keep highlightedAreaId + highlightedCoord in lockstep (the donut
+        // needs both): only highlight when we also have a coordinate.
         if (route.lat != null && route.lng != null) {
+          setHighlightedAreaId(route.area_id);
           setHighlightedCoord([route.lng, route.lat]);
         }
       }
@@ -1537,7 +1546,14 @@ export default function MapScreenMapbox({
                 only while a pin is selected + its composition has loaded; the
                 pin's white base disc (RoutePinCluster) covers the brief load
                 gap. Mounted AFTER RoutePinCluster so it paints on top. */}
-            {mode.kind === 'area' && highlightedCoord && selectedComposition.data ? (
+            {mode.kind === 'area' &&
+            highlightedCoord &&
+            selectedComposition.data &&
+            !selectedComposition.loading ? (
+              // `!loading` so that switching from pin A→B hides the donut (the
+              // white base disc shows) while B's composition loads, instead of
+              // painting A's stale composition at B's coordinate (useFetchOnce
+              // keeps prior data during the next fetch).
               <MapboxGL.MarkerView
                 coordinate={highlightedCoord}
                 anchor={{ x: 0.5, y: 0.5 }}
