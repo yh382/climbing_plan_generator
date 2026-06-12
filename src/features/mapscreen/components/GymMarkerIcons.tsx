@@ -10,8 +10,8 @@
 import Svg, { Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
-const GREEN = theme.colors.accent; // #306E6F — the whole house
-const WHITE = '#FFFFFF'; // the climber
+const GREEN = theme.colors.accent; // #306E6F — house body fill
+const BROWN = '#CBA07A'; // 浅棕 — upper-left house outline + climber
 
 // — house: solid building fill + its outline —
 const HOUSE_FILL =
@@ -50,19 +50,19 @@ const CLIMBER_OUTLINE =
   'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
   'L 614 735 L 582 680 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. Whole house theme
- *  green, climber white on top. */
+/** The rock-gym marker — registered once as image `gym-rock`. Green house body;
+ *  the upper-left house outline + the climber are light brown, painted on top. */
 export function GymIconRock() {
   return (
     <Svg width={32} height={32} viewBox="0 0 1254 1254">
-      {/* green house (fill + outline) */}
+      {/* green house body */}
       <Path d={HOUSE_FILL} fill={GREEN} fillRule="evenodd" />
-      <Path d={HOUSE_OUTLINE} fill={GREEN} fillRule="evenodd" />
-      {/* white climber, painted over the house */}
-      <Path d={CLIMBER_LIMB} fill={WHITE} fillRule="evenodd" />
-      <Path d={CLIMBER_TORSO} fill={WHITE} fillRule="evenodd" />
-      <Path d={CLIMBER_HEAD} fill={WHITE} fillRule="evenodd" />
-      <Path d={CLIMBER_OUTLINE} fill={WHITE} fillRule="evenodd" />
+      {/* light-brown upper-left outline + climber */}
+      <Path d={HOUSE_OUTLINE} fill={BROWN} fillRule="evenodd" />
+      <Path d={CLIMBER_LIMB} fill={BROWN} fillRule="evenodd" />
+      <Path d={CLIMBER_TORSO} fill={BROWN} fillRule="evenodd" />
+      <Path d={CLIMBER_HEAD} fill={BROWN} fillRule="evenodd" />
+      <Path d={CLIMBER_OUTLINE} fill={BROWN} fillRule="evenodd" />
     </Svg>
   );
 }
