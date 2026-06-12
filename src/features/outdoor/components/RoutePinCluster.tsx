@@ -37,7 +37,7 @@ export const STYLE_COLORS = {
 type StyleBucket = keyof typeof STYLE_COLORS;
 
 /** Dominant style bucket (argmax; ties resolve boulder>sport>trad>other). */
-function dominantStyle(c: AreaComposition): StyleBucket {
+export function dominantStyle(c: AreaComposition): StyleBucket {
   const entries: [StyleBucket, number][] = [
     ['boulder', c.boulder],
     ['sport', c.sport],
@@ -104,14 +104,6 @@ export type RoutePinClusterProps = {
    *  is the only honest per-pin count. Falls back to the sample count when an
    *  area isn't in the preload. */
   areaTotals?: Record<string, number>;
-  /** CB Phase F — area_id → prefetched 4-bucket composition. Drives the
-   *  dominant-style pin color. Falls back to the 2-color boulder/routes split
-   *  for areas not yet prefetched. */
-  compositionMap?: Map<string, AreaComposition>;
-  /** CB Phase F (F4) — area_ids that render a ratio ring (MarkerView, mounted
-   *  by MapScreenMapbox). Those pins hide their dot + number (the ring replaces
-   *  them); everything else (pure, dimmed, or over the ring cap) keeps a dot. */
-  ringAreaIds?: Set<string>;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -194,8 +186,6 @@ function toGeoJSON(
   highlightedAreaId?: string | null,
   disciplineFilter?: 'boulder' | 'rope' | null,
   areaTotals?: Record<string, number>,
-  compositionMap?: Map<string, AreaComposition>,
-  ringAreaIds?: Set<string>,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -210,19 +200,6 @@ function toGeoJSON(
           : disciplineFilter === 'rope'
             ? ropeCount === 0
             : false;
-      // CB Phase F — dominant style (4-color) + mix flag from the prefetched
-      // composition. Fallback (not yet prefetched): the 2-color boulder/routes
-      // split, where "routes" maps to the sport color so it matches.
-      const comp = compositionMap?.get(a.area_id);
-      const dom = comp
-        ? dominantStyle(comp)
-        : a.boulder_count * 2 > a.route_count
-          ? 'boulder'
-          : 'sport';
-      // has_ring is the single source of truth for "this pin shows a ring, not
-      // a dot" — already excludes dimmed pins + respects the ring cap (computed
-      // in MapScreenMapbox), so over-cap mix pins correctly fall back to a dot.
-      const hasRing = ringAreaIds?.has(a.area_id) ?? false;
       return {
       type: 'Feature',
       id: a.area_id,
@@ -232,11 +209,8 @@ function toGeoJSON(
         display_kind: a.display_kind,
         route_count: a.route_count,
         // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
-        // "Routes"). Kept as the 2-color fallback flag.
+        // "Routes"). Drives the 2-color fill.
         dominant_boulder: a.boulder_count * 2 > a.route_count,
-        // CB Phase F — dominant style (4-color) + whether a ring replaces it.
-        dom,
-        has_ring: hasRing,
         dimmed,
         // CB Phase F (F2) — TRUE total (preload) for the per-pin number; the
         // grouped sample count is the fallback when the area isn't preloaded.
@@ -258,16 +232,14 @@ export default function RoutePinCluster({
   highlightedAreaId,
   disciplineFilter,
   areaTotals,
-  compositionMap,
-  ringAreaIds,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap, ringAreaIds),
-    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap, ringAreaIds],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals),
+    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -357,24 +329,15 @@ export default function RoutePinCluster({
           list shows. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-single"
-        filter={['all',
-          ['!', ['has', 'point_count']],
-          ['!=', ['get', 'highlighted'], true],
-          // CB Phase F — pins that render a ring (has_ring) hide their dot; all
-          // others (pure / dimmed / over-cap mix) keep one.
-          ['!=', ['get', 'has_ring'], true],
-        ] as any}
+        filter={['!', ['has', 'point_count']]}
         style={{
           circleColor: [
             'case',
             ['get', 'dimmed'],
             DIM_FILL,
-            ['match', ['get', 'dom'],
-              'boulder', STYLE_COLORS.boulder,
-              'sport', STYLE_COLORS.sport,
-              'trad', STYLE_COLORS.trad,
-              'other', STYLE_COLORS.other,
-              STYLE_COLORS.boulder],
+            ['case', ['get', 'dominant_boulder'],
+              STYLE_COLORS.boulder,
+              STYLE_COLORS.sport],
           ] as any,
           circleOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
           circleRadius: AREA_PIN_RADIUS,
@@ -391,9 +354,7 @@ export default function RoutePinCluster({
         id="outdoor-route-pins-count"
         filter={['all',
           ['!', ['has', 'point_count']],
-          ['!=', ['get', 'highlighted'], true],
           ['!=', ['get', 'dimmed'], true],
-          ['!=', ['get', 'has_ring'], true],
           ['>', ['get', 'count'], 0],
         ] as any}
         style={{

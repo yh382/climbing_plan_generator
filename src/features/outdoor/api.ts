@@ -19,8 +19,6 @@ import type {
   AreaSearchResponse, DisplayKind,
   // CA-FU Phase B — compact crag preload
   CragPinsResponse,
-  // CB Phase F — selected-pin ring composition
-  AreaComposition, AreaCompositionItem,
 } from './types';
 import { MOCK_REGIONS, MOCK_ROUTES } from './mockData';
 
@@ -195,23 +193,6 @@ export const outdoorApi = {
     return api.get<CoverageResponse>(`/outdoor/areas/${areaId}/coverage`);
   },
 
-  // CB Phase F — single-area 4-bucket style composition for the selected-pin
-  // ratio ring. Called per pin tap (1 area), not per viewport.
-  getAreaComposition: async (areaId: string): Promise<AreaComposition> => {
-    return api.get<AreaComposition>(
-      `/outdoor/areas/${areaId}/discipline-composition`,
-    );
-  },
-
-  // CB Phase F — batch composition for the browse map's prefetch (all visible
-  // pins' areas in one round-trip → instant donut + dominant color + rings).
-  getAreasComposition: async (
-    areaIds: string[],
-  ): Promise<AreaCompositionItem[]> => {
-    return api.post<AreaCompositionItem[]>('/outdoor/areas/composition', {
-      area_ids: areaIds,
-    });
-  },
 
   /** CB 点6 — representative 'area' label for the camera viewport, for the
    *  browse-sheet title (tracks the camera, not a tapped pin). */

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { outdoorApi, type RegionLabel } from './api';
 import type {
-  AreaComposition, AreaCompositionItem, AreaSearchResponse, CoverageResponse,
+  AreaSearchResponse, CoverageResponse,
   DisplayKind, OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
 } from './types';
 
@@ -137,41 +137,6 @@ export function useAreaCoverage(areaId: string | null | undefined) {
   );
 }
 
-/** CB Phase F — GET /outdoor/areas/{id}/discipline-composition for the
- *  selected-pin ratio ring. No-op (data: null) when areaId is null. Fetched
- *  per tap (1 area) — the donut renders once data resolves; the pin's white
- *  base disc is the meanwhile / on-error fallback. */
-export function useAreaComposition(areaId: string | null | undefined) {
-  return useFetchOnce<AreaComposition | null>(
-    () => areaId ? outdoorApi.getAreaComposition(areaId) : Promise.resolve(null),
-    [areaId],
-  );
-}
-
-/** CB Phase F — batch prefetch of 4-bucket composition for all visible browse
- *  pins (POST /outdoor/areas/composition), returned as a area_id→composition
- *  Map. Re-fetches only when the SET of ids changes (keyed on a sorted join),
- *  so panning within the same area cluster doesn't re-hit. Powers the instant
- *  selected donut + dominant-style pin color + mix-pin rings. */
-export function useAreasComposition(areaIds: string[]) {
-  const key = useMemo(
-    () => Array.from(new Set(areaIds)).sort().join(','),
-    [areaIds],
-  );
-  const state = useFetchOnce<AreaCompositionItem[]>(
-    () => (key ? outdoorApi.getAreasComposition(key.split(',')) : Promise.resolve([])),
-    [key],
-  );
-  const map = useMemo(() => {
-    const m = new Map<string, AreaComposition>();
-    for (const it of state.data ?? []) {
-      const { area_id, ...comp } = it;
-      m.set(area_id, comp);
-    }
-    return m;
-  }, [state.data]);
-  return { map, loading: state.loading };
-}
 
 /** GET /outdoor/areas?bbox=...&display_kinds=... Zoom-aware pin source. */
 export function useAreaBboxPins(params: {

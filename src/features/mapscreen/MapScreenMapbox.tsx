@@ -79,16 +79,13 @@ import { useGymsColors } from '../gyms/useGymsColors';
 import MapPinCluster from '../outdoor/components/MapPinCluster';
 import RoutePinCluster, {
   type AreaPinContext,
-  groupByArea,
-  isMix,
 } from '../outdoor/components/RoutePinCluster';
 import CragOverviewCluster from '../outdoor/components/CragOverviewCluster';
 import { type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
-import { useAreaComposition, useAreasComposition, useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
-import RoutePinDonut from '../outdoor/components/RoutePinDonut';
+import { useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
@@ -109,7 +106,6 @@ import type {
   RoutePin,
   SearchResult,
   CragPin,
-  AreaComposition,
 } from '../outdoor/types';
 
 import { MapTopBar } from './components/MapTopBar';
@@ -460,9 +456,6 @@ export default function MapScreenMapbox({
   // draws that pin's map halo.
   const [focusedCragId, setFocusedCragId] = useState<string | null>(null);
   const [highlightedAreaId, setHighlightedAreaId] = useState<string | null>(null);
-  // CB Phase F (F3) — [lng, lat] of the selected pin, for the donut MarkerView.
-  const [highlightedCoord, setHighlightedCoord] =
-    useState<[number, number] | null>(null);
   // CB 点2 — browse-mode discipline segment, lifted from the sheet's
   // AreaRoutesBrowser so (a) the map pins dim to it and (b) a pin tap can
   // switch it. Override is sticky until the user changes it or browse mode
@@ -491,55 +484,6 @@ export default function MapScreenMapbox({
     }
     return m;
   }, [allCrags.crags]);
-  // CB Phase F — batch-prefetch the 4-bucket composition for every visible
-  // browse pin (one round-trip, keyed on the id set). Powers instant donut +
-  // dominant-style pin color + mix-pin rings.
-  const browseAreaIds = useMemo(
-    () => Array.from(new Set(browsePins.map((p) => p.area_id))),
-    [browsePins],
-  );
-  const browseComposition = useAreasComposition(browseAreaIds);
-  // Per-tap single-area fetch — fallback for a selected pin missing from the
-  // prefetch (e.g. tapped before the batch resolved).
-  const selectedComposition = useAreaComposition(highlightedAreaId);
-  // Donut data: prefer the prefetched composition (instant, no gap), else the
-  // per-tap fetch. `loading` only blocks when we have neither.
-  const selectedPrefetched = highlightedAreaId
-    ? browseComposition.map.get(highlightedAreaId) ?? null
-    : null;
-  const selectedComp = selectedPrefetched ?? selectedComposition.data;
-  const selectedCompLoading = !selectedPrefetched && selectedComposition.loading;
-  // CB Phase F (F4 preview) — mix pins (≥2 style buckets) render as a small
-  // static ratio ring instead of a dot. Excludes the selected pin (gets the
-  // big donut) + dimmed pins (filtered-out → grey dot, not a ring). Capped for
-  // the MarkerView perf preview (densest viewport ≈ 58 mix pins); biggest crags
-  // win the cap. If this is smooth on device we lift the cap / add a zoom gate.
-  const MIX_RING_CAP = 60;
-  const mixRingPins = useMemo(() => {
-    if (browseComposition.map.size === 0) return [];
-    const out: { area_id: string; lng: number; lat: number; comp: AreaComposition }[] = [];
-    for (const ctx of groupByArea(browsePins)) {
-      if (ctx.area_id === highlightedAreaId) continue;
-      const comp = browseComposition.map.get(ctx.area_id);
-      if (!comp || !isMix(comp)) continue;
-      const rope = ctx.route_count - ctx.boulder_count;
-      const dimmed =
-        browseDiscipline === 'boulder'
-          ? ctx.boulder_count === 0
-          : rope === 0;
-      if (dimmed) continue;
-      out.push({ area_id: ctx.area_id, lng: ctx.lng, lat: ctx.lat, comp });
-    }
-    out.sort((a, b) => b.comp.total - a.comp.total);
-    return out.slice(0, MIX_RING_CAP);
-  }, [browsePins, browseComposition.map, highlightedAreaId, browseDiscipline]);
-  // area_ids that actually get a ring → those pins hide their dot in
-  // RoutePinCluster. Mix pins beyond the cap aren't here, so they keep a dot
-  // (never invisible).
-  const ringAreaIds = useMemo(
-    () => new Set(mixRingPins.map((p) => p.area_id)),
-    [mixRingPins],
-  );
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -820,7 +764,6 @@ export default function MapScreenMapbox({
   const onAreaPinPress = useCallback((ctx: AreaPinContext) => {
     setFocusedCragId(ctx.area_id);
     setHighlightedAreaId(ctx.area_id);
-    setHighlightedCoord([ctx.lng, ctx.lat]);
     // CB 点2 — if the tapped crag has nothing in the current segment, switch
     // segments so its pinned routes actually show (e.g. tapped a routes-only
     // pin while the sheet is on Boulder). Uses the per-area discipline counts
@@ -839,12 +782,7 @@ export default function MapScreenMapbox({
     (route: OutdoorRoute) => {
       if (route.area_id) {
         setFocusedCragId(route.area_id);
-        // Keep highlightedAreaId + highlightedCoord in lockstep (the donut
-        // needs both): only highlight when we also have a coordinate.
-        if (route.lat != null && route.lng != null) {
-          setHighlightedAreaId(route.area_id);
-          setHighlightedCoord([route.lng, route.lat]);
-        }
+        setHighlightedAreaId(route.area_id);
       }
       if (route.lat != null && route.lng != null) {
         try {
@@ -866,7 +804,6 @@ export default function MapScreenMapbox({
     if (mode.kind !== 'area') {
       setFocusedCragId(null);
       setHighlightedAreaId(null);
-      setHighlightedCoord(null);
       setBrowseDisciplineOverride(null);
     }
   }, [mode.kind]);
@@ -1587,54 +1524,10 @@ export default function MapScreenMapbox({
                 highlightedAreaId={highlightedAreaId}
                 disciplineFilter={browseDiscipline}
                 areaTotals={areaTotals}
-                compositionMap={browseComposition.map}
-                ringAreaIds={ringAreaIds}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
             )}
-
-            {/* CB Phase F (F4 preview) — static ratio rings on mix pins. One
-                MarkerView each, capped at MIX_RING_CAP. Static (no entrance
-                animation) so panning doesn't re-trigger dozens of springs. */}
-            {mode.kind === 'area'
-              ? mixRingPins.map((p) => (
-                  <MapboxGL.MarkerView
-                    key={p.area_id}
-                    coordinate={[p.lng, p.lat]}
-                    anchor={{ x: 0.5, y: 0.5 }}
-                    allowOverlap
-                  >
-                    <RoutePinDonut
-                      composition={p.comp}
-                      size={26}
-                      showCount={false}
-                      animate={false}
-                    />
-                  </MapboxGL.MarkerView>
-                ))
-              : null}
-
-            {/* CB Phase F (F3) — selected pin's ratio donut. One MarkerView,
-                only while a pin is selected + its composition has loaded; the
-                pin's white base disc (RoutePinCluster) covers the brief load
-                gap. Mounted AFTER RoutePinCluster so it paints on top. */}
-            {mode.kind === 'area' &&
-            highlightedCoord &&
-            selectedComp &&
-            !selectedCompLoading ? (
-              // Prefetched → instant. `!loading` only matters for the per-tap
-              // fallback: switching A→B then hides the donut (white base disc
-              // shows) while B loads, instead of painting A's stale composition
-              // at B's coordinate.
-              <MapboxGL.MarkerView
-                coordinate={highlightedCoord}
-                anchor={{ x: 0.5, y: 0.5 }}
-                allowOverlap
-              >
-                <RoutePinDonut composition={selectedComp} />
-              </MapboxGL.MarkerView>
-            ) : null}
 
             {/* List mode: MapPinCluster (cherry-picked saved items) */}
             {mode.kind === 'list' && (
@@ -1832,7 +1725,6 @@ export default function MapScreenMapbox({
             onClearFocus={() => {
               setFocusedCragId(null);
               setHighlightedAreaId(null);
-              setHighlightedCoord(null);
             }}
             onLocateRoute={onLocateRoute}
             browseDiscipline={browseDiscipline}
