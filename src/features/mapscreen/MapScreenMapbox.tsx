@@ -469,18 +469,15 @@ export default function MapScreenMapbox({
     return b > rows.length - b ? 'boulder' : 'rope';
   }, [browseNearby.data]);
   const browseDiscipline = browseDisciplineOverride ?? browseAutoDiscipline;
-  // CB Phase F (F2) — area_id → TRUE total route count, from the all-crags
-  // preload (the browse sample only carries an area's top ~2 routes, so it
-  // can't supply an honest per-pin number). Use the APPROVED-only sum of the
-  // preload's discipline_counts (not `route_count` = direct_route_count, which
-  // is status-agnostic) so the pin number always equals the selected donut's
-  // total (F1 is approved-only). Today all routes are approved so they match;
-  // this keeps them aligned once non-approved submissions exist.
-  const areaTotals = useMemo(() => {
-    const m: Record<string, number> = {};
+  // CB Phase F — area_id → TRUE discipline_counts from the all-crags preload
+  // (the browse sample only carries an area's top ~2 routes, so it can't give
+  // an honest per-pin number OR detect a boulder+rope split). Approved-only
+  // (discipline_counts is), so the number matches the data shown elsewhere.
+  const areaDisc = useMemo(() => {
+    const m: Record<string, { boulder: number; rope: number; other: number }> = {};
     for (const c of allCrags.crags) {
       const d = c.discipline_counts;
-      m[c.id] = d.boulder + d.rope + d.other;
+      m[c.id] = { boulder: d.boulder, rope: d.rope, other: d.other };
     }
     return m;
   }, [allCrags.crags]);
@@ -1523,7 +1520,7 @@ export default function MapScreenMapbox({
                 styleReady={styleReady}
                 highlightedAreaId={highlightedAreaId}
                 disciplineFilter={browseDiscipline}
-                areaTotals={areaTotals}
+                areaDisc={areaDisc}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />

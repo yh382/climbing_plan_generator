@@ -21,6 +21,7 @@
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 import type { AreaComposition, RoutePin } from '../types';
 
@@ -35,6 +36,27 @@ export const STYLE_COLORS = {
 } as const;
 
 type StyleBucket = keyof typeof STYLE_COLORS;
+
+/** CB Phase F — half/half split dot for boulder+rope-mixed pins (left brown =
+ *  boulder, right blue = routes). Registered once via MapboxGL.Images and
+ *  drawn by a SymbolLayer iconImage (GPU-rasterized, scales to any pin count —
+ *  CircleLayer can't render a two-tone circle). Rendered at 2× then scaled
+ *  down on-map for crisp edges. */
+const SPLIT_ICON_PX = 24;
+function SplitDotIcon() {
+  const s = SPLIT_ICON_PX;
+  const c = s / 2;
+  const r = c - 3;
+  // Right semicircle (top → bottom, clockwise) filled blue over the brown base.
+  const rightHalf = `M ${c} ${c - r} A ${r} ${r} 0 0 1 ${c} ${c + r} Z`;
+  return (
+    <Svg width={s} height={s}>
+      <Circle cx={c} cy={c} r={r} fill={STYLE_COLORS.boulder} />
+      <Path d={rightHalf} fill={STYLE_COLORS.sport} />
+      <Circle cx={c} cy={c} r={r} fill="none" stroke="#FFFFFF" strokeWidth={2} />
+    </Svg>
+  );
+}
 
 /** Dominant style bucket (argmax; ties resolve boulder>sport>trad>other). */
 export function dominantStyle(c: AreaComposition): StyleBucket {
@@ -99,11 +121,12 @@ export type RoutePinClusterProps = {
    *  of this discipline are dimmed (grey + low opacity) so the map emphasizes
    *  the same discipline the list is showing. null = no dim. */
   disciplineFilter?: 'boulder' | 'rope' | null;
-  /** CB Phase F (F2) — area_id → TRUE total route count (from the all-crags
-   *  preload). The browse sample only carries an area's top ~2 routes, so this
-   *  is the only honest per-pin count. Falls back to the sample count when an
-   *  area isn't in the preload. */
-  areaTotals?: Record<string, number>;
+  /** CB Phase F — area_id → TRUE discipline_counts (from the all-crags
+   *  preload): drives the per-pin number (boulder+rope+other) AND the
+   *  boulder+rope split-dot (both>0). The browse sample only carries an area's
+   *  top ~2 routes, so the preload is the only honest source. Falls back to the
+   *  sample for areas not in the preload. */
+  areaDisc?: Record<string, { boulder: number; rope: number; other: number }>;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -185,7 +208,7 @@ function toGeoJSON(
   areas: AreaPinContext[],
   highlightedAreaId?: string | null,
   disciplineFilter?: 'boulder' | 'rope' | null,
-  areaTotals?: Record<string, number>,
+  areaDisc?: Record<string, { boulder: number; rope: number; other: number }>,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -200,6 +223,18 @@ function toGeoJSON(
           : disciplineFilter === 'rope'
             ? ropeCount === 0
             : false;
+      // CB Phase F — prefer the preload's true discipline_counts; fall back to
+      // the sampled boulder/rope split when the area isn't preloaded.
+      const disc = areaDisc?.[a.area_id];
+      const count = disc
+        ? disc.boulder + disc.rope + disc.other
+        : a.route_count;
+      const dominantBoulder = disc
+        ? disc.boulder > disc.rope
+        : a.boulder_count * 2 > a.route_count;
+      // split-dot: the area genuinely has BOTH boulder and rope routes (left
+      // brown / right blue). Only known from the true preload counts.
+      const split = disc ? disc.boulder > 0 && disc.rope > 0 : false;
       return {
       type: 'Feature',
       id: a.area_id,
@@ -208,13 +243,14 @@ function toGeoJSON(
         area_name: a.area_name,
         display_kind: a.display_kind,
         route_count: a.route_count,
-        // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
-        // "Routes"). Drives the 2-color fill.
-        dominant_boulder: a.boulder_count * 2 > a.route_count,
+        // CB 点2 — drives the 2-color fill for pure pins.
+        dominant_boulder: dominantBoulder,
+        // CB Phase F — boulder+rope-both → half/half split icon.
+        split,
         dimmed,
         // CB Phase F (F2) — TRUE total (preload) for the per-pin number; the
         // grouped sample count is the fallback when the area isn't preloaded.
-        count: areaTotals?.[a.area_id] ?? a.route_count,
+        count,
         highlighted: a.area_id === highlightedAreaId,
       },
       geometry: {
@@ -231,15 +267,15 @@ export default function RoutePinCluster({
   styleReady,
   highlightedAreaId,
   disciplineFilter,
-  areaTotals,
+  areaDisc,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals),
-    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaDisc),
+    [areaContexts, highlightedAreaId, disciplineFilter, areaDisc],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -273,6 +309,14 @@ export default function RoutePinCluster({
   if (!styleReady || shape.features.length === 0) return null;
 
   return (
+    <>
+    {/* Register the half/half split-dot once (a rasterized SVG view → GPU
+        texture); the split SymbolLayer references it by name. */}
+    <MapboxGL.Images>
+      <MapboxGL.Image name="route-pin-split">
+        <SplitDotIcon />
+      </MapboxGL.Image>
+    </MapboxGL.Images>
     <MapboxGL.ShapeSource
       id="outdoor-route-pins-src"
       shape={shape}
@@ -329,7 +373,12 @@ export default function RoutePinCluster({
           list shows. */}
       <MapboxGL.CircleLayer
         id="outdoor-route-pins-single"
-        filter={['!', ['has', 'point_count']]}
+        filter={['all',
+          ['!', ['has', 'point_count']],
+          // boulder+rope split pins render as the half/half icon below — unless
+          // dimmed, in which case they fall back to a grey dot here.
+          ['any', ['!=', ['get', 'split'], true], ['==', ['get', 'dimmed'], true]],
+        ] as any}
         style={{
           circleColor: [
             'case',
@@ -344,6 +393,23 @@ export default function RoutePinCluster({
           circleStrokeColor: '#FFFFFF',
           circleStrokeWidth: 1.2,
           circleStrokeOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
+        }}
+      />
+      {/* CB Phase F — boulder+rope split pins: half/half icon (left brown =
+          boulder, right blue = routes). Non-dimmed only; dimmed split pins use
+          the grey dot above. */}
+      <MapboxGL.SymbolLayer
+        id="outdoor-route-pins-split"
+        filter={['all',
+          ['!', ['has', 'point_count']],
+          ['==', ['get', 'split'], true],
+          ['!=', ['get', 'dimmed'], true],
+        ] as any}
+        style={{
+          iconImage: 'route-pin-split',
+          iconSize: 0.6,
+          iconAllowOverlap: true,
+          iconIgnorePlacement: true,
         }}
       />
       {/* CB Phase F (F2) — per-pin route count below the dot. SymbolLayer text
@@ -369,5 +435,6 @@ export default function RoutePinCluster({
         }}
       />
     </MapboxGL.ShapeSource>
+    </>
   );
 }
