@@ -1424,7 +1424,7 @@ export default function MapScreenMapbox({
                     minZoomLevel={8}
                     style={{
                       iconImage: GYM_MARKER_IMAGE,
-                      iconSize: 0.8,
+                      iconSize: 0.7,
                       iconAllowOverlap: true,
                       iconIgnorePlacement: true,
                     }}

@@ -9,9 +9,10 @@
 // on top. nonzero fill = "inside only" so the cream never spills outside.
 
 import Svg, { Path } from 'react-native-svg';
+import { theme } from '../../../lib/theme';
 
-const CREAM = '#F3EEE3'; // 米白 interior
-const INK = '#1C1C1E'; // near-black outline/climber
+const TEAL = theme.colors.gymMarkerFill; // #44847E — solid house, on-brand
+const WHITE = '#FFFFFF'; // the climber
 
 // head / top hold (small circle)
 const P_HEAD =
@@ -45,21 +46,20 @@ const P_WALL_OUTER =
 const P_WALL_HOLE =
   'M 738 447 L 751 469 L 813 601 L 813 611 L 777 702 L 768 709 L 680 740 ' +
   'L 668 740 L 589 720 L 583 714 L 552 644 L 542 630 Z';
-const P_WALL = `${P_WALL_OUTER} ${P_WALL_HOLE}`;
 
-/** The rock-gym marker — registered once as image `gym-rock`. Cream building
- *  interior (no tile), black glyph on top. */
+/** The rock-gym marker — registered once as image `gym-rock`. Solid teal house
+ *  silhouette (on-brand, matches the solid outdoor dots) + a white climber
+ *  (head + torso); the reaching limbs read as notches in the silhouette. No
+ *  black line-art, no tile. */
 export function GymIconRock() {
   return (
-    <Svg width={34} height={34} viewBox="0 0 1254 1254">
-      {/* cream interior — solid fills of the building outlines (inside only) */}
-      <Path d={P_WALL_OUTER} fill={CREAM} />
-      <Path d={P_ROOF_FLOOR} fill={CREAM} />
-      <Path d={P_HEAD} fill={CREAM} />
-      {/* black glyph, faithful evenodd, on top */}
-      <Path d={P_HEAD} fill={INK} fillRule="evenodd" />
-      <Path d={P_ROOF_FLOOR} fill={INK} fillRule="evenodd" />
-      <Path d={P_WALL} fill={INK} fillRule="evenodd" />
+    <Svg width={32} height={32} viewBox="0 0 1254 1254">
+      {/* solid teal house silhouette (wall + roof/floor) */}
+      <Path d={P_WALL_OUTER} fill={TEAL} />
+      <Path d={P_ROOF_FLOOR} fill={TEAL} />
+      {/* white climber: head circle + torso (the wall-path body cutout) */}
+      <Path d={P_HEAD} fill={WHITE} />
+      <Path d={P_WALL_HOLE} fill={WHITE} />
     </Svg>
   );
 }
