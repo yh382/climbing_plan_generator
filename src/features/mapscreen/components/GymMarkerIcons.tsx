@@ -7,11 +7,15 @@
 // wall. No background tile. Registered via MapboxGL.Images → SymbolLayer
 // iconImage (GPU-rasterized).
 
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
-const GREEN = theme.colors.accent; // #306E6F — house body fill
-const BROWN = '#CBA07A'; // 浅棕 — upper-left house outline + climber
+const GREEN = theme.colors.accent; // #306E6F — was the SVG's #2db83d green
+const BROWN = '#CBA07A'; // 浅棕 — was the SVG's black
+// The gaps between shapes (e.g. torso↔house) are the background showing
+// through — torso and house are the SAME green in this SVG, so without a
+// backdrop they merge. A rounded white tile restores those gaps.
+const TILE = '#FFFFFF';
 
 // — house: solid building fill + its outline —
 const HOUSE_FILL =
@@ -50,13 +54,23 @@ const CLIMBER_OUTLINE =
   'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
   'L 614 735 L 582 680 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. Original SVG
- *  structure/order, recolored: the original bright-green areas (limb / torso /
- *  house body) → theme green; the original black areas (head / outlines) →
- *  light brown, on top. */
+/** The rock-gym marker — registered once as image `gym-rock`. Faithful to the
+ *  SVG (incl. the white backdrop so the torso↔house gaps show), recolored:
+ *  bright green → theme green, black → light brown. */
 export function GymIconRock() {
   return (
-    <Svg width={32} height={32} viewBox="0 0 1254 1254">
+    <Svg width={34} height={34} viewBox="0 0 1254 1254">
+      {/* rounded white backdrop — the gaps between shapes show through it */}
+      <Rect
+        x={36}
+        y={36}
+        width={1182}
+        height={1182}
+        rx={210}
+        fill={TILE}
+        stroke="rgba(0,0,0,0.12)"
+        strokeWidth={22}
+      />
       {/* original green areas → theme green */}
       <Path d={CLIMBER_LIMB} fill={GREEN} fillRule="evenodd" />
       <Path d={CLIMBER_TORSO} fill={GREEN} fillRule="evenodd" />
