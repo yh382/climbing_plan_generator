@@ -49,9 +49,13 @@ import CragMenuSheet, { type CragMenuSheetHandle } from './components/CragMenuSh
 // CragInfoSheet. Display kind is derived from the OutdoorArea, not the route.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
+} from './components/OutdoorAreaInfoSheet';
+// CD Phase 1a — seed type + child mapper now live in the neutral shared
+// module (survive OutdoorAreaInfoSheet's 1b deletion).
+import {
   type AreaSeedInput,
   areaListItemToSeed,
-} from './components/OutdoorAreaInfoSheet';
+} from './components/outdoor-area-sheet/shared';
 import MyListSheet, { type MyListSheetHandle } from './components/MyListSheet';
 import ReportsSheet, { type ReportsSheetHandle } from './components/ReportsSheet';
 import OfflineMapsSheet, {
@@ -86,7 +90,8 @@ import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
 import { useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
-import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
+import { OutdoorBrowseSheet, type TabKey } from './components/OutdoorBrowseSheet';
+import { OutdoorAreaFooter } from './components/OutdoorAreaFooter';
 import { GymIconRock, GYM_MARKER_IMAGE } from './components/GymMarkerIcons';
 import { DiscoverLegend } from './components/DiscoverLegend';
 import TrailLayer from '../outdoor/components/TrailLayer';
@@ -495,6 +500,66 @@ export default function MapScreenMapbox({
   // focusedWall-derived crag context.
   const [browsedCrag, setBrowsedCrag] = useState<CragPin | null>(null);
   const primaryDiscipline = useSettingsStore((s) => s.primaryDiscipline);
+
+  // CD Phase 1a — instant-paint seed for the tabbed area sheet's Overview
+  // hero. Uses the tapped CragPin's known counts when it matches the active
+  // area (crag-pin tap), otherwise a name-only seed from the mode (saved-spot
+  // / search / drill-in) that detail hydrates within one fetch.
+  const browseSeed = useMemo<AreaSeedInput | null>(() => {
+    if (mode.kind !== 'area') return null;
+    if (browsedCrag && browsedCrag.id === mode.areaId) {
+      return {
+        id: browsedCrag.id,
+        name: browsedCrag.name,
+        display_kind: 'crag',
+        lat: browsedCrag.lat,
+        lng: browsedCrag.lng,
+        direct_route_count: browsedCrag.route_count,
+        subtree_route_count: browsedCrag.route_count,
+      };
+    }
+    return {
+      id: mode.areaId,
+      name: mode.areaName ?? '',
+      display_kind: regionLabel?.display_kind ?? 'area',
+    };
+  }, [mode, browsedCrag, regionLabel?.display_kind]);
+
+  // CD Phase 1a — target for the floating glass footer (share + ♡ save).
+  // Prefers the hydrated detail (accurate display_kind → bookmark
+  // target_type) and falls back to the instant-paint seed while it loads.
+  const footerArea = useMemo(() => {
+    if (mode.kind !== 'area') return null;
+    const d = areaDetail.data;
+    if (d) {
+      return {
+        id: d.id,
+        name: d.name,
+        lat: d.lat,
+        lng: d.lng,
+        display_kind: d.display_kind,
+      };
+    }
+    if (browseSeed) {
+      return {
+        id: browseSeed.id,
+        name: browseSeed.name,
+        lat: browseSeed.lat ?? null,
+        lng: browseSeed.lng ?? null,
+        display_kind: browseSeed.display_kind,
+      };
+    }
+    return null;
+  }, [mode.kind, areaDetail.data, browseSeed]);
+
+  // CD Phase 1a — controlled area-sheet tab, lifted so the floating footer
+  // shows only on Overview. Resets to Overview on every area change (crag
+  // pin tap / drill-in / breadcrumb) — crag entries open on Overview, not
+  // straight into Routes.
+  const [areaTab, setAreaTab] = useState<TabKey>('overview');
+  useEffect(() => {
+    setAreaTab('overview');
+  }, [areaId]);
   const [areaModeIndex, setAreaModeIndex] = useState(
     primaryDiscipline === "boulder" ? 1 : 0,
   ); // 0=Routes, 1=Boulder
@@ -1624,6 +1689,14 @@ export default function MapScreenMapbox({
         grabber
         grabberOptions={{ height: 3, width: 36, topMargin: 6 }}
         header={sheetHeader}
+        // CD Phase 1a — area mode floats a glass share + ♡ save capsule
+        // (gym-sheet parity). Kept mounted in area mode (saved state survives)
+        // but only VISIBLE on the Overview tab.
+        footer={
+          mode.kind === 'area'
+            ? <OutdoorAreaFooter area={footerArea} visible={areaTab === 'overview'} />
+            : undefined
+        }
         scrollable
         onDidPresent={sheet.onDidPresent}
         onWillDismiss={sheet.onWillDismiss}
@@ -1723,6 +1796,9 @@ export default function MapScreenMapbox({
              mode below until D.2 splits out SavedRoutesListSheet. */
           <OutdoorBrowseSheet
             areaId={mode.areaId}
+            seed={browseSeed}
+            tab={areaTab}
+            onTabChange={setAreaTab}
             title={regionLabel?.name ?? undefined}
             titleKind={regionLabel?.display_kind ?? undefined}
             nearbyCenter={browseCenter}
@@ -1739,6 +1815,7 @@ export default function MapScreenMapbox({
             insets={insets}
             onPressRoute={(route) => navigateToRoute(route.id)}
             onPressChildArea={(child) => enterArea(child.id, child.name)}
+            onPressAncestor={(a) => enterArea(a.id, a.name)}
             onPressHamburger={() => cragMenuSheetRef.current?.present()}
           />
         ) : (

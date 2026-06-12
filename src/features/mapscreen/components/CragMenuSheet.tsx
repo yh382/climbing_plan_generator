@@ -41,8 +41,9 @@ import RoutesLibrarySheet, { type RoutesLibrarySheetHandle } from './RoutesLibra
 // CA Phase 4b — unified outdoor area sheet replaces CragInfo/AreaInfo/RegionInfo.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
-  areaListItemToSeed,
 } from './OutdoorAreaInfoSheet';
+// CD Phase 1a — child→seed mapper now in the neutral shared module.
+import { areaListItemToSeed } from './outdoor-area-sheet/shared';
 import { AreaCoverImage } from './AreaCoverImage';
 import type { Area } from '../../outdoor/types';
 

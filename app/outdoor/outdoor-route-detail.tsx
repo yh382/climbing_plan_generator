@@ -26,9 +26,12 @@ import OutdoorSendSheet, { type OutdoorSendDraft } from '../../src/features/outd
 // AreaInfoSheet + CragInfoSheet trio. One mount serves region/area/crag.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
+} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
+// CD Phase 1a — seed type + child mapper moved to the neutral shared module.
+import {
   type AreaSeedInput,
   areaListItemToSeed,
-} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
+} from '../../src/features/mapscreen/components/outdoor-area-sheet/shared';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
 import { RouteHeroCarousel } from '../../src/components/shared/RouteHeroCarousel';
 import { RouteActionRow } from '../../src/components/shared/RouteActionRow';
