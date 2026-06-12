@@ -11,9 +11,10 @@ import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { theme } from '../../../lib/theme';
@@ -40,11 +41,16 @@ export default function RoutePinDonut({
 }: {
   composition: AreaComposition;
 }) {
-  const scale = useSharedValue(0.7);
+  // Gentle scale-up + fade-in, then it settles dead still — withTiming (no
+  // spring) so there's zero post-appearance wobble.
+  const scale = useSharedValue(0.85);
+  const opacity = useSharedValue(0);
   useEffect(() => {
-    scale.value = withSpring(1, { damping: 13, stiffness: 190 });
-  }, [scale]);
+    scale.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) });
+    opacity.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.quad) });
+  }, [scale, opacity]);
   const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
     transform: [{ scale: scale.value }],
   }));
 
