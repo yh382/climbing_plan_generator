@@ -45,14 +45,20 @@ const P_CLIMBER =
 const GYM_GLYPH_D = `${P_ROOF_FLOOR} ${P_WALL} ${P_CLIMBER}`;
 
 /** The rock-gym marker — registered once as image `gym-rock`. Cream-filled
- *  building interior (no tile), black outline + climber on top. */
+ *  building interior (no tile), black outline + climber on top.
+ *
+ *  The glyph subpaths are thin self-intersecting outlines, so filling any one
+ *  leaves gaps. To get a solid cream interior WITHOUT spilling outside the
+ *  building, fill the whole path nonzero AND every subpath solid — their union
+ *  is exactly the building footprint — then paint the black evenodd glyph over
+ *  it. */
 export function GymIconRock() {
   return (
     <Svg width={34} height={34} viewBox="0 0 1254 1254">
-      {/* cream building interior — the two outline pieces filled solid on their
-          own so the area around the climber stays filled */}
+      <Path d={GYM_GLYPH_D} fill={CREAM} />
       <Path d={P_ROOF_FLOOR} fill={CREAM} />
       <Path d={P_WALL} fill={CREAM} />
+      <Path d={P_CLIMBER} fill={CREAM} />
       {/* black outline + climber; evenodd cuts the openings back to cream */}
       <Path d={GYM_GLYPH_D} fill={INK} fillRule="evenodd" />
     </Svg>
