@@ -50,18 +50,20 @@ const CLIMBER_OUTLINE =
   'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
   'L 614 735 L 582 680 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. Green house body;
- *  the upper-left house outline + the climber are light brown, painted on top. */
+/** The rock-gym marker — registered once as image `gym-rock`. Original SVG
+ *  structure/order, recolored: the original bright-green areas (limb / torso /
+ *  house body) → theme green; the original black areas (head / outlines) →
+ *  light brown, on top. */
 export function GymIconRock() {
   return (
     <Svg width={32} height={32} viewBox="0 0 1254 1254">
-      {/* green house body */}
+      {/* original green areas → theme green */}
+      <Path d={CLIMBER_LIMB} fill={GREEN} fillRule="evenodd" />
+      <Path d={CLIMBER_TORSO} fill={GREEN} fillRule="evenodd" />
       <Path d={HOUSE_FILL} fill={GREEN} fillRule="evenodd" />
-      {/* light-brown upper-left outline + climber */}
-      <Path d={HOUSE_OUTLINE} fill={BROWN} fillRule="evenodd" />
-      <Path d={CLIMBER_LIMB} fill={BROWN} fillRule="evenodd" />
-      <Path d={CLIMBER_TORSO} fill={BROWN} fillRule="evenodd" />
+      {/* original black areas → light brown */}
       <Path d={CLIMBER_HEAD} fill={BROWN} fillRule="evenodd" />
+      <Path d={HOUSE_OUTLINE} fill={BROWN} fillRule="evenodd" />
       <Path d={CLIMBER_OUTLINE} fill={BROWN} fillRule="evenodd" />
     </Svg>
   );
