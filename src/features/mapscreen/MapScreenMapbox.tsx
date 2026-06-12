@@ -1424,7 +1424,9 @@ export default function MapScreenMapbox({
                     minZoomLevel={8}
                     style={{
                       iconImage: GYM_MARKER_IMAGE,
-                      iconSize: 0.7,
+                      iconSize: 0.85,
+                      // teardrop tip sits on the gym coordinate
+                      iconAnchor: 'bottom',
                       iconAllowOverlap: true,
                       iconIgnorePlacement: true,
                     }}
