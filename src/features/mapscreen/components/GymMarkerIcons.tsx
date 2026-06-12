@@ -11,7 +11,7 @@ import Svg, { Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
 const GREEN = theme.colors.accent; // #306E6F — was #2db83d
-const BROWN = '#C7A468'; // deeper cream/tan, yellow pulled back (was #C9A85E) — was black
+const BROWN = '#D6B786'; // lighter warm cream/tan (was #C7A468) — was black
 
 // — green paths (limb / torso+holds / house body) —
 const G_LIMB =
