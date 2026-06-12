@@ -1,68 +1,54 @@
 // src/features/mapscreen/components/GymMarkerIcons.tsx
-// CB Phase F — gym distinct-marker PREVIEW variants. Now that outdoor pins are
-// colored dots + composition rings, gyms (a teal dot) blend in. These three
-// designs give gyms a distinct SHAPE/glyph so indoor ≠ outdoor at a glance.
-// Round-robin'd across gyms (by index) so all three are visible in one screen
-// to compare; once a winner is picked we drop to that one only.
-//
-// All teal (gymMarkerFill) with white detail, drawn as react-native-svg views
-// registered via MapboxGL.Images → SymbolLayer iconImage (GPU-rasterized).
+// CB Phase F — gym map marker. A distinct climbing-gym glyph (user-supplied
+// rock_gym_icon: a wall/roof + a climber) on a rounded white tile, so gyms read
+// as indoor and stand apart from the colored outdoor dots/rings. Drawn as a
+// react-native-svg view + registered via MapboxGL.Images → SymbolLayer
+// iconImage (GPU-rasterized).
 
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { theme } from '../../../lib/theme';
+import Svg, { Path, Rect } from 'react-native-svg';
 
-const TEAL = theme.colors.gymMarkerFill; // #44847E
-const STROKE = '#FFFFFF';
+// Original glyph path, viewBox 0 0 1254 1254, fill-rule evenodd (cuts the
+// holds/holes). Glyph drawn in near-black on a rounded white tile.
+const GYM_GLYPH_D =
+  'M 1115.0 593.0 L 919.0 395.0 L 896.0 406.0 L 1074.0 593.0 L 977.0 595.0 ' +
+  'L 966.0 607.0 L 965.0 1087.0 L 243.0 1087.0 L 240.0 1112.0 L 988.0 1113.0 ' +
+  'L 995.0 625.0 L 1107.0 624.0 Z ' +
+  'M 644.0 112.0 L 624.0 115.0 L 142.0 597.0 L 152.0 617.0 L 238.0 618.0 ' +
+  'L 244.0 1030.0 L 474.0 787.0 L 489.0 801.0 L 565.0 797.0 L 619.0 871.0 ' +
+  'L 539.0 888.0 L 473.0 973.0 L 482.0 998.0 L 505.0 991.0 L 561.0 917.0 ' +
+  'L 678.0 899.0 L 706.0 876.0 L 783.0 659.0 L 775.0 610.0 L 733.0 522.0 ' +
+  'L 883.0 373.0 L 888.0 354.0 Z ' +
+  'M 570.0 687.0 L 591.0 730.0 L 602.0 744.0 L 625.0 762.0 L 652.0 772.0 ' +
+  'L 632.0 829.0 L 591.0 773.0 L 580.0 764.0 L 559.0 763.0 L 509.0 766.0 ' +
+  'L 494.0 765.0 Z ' +
+  'M 713.0 543.0 L 735.0 593.0 L 750.0 634.0 L 751.0 657.0 L 745.0 678.0 ' +
+  'L 729.0 718.0 L 720.0 726.0 L 704.0 733.0 L 676.0 740.0 L 660.0 740.0 ' +
+  'L 648.0 737.0 L 635.0 730.0 L 621.0 716.0 L 600.0 672.0 L 590.0 666.0 Z ' +
+  'M 683.0 636.0 L 682.0 637.0 L 674.0 638.0 L 664.0 643.0 L 654.0 653.0 ' +
+  'L 648.0 665.0 L 646.0 678.0 L 647.0 679.0 L 647.0 686.0 L 652.0 698.0 ' +
+  'L 663.0 710.0 L 672.0 715.0 L 678.0 717.0 L 690.0 718.0 L 691.0 717.0 ' +
+  'L 696.0 717.0 L 708.0 712.0 L 720.0 701.0 L 727.0 686.0 L 728.0 674.0 ' +
+  'L 727.0 673.0 L 727.0 668.0 L 722.0 656.0 L 711.0 644.0 L 700.0 638.0 ' +
+  'L 692.0 637.0 L 691.0 636.0 Z';
 
-/** V0 — rounded-square "chip" with a 2×2 white holds grid (a climbing wall).
- *  Square shape reads clearly different from the round outdoor pins. */
-export function GymIconChip() {
+/** The rock-gym marker — registered once as image `gym-rock`. */
+export function GymIconRock() {
   return (
-    <Svg width={30} height={30}>
-      <Rect x={4} y={4} width={22} height={22} rx={6} fill={TEAL} stroke={STROKE} strokeWidth={2} />
-      <Rect x={10} y={10} width={4} height={4} rx={1} fill={STROKE} />
-      <Rect x={16} y={10} width={4} height={4} rx={1} fill={STROKE} />
-      <Rect x={10} y={16} width={4} height={4} rx={1} fill={STROKE} />
-      <Rect x={16} y={16} width={4} height={4} rx={1} fill={STROKE} />
-    </Svg>
-  );
-}
-
-/** V1 — teardrop map-pin with a white center dot. Classic "place" marker;
- *  the pin silhouette + drop point separate it from flat outdoor dots. */
-export function GymIconPin() {
-  return (
-    <Svg width={30} height={36}>
-      <Path
-        d="M15 3 C 8 3 3 8 3 15 C 3 23 15 33 15 33 C 15 33 27 23 27 15 C 27 8 22 3 15 3 Z"
-        fill={TEAL}
-        stroke={STROKE}
-        strokeWidth={2}
+    <Svg width={34} height={34} viewBox="0 0 1254 1254">
+      {/* rounded white tile + subtle border so it reads as a marker */}
+      <Rect
+        x={16}
+        y={16}
+        width={1222}
+        height={1222}
+        rx={210}
+        fill="#FFFFFF"
+        stroke="rgba(0,0,0,0.18)"
+        strokeWidth={28}
       />
-      <Circle cx={15} cy={14} r={4.5} fill={STROKE} />
+      <Path d={GYM_GLYPH_D} fill="#1C1C1E" fillRule="evenodd" />
     </Svg>
   );
 }
 
-/** V2 — teal circle with three white "holds". Same circular footprint as the
- *  outdoor dots but a glyph inside flags it as a gym. */
-export function GymIconHolds() {
-  return (
-    <Svg width={30} height={30}>
-      <Circle cx={15} cy={15} r={12} fill={TEAL} stroke={STROKE} strokeWidth={2} />
-      <Circle cx={12} cy={11} r={2} fill={STROKE} />
-      <Circle cx={19.5} cy={14} r={2} fill={STROKE} />
-      <Circle cx={13} cy={19.5} r={2} fill={STROKE} />
-    </Svg>
-  );
-}
-
-/** Registration list — name ↔ component ↔ display anchor. The `anchor` differs
- *  because the teardrop points DOWN (anchor at its tip), the others are
- *  centered. */
-export const GYM_MARKER_VARIANTS = [
-  { name: 'gym-v0-chip', Comp: GymIconChip, anchor: 'center' as const },
-  { name: 'gym-v1-pin', Comp: GymIconPin, anchor: 'bottom' as const },
-  { name: 'gym-v2-holds', Comp: GymIconHolds, anchor: 'center' as const },
-];
-export const GYM_VARIANT_COUNT = GYM_MARKER_VARIANTS.length;
+export const GYM_MARKER_IMAGE = 'gym-rock';
