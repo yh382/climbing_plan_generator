@@ -87,6 +87,7 @@ import { outdoorApi } from '../outdoor/api';
 import { useAllCrags } from '../outdoor/useAllCrags';
 import { useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
+import { GYM_MARKER_VARIANTS, GYM_VARIANT_COUNT } from './components/GymMarkerIcons';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
 import AreaCoverageOverlay from '../outdoor/components/AreaCoverageOverlay';
@@ -934,10 +935,13 @@ export default function MapScreenMapbox({
   const gymsGeoJSON = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
-      features: Object.values(accumulatedGyms).map((g) => ({
+      features: Object.values(accumulatedGyms).map((g, i) => ({
         type: 'Feature' as const,
         id: g.place_id,
-        properties: { name: g.name, place_id: g.place_id },
+        // CB Phase F — round-robin the gym marker variant for the on-device
+        // preview (every Nth gym uses the next design). Drop to a single
+        // variant once one is chosen.
+        properties: { name: g.name, place_id: g.place_id, variant: i % GYM_VARIANT_COUNT },
         geometry: { type: 'Point' as const, coordinates: [g.location.lng, g.location.lat] },
       })),
     }),
@@ -1404,24 +1408,35 @@ export default function MapScreenMapbox({
                     state 同步). 不为极端密集城市加 fallback
                     cluster — 真出现 (e.g. Manhattan) 再做.
                     Previous: cluster + clusterMaxZoomLevel=12. */}
+                {/* CB Phase F — register the gym marker variants (preview). */}
+                <MapboxGL.Images>
+                  {GYM_MARKER_VARIANTS.map(({ name, Comp }) => (
+                    <MapboxGL.Image key={name} name={name}>
+                      <Comp />
+                    </MapboxGL.Image>
+                  ))}
+                </MapboxGL.Images>
                 <MapboxGL.ShapeSource
                   id="gyms-src"
                   shape={gymsGeoJSON}
                   onPress={onGymPinPress}
                 >
-                  <MapboxGL.CircleLayer
+                  {/* CB Phase F — gyms as a distinct glyph marker (was a teal
+                      dot) so indoor ≠ outdoor. iconImage picks the round-robin
+                      preview variant; iconSize makes gyms a touch larger than
+                      the outdoor dots so they pop. */}
+                  <MapboxGL.SymbolLayer
                     id="gyms-pins"
                     minZoomLevel={8}
                     style={{
-                      circleRadius: 6,
-                      // BS-P1-η — softer muted teal palette (was raw
-                      // accent `#306E6F` + white stroke `#fff`).
-                      // Explicit circleOpacity because @rnmapbox/maps
-                      // drops alpha from `rgba()` in circleColor.
-                      circleColor: colors.gymMarkerFill,
-                      circleOpacity: Number(colors.markerOpacity),
-                      circleStrokeWidth: 2,
-                      circleStrokeColor: colors.gymMarkerStroke,
+                      iconImage: ['match', ['get', 'variant'],
+                        0, 'gym-v0-chip',
+                        1, 'gym-v1-pin',
+                        2, 'gym-v2-holds',
+                        'gym-v0-chip'] as any,
+                      iconSize: 0.85,
+                      iconAllowOverlap: true,
+                      iconIgnorePlacement: true,
                     }}
                   />
                   {/* Gym name label — minZoomLevel matches pin (8) so
