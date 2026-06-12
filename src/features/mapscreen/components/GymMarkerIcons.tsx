@@ -5,7 +5,7 @@
 // react-native-svg view + registered via MapboxGL.Images → SymbolLayer
 // iconImage (GPU-rasterized).
 
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 // Original glyph path, viewBox 0 0 1254 1254, fill-rule evenodd (cuts the
 // holds/holes). Glyph drawn in near-black on a rounded white tile.
@@ -31,21 +31,16 @@ const GYM_GLYPH_D =
   'L 727.0 673.0 L 727.0 668.0 L 722.0 656.0 L 711.0 644.0 L 700.0 638.0 ' +
   'L 692.0 637.0 L 691.0 636.0 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. */
+/** The rock-gym marker — registered once as image `gym-rock`. No background
+ *  tile: a white fill of the glyph outline gives the "inside the building"
+ *  white, and the black evenodd glyph on top re-cuts the openings so they show
+ *  that white. Everything outside the glyph is transparent. */
 export function GymIconRock() {
   return (
     <Svg width={34} height={34} viewBox="0 0 1254 1254">
-      {/* rounded white tile + subtle border so it reads as a marker */}
-      <Rect
-        x={16}
-        y={16}
-        width={1222}
-        height={1222}
-        rx={210}
-        fill="#FFFFFF"
-        stroke="rgba(0,0,0,0.18)"
-        strokeWidth={28}
-      />
+      {/* white interior (nonzero fill of the whole outline) */}
+      <Path d={GYM_GLYPH_D} fill="#FFFFFF" />
+      {/* black outline + climber; evenodd keeps the openings showing white */}
       <Path d={GYM_GLYPH_D} fill="#1C1C1E" fillRule="evenodd" />
     </Svg>
   );
