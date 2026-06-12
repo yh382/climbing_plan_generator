@@ -1,30 +1,20 @@
 // src/features/mapscreen/components/GymMarkerIcons.tsx
-// CB Phase F — gym map marker (user-supplied house_climbing_icon). Recoloured
-// per request: the SVG's black areas → theme green; its original bright green
-// → cream. No white background tile (transparent outside the glyph). Drawn as a
-// react-native-svg view + registered via MapboxGL.Images → SymbolLayer
+// CB Phase F — gym map marker (user-supplied house_climbing_icon), recolored:
+// the WHOLE house is theme green, ONLY the climber is white. The original SVG's
+// black path bundled the house outline together with the climber, so it's split
+// here (HOUSE_OUTLINE vs CLIMBER) — the house pieces paint green first, the
+// climber pieces paint white on top, so the figure separates cleanly from the
+// wall. No background tile. Registered via MapboxGL.Images → SymbolLayer
 // iconImage (GPU-rasterized).
 
 import Svg, { Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
-// Pop on the light-beige map = the big fill carries the saturated color and the
-// figure is white (cream blended into the map). So the building fill takes the
-// theme green and the outline/climber goes white.
-const GREEN = theme.colors.accent; // #306E6F — building fill (was #2db83d)
-const WHITE = '#FFFFFF'; // outline + climber (was black)
+const GREEN = theme.colors.accent; // #306E6F — the whole house
+const WHITE = '#FFFFFF'; // the climber
 
-// — original GREEN (#2db83d) shapes → cream —
-const G1 =
-  'M 477 790 L 553 791 L 566 796 L 630 869 L 647 808 L 581 778 L 574 771 ' +
-  'L 545 720 Z';
-const G2 =
-  'M 722 536 L 584 681 L 616 735 L 668 756 L 682 755 L 732 736 L 746 727 ' +
-  'L 769 645 L 765 632 Z ' +
-  'M 684 621 L 698 622 L 721 633 L 736 650 L 743 670 L 742 691 L 733 711 ' +
-  'L 717 726 L 690 735 L 672 733 L 651 722 L 637 705 L 631 687 L 633 661 ' +
-  'L 646 639 L 664 626 Z';
-const G3 =
+// — house: solid building fill + its outline —
+const HOUSE_FILL =
   'M 1121 584 L 923 377 L 896 353 L 768 487 L 758 501 L 770 511 L 818 619 ' +
   'L 822 632 L 823 654 L 742 927 L 734 939 L 714 956 L 696 962 L 544 971 ' +
   'L 536 977 L 484 1051 L 471 1056 L 459 1055 L 449 1049 L 443 1041 L 440 1032 ' +
@@ -32,35 +22,47 @@ const G3 =
   'L 532 847 L 463 848 L 448 842 L 439 830 L 244 1033 L 243 1121 L 247 1133 ' +
   'L 255 1141 L 264 1145 L 989 1145 L 997 1142 L 1005 1135 L 1009 1126 ' +
   'L 1009 643 L 1013 633 L 1024 626 L 1104 626 L 1112 623 L 1124 608 L 1125 596 Z';
-
-// — original BLACK shapes → theme green —
-const B1 =
-  'M 677 623 L 659 630 L 641 647 L 632 670 L 632 686 L 640 708 L 654 723 ' +
-  'L 677 733 L 696 733 L 715 726 L 731 712 L 741 690 L 741 666 L 732 646 ' +
-  'L 718 632 L 697 623 Z';
-const B2 =
+const HOUSE_OUTLINE =
   'M 632 99 L 616 105 L 138 583 L 133 592 L 133 609 L 137 616 L 148 624 ' +
   'L 235 625 L 241 628 L 245 635 L 246 1030 L 432 836 L 441 830 L 448 841 ' +
   'L 459 846 L 533 846 L 539 849 L 582 906 L 574 909 L 524 912 L 512 917 ' +
   'L 501 927 L 442 1019 L 443 1039 L 452 1050 L 463 1055 L 478 1053 L 490 1044 ' +
   'L 535 977 L 543 970 L 700 960 L 725 947 L 742 924 L 822 653 L 821 633 ' +
-  'L 816 617 L 770 513 L 756 499 L 891 358 L 893 351 L 891 345 L 650 105 Z ' +
+  'L 816 617 L 770 513 L 756 499 L 891 358 L 893 351 L 891 345 L 650 105 Z';
+
+// — climber: limbs + torso + head (white, painted over the house) —
+const CLIMBER_LIMB =
+  'M 477 790 L 553 791 L 566 796 L 630 869 L 647 808 L 581 778 L 574 771 ' +
+  'L 545 720 Z';
+const CLIMBER_TORSO =
+  'M 722 536 L 584 681 L 616 735 L 668 756 L 682 755 L 732 736 L 746 727 ' +
+  'L 769 645 L 765 632 Z ' +
+  'M 684 621 L 698 622 L 721 633 L 736 650 L 743 670 L 742 691 L 733 711 ' +
+  'L 717 726 L 690 735 L 672 733 L 651 722 L 637 705 L 631 687 L 633 661 ' +
+  'L 646 639 L 664 626 Z';
+const CLIMBER_HEAD =
+  'M 677 623 L 659 630 L 641 647 L 632 670 L 632 686 L 640 708 L 654 723 ' +
+  'L 677 733 L 696 733 L 715 726 L 731 712 L 741 690 L 741 666 L 732 646 ' +
+  'L 718 632 L 697 623 Z';
+const CLIMBER_OUTLINE =
   'M 544 719 L 549 723 L 575 771 L 581 777 L 647 806 L 630 871 L 574 804 ' +
   'L 564 796 L 551 792 L 475 791 Z ' +
   'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
   'L 614 735 L 582 680 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. Solid theme-green
- *  building (was the SVG's green fill) with a white outline + climber (was
- *  black). Render order preserved so the white paints over the green. */
+/** The rock-gym marker — registered once as image `gym-rock`. Whole house theme
+ *  green, climber white on top. */
 export function GymIconRock() {
   return (
     <Svg width={32} height={32} viewBox="0 0 1254 1254">
-      <Path d={G1} fill={GREEN} fillRule="evenodd" />
-      <Path d={G2} fill={GREEN} fillRule="evenodd" />
-      <Path d={G3} fill={GREEN} fillRule="evenodd" />
-      <Path d={B1} fill={WHITE} fillRule="evenodd" />
-      <Path d={B2} fill={WHITE} fillRule="evenodd" />
+      {/* green house (fill + outline) */}
+      <Path d={HOUSE_FILL} fill={GREEN} fillRule="evenodd" />
+      <Path d={HOUSE_OUTLINE} fill={GREEN} fillRule="evenodd" />
+      {/* white climber, painted over the house */}
+      <Path d={CLIMBER_LIMB} fill={WHITE} fillRule="evenodd" />
+      <Path d={CLIMBER_TORSO} fill={WHITE} fillRule="evenodd" />
+      <Path d={CLIMBER_HEAD} fill={WHITE} fillRule="evenodd" />
+      <Path d={CLIMBER_OUTLINE} fill={WHITE} fillRule="evenodd" />
     </Svg>
   );
 }
