@@ -88,6 +88,7 @@ import { useAllCrags } from '../outdoor/useAllCrags';
 import { useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import { GymIconRock, GYM_MARKER_IMAGE } from './components/GymMarkerIcons';
+import { DiscoverLegend } from './components/DiscoverLegend';
 import TrailLayer from '../outdoor/components/TrailLayer';
 // CA Phase 5.3 — server-driven coverage replaces the local hull.
 import AreaCoverageOverlay from '../outdoor/components/AreaCoverageOverlay';
@@ -1667,6 +1668,8 @@ export default function MapScreenMapbox({
                 });
               }}
             />
+            {/* CB Phase F — persistent legend for the discover map markers. */}
+            <DiscoverLegend />
             <View style={styles.gymsListSectionHeader}>
               <Text style={styles.gymsListSectionTitle}>
                 {gymsQuery.trim()

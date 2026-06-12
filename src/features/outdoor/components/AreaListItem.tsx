@@ -3,7 +3,7 @@
 
 import React from "react";
 import { Text, Pressable, View, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { SymbolView } from "expo-symbols";
 // BR Track A: this card renders the top-level Region (was Area). Type
 // alias kept for caller minimum-diff — Track D will rename.
 import type { Region as Area } from "../types";
@@ -26,11 +26,14 @@ export function AreaListItem({ area, distanceM, onPress, colors }: AreaListItemP
       style={styles.rowItem}
     >
       <View style={styles.titleRow}>
-        <Ionicons
-          name="trail-sign-outline"
-          size={14}
-          color={colors.iconLabel}
-          style={{ marginRight: 6 }}
+        {/* CB Phase F — outdoor crag rows use the climbing-figure SF Symbol
+            (gym rows use the teardrop), so indoor vs outdoor reads in the
+            nearby list too. */}
+        <SymbolView
+          name="figure.climbing"
+          tintColor={colors.iconLabel}
+          resizeMode="scaleAspectFit"
+          style={{ width: 15, height: 15, marginRight: 6 }}
         />
         <Text style={[styles.rowTitle, { color: colors.iconLabel }]} numberOfLines={1}>
           {area.name}
