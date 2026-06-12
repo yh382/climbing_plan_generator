@@ -54,9 +54,12 @@ import CragMenuSheet, { type CragMenuSheetHandle } from '../../src/features/maps
 // CA Phase 4b — unified outdoor area sheet replaces RegionInfoSheet + CragInfoSheet.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
+} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
+// CD Phase 1a — seed type + child mapper moved to the neutral shared module.
+import {
   type AreaSeedInput,
   areaListItemToSeed,
-} from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
+} from '../../src/features/mapscreen/components/outdoor-area-sheet/shared';
 import { FilterChipsBar } from '../../src/features/mapscreen/components/FilterChipsBar';
 import useOutdoorMapFiltersStore from '../../src/store/useOutdoorMapFiltersStore';
 import MyListSheet, { type MyListSheetHandle } from '../../src/features/mapscreen/components/MyListSheet';
