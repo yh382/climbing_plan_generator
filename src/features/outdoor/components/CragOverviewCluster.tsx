@@ -18,7 +18,9 @@
  */
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
+import Svg, { Circle } from 'react-native-svg';
 import { useThemeColors } from '../../../lib/useThemeColors';
+import { STYLE_COLORS } from './RoutePinCluster';
 // CA-FU Phase C.2 — source switched from the legacy CragOverview (region-
 // scoped, ~15k) to CragPin: the BE-classified crag-tier nodes from the 35k
 // /outdoor/areas/crags preload (useAllCrags). discipline_counts.{boulder,
@@ -152,6 +154,79 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+// ─── CB Phase F — discover cluster composition ring ─────────────────
+// A boulder/rope ratio ring drawn on cluster bubbles via a quantized set of
+// pre-rendered SVG-view images + a SymbolLayer iconImage (GPU-rasterized,
+// scales — MarkerView would choke on the discover crag count). Quantized to
+// 11 boulder-fraction buckets (0%,10%,…,100%); `other` is folded into rope so
+// the overview reads as boulder-vs-rope (the story at this zoom). Transparent
+// center so the white bubble base + count text show through.
+const RING_BUCKETS = 10; // → 11 images, indices 0..10
+const RING_IMG = 48;
+const RING_STROKE = 8;
+const RING_R = (RING_IMG - RING_STROKE) / 2;
+const RING_C = RING_IMG / 2;
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function RingIcon({ boulderFraction }: { boulderFraction: number }) {
+  const bLen = boulderFraction * RING_CIRC;
+  return (
+    <Svg width={RING_IMG} height={RING_IMG}>
+      {/* full rope (blue) base ring */}
+      <Circle
+        cx={RING_C}
+        cy={RING_C}
+        r={RING_R}
+        fill="none"
+        stroke={STYLE_COLORS.sport}
+        strokeWidth={RING_STROKE}
+      />
+      {/* boulder (brown) arc over the top for its fraction */}
+      {boulderFraction > 0 ? (
+        <Circle
+          cx={RING_C}
+          cy={RING_C}
+          r={RING_R}
+          fill="none"
+          stroke={STYLE_COLORS.boulder}
+          strokeWidth={RING_STROKE}
+          strokeDasharray={[bLen, RING_CIRC - bLen]}
+          rotation={-90}
+          originX={RING_C}
+          originY={RING_C}
+        />
+      ) : null}
+    </Svg>
+  );
+}
+
+const RING_INDEXES = Array.from({ length: RING_BUCKETS + 1 }, (_, i) => i);
+
+// iconImage: pick the ring bucket from the cluster's boulder fraction
+// (boulder / (boulder+rope), guarded against /0). Step thresholds at the
+// bucket midpoints (0.05, 0.15, …) round to the nearest 10%.
+const RING_FRACTION_EXPR = [
+  '/',
+  ['get', 'boulder_count_sum'],
+  ['max', 1, ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']]],
+] as const;
+const RING_IMAGE_EXPR: any = ['step', RING_FRACTION_EXPR, 'crag-ring-0'];
+for (let i = 1; i <= RING_BUCKETS; i++) {
+  RING_IMAGE_EXPR.push((i * 10 - 5) / 100, `crag-ring-${i}`);
+}
+
+// iconSize: scale the 48px ring image down to the bubble radius
+// (outer ring radius ≈ 24px), mirroring CLUSTER_RADIUS_EXPRESSION steps.
+const RING_SIZE_EXPR = [
+  'step',
+  ['get', 'route_count_sum'],
+  8 / 24,
+  100, 12 / 24,
+  500, 16 / 24,
+  2000, 20 / 24,
+  10000, 24 / 24,
+] as const;
+
 function toGeoJSON(crags: CragPin[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -239,6 +314,15 @@ export default function CragOverviewCluster({
   if (!styleReady || shape.features.length === 0) return null;
 
   return (
+    <>
+    {/* CB Phase F — register the 11 quantized composition-ring images once. */}
+    <MapboxGL.Images>
+      {RING_INDEXES.map((i) => (
+        <MapboxGL.Image key={i} name={`crag-ring-${i}`}>
+          <RingIcon boulderFraction={i / RING_BUCKETS} />
+        </MapboxGL.Image>
+      ))}
+    </MapboxGL.Images>
     <MapboxGL.ShapeSource
       id="crag-overview-src"
       shape={shape}
@@ -277,43 +361,32 @@ export default function CragOverviewCluster({
           unknown_ratio > 0.3 (don't mislead with sparse data). Kept
           expression shallow (handoff §10 caveat: @rnmapbox/maps RN
           version chokes on deep nesting). */}
+      {/* CB Phase F — bubble is now a WHITE base; the composition ring
+          (boulder/rope) is drawn on top by the iconImage SymbolLayer below,
+          and the count label sits in the white center. (Was a single
+          dominant-discipline fill via a case expression.) */}
       <MapboxGL.CircleLayer
         id="crag-overview-cluster-circles"
         filter={['has', 'point_count']}
         style={{
-          circleColor: [
-            'case',
-            // Guard: too much unknown → neutral fallback
-            ['>',
-              ['/', ['get', 'unknown_count_sum'], ['get', 'route_count_sum']],
-              0.3,
-            ],
-            colors.outdoorMarkerFill,
-            // Boulder-dominant (≥70% of known are boulders)
-            ['>=',
-              ['/',
-                ['get', 'boulder_count_sum'],
-                ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']],
-              ],
-              0.7,
-            ],
-            colors.outdoorMarkerFillBoulder,
-            // Rope-dominant (≥70% of known are rope)
-            ['>=',
-              ['/',
-                ['get', 'rope_count_sum'],
-                ['+', ['get', 'boulder_count_sum'], ['get', 'rope_count_sum']],
-              ],
-              0.7,
-            ],
-            colors.outdoorMarkerFill,
-            // Mixed — neither dominant
-            colors.outdoorMarkerFillMixed,
-          ] as any,
-          circleOpacity: Number(colors.markerOpacity),
+          circleColor: '#FFFFFF',
+          circleOpacity: 0.96,
           circleRadius: CLUSTER_RADIUS_EXPRESSION,
           circleStrokeColor: colors.outdoorMarkerStroke,
-          circleStrokeWidth: 2,
+          circleStrokeWidth: 1,
+        }}
+      />
+      {/* CB Phase F — composition ring on the cluster bubble (boulder brown /
+          rope blue), quantized image picked by boulder fraction, sized to the
+          bubble. */}
+      <MapboxGL.SymbolLayer
+        id="crag-overview-cluster-ring"
+        filter={['has', 'point_count']}
+        style={{
+          iconImage: RING_IMAGE_EXPR,
+          iconSize: RING_SIZE_EXPR as any,
+          iconAllowOverlap: true,
+          iconIgnorePlacement: true,
         }}
       />
       {/* Cluster bubble label — total route count across the cluster's
@@ -460,5 +533,6 @@ export default function CragOverviewCluster({
         }}
       />
     </MapboxGL.ShapeSource>
+    </>
   );
 }
