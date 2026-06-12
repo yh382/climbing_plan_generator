@@ -43,10 +43,10 @@ type StyleBucket = keyof typeof STYLE_COLORS;
  *  CircleLayer can't render a two-tone circle). Rendered at 2× then scaled
  *  down on-map for crisp edges. */
 const SPLIT_ICON_PX = 24;
-function SplitDotIcon() {
+export function SplitDotIcon() {
   const s = SPLIT_ICON_PX;
   const c = s / 2;
-  const r = c - 3;
+  const r = c - 2;
   // Right semicircle (top → bottom, clockwise) filled blue over the brown base.
   const rightHalf = `M ${c} ${c - r} A ${r} ${r} 0 0 1 ${c} ${c + r} Z`;
   return (
@@ -406,8 +406,11 @@ export default function RoutePinCluster({
           ['!=', ['get', 'dimmed'], true],
         ] as any}
         style={{
+          // Sized so the split circle matches the CircleLayer dot diameter
+          // (the SVG circle is r=10 in a 24px box → 20px; 0.66 ≈ 13px ≈ the
+          // 12px dot + its 1.2 white stroke).
           iconImage: 'route-pin-split',
-          iconSize: 0.6,
+          iconSize: 0.66,
           iconAllowOverlap: true,
           iconIgnorePlacement: true,
         }}
