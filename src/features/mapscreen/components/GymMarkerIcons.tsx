@@ -1,65 +1,63 @@
 // src/features/mapscreen/components/GymMarkerIcons.tsx
-// CB Phase F — gym map marker. A distinct climbing-gym glyph (user-supplied
-// rock_gym_icon_final: a wall/roof + a climber) so gyms read as indoor and
-// stand apart from the colored outdoor dots/rings. Drawn as a react-native-svg
-// view + registered via MapboxGL.Images → SymbolLayer iconImage (GPU-raster).
-//
-// No background tile. The building OUTER outline is filled solid cream as the
-// interior; the black evenodd glyph (head + roof/floor + wall/climber) paints
-// on top. nonzero fill = "inside only" so the cream never spills outside.
+// CB Phase F — gym map marker (user-supplied house_climbing_icon). Recoloured
+// per request: the SVG's black areas → theme green; its original bright green
+// → cream. No white background tile (transparent outside the glyph). Drawn as a
+// react-native-svg view + registered via MapboxGL.Images → SymbolLayer
+// iconImage (GPU-rasterized).
 
 import Svg, { Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
-const TEAL = theme.colors.gymMarkerFill; // #44847E — solid house, on-brand
-const WHITE = '#FFFFFF'; // the climber
+const GREEN = theme.colors.accent; // #306E6F — was the SVG's black areas
+const CREAM = '#F3EEE3'; // 米白 — was the SVG's #2db83d green
 
-// head / top hold (small circle)
-const P_HEAD =
-  'M 688 563 L 668 568 L 656 574 L 637 591 L 629 603 L 623 618 L 621 628 ' +
-  'L 621 650 L 625 665 L 632 679 L 650 699 L 665 708 L 680 713 L 706 714 ' +
-  'L 729 707 L 744 697 L 755 686 L 764 672 L 769 659 L 771 649 L 771 628 ' +
-  'L 768 615 L 761 600 L 745 581 L 730 571 L 718 566 L 703 563 Z';
+// — original GREEN (#2db83d) shapes → cream —
+const G1 =
+  'M 477 790 L 553 791 L 566 796 L 630 869 L 647 808 L 581 778 L 574 771 ' +
+  'L 545 720 Z';
+const G2 =
+  'M 722 536 L 584 681 L 616 735 L 668 756 L 682 755 L 732 736 L 746 727 ' +
+  'L 769 645 L 765 632 Z ' +
+  'M 684 621 L 698 622 L 721 633 L 736 650 L 743 670 L 742 691 L 733 711 ' +
+  'L 717 726 L 690 735 L 672 733 L 651 722 L 637 705 L 631 687 L 633 661 ' +
+  'L 646 639 L 664 626 Z';
+const G3 =
+  'M 1121 584 L 923 377 L 896 353 L 768 487 L 758 501 L 770 511 L 818 619 ' +
+  'L 822 632 L 823 654 L 742 927 L 734 939 L 714 956 L 696 962 L 544 971 ' +
+  'L 536 977 L 484 1051 L 471 1056 L 459 1055 L 449 1049 L 443 1041 L 440 1032 ' +
+  'L 441 1019 L 499 928 L 510 917 L 523 911 L 571 908 L 581 905 L 537 849 ' +
+  'L 532 847 L 463 848 L 448 842 L 439 830 L 244 1033 L 243 1121 L 247 1133 ' +
+  'L 255 1141 L 264 1145 L 989 1145 L 997 1142 L 1005 1135 L 1009 1126 ' +
+  'L 1009 643 L 1013 633 L 1024 626 L 1104 626 L 1112 623 L 1124 608 L 1125 596 Z';
 
-// right roof beam + floor + right wall
-const P_ROOF_FLOOR =
-  'M 1193 582 L 955 340 L 951 338 L 941 338 L 918 357 L 915 363 L 915 371 ' +
-  'L 917 376 L 1127 587 L 1021 588 L 1010 592 L 1002 600 L 998 611 L 997 1146 ' +
-  'L 178 1146 L 172 1149 L 167 1157 L 168 1189 L 172 1194 L 178 1197 L 1036 1197 ' +
-  'L 1042 1194 L 1047 1189 L 1050 1182 L 1051 638 L 1174 638 L 1181 636 ' +
-  'L 1190 629 L 1196 616 L 1196 590 Z';
+// — original BLACK shapes → theme green —
+const B1 =
+  'M 677 623 L 659 630 L 641 647 L 632 670 L 632 686 L 640 708 L 654 723 ' +
+  'L 677 733 L 696 733 L 715 726 L 731 712 L 741 690 L 741 666 L 732 646 ' +
+  'L 718 632 L 697 623 Z';
+const B2 =
+  'M 632 99 L 616 105 L 138 583 L 133 592 L 133 609 L 137 616 L 148 624 ' +
+  'L 235 625 L 241 628 L 245 635 L 246 1030 L 432 836 L 441 830 L 448 841 ' +
+  'L 459 846 L 533 846 L 539 849 L 582 906 L 574 909 L 524 912 L 512 917 ' +
+  'L 501 927 L 442 1019 L 443 1039 L 452 1050 L 463 1055 L 478 1053 L 490 1044 ' +
+  'L 535 977 L 543 970 L 700 960 L 725 947 L 742 924 L 822 653 L 821 633 ' +
+  'L 816 617 L 770 513 L 756 499 L 891 358 L 893 351 L 891 345 L 650 105 Z ' +
+  'M 544 719 L 549 723 L 575 771 L 581 777 L 647 806 L 630 871 L 574 804 ' +
+  'L 564 796 L 551 792 L 475 791 Z ' +
+  'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
+  'L 614 735 L 582 680 Z';
 
-// main wall/building outer outline (the climber's surroundings)
-const P_WALL_OUTER =
-  'M 657 67 L 643 67 L 634 72 L 371 313 L 80 576 L 59 597 L 57 602 L 58 617 ' +
-  'L 64 626 L 73 631 L 164 632 L 167 635 L 167 1057 L 169 1062 L 176 1067 ' +
-  'L 182 1067 L 189 1062 L 403 766 L 491 680 L 497 690 L 530 765 L 542 778 ' +
-  'L 554 784 L 652 810 L 656 813 L 656 817 L 637 889 L 558 809 L 544 801 ' +
-  'L 535 799 L 438 799 L 424 804 L 415 812 L 408 826 L 407 839 L 411 852 ' +
-  'L 419 862 L 431 869 L 441 871 L 517 871 L 584 939 L 576 941 L 507 943 ' +
-  'L 490 949 L 478 958 L 398 1057 L 394 1069 L 394 1081 L 401 1097 L 411 1106 ' +
-  'L 423 1111 L 438 1111 L 449 1107 L 458 1100 L 518 1028 L 526 1021 L 694 1018 ' +
-  'L 718 1016 L 728 1013 L 748 1001 L 761 987 L 769 972 L 836 757 L 886 618 ' +
-  'L 886 599 L 882 585 L 802 415 L 787 401 L 886 310 L 891 298 L 892 289 ' +
-  'L 889 276 L 882 266 L 666 72 Z';
-// climber body cutout (a hole in the wall path)
-const P_WALL_HOLE =
-  'M 738 447 L 751 469 L 813 601 L 813 611 L 777 702 L 768 709 L 680 740 ' +
-  'L 668 740 L 589 720 L 583 714 L 552 644 L 542 630 Z';
-
-/** The rock-gym marker — registered once as image `gym-rock`. Solid teal house
- *  silhouette (on-brand, matches the solid outdoor dots) + a white climber
- *  (head + torso); the reaching limbs read as notches in the silhouette. No
- *  black line-art, no tile. */
+/** The rock-gym marker — registered once as image `gym-rock`. Cream building/
+ *  climber fills (was the SVG's green) under theme-green outline + figure (was
+ *  black). Render order preserved so the green paints over the cream. */
 export function GymIconRock() {
   return (
     <Svg width={32} height={32} viewBox="0 0 1254 1254">
-      {/* solid teal house silhouette (wall + roof/floor) */}
-      <Path d={P_WALL_OUTER} fill={TEAL} />
-      <Path d={P_ROOF_FLOOR} fill={TEAL} />
-      {/* white climber: head circle + torso (the wall-path body cutout) */}
-      <Path d={P_HEAD} fill={WHITE} />
-      <Path d={P_WALL_HOLE} fill={WHITE} />
+      <Path d={G1} fill={CREAM} fillRule="evenodd" />
+      <Path d={G2} fill={CREAM} fillRule="evenodd" />
+      <Path d={G3} fill={CREAM} fillRule="evenodd" />
+      <Path d={B1} fill={GREEN} fillRule="evenodd" />
+      <Path d={B2} fill={GREEN} fillRule="evenodd" />
     </Svg>
   );
 }
