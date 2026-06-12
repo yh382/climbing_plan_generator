@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { outdoorApi, type RegionLabel } from './api';
 import type {
-  AreaComposition, AreaSearchResponse, CoverageResponse, DisplayKind,
-  OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
+  AreaComposition, AreaCompositionItem, AreaSearchResponse, CoverageResponse,
+  DisplayKind, OutdoorAreaDetail, OutdoorAreaListItem, OutdoorRoute, SearchResult,
 } from './types';
 
 // CA Phase 6.1 — `useAreaFavoriteToggle` removed. The legacy region-only
@@ -146,6 +146,31 @@ export function useAreaComposition(areaId: string | null | undefined) {
     () => areaId ? outdoorApi.getAreaComposition(areaId) : Promise.resolve(null),
     [areaId],
   );
+}
+
+/** CB Phase F — batch prefetch of 4-bucket composition for all visible browse
+ *  pins (POST /outdoor/areas/composition), returned as a area_id→composition
+ *  Map. Re-fetches only when the SET of ids changes (keyed on a sorted join),
+ *  so panning within the same area cluster doesn't re-hit. Powers the instant
+ *  selected donut + dominant-style pin color + mix-pin rings. */
+export function useAreasComposition(areaIds: string[]) {
+  const key = useMemo(
+    () => Array.from(new Set(areaIds)).sort().join(','),
+    [areaIds],
+  );
+  const state = useFetchOnce<AreaCompositionItem[]>(
+    () => (key ? outdoorApi.getAreasComposition(key.split(',')) : Promise.resolve([])),
+    [key],
+  );
+  const map = useMemo(() => {
+    const m = new Map<string, AreaComposition>();
+    for (const it of state.data ?? []) {
+      const { area_id, ...comp } = it;
+      m.set(area_id, comp);
+    }
+    return m;
+  }, [state.data]);
+  return { map, loading: state.loading };
 }
 
 /** GET /outdoor/areas?bbox=...&display_kinds=... Zoom-aware pin source. */

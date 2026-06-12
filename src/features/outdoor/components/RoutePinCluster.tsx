@@ -22,7 +22,43 @@
 import { useCallback, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 import { theme } from '../../../lib/theme';
-import type { RoutePin } from '../types';
+import type { AreaComposition, RoutePin } from '../types';
+
+/** CB Phase F — 4-bucket style palette, shared with the donut so dots, rings,
+ *  and the legend all read the same. Boulder/sport reuse the pin colors; trad
+ *  green + other grey are device-tunable. */
+export const STYLE_COLORS = {
+  boulder: theme.colors.outdoorMarkerFill, // sandstone
+  sport: theme.colors.routesMarkerFill, // teal-blue
+  trad: '#5E8C61', // muted green
+  other: '#9AA0A6', // grey
+} as const;
+
+type StyleBucket = keyof typeof STYLE_COLORS;
+
+/** Dominant style bucket (argmax; ties resolve boulder>sport>trad>other). */
+function dominantStyle(c: AreaComposition): StyleBucket {
+  const entries: [StyleBucket, number][] = [
+    ['boulder', c.boulder],
+    ['sport', c.sport],
+    ['trad', c.trad],
+    ['other', c.other],
+  ];
+  let best = entries[0];
+  for (const e of entries) if (e[1] > best[1]) best = e;
+  return best[0];
+}
+
+/** ≥2 non-empty buckets → the area is "mixed" and warrants a ratio ring. */
+function isMix(c: AreaComposition): boolean {
+  return (
+    (c.boulder > 0 ? 1 : 0) +
+      (c.sport > 0 ? 1 : 0) +
+      (c.trad > 0 ? 1 : 0) +
+      (c.other > 0 ? 1 : 0) >=
+    2
+  );
+}
 
 /** Per-area aggregated context attached to features so a tap surfaces
  *  the canonical UUID without a second fetch. CA Phase 6.2 — primary
@@ -68,6 +104,10 @@ export type RoutePinClusterProps = {
    *  is the only honest per-pin count. Falls back to the sample count when an
    *  area isn't in the preload. */
   areaTotals?: Record<string, number>;
+  /** CB Phase F — area_id → prefetched 4-bucket composition. Drives the
+   *  dominant-style pin color + the `is_mix` flag. Falls back to the 2-color
+   *  boulder/routes split for areas not yet prefetched. */
+  compositionMap?: Map<string, AreaComposition>;
   onAreaPress?: (ctx: AreaPinContext) => void;
   /** When the user taps a cluster bubble, fly camera in. The caller knows
    *  how to compute the next zoom from `getClusterExpansionZoom`. */
@@ -150,6 +190,7 @@ function toGeoJSON(
   highlightedAreaId?: string | null,
   disciplineFilter?: 'boulder' | 'rope' | null,
   areaTotals?: Record<string, number>,
+  compositionMap?: Map<string, AreaComposition>,
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -164,6 +205,16 @@ function toGeoJSON(
           : disciplineFilter === 'rope'
             ? ropeCount === 0
             : false;
+      // CB Phase F — dominant style (4-color) + mix flag from the prefetched
+      // composition. Fallback (not yet prefetched): the 2-color boulder/routes
+      // split, where "routes" maps to the sport color so it matches.
+      const comp = compositionMap?.get(a.area_id);
+      const dom = comp
+        ? dominantStyle(comp)
+        : a.boulder_count * 2 > a.route_count
+          ? 'boulder'
+          : 'sport';
+      const mix = comp ? isMix(comp) : false;
       return {
       type: 'Feature',
       id: a.area_id,
@@ -173,8 +224,11 @@ function toGeoJSON(
         display_kind: a.display_kind,
         route_count: a.route_count,
         // CB 点2 — boulder-dominant = strict majority of boulders (ties lean
-        // "Routes"). Drives the single-pin fill color.
+        // "Routes"). Kept as the 2-color fallback flag.
         dominant_boulder: a.boulder_count * 2 > a.route_count,
+        // CB Phase F — dominant style (4-color) + mix flag.
+        dom,
+        is_mix: mix,
         dimmed,
         // CB Phase F (F2) — TRUE total (preload) for the per-pin number; the
         // grouped sample count is the fallback when the area isn't preloaded.
@@ -196,14 +250,15 @@ export default function RoutePinCluster({
   highlightedAreaId,
   disciplineFilter,
   areaTotals,
+  compositionMap,
   onAreaPress,
   onClusterPress,
 }: RoutePinClusterProps) {
   const tapHandler = onAreaPress;
   const areaContexts = useMemo(() => groupByArea(pins), [pins]);
   const shape = useMemo(
-    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals),
-    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals],
+    () => toGeoJSON(areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap),
+    [areaContexts, highlightedAreaId, disciplineFilter, areaTotals, compositionMap],
   );
   const areaLookup = useMemo(() => {
     const map = new Map<string, AreaPinContext>();
@@ -299,9 +354,12 @@ export default function RoutePinCluster({
             'case',
             ['get', 'dimmed'],
             DIM_FILL,
-            ['case', ['get', 'dominant_boulder'],
-              theme.colors.outdoorMarkerFill,
-              theme.colors.routesMarkerFill],
+            ['match', ['get', 'dom'],
+              'boulder', STYLE_COLORS.boulder,
+              'sport', STYLE_COLORS.sport,
+              'trad', STYLE_COLORS.trad,
+              'other', STYLE_COLORS.other,
+              STYLE_COLORS.boulder],
           ] as any,
           circleOpacity: ['case', ['get', 'dimmed'], DIM_OPACITY, 1] as any,
           circleRadius: AREA_PIN_RADIUS,

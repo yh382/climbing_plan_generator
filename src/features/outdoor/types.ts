@@ -654,6 +654,10 @@ export type AreaComposition = {
   other: number;
 };
 
+/** Batch-composition row (POST /outdoor/areas/composition) — AreaComposition
+ *  keyed by area_id, for the browse map's per-pin prefetch. */
+export type AreaCompositionItem = AreaComposition & { area_id: string };
+
 /** One crag-tier pin in the preload source. */
 export type CragPin = {
   id: string;

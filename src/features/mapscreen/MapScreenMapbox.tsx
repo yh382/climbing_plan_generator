@@ -85,7 +85,7 @@ import { type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CA-FU Phase C — explore-mode preload (35k crag static source) supersedes
 import { useAllCrags } from '../outdoor/useAllCrags';
-import { useAreaComposition, useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
+import { useAreaComposition, useAreasComposition, useAreaDetail, useNearbyRoutes, useRegionLabel } from '../outdoor/hooks';
 import RoutePinDonut from '../outdoor/components/RoutePinDonut';
 import { OutdoorBrowseSheet } from './components/OutdoorBrowseSheet';
 import TrailLayer from '../outdoor/components/TrailLayer';
@@ -488,8 +488,24 @@ export default function MapScreenMapbox({
     }
     return m;
   }, [allCrags.crags]);
-  // CB Phase F (F3) — 4-bucket composition for the selected pin's donut.
+  // CB Phase F — batch-prefetch the 4-bucket composition for every visible
+  // browse pin (one round-trip, keyed on the id set). Powers instant donut +
+  // dominant-style pin color + mix-pin rings.
+  const browseAreaIds = useMemo(
+    () => Array.from(new Set(browsePins.map((p) => p.area_id))),
+    [browsePins],
+  );
+  const browseComposition = useAreasComposition(browseAreaIds);
+  // Per-tap single-area fetch — fallback for a selected pin missing from the
+  // prefetch (e.g. tapped before the batch resolved).
   const selectedComposition = useAreaComposition(highlightedAreaId);
+  // Donut data: prefer the prefetched composition (instant, no gap), else the
+  // per-tap fetch. `loading` only blocks when we have neither.
+  const selectedPrefetched = highlightedAreaId
+    ? browseComposition.map.get(highlightedAreaId) ?? null
+    : null;
+  const selectedComp = selectedPrefetched ?? selectedComposition.data;
+  const selectedCompLoading = !selectedPrefetched && selectedComposition.loading;
   // BR Track D Day 5d — focused Wall pin context. When set, RoutesListSheet
   // flips to 2-row header (Crag subtitle + large Wall title per PLAN §3.2),
   // and `walls` is reduced to that single wall. Cleared on enterArea /
@@ -1537,6 +1553,7 @@ export default function MapScreenMapbox({
                 highlightedAreaId={highlightedAreaId}
                 disciplineFilter={browseDiscipline}
                 areaTotals={areaTotals}
+                compositionMap={browseComposition.map}
                 onAreaPress={onAreaPinPress}
                 onClusterPress={onClusterBubblePress}
               />
@@ -1548,18 +1565,18 @@ export default function MapScreenMapbox({
                 gap. Mounted AFTER RoutePinCluster so it paints on top. */}
             {mode.kind === 'area' &&
             highlightedCoord &&
-            selectedComposition.data &&
-            !selectedComposition.loading ? (
-              // `!loading` so that switching from pin A→B hides the donut (the
-              // white base disc shows) while B's composition loads, instead of
-              // painting A's stale composition at B's coordinate (useFetchOnce
-              // keeps prior data during the next fetch).
+            selectedComp &&
+            !selectedCompLoading ? (
+              // Prefetched → instant. `!loading` only matters for the per-tap
+              // fallback: switching A→B then hides the donut (white base disc
+              // shows) while B loads, instead of painting A's stale composition
+              // at B's coordinate.
               <MapboxGL.MarkerView
                 coordinate={highlightedCoord}
                 anchor={{ x: 0.5, y: 0.5 }}
                 allowOverlap
               >
-                <RoutePinDonut composition={selectedComposition.data} />
+                <RoutePinDonut composition={selectedComp} />
               </MapboxGL.MarkerView>
             ) : null}
 
