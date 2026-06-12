@@ -8,8 +8,11 @@
 import Svg, { Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 
-const GREEN = theme.colors.accent; // #306E6F — was the SVG's black areas
-const CREAM = '#F3EEE3'; // 米白 — was the SVG's #2db83d green
+// Pop on the light-beige map = the big fill carries the saturated color and the
+// figure is white (cream blended into the map). So the building fill takes the
+// theme green and the outline/climber goes white.
+const GREEN = theme.colors.accent; // #306E6F — building fill (was #2db83d)
+const WHITE = '#FFFFFF'; // outline + climber (was black)
 
 // — original GREEN (#2db83d) shapes → cream —
 const G1 =
@@ -47,17 +50,17 @@ const B2 =
   'M 722 535 L 767 634 L 770 644 L 769 653 L 747 728 L 730 738 L 672 758 ' +
   'L 614 735 L 582 680 Z';
 
-/** The rock-gym marker — registered once as image `gym-rock`. Cream building/
- *  climber fills (was the SVG's green) under theme-green outline + figure (was
- *  black). Render order preserved so the green paints over the cream. */
+/** The rock-gym marker — registered once as image `gym-rock`. Solid theme-green
+ *  building (was the SVG's green fill) with a white outline + climber (was
+ *  black). Render order preserved so the white paints over the green. */
 export function GymIconRock() {
   return (
     <Svg width={32} height={32} viewBox="0 0 1254 1254">
-      <Path d={G1} fill={CREAM} fillRule="evenodd" />
-      <Path d={G2} fill={CREAM} fillRule="evenodd" />
-      <Path d={G3} fill={CREAM} fillRule="evenodd" />
-      <Path d={B1} fill={GREEN} fillRule="evenodd" />
-      <Path d={B2} fill={GREEN} fillRule="evenodd" />
+      <Path d={G1} fill={GREEN} fillRule="evenodd" />
+      <Path d={G2} fill={GREEN} fillRule="evenodd" />
+      <Path d={G3} fill={GREEN} fillRule="evenodd" />
+      <Path d={B1} fill={WHITE} fillRule="evenodd" />
+      <Path d={B2} fill={WHITE} fillRule="evenodd" />
     </Svg>
   );
 }
