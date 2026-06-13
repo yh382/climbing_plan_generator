@@ -16,16 +16,11 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  Dimensions,
-  Pressable,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
   Share,
-  FlatList,
 } from 'react-native';
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
-import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import {
   Stack,
@@ -42,6 +37,9 @@ import { theme } from '../../../src/lib/theme';
 import GradeSuggestionCard, {
   type SendLog,
 } from '../../../src/components/shared/GradeSuggestionCard';
+import { RouteHeroCarousel } from '../../../src/components/shared/RouteHeroCarousel';
+import { RouteActionRow } from '../../../src/components/shared/RouteActionRow';
+import { gradeOptionsFor } from '../../../src/features/outdoor/sendSheet/gradeOptions';
 import { pickMediaFromLibrary } from '../../../src/lib/mediaPicker';
 import {
   uploadSingleFileToR2,
@@ -74,37 +72,6 @@ import type {
   GymRoute,
   GymRouteAscent,
 } from '../../../src/features/gymsCatalog/types';
-
-const SCREEN_W = Dimensions.get('window').width;
-const PHOTO_H = SCREEN_W * 0.82;
-
-// B2 #2: greyed Send button background when current user already sent this
-// route. Mid-grey so the white text + checkmark icon stay readable in both
-// light and dark modes (theme-agnostic by design — disabled state). The
-// checkmark itself stays green to celebrate completion.
-const SENDED_BG = '#6B7280';
-const SENDED_TICK = '#34D399'; // emerald-400 — readable on both light & dark grey
-
-// Same grade pickers OutdoorSendSheet uses for outdoor routes — indoor
-// boulder is V-scale, indoor rope is YDS in our schema. font/french
-// systems exist on backend but are rare for indoor; fall back by family.
-const YDS_GRADES = [
-  '5.5', '5.6', '5.7', '5.8', '5.9',
-  '5.10a', '5.10b', '5.10c', '5.10d',
-  '5.11a', '5.11b', '5.11c', '5.11d',
-  '5.12a', '5.12b', '5.12c', '5.12d',
-  '5.13a', '5.13b', '5.13c', '5.13d',
-  '5.14a', '5.14b', '5.14c', '5.14d',
-  '5.15a', '5.15b', '5.15c',
-];
-const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16'];
-
-function gymGradeOptions(systemHint?: string, originalGrade?: string): string[] {
-  if (systemHint === 'vscale' || (originalGrade && originalGrade.toUpperCase().startsWith('V'))) {
-    return V_GRADES;
-  }
-  return YDS_GRADES;
-}
 
 export default function GymRouteDetailPage() {
   const colors = useThemeColors();
@@ -477,46 +444,9 @@ export default function GymRouteDetailPage() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero — photo carousel or color block fallback. Routes without
-            photos fall back to a flat color band derived from route.color
-            so the page never looks empty above the fold. */}
-        <View style={styles.photoWrap}>
-          {photos.length > 0 ? (
-            <FlatList
-              horizontal
-              pagingEnabled
-              data={photos}
-              keyExtractor={(_, i) => `photo-${i}`}
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable onPress={openBetaList}>
-                  <Image
-                    source={{ uri: item.url }}
-                    style={styles.photo}
-                    contentFit="cover"
-                  />
-                </Pressable>
-              )}
-            />
-          ) : (
-            <Pressable
-              onPress={openBetaList}
-              style={[styles.photo, styles.photoPlaceholder]}
-            >
-              <Ionicons
-                name="image-outline"
-                size={40}
-                color={colors.textTertiary}
-              />
-            </Pressable>
-          )}
-          <View style={styles.viewBetaPill} pointerEvents="none">
-            <Ionicons name="videocam" size={14} color="#fff" />
-            <Text style={styles.viewBetaText}>
-              {tr('查看 Beta', 'View Beta')}
-            </Text>
-          </View>
-        </View>
+        {/* Hero — photo carousel (shared with outdoor route detail).
+            Routes without photos render the placeholder + View Beta pill. */}
+        <RouteHeroCarousel photos={photos} onPress={openBetaList} />
 
         {isArchived && <ArchivedBanner archivedAt={route.archived_at} />}
 
@@ -565,78 +495,16 @@ export default function GymRouteDetailPage() {
             </View>
           ) : null}
 
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                {
-                  backgroundColor: isArchived
-                    ? colors.backgroundSecondary
-                    : userHasSent
-                      ? SENDED_BG
-                      : colors.accent,
-                },
-              ]}
-              onPress={isArchived || userHasSent ? undefined : handleSend}
-              disabled={isArchived || userHasSent}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                size={18}
-                color={
-                  isArchived
-                    ? colors.textTertiary
-                    : userHasSent
-                      ? SENDED_TICK
-                      : '#FFFFFF'
-                }
-              />
-              <Text
-                style={[
-                  styles.primaryBtnText,
-                  isArchived && { color: colors.textTertiary },
-                ]}
-              >
-                {userHasSent ? tr('已完成', 'Sent') : tr('完成', 'Send')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { backgroundColor: colors.pillBackground }]}
-              onPress={handleAttempt}
-              disabled={isArchived}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name="refresh-outline"
-                size={18}
-                color={colors.pillText}
-              />
-              <Text style={styles.secondaryBtnText}>
-                {tr('尝试', 'Attempt')}
-              </Text>
-              {localAttempts > 0 && (
-                <View style={styles.attemptBadge}>
-                  <Text style={styles.attemptBadgeText}>+{localAttempts}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            {/* Camera — pure share-beta flow. Picker → BetaShareSheet
-                (description + submit). Parallel to outdoor route detail. */}
-            <TouchableOpacity
-              style={[styles.cameraBtn, { backgroundColor: colors.pillBackground }]}
-              onPress={handleShareBeta}
-              disabled={isArchived}
-              activeOpacity={0.85}
-              hitSlop={6}
-            >
-              <Ionicons
-                name="videocam-outline"
-                size={20}
-                color={colors.pillText}
-              />
-            </TouchableOpacity>
-          </View>
+          <RouteActionRow
+            userHasSent={userHasSent}
+            attempts={localAttempts}
+            onSend={handleSend}
+            onAttempt={handleAttempt}
+            onShareBeta={handleShareBeta}
+            disabled={isArchived}
+            tr={tr}
+            style={styles.actionRowSpacing}
+          />
 
           <WallCloseUpCard
             wallCloseUpUrl={route.wall_close_up_url}
@@ -680,10 +548,10 @@ export default function GymRouteDetailPage() {
         visible={sendSheetOpen}
         routeName={displayName}
         originalGrade={route.grade_text}
-        gradeOptions={gymGradeOptions(route.grade_system, route.grade_text)}
+        gradeOptions={gradeOptionsFor(route.grade_system, route.grade_text)}
         originalGradeIndex={Math.max(
           0,
-          gymGradeOptions(route.grade_system, route.grade_text).indexOf(
+          gradeOptionsFor(route.grade_system, route.grade_text).indexOf(
             route.grade_text,
           ),
         )}
@@ -709,30 +577,6 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.regular,
       fontSize: 15,
       color: c.textSecondary,
-    },
-    photoWrap: { position: 'relative' },
-    photo: { width: SCREEN_W, height: PHOTO_H },
-    photoPlaceholder: {
-      backgroundColor: c.backgroundSecondary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    viewBetaPill: {
-      position: 'absolute',
-      left: 12,
-      bottom: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 14,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    viewBetaText: {
-      color: '#fff',
-      fontFamily: theme.fonts.medium,
-      fontSize: 12,
     },
     body: { padding: theme.spacing.screenPadding },
     routeName: {
@@ -781,57 +625,9 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: '#FFFFFF',
     },
-    actionRow: { flexDirection: 'row', gap: 10, marginTop: 16, marginBottom: 20 },
-    primaryBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.card,
-    },
-    primaryBtnText: {
-      fontFamily: theme.fonts.black,
-      fontSize: 15,
-      color: '#FFFFFF',
-    },
-    secondaryBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.card,
-      position: 'relative',
-    },
-    secondaryBtnText: {
-      fontFamily: theme.fonts.black,
-      fontSize: 15,
-      color: c.pillText,
-    },
-    cameraBtn: {
-      width: 48,
-      aspectRatio: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.borderRadius.card,
-    },
-    attemptBadge: {
-      position: 'absolute',
-      top: 6,
-      right: 10,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      borderRadius: 999,
-      backgroundColor: c.accent,
-    },
-    attemptBadgeText: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 10,
-      color: '#FFFFFF',
-    },
+    // Top gap above the shared RouteActionRow (the row component itself
+    // only carries marginBottom).
+    actionRowSpacing: { marginTop: 16 },
     section: { marginTop: theme.spacing.sectionGap },
     sectionTitle: {
       fontFamily: theme.fonts.black,

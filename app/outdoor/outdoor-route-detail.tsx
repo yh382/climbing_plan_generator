@@ -4,12 +4,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, Dimensions,
-  FlatList, TouchableOpacity, Pressable, ActivityIndicator,
+  View, Text, ScrollView, StyleSheet,
+  TouchableOpacity, Pressable, ActivityIndicator,
   Alert, Share, ActionSheetIOS, Linking, Platform,
 } from 'react-native';
 import { HEADER_TRANSPARENT } from "@/lib/nativeHeaderOptions";
-import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import MapboxGL from '@rnmapbox/maps';
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -31,6 +30,9 @@ import OutdoorAreaInfoSheet, {
   areaListItemToSeed,
 } from '../../src/features/mapscreen/components/OutdoorAreaInfoSheet';
 import GradeSuggestionCard, { type SendLog } from '../../src/components/shared/GradeSuggestionCard';
+import { RouteHeroCarousel } from '../../src/components/shared/RouteHeroCarousel';
+import { RouteActionRow } from '../../src/components/shared/RouteActionRow';
+import { gradeOptionsFor } from '../../src/features/outdoor/sendSheet/gradeOptions';
 import { RouteTopoCard } from '../../src/features/outdoor/components/RouteTopoCard';
 import { RouteDescriptionCard } from '../../src/features/outdoor/components/RouteDescriptionCard';
 import AddToListSheet from '../../src/features/outdoor/components/AddToListSheet';
@@ -58,36 +60,6 @@ import {
 import { trackSessionBeta } from '../../src/features/journal/sync/sessionBetaTracker';
 import useLogsStore from '../../src/store/useLogsStore';
 import type { LogMedia } from '../../src/features/journal/loglist/types';
-
-const SCREEN_W = Dimensions.get('window').width;
-const PHOTO_H = SCREEN_W * 0.82;
-
-// B2 #2: greyed Send button background when current user already sent this
-// route. Mid-grey so the white text + checkmark icon stay readable in both
-// light and dark modes (theme-agnostic by design — disabled state, not
-// brand-colored). The checkmark itself stays green to celebrate completion.
-const SENDED_BG = '#6B7280';
-const SENDED_TICK = '#34D399'; // emerald-400 — readable on both light & dark grey
-
-// Grade option list — used by OutdoorSendSheet's suggest-a-grade stepper.
-const YDS_GRADES = [
-  '5.5', '5.6', '5.7', '5.8', '5.9',
-  '5.10a', '5.10b', '5.10c', '5.10d',
-  '5.11a', '5.11b', '5.11c', '5.11d',
-  '5.12a', '5.12b', '5.12c', '5.12d',
-  '5.13a', '5.13b', '5.13c', '5.13d',
-  '5.14a', '5.14b', '5.14c', '5.14d',
-  '5.15a', '5.15b', '5.15c',
-];
-
-const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16'];
-
-function gradeOptionsFor(systemHint?: string, originalGrade?: string): string[] {
-  if (systemHint === 'vscale' || (originalGrade && originalGrade.toUpperCase().startsWith('V'))) {
-    return V_GRADES;
-  }
-  return YDS_GRADES;
-}
 
 export default function OutdoorRouteDetailPage() {
   const colors = useThemeColors();
@@ -612,36 +584,10 @@ export default function OutdoorRouteDetailPage() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
       >
-        {/* Photo carousel — flush to top. The entire cover is tappable;
-            tapping navigates to the route's beta viewer. We wrap each
-            FlatList item in a Pressable (not the outer View) so horizontal
-            swipe gestures still drive carousel paging — Pressable fires
-            only on clean taps. The "View Beta" pill remains as a visual
-            affordance hinting at the tap target. */}
-        <View style={styles.photoWrap}>
-          {carouselPhotos.length > 0 ? (
-            <FlatList
-              horizontal
-              pagingEnabled
-              data={carouselPhotos}
-              keyExtractor={(_, i) => `photo-${i}`}
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable onPress={openBetaList}>
-                  <Image source={{ uri: item.url }} style={styles.photo} contentFit="cover" />
-                </Pressable>
-              )}
-            />
-          ) : (
-            <Pressable onPress={openBetaList} style={[styles.photo, styles.photoPlaceholder]}>
-              <Ionicons name="image-outline" size={40} color={colors.textTertiary} />
-            </Pressable>
-          )}
-          <View style={styles.viewBetaPill} pointerEvents="none">
-            <Ionicons name="videocam" size={14} color="#fff" />
-            <Text style={styles.viewBetaText}>{tr('查看 Beta', 'View Beta')}</Text>
-          </View>
-        </View>
+        {/* Photo carousel (shared with gym route detail) — flush to top,
+            whole cover taps through to the beta viewer. Beta thumbnails
+            lead, then official photos (see carouselPhotos). */}
+        <RouteHeroCarousel photos={carouselPhotos} onPress={openBetaList} />
 
         <View style={styles.body}>
           {/* BR Track D Day 6/7 — breadcrumb (PLAN §5). Day 6 shipped
@@ -769,55 +715,16 @@ export default function OutdoorRouteDetailPage() {
             </View>
           )}
 
-          {/* Two-button row: Send (primary) + Attempt (secondary, counter) */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                {
-                  backgroundColor: userHasSent ? SENDED_BG : colors.accent,
-                },
-              ]}
-              onPress={userHasSent ? undefined : handleSend}
-              disabled={userHasSent}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={userHasSent ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                size={18}
-                color={userHasSent ? SENDED_TICK : '#FFFFFF'}
-              />
-              <Text style={styles.primaryBtnText}>
-                {userHasSent ? tr('已完成', 'Sent') : tr('完成', 'Send')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { backgroundColor: colors.pillBackground }]}
-              onPress={handleAttempt}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="refresh-outline" size={18} color={colors.pillText} />
-              <Text style={styles.secondaryBtnText}>
-                {tr('尝试', 'Attempt')}
-              </Text>
-              {localAttempts > 0 && (
-                <View style={styles.attemptBadge}>
-                  <Text style={styles.attemptBadgeText}>+{localAttempts}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            {/* Camera — launches the "pure share beta" flow: picker →
-                BetaShareSheet (description + submit). Separate from the
-                Send-integrated path which attaches a beta to a send log. */}
-            <TouchableOpacity
-              style={[styles.cameraBtn, { backgroundColor: colors.pillBackground }]}
-              onPress={handleDirectShareBeta}
-              activeOpacity={0.85}
-              hitSlop={6}
-            >
-              <Ionicons name="videocam-outline" size={20} color={colors.pillText} />
-            </TouchableOpacity>
-          </View>
+          {/* Send / Attempt / Camera — shared with gym route detail.
+              Camera fires the standalone "direct" share-beta flow. */}
+          <RouteActionRow
+            userHasSent={userHasSent}
+            attempts={localAttempts}
+            onSend={handleSend}
+            onAttempt={handleAttempt}
+            onShareBeta={handleDirectShareBeta}
+            tr={tr}
+          />
 
           <RouteTopoCard topoUrl={route.wall_topo_url} />
 
@@ -1135,30 +1042,6 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     centered: { alignItems: 'center', justifyContent: 'center' },
     emptyText: { fontFamily: theme.fonts.regular, fontSize: 15, color: c.textSecondary },
 
-    // Photo — flush to top, full width. photoWrap wraps the carousel +
-    // View Beta overlay so the pill stays fixed against the cover area
-    // even when the user pages the carousel.
-    photoWrap: { position: 'relative' },
-    photo: { width: SCREEN_W, height: PHOTO_H },
-    photoPlaceholder: { backgroundColor: c.backgroundSecondary, alignItems: 'center', justifyContent: 'center' },
-    viewBetaPill: {
-      position: 'absolute',
-      left: 12,
-      bottom: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 14,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    viewBetaText: {
-      color: '#fff',
-      fontFamily: theme.fonts.medium,
-      fontSize: 12,
-    },
-
     // Body
     body: { padding: theme.spacing.screenPadding },
     routeName: { fontFamily: theme.fonts.black, fontSize: 24, color: c.textPrimary, marginBottom: 4 },
@@ -1213,54 +1096,6 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     },
     starsRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 20 },
     starsText: { fontFamily: theme.fonts.regular, fontSize: 12, color: c.textSecondary, marginLeft: 4 },
-
-    // Actions — unified accent + dark pill palette
-    actionRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-    primaryBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.card,
-    },
-    primaryBtnText: { fontFamily: theme.fonts.black, fontSize: 15, color: '#FFFFFF' },
-    secondaryBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.card,
-      position: 'relative',
-    },
-    secondaryBtnText: { fontFamily: theme.fonts.black, fontSize: 15, color: c.pillText },
-    cameraBtn: {
-      // Square, width-matched to button height so it reads as a small
-      // icon action rather than competing with the full-width primary/
-      // secondary pair next to it.
-      width: 48,
-      aspectRatio: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.borderRadius.card,
-    },
-    attemptBadge: {
-      position: 'absolute',
-      top: 6,
-      right: 10,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      borderRadius: 999,
-      backgroundColor: c.accent,
-    },
-    attemptBadgeText: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 10,
-      color: '#FFFFFF',
-    },
 
     // Sections
     section: { marginTop: theme.spacing.sectionGap },
