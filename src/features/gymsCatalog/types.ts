@@ -2,10 +2,33 @@
 // Mirrors backend schemas/gym_catalog.py shapes 1:1 so api responses
 // can be assigned without conversion.
 
-export type GymRouteStatus = 'active' | 'archived' | 'pending' | 'rejected';
+// `planned` (Window INDOOR_SET / SET-P3) = KAYA "Not Set": scheduled but
+// not yet built. Setter-only — the climber app never requests it (gym
+// lists default to status:'active'), so planned routes stay hidden here.
+export type GymRouteStatus =
+  | 'active'
+  | 'archived'
+  | 'pending'
+  | 'rejected'
+  | 'planned';
 export type GymStyle = 'boulder' | 'rope';
 export type GymWallStyle = GymStyle | 'mixed';
 export type GymGradeSystem = 'vscale' | 'yds' | 'font' | 'french';
+
+/** Structured movement-characteristic tags (Window INDOOR_SET). Mirrors
+ *  backend `MovementTags` — single source of truth is the backend schema;
+ *  the app only renders whatever string values come back per category. */
+export type MovementTags = {
+  grip?: string[];
+  footwork?: string[];
+  style?: string[];
+  usage?: string[];
+};
+
+/** Zone region on the whole-gym floor plan, 0..1 normalized (Window
+ *  INDOOR_SET). Used by the setter pin editor + future "tap zone → zoom"
+ *  affordance; the app reads it opportunistically. */
+export type WallBbox = { x: number; y: number; w: number; h: number };
 
 export type GymHours = Partial<Record<
   'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun',
@@ -36,6 +59,9 @@ export type WallSection = {
   sort_order: number;
   status: string;
   route_count: number;
+  /** Window INDOOR_SET — zone region box on the whole-gym floor plan.
+   *  Optional: absent on pre-Phase-1 backends. */
+  bbox?: WallBbox | null;
 };
 
 export type GymRoute = {
@@ -59,6 +85,20 @@ export type GymRoute = {
   description: string | null;
   created_at: string;
   updated_at: string;
+  // ── Routesetter fields (Window INDOOR_SET / SET-P3) ──────────────
+  // All optional: pre-Phase-1 backends (current prod) omit them entirely,
+  // so a route without these reads as "not pinned / no metadata" and the
+  // floor plan falls back to the legacy scatter algorithm (see
+  // GymFloorPlanView per-wall fallback). Do NOT serialize these into the
+  // logs outbox / LocalDayLogItem — display-only.
+  /** Whole-gym floor-plan pin, 0..1. Absolute coords (vs the wall-center
+   *  scatter of deriveRoutePosition) — never mix the two on one wall. */
+  pin_x?: number | null;
+  pin_y?: number | null;
+  expiry_date?: string | null;     // ISO date — planned reset/strip date
+  setter_user_id?: string | null;  // structured setter; setter_name = guest fallback
+  movement_tags?: MovementTags | null;
+  is_benchmark?: boolean;
   // B2 follow-up: parent gym ancestry, populated by GET /routes/{id}.
   // Used by catalog Send to label the auto-started session with the
   // actual gym name instead of the literal "Gym" fallback.

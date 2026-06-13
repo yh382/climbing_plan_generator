@@ -72,6 +72,28 @@ export function GymFloorPlanView({
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  // Per-wall real-pin fallback (Window INDOOR_SET / SET-P3). A wall flips
+  // to real routesetter coords ({x:pin_x, y:pin_y}) ONLY when every route
+  // on it has a pin. deriveRoutePosition scatters dots around the wall
+  // center hash, while pin_x/y are absolute whole-gym coords — the two
+  // bases aren't comparable, so mixing them on one wall makes new + legacy
+  // lines collide. Whole-wall keeps each wall internally consistent; a
+  // setter re-pinning a wall flips it wholesale (risk R3).
+  const fullyPinnedWallIds = useMemo(() => {
+    const counts = new Map<string, { total: number; pinned: number }>();
+    for (const r of routes) {
+      const e = counts.get(r.wall_section_id) ?? { total: 0, pinned: 0 };
+      e.total += 1;
+      if (r.pin_x != null && r.pin_y != null) e.pinned += 1;
+      counts.set(r.wall_section_id, e);
+    }
+    const ids = new Set<string>();
+    counts.forEach((e, id) => {
+      if (e.total > 0 && e.pinned === e.total) ids.add(id);
+    });
+    return ids;
+  }, [routes]);
+
   const initial = (cacheKey && viewStateCache.get(cacheKey)) || DEFAULT_VIEW;
 
   const scale = useSharedValue(initial.scale);
@@ -448,11 +470,21 @@ export function GymFloorPlanView({
                 (w) => w.id === r.wall_section_id,
               );
               if (!wall) return null;
+              // Whole-wall decision (see fullyPinnedWallIds): real pins for
+              // a fully-pinned wall, else the legacy scatter for everyone
+              // on that wall. The pin_x/y null guard also narrows the
+              // optional fields to numbers for RouteDot's position prop.
+              const position =
+                fullyPinnedWallIds.has(r.wall_section_id) &&
+                r.pin_x != null &&
+                r.pin_y != null
+                  ? { x: r.pin_x, y: r.pin_y }
+                  : deriveRoutePosition(r, wall);
               return (
                 <RouteDot
                   key={r.id}
                   route={r}
-                  position={deriveRoutePosition(r, wall)}
+                  position={position}
                   onPress={() => onSelectRoute?.(r.id)}
                   containerW={containerSize.w}
                   containerH={containerSize.h}

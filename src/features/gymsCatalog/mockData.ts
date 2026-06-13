@@ -69,7 +69,16 @@ type WallConfig = {
   floor_plan_y: number;
   /** grade → count */
   gradeDist: Record<string, number>;
+  /** Window INDOOR_SET / SET-P3 — when true, every route on this wall gets
+   *  a deterministic grid pin_x/pin_y so the floor plan's per-wall real-pin
+   *  fallback can be exercised in mock mode (Phase 1 backend isn't deployed
+   *  yet, so the real-coords path is otherwise untestable). Only ONE wall
+   *  is seeded so the contrast is obvious: East = neat real-coord grid,
+   *  every other wall = legacy scattered dots, with no mixing. */
+  seedPins?: boolean;
 };
+
+const PIN_GRID_COLS = 4;
 
 const WALL_CONFIGS: WallConfig[] = [
   {
@@ -79,6 +88,7 @@ const WALL_CONFIGS: WallConfig[] = [
     floor_plan_x: 0.20,
     floor_plan_y: 0.55,
     gradeDist: { V0: 2, V1: 2, V2: 3, V3: 3, V4: 2, V5: 2, V6: 1 },  // 15
+    seedPins: true,
   },
   {
     id: 'ws-west',
@@ -138,6 +148,16 @@ function makeRoute(args: {
   const hasRating = index % 5 !== 0;  // 80% have ratings
   const isClassic = index % 6 === 0;  // ~16% classics
 
+  // SET-P3 — deterministic grid pins for seeded walls only. Laid out near
+  // the wall's floor_plan anchor so the grid reads as "this wall".
+  const pinFields =
+    wall.seedPins && status === 'active'
+      ? {
+          pin_x: 0.08 + (index % PIN_GRID_COLS) * 0.085,
+          pin_y: 0.4 + Math.floor(index / PIN_GRID_COLS) * 0.07,
+        }
+      : {};
+
   return {
     id: `gr-${wall.id}-${index.toString().padStart(3, '0')}`,
     wall_section_id: wall.id,
@@ -162,6 +182,31 @@ function makeRoute(args: {
     description: null,
     created_at: isoDatetimeMinusDays(setDateDays),
     updated_at: isoDatetimeMinusDays(setDateDays),
+    ...pinFields,
+    // SET-P3 — deterministic routesetter metadata on a subset of active
+    // routes so the detail page's movement chips / benchmark + expiry
+    // badges are exercisable in mock mode.
+    ...(status === 'active'
+      ? {
+          is_benchmark: index % 7 === 0,
+          movement_tags:
+            index % 3 === 0
+              ? {
+                  grip: ['crimp', 'sloper'].slice(0, (index % 2) + 1),
+                  footwork: index % 2 === 0 ? ['heel hook'] : [],
+                  style: ['powerful'],
+                  usage: [],
+                }
+              : null,
+          // isoDateMinusDays(-6) = 6 days in the future.
+          expiry_date:
+            index % 9 === 0
+              ? isoDateMinusDays(3) // already expired
+              : index % 4 === 0
+                ? isoDateMinusDays(-6) // expires soon
+                : null,
+        }
+      : {}),
   };
 }
 

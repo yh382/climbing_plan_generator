@@ -68,6 +68,8 @@ import {
 } from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
 import { WallCloseUpCard } from '../../../src/features/gymsCatalog/components/WallCloseUpCard';
+import { MovementTagChips } from '../../../src/features/gymsCatalog/components/MovementTagChips';
+import { RouteExpiryBadge } from '../../../src/features/gymsCatalog/components/RouteExpiryBadge';
 import type {
   GymRoute,
   GymRouteAscent,
@@ -428,6 +430,12 @@ export default function GymRouteDetailPage() {
   const isArchived = route.status === 'archived';
   const photos = route.photos ?? [];
   const displayName = route.name ?? tr('未命名路线', 'Unnamed route');
+  const mt = route.movement_tags;
+  const hasMovementTags =
+    !!mt &&
+    [mt.grip, mt.footwork, mt.style, mt.usage].some(
+      (arr) => (arr?.length ?? 0) > 0,
+    );
 
   return (
     <>
@@ -539,6 +547,24 @@ export default function GymRouteDetailPage() {
             </View>
           )}
 
+          {/* Routesetter badges (Window INDOOR_SET / SET-P3): benchmark
+              + expiry/staleness. Each self-gates, so this row may render
+              empty for a route whose expiry is far out and isn't a
+              benchmark — harmless. */}
+          {route.is_benchmark || route.expiry_date ? (
+            <View style={styles.badgeRow}>
+              {route.is_benchmark ? (
+                <View style={styles.benchmarkBadge}>
+                  <Ionicons name="ribbon" size={13} color="#FFFFFF" />
+                  <Text style={styles.benchmarkText}>
+                    {tr('标杆线', 'Benchmark')}
+                  </Text>
+                </View>
+              ) : null}
+              <RouteExpiryBadge expiryDate={route.expiry_date} />
+            </View>
+          ) : null}
+
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[
@@ -616,6 +642,15 @@ export default function GymRouteDetailPage() {
             wallCloseUpUrl={route.wall_close_up_url}
             routeName={route.name}
           />
+
+          {hasMovementTags ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                {tr('动作特点', 'Movement')}
+              </Text>
+              <MovementTagChips tags={route.movement_tags} />
+            </View>
+          ) : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -724,6 +759,27 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 12,
       color: c.textSecondary,
       marginLeft: 4,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 12,
+    },
+    benchmarkBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: 12,
+      backgroundColor: c.accent,
+    },
+    benchmarkText: {
+      fontFamily: theme.fonts.medium,
+      fontSize: 12,
+      color: '#FFFFFF',
     },
     actionRow: { flexDirection: 'row', gap: 10, marginTop: 16, marginBottom: 20 },
     primaryBtn: {
