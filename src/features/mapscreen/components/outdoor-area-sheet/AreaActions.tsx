@@ -23,10 +23,14 @@ type Props = {
   /** Optional. When absent the Save action is omitted (parents that don't
    *  own bookmark wiring shouldn't show a no-op button). */
   onToggleSave?: () => void | Promise<void>;
+  /** CD 1a — set false when a floating footer already owns Share (the tabbed
+   *  area sheet's Overview tab). Defaults true so legacy callers
+   *  (OutdoorAreaInfoSheet) keep the inline Share pill. */
+  showShare?: boolean;
 };
 
 export function AreaActions({
-  areaId, areaName, lat, lng, saved, saveLoading, onToggleSave,
+  areaId, areaName, lat, lng, saved, saveLoading, onToggleSave, showShare = true,
 }: Props) {
   const { tr } = useSettings();
 
@@ -43,19 +47,21 @@ export function AreaActions({
       });
     }
 
-    list.push({
-      icon: 'share-outline',
-      label: sheetLabels.share(tr),
-      onPress: () => {
-        void Share.share({
-          title: areaName,
-          message: tr(
-            `${areaName} · ClimMate`,
-            `${areaName} on ClimMate`,
-          ),
-        });
-      },
-    });
+    if (showShare) {
+      list.push({
+        icon: 'share-outline',
+        label: sheetLabels.share(tr),
+        onPress: () => {
+          void Share.share({
+            title: areaName,
+            message: tr(
+              `${areaName} · ClimMate`,
+              `${areaName} on ClimMate`,
+            ),
+          });
+        },
+      });
+    }
 
     if (lat != null && lng != null) {
       list.push({
@@ -85,7 +91,7 @@ export function AreaActions({
     }
 
     return list;
-  }, [areaId, areaName, lat, lng, saved, saveLoading, onToggleSave, tr]);
+  }, [areaId, areaName, lat, lng, saved, saveLoading, onToggleSave, showShare, tr]);
 
   return <PlaceSheetActions actions={actions} />;
 }

@@ -41,8 +41,9 @@ import RoutesLibrarySheet, { type RoutesLibrarySheetHandle } from './RoutesLibra
 // CA Phase 4b — unified outdoor area sheet replaces CragInfo/AreaInfo/RegionInfo.
 import OutdoorAreaInfoSheet, {
   type OutdoorAreaInfoSheetHandle,
-  areaListItemToSeed,
 } from './OutdoorAreaInfoSheet';
+// CD Phase 1a — child→seed mapper now in the neutral shared module.
+import { areaListItemToSeed } from './outdoor-area-sheet/shared';
 import { AreaCoverImage } from './AreaCoverImage';
 import type { Area } from '../../outdoor/types';
 
@@ -91,6 +92,15 @@ interface CragMenuSheetProps {
   /** Hydrated parent Area record for the Browse Up → Area info sheet.
    *  Omit when the caller doesn't have it; the row hides gracefully. */
   parentArea?: Area | null;
+  /** CD 1b — Browse Up drill. When provided (map host with the area state
+   *  machine), Browse Up rows dismiss this sheet + drill via enterArea into
+   *  the tabbed area page. When omitted (crag-map, no state machine), they
+   *  fall back to the stacked OutdoorAreaInfoSheet. */
+  onBrowseUpArea?: (areaId: string, name: string) => void;
+  /** CD 1b — Crag Info & Approach tap. When provided (map host), the crag's
+   *  detail already lives in the Overview tab, so this dismisses + switches
+   *  there. When omitted (crag-map), falls back to the stacked info sheet. */
+  onShowCragOverview?: () => void;
 }
 
 const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props, ref) => {
@@ -133,6 +143,14 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
 
   const presentCragInfo = () => {
     if (!props.crag?.id) return;
+    // CD 1b — map host: the crag's detail is already in the Overview tab, so
+    // dismiss this menu and switch there instead of stacking a second sheet.
+    if (props.onShowCragOverview) {
+      sheetRef.current?.dismiss().catch(() => {});
+      props.onShowCragOverview();
+      return;
+    }
+    // Fallback (crag-map): stacked OutdoorAreaInfoSheet.
     void outdoorAreaSheetRef.current?.present({
       id: props.crag.id,
       name: props.crag.name,
@@ -267,6 +285,11 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
             )}
             onPress={() => {
               if (!props.parentArea) return;
+              if (props.onBrowseUpArea) {
+                sheetRef.current?.dismiss().catch(() => {});
+                props.onBrowseUpArea(props.parentArea.id, props.parentArea.name);
+                return;
+              }
               void outdoorAreaSheetRef.current?.present({
                 id: props.parentArea.id,
                 name: props.parentArea.name,
@@ -285,6 +308,11 @@ const CragMenuSheet = forwardRef<CragMenuSheetHandle, CragMenuSheetProps>((props
             )}
             onPress={() => {
               if (!props.crag?.region_id || !props.crag?.region_name) return;
+              if (props.onBrowseUpArea) {
+                sheetRef.current?.dismiss().catch(() => {});
+                props.onBrowseUpArea(props.crag.region_id, props.crag.region_name);
+                return;
+              }
               void outdoorAreaSheetRef.current?.present({
                 id: props.crag.region_id,
                 name: props.crag.region_name,
