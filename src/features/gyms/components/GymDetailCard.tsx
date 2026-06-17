@@ -77,6 +77,20 @@ export function GymDetailCard({
     }
   }, [gym.place_id, gym.name, gymId, onClose]);
 
+  const handleViewFloorPlan = useCallback(async () => {
+    setNavigating(true);
+    try {
+      const id =
+        gymId ?? (await gymCommunityApi.ensureGym(gym.place_id)).gym_id;
+      onClose();
+      router.push(`/gym/${id}` as any);
+    } catch {
+      Alert.alert('Error', 'Could not load gym page');
+    } finally {
+      setNavigating(false);
+    }
+  }, [gym.place_id, gymId, onClose]);
+
   const handleNavigate = useCallback(async () => {
     const { lat, lng } = gym.location;
     const label = encodeURIComponent(gym.name);
@@ -125,16 +139,23 @@ export function GymDetailCard({
     ? `${tr('攀岩馆', 'Climbing Gym')} · ${distanceText}`
     : tr('攀岩馆', 'Climbing Gym');
 
-  // Two-pill action row: Community is the primary CTA (solid accent
-  // fill — the most important next step), Directions is the tinted
-  // secondary. Favorite + Share moved to the sheet's glass footer.
+  // Action row: Floor plan is the primary CTA (solid accent — the gym's
+  // overhead map + route list is the core browse step), Community +
+  // Directions are tinted secondaries. Favorite + Share live in the
+  // sheet's glass footer.
   const actions: PlaceSheetAction[] = [
+    {
+      icon: 'map-outline',
+      label: tr('俯瞰图', 'Floor plan'),
+      onPress: handleViewFloorPlan,
+      loading: navigating,
+      variant: 'solid',
+    },
     {
       icon: 'people-outline',
       label: tr('社区', 'Community'),
       onPress: handleViewCommunity,
-      loading: navigating,
-      variant: 'solid',
+      variant: 'tint',
     },
     {
       icon: 'navigate',
