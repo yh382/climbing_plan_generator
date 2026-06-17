@@ -1,23 +1,17 @@
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { theme } from '../../../lib/theme';
+import {
+  gradeTextColor,
+  pinGradeLabel,
+  resolveRouteColor,
+} from '../../../lib/routePinColors';
 import type { GymRoute, WallSection } from '../types';
-
-const COLOR_HEX: Record<string, string> = {
-  blue: '#2D6EE6',
-  yellow: '#F1C232',
-  red: '#E04E4E',
-  green: '#2EAE5A',
-  black: '#1F1F22',
-  white: '#FFFFFF',
-  pink: '#EE5BB7',
-  purple: '#8E5BD9',
-  orange: '#F08A3C',
-};
 
 interface Props {
   route: GymRoute;
@@ -36,7 +30,7 @@ interface Props {
   translateY: SharedValue<number>;
 }
 
-const DEFAULT_SIZE = 16;
+const DEFAULT_SIZE = 26;
 
 export function RouteDot({
   route,
@@ -54,8 +48,9 @@ export function RouteDot({
   translateY,
 }: Props) {
   const styles = useMemo(() => createStyles(size), [size]);
-  const fill = COLOR_HEX[route.color ?? ''] ?? '#9AA3B2';
-  const isLight = route.color === 'white' || route.color === 'yellow';
+  const fill = resolveRouteColor(route.color);
+  const textColor = gradeTextColor(fill);
+  const label = pinGradeLabel(route.grade_text);
 
   const dotX = rectX + position.x * rectW;
   const dotY = rectY + position.y * rectH;
@@ -79,15 +74,15 @@ export function RouteDot({
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <Pressable onPress={onPress} hitSlop={6}>
-        <View
-          style={[
-            styles.dot,
-            {
-              backgroundColor: fill,
-              borderColor: isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.7)',
-            },
-          ]}
-        />
+        <View style={[styles.dot, { backgroundColor: fill }]}>
+          <Text
+            style={[styles.grade, { color: textColor }]}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
+            {label}
+          </Text>
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -127,6 +122,16 @@ const createStyles = (size: number) =>
       width: size,
       height: size,
       borderRadius: size / 2,
-      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      // Subtle dark hairline for definition against light floor plans —
+      // replaces the old ugly white ring (SET-UX Phase A).
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(0,0,0,0.22)',
+    },
+    grade: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 11,
+      letterSpacing: -0.2,
     },
   });
