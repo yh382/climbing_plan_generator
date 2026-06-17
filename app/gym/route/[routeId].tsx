@@ -65,7 +65,6 @@ import {
   flushLogsOutboxNow,
 } from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
-import { WallCloseUpCard } from '../../../src/features/gymsCatalog/components/WallCloseUpCard';
 import { MovementTagChips } from '../../../src/features/gymsCatalog/components/MovementTagChips';
 import { RouteExpiryBadge } from '../../../src/features/gymsCatalog/components/RouteExpiryBadge';
 import type {
@@ -395,7 +394,11 @@ export default function GymRouteDetailPage() {
   }
 
   const isArchived = route.status === 'archived';
-  const photos = route.photos ?? [];
+  // SET-UX Phase E: wall close-up doubles as the detail cover (user call —
+  // same image role). It leads the hero carousel; route.photos follow.
+  const photos = route.wall_close_up_url
+    ? [{ url: route.wall_close_up_url }, ...(route.photos ?? [])]
+    : route.photos ?? [];
   const displayName = route.name ?? tr('未命名路线', 'Unnamed route');
   const mt = route.movement_tags;
   const hasMovementTags =
@@ -504,11 +507,6 @@ export default function GymRouteDetailPage() {
             disabled={isArchived}
             tr={tr}
             style={styles.actionRowSpacing}
-          />
-
-          <WallCloseUpCard
-            wallCloseUpUrl={route.wall_close_up_url}
-            routeName={route.name}
           />
 
           {hasMovementTags ? (
