@@ -19,6 +19,8 @@ import type {
   AreaSearchResponse, DisplayKind,
   // CA-FU Phase B — compact crag preload
   CragPinsResponse,
+  // CD Phase 2 — whole-tree all-node preload
+  AreaNodesResponse,
 } from './types';
 import { MOCK_REGIONS, MOCK_ROUTES } from './mockData';
 
@@ -262,5 +264,12 @@ export const outdoorApi = {
    *  (AsyncStorage SWR + data_version hot-swap). */
   listAllCrags: async (): Promise<CragPinsResponse> => {
     return api.get<CragPinsResponse>('/outdoor/areas/crags');
+  },
+
+  /** Window CD Phase 2 — whole-tree all-display_kind node preload for the
+   *  tree-clustered map. Public, edge-cached, ~43k nodes (~2.2MB gzip).
+   *  Consumed by useAllAreaNodes (AsyncStorage SWR + data_version hot-swap). */
+  listAllAreaNodes: async (): Promise<AreaNodesResponse> => {
+    return api.get<AreaNodesResponse>('/outdoor/areas/nodes');
   },
 };

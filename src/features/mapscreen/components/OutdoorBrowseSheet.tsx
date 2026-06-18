@@ -51,7 +51,6 @@ import {
 } from '../../outdoor/hooks';
 import type {
   AncestorBreadcrumb,
-  DisplayKind,
   OutdoorAreaListItem,
   OutdoorRoute,
 } from '../../outdoor/types';
@@ -87,29 +86,6 @@ export type OutdoorBrowseSheetProps = {
   onPressAncestor?: (ancestor: AncestorBreadcrumb) => void;
   /** Header hamburger → caller presents CragMenuSheet / Info (stacked). */
   onPressHamburger: () => void;
-
-  // ── Deprecated (CB nearby-browse). Superseded by the crag-own Routes tab
-  // in CD 1a; props kept so the call site stays compiling. Removed in 1b. ──
-  /** @deprecated CD 1b — region-label title override (nearby-browse). */
-  title?: string;
-  /** @deprecated CD 1b */
-  titleKind?: DisplayKind;
-  /** @deprecated CD 1b */
-  nearbyCenter?: { lat: number; lng: number } | null;
-  /** @deprecated CD 1b */
-  nearbyRoutes?: OutdoorRoute[] | null;
-  /** @deprecated CD 1b */
-  nearbyLoading?: boolean;
-  /** @deprecated CD 1b */
-  focusedCragId?: string | null;
-  /** @deprecated CD 1b */
-  onClearFocus?: () => void;
-  /** @deprecated CD 1b */
-  onLocateRoute?: (route: OutdoorRoute) => void;
-  /** @deprecated CD 1b */
-  browseDiscipline?: 'boulder' | 'rope';
-  /** @deprecated CD 1b */
-  onBrowseDiscipline?: (d: 'boulder' | 'rope') => void;
 };
 
 export function OutdoorBrowseSheet({

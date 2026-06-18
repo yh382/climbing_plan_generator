@@ -661,6 +661,38 @@ export type CragPinsResponse = {
   data_version: string;
 };
 
+// ── Window CD Phase 2 — tree-clustered all-node preload ──────────────
+// GET /outdoor/areas/nodes. Every visible node (country→crag), each with its
+// SUBTREE 4-bucket style composition for the ratio ring. FE clusters
+// client-side by display_kind + subtree_route_count (importance), NOT raw
+// depth (the tree depth is irregular — R2). Deliberately narrower than
+// OutdoorAreaListItem (no parent_id/depth/has_*/cover_url) to keep the ~43k
+// preload under the ~3MB gzip ship gate; tap-time detail comes from
+// GET /outdoor/areas/{id}.
+export type AreaNodeComposition = {
+  total: number;
+  boulder: number;
+  sport: number;
+  trad: number;
+  other: number;
+};
+
+export type AreaNode = {
+  id: string;
+  name: string;
+  display_kind: DisplayKind;
+  lat: number;
+  lng: number;
+  subtree_route_count: number;
+  composition: AreaNodeComposition;
+};
+
+export type AreaNodesResponse = {
+  items: AreaNode[];
+  count: number;
+  data_version: string;
+};
+
 // Legacy alias envelope (7-14d bridge) — FE can show deprecation hint.
 export type LegacyAliasResponse = {
   deprecated: boolean;

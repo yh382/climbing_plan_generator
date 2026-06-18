@@ -24,16 +24,8 @@ import MapboxGL from '@rnmapbox/maps';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { theme } from '../../../lib/theme';
 import type { RoutePin } from '../types';
-
-/** CB Phase F — 4-bucket style palette, shared with the discover cluster rings
- *  + legend so dots, rings, and the legend all read the same. Boulder/sport
- *  reuse the pin colors; trad green + other grey are device-tunable. */
-export const STYLE_COLORS = {
-  boulder: theme.colors.outdoorMarkerFill, // sandstone
-  sport: theme.colors.routesMarkerFill, // teal-blue
-  trad: '#5E8C61', // muted green
-  other: '#9AA0A6', // grey
-} as const;
+// CD Phase 2 — STYLE_COLORS lives in the neutral disciplineColors module.
+import { STYLE_COLORS } from '../disciplineColors';
 
 /** CB Phase F — half/half split dot for boulder+rope-mixed pins (left brown =
  *  boulder, right blue = routes). Registered once via MapboxGL.Images and
