@@ -460,7 +460,23 @@ export default function GymRouteDetailPage() {
             {' · '}
             {route.style === 'boulder' ? tr('抱石', 'Boulder') : tr('绳攀', 'Rope')}
             {route.color ? ` · ${route.color}` : ''}
-            {route.setter_name ? ` · ${tr('设线', 'Set by')} ${route.setter_name}` : ''}
+            {route.setter_name ? (
+              <Text>
+                {` · ${tr('设线', 'Set by')} `}
+                {route.setter_user_id ? (
+                  <Text
+                    style={styles.setterLink}
+                    onPress={() =>
+                      router.push(`/community/u/${route.setter_user_id}` as any)
+                    }
+                  >
+                    {route.setter_name}
+                  </Text>
+                ) : (
+                  route.setter_name
+                )}
+              </Text>
+            ) : null}
           </Text>
 
           {route.stars != null && (
@@ -588,6 +604,10 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       fontSize: 14,
       color: c.textSecondary,
       marginBottom: 2,
+    },
+    setterLink: {
+      fontFamily: theme.fonts.medium,
+      color: c.accent,
     },
     starsRow: {
       flexDirection: 'row',
