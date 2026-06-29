@@ -1397,7 +1397,8 @@ export interface paths {
         get: operations["get_challenge_challenges__challenge_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Challenge */
+        delete: operations["delete_challenge_challenges__challenge_id__delete"];
         options?: never;
         head?: never;
         /** Update Challenge */
@@ -2357,7 +2358,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Route */
+        /**
+         * Update Route
+         * @description Edit a route. Writable by a platform operator (admin path) or an
+         *     active routesetter for the route's gym org (Window INDOOR_SET).
+         */
         patch: operations["update_route_gym_routes__route_id__patch"];
         trace?: never;
     };
@@ -2434,6 +2439,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gym/routes/{route_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gym Route Feedback
+         * @description Setter-facing feedback aggregate: star distribution, community feel
+         *     consensus (grade accuracy), ascent + beta counts, and comments with
+         *     climber demographics. Three aggregate queries, no per-comment N+1.
+         *     Setter / admin only.
+         */
+        get: operations["gym_route_feedback_gym_routes__route_id__feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gym/routes/{route_id}/rate": {
         parameters: {
             query?: never;
@@ -2484,6 +2512,27 @@ export interface paths {
         put?: never;
         /** Reject Route */
         post: operations["reject_route_gym_routes__route_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gym/routes/{route_id}/set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Route Set
+         * @description Mark a planned route as built ("Not Set" → "Set"): status → active
+         *     and stamp set_date = today. Setter / admin only.
+         */
+        post: operations["mark_route_set_gym_routes__route_id__set_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2553,10 +2602,40 @@ export interface paths {
         put?: never;
         /**
          * Submit Route
-         * @description User-facing route creation. Rate-limited per user per 24h to
-         *     keep one account from flooding a gym after a setting day.
+         * @description Route creation. A privileged writer — a platform operator (admin
+         *     path, unchanged) or an active routesetter for the gym's org — may set
+         *     the full routesetter field set (pin, expiry, structured setter, tags,
+         *     benchmark, status) and bypasses the community rate limit. Everyone else
+         *     submits a basic community route: rate-limited per user per 24h, with the
+         *     routesetter-only fields dropped.
          */
         post: operations["submit_route_gym_wall_sections__section_id__routes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gym/{gym_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gym For Catalog
+         * @description Public single-gym fetch for the app catalog (gym map screen).
+         *
+         *     Mirrors the climber-facing ``Gym`` shape the FE
+         *     ``gymsCatalogApi.getGym`` expects. Unauthenticated, like the sibling
+         *     ``/{gym_id}/routes`` + ``/{gym_id}/wall-sections`` reads. Declared
+         *     after the literal ``/gyms`` route so ``/gym/gyms`` still resolves to
+         *     the admin list, not here.
+         */
+        get: operations["get_gym_for_catalog_gym__gym_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2578,6 +2657,27 @@ export interface paths {
          *     per-section endpoint so callers can swap freely.
          */
         get: operations["list_routes_in_gym_gym__gym_id__routes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gym/{gym_id}/staleness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gym Staleness
+         * @description Rotation board: every active/planned route's age and overdue flag.
+         *     Setter / admin only.
+         */
+        get: operations["gym_staleness_gym__gym_id__staleness_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3362,7 +3462,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Org */
+        patch: operations["update_org_orgs__org_id__patch"];
         trace?: never;
     };
     "/orgs/{org_id}/analytics/funnel": {
@@ -3399,6 +3500,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orgs/{org_id}/analytics/route-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org Route Quality
+         * @description Per-route quality metrics for a gym, from climb_logs (sends/attempts/feel)
+         *     + denormalized ratings. Grade-feel consensus is sample-size gated (n_min).
+         */
+        get: operations["org_route_quality_orgs__org_id__analytics_route_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orgs/{org_id}/analytics/timeseries": {
         parameters: {
             query?: never;
@@ -3427,6 +3549,164 @@ export interface paths {
         get: operations["org_analytics_top_orgs__org_id__analytics_top_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Competitions */
+        get: operations["list_competitions_orgs__org_id__competitions_get"];
+        put?: never;
+        /** Create Competition */
+        post: operations["create_competition_orgs__org_id__competitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Competition */
+        get: operations["get_competition_orgs__org_id__competitions__comp_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Competition */
+        delete: operations["delete_competition_orgs__org_id__competitions__comp_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Competition */
+        patch: operations["update_competition_orgs__org_id__competitions__comp_id__patch"];
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Enrollments */
+        get: operations["list_enrollments_orgs__org_id__competitions__comp_id__enrollments_get"];
+        put?: never;
+        /** Add Enrollment */
+        post: operations["add_enrollment_orgs__org_id__competitions__comp_id__enrollments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/enrollments/{enrollment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Enrollment */
+        delete: operations["remove_enrollment_orgs__org_id__competitions__comp_id__enrollments__enrollment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Problems */
+        post: operations["add_problems_orgs__org_id__competitions__comp_id__problems_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/problems/{problem_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Problem */
+        delete: operations["remove_problem_orgs__org_id__competitions__comp_id__problems__problem_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/scorecards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scorecards */
+        get: operations["list_scorecards_orgs__org_id__competitions__comp_id__scorecards_get"];
+        /** Upsert Scorecard */
+        put: operations["upsert_scorecard_orgs__org_id__competitions__comp_id__scorecards_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/standings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Standings */
+        get: operations["get_standings_orgs__org_id__competitions__comp_id__standings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/competitions/{comp_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Status */
+        post: operations["set_status_orgs__org_id__competitions__comp_id__status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3722,7 +4002,8 @@ export interface paths {
         get: operations["get_plan_orgs__org_id__route_setting_plans__plan_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Plan */
+        delete: operations["delete_plan_orgs__org_id__route_setting_plans__plan_id__delete"];
         options?: never;
         head?: never;
         /** Update Plan */
@@ -3834,6 +4115,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outdoor/areas/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch 4-bucket style composition for browse pins (prefetch) */
+        post: operations["post_areas_discipline_composition_outdoor_areas_composition_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/outdoor/areas/crags": {
         parameters: {
             query?: never;
@@ -3852,6 +4150,40 @@ export interface paths {
          *     per-request sha1; edge cache means honest clients rarely reach origin.
          */
         get: operations["list_all_crags_outdoor_areas_crags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preload of ALL display_kind nodes for the tree-clustered map (Window CD Phase 2)
+         * @description Whole-tree preload (~43k nodes, every display_kind) so the FE clusters
+         *     client-side by display_kind + subtree_route_count — no per-viewport
+         *     refetch / pin pop-in (CD Phase 2 / M3). Each node carries its subtree
+         *     4-bucket ratio-ring composition. Unlike /outdoor/areas/crags (crag-tier
+         *     only), this returns country→wall.
+         *
+         *     Public (`get_optional_user`) — preload must not be auth-gated. Same abuse
+         *     posture as /outdoor/areas/crags: edge-cached 5 min + 1d SWR window + 60/min
+         *     /IP rate-limit as a backstop on the per-request rollup over ~206k routes;
+         *     honest clients are served from the edge.
+         *
+         *     zoom → display_kind / importance thresholds are a FE render-layer concern,
+         *     intentionally NOT an endpoint param: M3 is one static payload the client
+         *     re-shards locally per viewport, and keeping the threshold tuning on the FE
+         *     means a UX feel change needs no backend redeploy.
+         */
+        get: operations["list_all_area_nodes_outdoor_areas_nodes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3942,6 +4274,23 @@ export interface paths {
         };
         /** Convex hull polygon of subtree route points */
         get: operations["get_outdoor_area_coverage_outdoor_areas__area_id__coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/areas/{area_id}/discipline-composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Single-area 4-bucket style composition (selected-pin ring) */
+        get: operations["get_area_discipline_composition_outdoor_areas__area_id__discipline_composition_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4139,6 +4488,74 @@ export interface paths {
         };
         /** List Route Pins */
         get: operations["list_route_pins_outdoor_pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/region-label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Representative 'area' label for a map viewport (browse title)
+         * @description CB 点6 — browse-sheet title tracks the camera (not a tapped pin).
+         *     See services.outdoor_areas.region_label_for_bbox (strategy B:
+         *     dominant-coverage, prefer-broadest 'area', fallback state). Returns an
+         *     all-null object when the viewport has no route-bearing areas.
+         */
+        get: operations["get_region_label_outdoor_region_label_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/routes/nearby": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Routes Nearby
+         * @description CB 点3 — browse sheet auto-loads routes within `radius_mi` of the
+         *     camera center (not a single area). Same row shape + crag·area breadcrumb
+         *     as /outdoor/areas/{id}/routes. bbox prefilter + haversine cull; marquee
+         *     default sort (stars→sends→grade).
+         */
+        get: operations["list_routes_nearby_outdoor_routes_nearby_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outdoor/routes/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Routes Endpoint
+         * @description CB 点9 — route name search for the discover-mode search list. Same row
+         *     shape + crag·area breadcrumb as the browse list (FE merges these under a
+         *     'Routes' group alongside area + gym hits).
+         */
+        get: operations["search_routes_endpoint_outdoor_routes_search_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5556,6 +5973,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/{user_id}/affiliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** User Affiliations */
+        get: operations["user_affiliations_users__user_id__affiliations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/{user_id}/ascents": {
         parameters: {
             query?: never;
@@ -6257,6 +6691,56 @@ export interface components {
             identity_token: string;
         };
         /**
+         * AreaCompositionBatchIn
+         * @description CB Phase F — batch composition request. The browse map prefetches the
+         *     4-bucket composition for every visible pin's area in one round-trip so the
+         *     selected donut is instant + the mix-pin rings + the dominant-style pin color
+         *     have data. Capped to bound the GROUP BY (the densest viewport is ~266 pins;
+         *     500 is comfortable headroom).
+         */
+        AreaCompositionBatchIn: {
+            /** Area Ids */
+            area_ids: string[];
+        };
+        /**
+         * AreaCompositionItemOut
+         * @description One area's 4-bucket composition in the batch response. Same partition as
+         *     DisciplineCompositionOut, plus the area_id key. Areas with no approved
+         *     routes are omitted from the batch (they have no pin).
+         */
+        AreaCompositionItemOut: {
+            /**
+             * Area Id
+             * Format: uuid
+             */
+            area_id: string;
+            /**
+             * Boulder
+             * @default 0
+             */
+            boulder: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+            /**
+             * Sport
+             * @default 0
+             */
+            sport: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Trad
+             * @default 0
+             */
+            trad: number;
+        };
+        /**
          * AreaListItem
          * @description Lightweight projection for /children / /areas?bbox= / /search.
          *
@@ -6298,6 +6782,98 @@ export interface components {
             parent_id?: string | null;
             /** Subtree Route Count */
             subtree_route_count: number;
+        };
+        /**
+         * AreaNodeComposition
+         * @description 4-bucket STYLE composition of a node's SUBTREE approved routes — the
+         *     ratio ring. Same partition as AreaCompositionItemOut (boulder+sport+trad+
+         *     other == total) so the ring fills 360°; `other` = toprope/aid/mixed/alpine.
+         *
+         *     SUBTREE (not direct): a parent 'area'/'state' node has ~0 direct routes
+         *     (routes hang off crags), so a direct-only count would render an empty ring.
+         *     The subtree rollup gives it the real mix of everything beneath it.
+         */
+        AreaNodeComposition: {
+            /**
+             * Boulder
+             * @default 0
+             */
+            boulder: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+            /**
+             * Sport
+             * @default 0
+             */
+            sport: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Trad
+             * @default 0
+             */
+            trad: number;
+        };
+        /**
+         * AreaNodeOut
+         * @description One node in the tree-clustered map preload (Window CD Phase 2).
+         *
+         *     Map-render + clustering field set only — narrower than AreaListItem.
+         *     parent_id / depth / direct_* / has_* / cover_url are dropped: they're
+         *     tap-time detail GET /outdoor/areas/{id} already returns, and parent_id's
+         *     UUIDs would push the gzip payload past the < 3MB preload ship gate.
+         */
+        AreaNodeOut: {
+            composition: components["schemas"]["AreaNodeComposition"];
+            /**
+             * Display Kind
+             * @enum {string}
+             */
+            display_kind: "country" | "state" | "region" | "area" | "crag" | "wall";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Subtree Route Count */
+            subtree_route_count: number;
+        };
+        /**
+         * AreaNodesOut
+         * @description All-display_kind node preload for the tree-clustered map (Window CD
+         *     Phase 2 / M3). Like CragPinsOut but EVERY kind (country→wall), each with
+         *     its subtree ratio-ring composition, so the FE preloads the whole tree once
+         *     and clusters client-side by display_kind + subtree_route_count with no
+         *     per-viewport refetch.
+         *
+         *     Intentionally unpaginated (~43k nodes): client-side clustering needs a
+         *     stable static source. gzip ≈ 2.2MB (< 3MB ship gate; proxy gzip). zoom →
+         *     display_kind / importance thresholds are a FE render-layer concern, not an
+         *     API param (keeps this one static payload + lets tuning skip a redeploy).
+         *
+         *     data_version = sha1[:16] over per-row payload fields (id, name,
+         *     display_kind, rounded lat/lng, subtree_route_count, 4 style buckets) — see
+         *     services.outdoor_areas.list_all_area_nodes for the invalidation contract.
+         */
+        AreaNodesOut: {
+            /** Count */
+            count: number;
+            /** Data Version */
+            data_version: string;
+            /** Items */
+            items: components["schemas"]["AreaNodeOut"][];
         };
         /** AuditLogOut */
         AuditLogOut: {
@@ -7372,6 +7948,38 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /** CompCreateIn */
+        CompCreateIn: {
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Description */
+            description?: string | null;
+            /** Event Id */
+            event_id?: string | null;
+            /** Gym Id */
+            gym_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** CompUpdateIn */
+        CompUpdateIn: {
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Description */
+            description?: string | null;
+            /** Event Id */
+            event_id?: string | null;
+            /** Gym Id */
+            gym_id?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** ContentSearchItem */
         ContentSearchItem: {
             /**
@@ -7463,6 +8071,44 @@ export interface components {
             sends: number;
         };
         /**
+         * DisciplineCompositionOut
+         * @description CB Phase F — single-area STYLE-level 4-bucket composition for the
+         *     selected-pin ratio ring. Unlike DisciplineCounts (discipline: boulder/rope/
+         *     other), this splits rope into sport/trad so the donut can show the dominant
+         *     REAL mix (sport vs trad — the common mixed case; boulder+rope-both is only
+         *     ~3.5% of areas). `other` = toprope/aid/mixed/alpine/anything not in the
+         *     three named style buckets. The four named-or-other buckets partition the
+         *     area's approved routes (boulder+sport+trad+other == total) so the ring
+         *     always fills 360°.
+         */
+        DisciplineCompositionOut: {
+            /**
+             * Boulder
+             * @default 0
+             */
+            boulder: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+            /**
+             * Sport
+             * @default 0
+             */
+            sport: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Trad
+             * @default 0
+             */
+            trad: number;
+        };
+        /**
          * DisciplineCounts
          * @description Three-bucket aggregation aligned with OutdoorRoute.discipline +
          *     /outdoor/pins contract (boulder / rope / other).
@@ -7526,6 +8172,16 @@ export interface components {
             /** Width */
             width: number;
         };
+        /** EnrollIn */
+        EnrollIn: {
+            /** Division Id */
+            division_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
         /** EventCreateIn */
         EventCreateIn: {
             /** Category */
@@ -7534,12 +8190,18 @@ export interface components {
             cover_url?: string | null;
             /** Description */
             description?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            } | null;
             /** Discipline */
             discipline?: string | null;
             /** End At */
             end_at?: string | null;
             /** Highlights */
             highlights?: string[] | null;
+            /** Is Featured */
+            is_featured?: boolean | null;
             /** Lat */
             lat?: number | null;
             /** Lng */
@@ -7580,6 +8242,10 @@ export interface components {
             created_at: string;
             /** Description */
             description?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            } | null;
             /** Discipline */
             discipline?: string | null;
             /** End At */
@@ -7596,6 +8262,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Featured
+             * @default false
+             */
+            is_featured: boolean;
             /**
              * Is Registered
              * @default false
@@ -7644,6 +8315,8 @@ export interface components {
             save_count: number;
             /** Scheduled Publish At */
             scheduled_publish_at?: string | null;
+            /** Spots Left */
+            spots_left?: number | null;
             /**
              * Start At
              * Format: date-time
@@ -7674,12 +8347,18 @@ export interface components {
             cover_url?: string | null;
             /** Description */
             description?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            } | null;
             /** Discipline */
             discipline?: string | null;
             /** End At */
             end_at?: string | null;
             /** Highlights */
             highlights?: string[] | null;
+            /** Is Featured */
+            is_featured?: boolean | null;
             /** Lat */
             lat?: number | null;
             /** Lng */
@@ -8215,12 +8894,36 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * GymRouteCommentOut
+         * @description One climber's rating + comment, with the demographics the setter
+         *     feedback view surfaces. Populated from route_ratings JOIN users.
+         */
+        GymRouteCommentOut: {
+            /** Climber Gender */
+            climber_gender?: string | null;
+            /** Climber Height Cm */
+            climber_height_cm?: number | null;
+            /** Climber Username */
+            climber_username?: string | null;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+            /** Stars */
+            stars: number;
+        };
         /** GymRouteCreateIn */
         GymRouteCreateIn: {
             /** Color */
             color?: string | null;
             /** Description */
             description?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
             /**
              * Grade System
              * @enum {string}
@@ -8228,16 +8931,30 @@ export interface components {
             grade_system: "vscale" | "yds" | "font" | "french";
             /** Grade Text */
             grade_text: string;
+            /**
+             * Is Benchmark
+             * @default false
+             */
+            is_benchmark: boolean;
+            movement_tags?: components["schemas"]["MovementTags"] | null;
             /** Name */
             name?: string | null;
             /** Photos */
             photos?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Pin X */
+            pin_x?: number | null;
+            /** Pin Y */
+            pin_y?: number | null;
             /** Set Date */
             set_date?: string | null;
             /** Setter Name */
             setter_name?: string | null;
+            /** Setter User Id */
+            setter_user_id?: string | null;
+            /** Status */
+            status?: ("active" | "archived" | "pending" | "rejected" | "planned") | null;
             /**
              * Style
              * @enum {string}
@@ -8245,6 +8962,43 @@ export interface components {
             style: "boulder" | "rope";
             /** Wall Close Up Url */
             wall_close_up_url?: string | null;
+        };
+        /** GymRouteFeedbackOut */
+        GymRouteFeedbackOut: {
+            /**
+             * Ascent Count
+             * @default 0
+             */
+            ascent_count: number;
+            /**
+             * Beta Count
+             * @default 0
+             */
+            beta_count: number;
+            /** Comments */
+            comments?: components["schemas"]["GymRouteCommentOut"][];
+            /** Feel Consensus */
+            feel_consensus?: string | null;
+            /** Feel Distribution */
+            feel_distribution?: {
+                [key: string]: number;
+            };
+            /**
+             * Rating Count
+             * @default 0
+             */
+            rating_count: number;
+            /**
+             * Route Id
+             * Format: uuid
+             */
+            route_id: string;
+            /** Stars Avg */
+            stars_avg?: number | null;
+            /** Stars Distribution */
+            stars_distribution?: {
+                [key: string]: number;
+            };
         };
         /** GymRouteOut */
         GymRouteOut: {
@@ -8259,6 +9013,8 @@ export interface components {
             created_at: string;
             /** Description */
             description?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
             /** Grade Score */
             grade_score?: number | null;
             /** Grade System */
@@ -8274,10 +9030,23 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Benchmark
+             * @default false
+             */
+            is_benchmark: boolean;
+            /** Movement Tags */
+            movement_tags?: {
+                [key: string]: unknown;
+            } | null;
             /** Name */
             name?: string | null;
             /** Photos */
             photos?: unknown[] | null;
+            /** Pin X */
+            pin_x?: number | null;
+            /** Pin Y */
+            pin_y?: number | null;
             /**
              * Rating Count
              * @default 0
@@ -8292,6 +9061,8 @@ export interface components {
             set_date?: string | null;
             /** Setter Name */
             setter_name?: string | null;
+            /** Setter User Id */
+            setter_user_id?: string | null;
             /** Stars */
             stars?: number | null;
             /** Status */
@@ -8317,20 +9088,33 @@ export interface components {
             color?: string | null;
             /** Description */
             description?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
             /** Grade System */
             grade_system?: ("vscale" | "yds" | "font" | "french") | null;
             /** Grade Text */
             grade_text?: string | null;
+            /** Is Benchmark */
+            is_benchmark?: boolean | null;
+            movement_tags?: components["schemas"]["MovementTags"] | null;
             /** Name */
             name?: string | null;
             /** Photos */
             photos?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Pin X */
+            pin_x?: number | null;
+            /** Pin Y */
+            pin_y?: number | null;
             /** Set Date */
             set_date?: string | null;
             /** Setter Name */
             setter_name?: string | null;
+            /** Setter User Id */
+            setter_user_id?: string | null;
+            /** Status */
+            status?: ("active" | "archived" | "pending" | "rejected" | "planned") | null;
             /** Style */
             style?: ("boulder" | "rope") | null;
             /** Wall Close Up Url */
@@ -8373,6 +9157,33 @@ export interface components {
             items: components["schemas"]["GymSessionItem"][];
             /** Total */
             total: number;
+        };
+        /** GymStalenessRow */
+        GymStalenessRow: {
+            /** Age Days */
+            age_days?: number | null;
+            /** Color */
+            color?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
+            /** Grade Text */
+            grade_text: string;
+            /**
+             * Is Overdue
+             * @default false
+             */
+            is_overdue: boolean;
+            /** Name */
+            name?: string | null;
+            /**
+             * Route Id
+             * Format: uuid
+             */
+            route_id: string;
+            /** Set Date */
+            set_date?: string | null;
+            /** Status */
+            status: string;
         };
         /** GymStatsOut */
         GymStatsOut: {
@@ -8704,11 +9515,23 @@ export interface components {
         };
         /** MemberOut */
         MemberOut: {
+            /** Email */
+            email?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Head Setter
+             * @default false
+             */
+            is_head_setter: boolean;
+            /**
+             * Is Setter
+             * @default false
+             */
+            is_setter: boolean;
             /**
              * Org Id
              * Format: uuid
@@ -8723,6 +9546,8 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+            /** Username */
+            username?: string | null;
         };
         /** MentionOut */
         MentionOut: {
@@ -8746,8 +9571,30 @@ export interface components {
             /** Mentioner Name */
             mentioner_name: string;
         };
+        /**
+         * MovementTags
+         * @description Structured movement-characteristic tags (Window INDOOR_SET). Single
+         *     source of truth for the tag taxonomy shape, shared by app + admin.
+         */
+        MovementTags: {
+            /** Footwork */
+            footwork?: string[];
+            /** Grip */
+            grip?: string[];
+            /** Style */
+            style?: string[];
+            /** Usage */
+            usage?: string[];
+        };
         /** MyOrgOut */
         MyOrgOut: {
+            /** Gyms */
+            gyms?: components["schemas"]["OrgGymOut"][];
+            /**
+             * Is Setter
+             * @default false
+             */
+            is_setter: boolean;
             /** Org Handle */
             org_handle: string;
             /**
@@ -8889,10 +9736,30 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * OrgGymOut
+         * @description A gym owned by an org, for the routesetter tool's gym picker.
+         */
+        OrgGymOut: {
+            /** Floor Plan Url */
+            floor_plan_url?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** OrgInviteIn */
         OrgInviteIn: {
             /** Email */
             email?: string | null;
+            /**
+             * Is Setter
+             * @default false
+             */
+            is_setter: boolean;
             /** Role */
             role: string;
             /** User Id */
@@ -8905,6 +9772,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Setter
+             * @default false
+             */
+            is_setter: boolean;
             /**
              * Org Id
              * Format: uuid
@@ -8978,6 +9850,15 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "suspended";
+        };
+        /** OrgUpdateIn */
+        OrgUpdateIn: {
+            /** Description */
+            description?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /**
          * OutdoorAreaDetail
@@ -9376,17 +10257,25 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Crew User Ids */
+            crew_user_ids?: string[] | null;
             /** Description */
             description?: string | null;
             /** End Date */
             end_date?: string | null;
             /** Event Id */
             event_id?: string | null;
+            /** Grade Targets */
+            grade_targets?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Lead Setter User Id */
+            lead_setter_user_id?: string | null;
             /**
              * Org Id
              * Format: uuid
@@ -9587,6 +10476,26 @@ export interface components {
             plans_public?: boolean | null;
             /** Posts Public */
             posts_public?: boolean | null;
+        };
+        /** ProblemIn */
+        ProblemIn: {
+            /** Group Key */
+            group_key?: string | null;
+            /** Gym Route Id */
+            gym_route_id?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Points */
+            points?: number | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /** ProblemsAddIn */
+        ProblemsAddIn: {
+            /** Gym Route Ids */
+            gym_route_ids?: string[] | null;
+            /** Problems */
+            problems?: components["schemas"]["ProblemIn"][] | null;
         };
         /** ProfileUpsert */
         ProfileUpsert: {
@@ -9954,6 +10863,25 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * RegionLabelOut
+         * @description CB 点6 — the single representative 'area' node for a map viewport,
+         *     used as the browse-sheet title (tracks the camera, not a tapped pin).
+         *
+         *     Strategy B (dominant-coverage, prefer-broadest): the shallowest
+         *     display_kind='area' ancestor covering ≥ the route-weighted threshold of
+         *     the in-view crags, falling back to the dominant state when no single
+         *     'area' dominates (viewport spans a whole state). All fields null when the
+         *     viewport has no route-bearing areas.
+         */
+        RegionLabelOut: {
+            /** Display Kind */
+            display_kind?: ("country" | "state" | "region" | "area" | "crag" | "wall") | null;
+            /** Id */
+            id?: string | null;
+            /** Name */
+            name?: string | null;
+        };
         /** RegisterIn */
         RegisterIn: {
             /** Email */
@@ -10073,10 +11001,20 @@ export interface components {
         /** RoleChangeIn */
         RoleChangeIn: {
             /**
-             * Role
-             * @description owner | editor | staff
+             * Is Head Setter
+             * @description head routesetter tag
              */
-            role: string;
+            is_head_setter?: boolean | null;
+            /**
+             * Is Setter
+             * @description routesetter job tag
+             */
+            is_setter?: boolean | null;
+            /**
+             * Role
+             * @description owner | editor | staff | member
+             */
+            role?: string | null;
         };
         /**
          * RouteContainmentOut
@@ -10314,6 +11252,39 @@ export interface components {
              * Format: date-time
              */
             scheduled_publish_at: string;
+        };
+        /** ScorecardIn */
+        ScorecardIn: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /**
+             * Comp Problem Id
+             * Format: uuid
+             */
+            comp_problem_id: string;
+            /**
+             * Flashed
+             * @default false
+             */
+            flashed: boolean;
+            /**
+             * Top
+             * @default false
+             */
+            top: boolean;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Zone
+             * @default false
+             */
+            zone: boolean;
         };
         /** SearchResultOut */
         SearchResultOut: {
@@ -10703,6 +11674,11 @@ export interface components {
             total_rope: number;
             /** Total Sends */
             total_sends: number;
+        };
+        /** StatusIn */
+        StatusIn: {
+            /** Status */
+            status: string;
         };
         /** TaskCreateIn */
         TaskCreateIn: {
@@ -11269,6 +12245,10 @@ export interface components {
         };
         /** WallSectionCreateIn */
         WallSectionCreateIn: {
+            /** Bbox */
+            bbox?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Floor Plan X
              * @default 0
@@ -11299,6 +12279,10 @@ export interface components {
         };
         /** WallSectionOut */
         WallSectionOut: {
+            /** Bbox */
+            bbox?: {
+                [key: string]: unknown;
+            } | null;
             /** Floor Plan X */
             floor_plan_x: number;
             /** Floor Plan Y */
@@ -11329,6 +12313,10 @@ export interface components {
         };
         /** WallSectionUpdateIn */
         WallSectionUpdateIn: {
+            /** Bbox */
+            bbox?: {
+                [key: string]: unknown;
+            } | null;
             /** Floor Plan X */
             floor_plan_x?: number | null;
             /** Floor Plan Y */
@@ -11555,12 +12543,20 @@ export interface components {
         };
         /** PlanCreateIn */
         routers__org_route_setting__PlanCreateIn: {
+            /** Crew User Ids */
+            crew_user_ids?: string[] | null;
             /** Description */
             description?: string | null;
             /** End Date */
             end_date?: string | null;
             /** Event Id */
             event_id?: string | null;
+            /** Grade Targets */
+            grade_targets?: {
+                [key: string]: unknown;
+            } | null;
+            /** Lead Setter User Id */
+            lead_setter_user_id?: string | null;
             /**
              * Start Date
              * Format: date
@@ -11576,12 +12572,20 @@ export interface components {
         };
         /** PlanUpdateIn */
         routers__org_route_setting__PlanUpdateIn: {
+            /** Crew User Ids */
+            crew_user_ids?: string[] | null;
             /** Description */
             description?: string | null;
             /** End Date */
             end_date?: string | null;
             /** Event Id */
             event_id?: string | null;
+            /** Grade Targets */
+            grade_targets?: {
+                [key: string]: unknown;
+            } | null;
+            /** Lead Setter User Id */
+            lead_setter_user_id?: string | null;
             /** Start Date */
             start_date?: string | null;
             /** Title */
@@ -14521,6 +15525,37 @@ export interface operations {
             };
         };
     };
+    delete_challenge_challenges__challenge_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                challenge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_challenge_challenges__challenge_id__patch: {
         parameters: {
             query?: never;
@@ -15601,6 +16636,8 @@ export interface operations {
             query?: {
                 org_id?: string | null;
                 include_drafts?: boolean;
+                category?: string | null;
+                featured?: boolean | null;
                 limit?: number;
             };
             header?: never;
@@ -16789,6 +17826,37 @@ export interface operations {
             };
         };
     };
+    gym_route_feedback_gym_routes__route_id__feedback_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GymRouteFeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     rate_gym_route_gym_routes__route_id__rate_post: {
         parameters: {
             query?: never;
@@ -16856,6 +17924,37 @@ export interface operations {
         };
     };
     reject_route_gym_routes__route_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GymRouteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_route_set_gym_routes__route_id__set_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -17053,6 +18152,37 @@ export interface operations {
             };
         };
     };
+    get_gym_for_catalog_gym__gym_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gym_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_routes_in_gym_gym__gym_id__routes_get: {
         parameters: {
             query?: {
@@ -17076,6 +18206,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GymRouteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gym_staleness_gym__gym_id__staleness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gym_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GymStalenessRow"][];
                 };
             };
             /** @description Validation Error */
@@ -18625,6 +19786,41 @@ export interface operations {
             };
         };
     };
+    update_org_orgs__org_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     org_analytics_funnel_orgs__org_id__analytics_funnel_get: {
         parameters: {
             query?: never;
@@ -18674,6 +19870,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalyticsOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    org_route_quality_orgs__org_id__analytics_route_quality_get: {
+        parameters: {
+            query: {
+                gym_id: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -18744,6 +19973,478 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TopContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_competitions_orgs__org_id__competitions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_competition_orgs__org_id__competitions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_competition_orgs__org_id__competitions__comp_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_competition_orgs__org_id__competitions__comp_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_competition_orgs__org_id__competitions__comp_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_enrollments_orgs__org_id__competitions__comp_id__enrollments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_enrollment_orgs__org_id__competitions__comp_id__enrollments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_enrollment_orgs__org_id__competitions__comp_id__enrollments__enrollment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+                enrollment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_problems_orgs__org_id__competitions__comp_id__problems_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemsAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_problem_orgs__org_id__competitions__comp_id__problems__problem_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+                problem_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scorecards_orgs__org_id__competitions__comp_id__scorecards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_scorecard_orgs__org_id__competitions__comp_id__scorecards_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScorecardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_standings_orgs__org_id__competitions__comp_id__standings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_status_orgs__org_id__competitions__comp_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -19534,6 +21235,38 @@ export interface operations {
             };
         };
     };
+    delete_plan_orgs__org_id__route_setting_plans__plan_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_plan_orgs__org_id__route_setting_plans__plan_id__patch: {
         parameters: {
             query?: never;
@@ -19891,6 +21624,39 @@ export interface operations {
             };
         };
     };
+    post_areas_discipline_composition_outdoor_areas_composition_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaCompositionBatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaCompositionItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_all_crags_outdoor_areas_crags_get: {
         parameters: {
             query?: never;
@@ -19907,6 +21673,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CragPinsOut"];
+                };
+            };
+        };
+    };
+    list_all_area_nodes_outdoor_areas_nodes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaNodesOut"];
                 };
             };
         };
@@ -20069,6 +21855,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_area_discipline_composition_outdoor_areas__area_id__discipline_composition_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisciplineCompositionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
@@ -20492,6 +22309,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoutePinsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_region_label_outdoor_region_label_get: {
+        parameters: {
+            query: {
+                /** @description bbox south (min lat) */
+                south: number;
+                /** @description bbox west (min lng) */
+                west: number;
+                /** @description bbox north (max lat) */
+                north: number;
+                /** @description bbox east (max lng) */
+                east: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionLabelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_routes_nearby_outdoor_routes_nearby_get: {
+        parameters: {
+            query: {
+                /** @description center latitude */
+                lat: number;
+                /** @description center longitude */
+                lng: number;
+                radius_mi?: number;
+                /** @description OutdoorRoute.style filter */
+                style?: string | null;
+                discipline?: ("boulder" | "rope" | "other") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_routes_endpoint_outdoor_routes_search_get: {
+        parameters: {
+            query: {
+                /** @description route name query (min 2 chars) */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -23334,6 +25261,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    user_affiliations_users__user_id__affiliations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
