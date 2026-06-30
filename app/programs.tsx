@@ -19,8 +19,9 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { eventApi } from "@/features/community/events/api";
 import { challengeApi } from "@/features/community/challenges/api";
 import { compApi } from "@/features/community/competitions/api";
+import { blogApi } from "@/features/community/blog/api";
 
-type Kind = "comp" | "event" | "challenge";
+type Kind = "comp" | "event" | "challenge" | "news";
 interface Item {
   kind: Kind;
   id: string;
@@ -35,12 +36,14 @@ const KINDS: { key: Kind | "all"; zh: string; en: string }[] = [
   { key: "comp", zh: "比赛", en: "Comps" },
   { key: "event", zh: "活动", en: "Events" },
   { key: "challenge", zh: "挑战", en: "Challenges" },
+  { key: "news", zh: "资讯", en: "News" },
 ];
 
 const META: Record<Kind, { icon: any; tint: string; zh: string; en: string }> = {
   comp: { icon: "trophy", tint: "#306E6F", zh: "比赛", en: "Comp" },
   event: { icon: "calendar", tint: "#2E6F8E", zh: "活动", en: "Event" },
   challenge: { icon: "flame", tint: "#C27C40", zh: "挑战", en: "Challenge" },
+  news: { icon: "newspaper", tint: "#5F5E5A", zh: "资讯", en: "News" },
 };
 
 export default function ProgramsScreen() {
@@ -59,8 +62,9 @@ export default function ProgramsScreen() {
       compApi.listAll(),
       eventApi.getEvents(),
       challengeApi.getChallenges({ limit: 50 }),
+      blogApi.getBlogs(),
     ])
-      .then(([comps, events, challenges]) => {
+      .then(([comps, events, challenges, blogs]) => {
         if (!alive) return;
         const out: Item[] = [];
         if (comps.status === "fulfilled") {
@@ -97,6 +101,17 @@ export default function ProgramsScreen() {
             });
           }
         }
+        if (blogs.status === "fulfilled") {
+          for (const b of blogs.value ?? []) {
+            out.push({
+              kind: "news",
+              id: b.id,
+              title: b.title,
+              subtitle: b.publisher?.name ?? tr("资讯", "News"),
+              ts: b.published_at ? new Date(b.published_at).getTime() || 0 : 0,
+            });
+          }
+        }
         // comps + featured events first, then by recency
         out.sort((a, b) => {
           const w = (i: Item) => (i.kind === "comp" ? 2 : i.featured ? 1 : 0);
@@ -114,6 +129,7 @@ export default function ProgramsScreen() {
 
   function open(i: Item) {
     if (i.kind === "comp") router.push(`/competition/${i.id}` as any);
+    else if (i.kind === "news") router.push(`/blog/${i.id}` as any);
     else if (i.kind === "event")
       router.push({ pathname: "/community/events/[eventId]", params: { eventId: i.id } } as any);
     else
