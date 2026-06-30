@@ -15,6 +15,7 @@ import ActivityFeedSection from "../../../../src/features/profile/components/fiv
 import StatsAndBadgesSection from "../../../../src/features/profile/components/fivecorefunction/StatsAndBadgesSection";
 import ProfileListsWrapper from "../../../../src/features/profile/components/ProfileListsWrapper";
 import ProfileChromeRoot from "../../../../src/features/profile/components/ProfileChromeRoot";
+import { useAffiliations } from "../../../../src/features/orgs/hooks";
 import type {
   ProfileChromeTab,
   ProfileTabKey,
@@ -125,6 +126,7 @@ export default function ProfileScreen() {
   const fetchMeProfile = useProfileStore((s) => s.fetchMe);
 
   const [me, setMe] = useState<UserMe | null>(null);
+  const { affiliations } = useAffiliations(me?.id);
   const didInitialLoad = useRef(false);
 
   const [followCounts, setFollowCounts] = useState<FollowCounts>({
@@ -314,6 +316,7 @@ export default function ProfileScreen() {
             onEditPress={() => router.push("/profile/edit")}
             onFollowersPress={() => router.push("/profile/followers" as any)}
             onFollowingPress={() => router.push("/profile/following" as any)}
+            affiliations={affiliations}
             scrollY={activeScrollY}
             bleedUnderHeader={false}
             boulderGrade={user.stats.boulderGrade}

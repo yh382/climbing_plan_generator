@@ -66,6 +66,7 @@ import {
 } from '../../../src/features/journal/sync/enqueueRouteSendLog';
 import { ArchivedBanner } from '../../../src/features/gymsCatalog/components/ArchivedBanner';
 import { MovementTagChips } from '../../../src/features/gymsCatalog/components/MovementTagChips';
+import RouteStatsCards from '../../../src/features/gymsCatalog/components/RouteStatsCards';
 import { RouteExpiryBadge } from '../../../src/features/gymsCatalog/components/RouteExpiryBadge';
 import type {
   GymRoute,
@@ -513,6 +514,12 @@ export default function GymRouteDetailPage() {
               <RouteExpiryBadge expiryDate={route.expiry_date} />
             </View>
           ) : null}
+
+          <RouteStatsCards
+            route={route}
+            ascents={ascents}
+            currentUserId={currentUserId}
+          />
 
           <RouteActionRow
             userHasSent={userHasSent}

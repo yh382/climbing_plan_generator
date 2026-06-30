@@ -19,6 +19,10 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import ProfileAffiliations, {
+  isStaff,
+} from "@/features/orgs/components/ProfileAffiliations";
+import type { Affiliation } from "@/features/orgs/types";
 import type { SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -154,6 +158,8 @@ export interface ProfileHeaderProps {
    * already sits at screen top with no content inset) neither offset applies.
    */
   bleedUnderHeader?: boolean;
+  /** P2-A — verified gym affiliations (avatar check + collapsible row). */
+  affiliations?: Affiliation[];
 }
 
 export default function ProfileHeader({
@@ -181,10 +187,15 @@ export default function ProfileHeader({
   totalSessions,
   onKPIPress,
   bleedUnderHeader = true,
+  affiliations,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
   const isDark = useColorScheme() === "dark";
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const hasStaff = useMemo(
+    () => (affiliations ?? []).some(isStaff),
+    [affiliations],
+  );
 
   // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
   // "automatic"`, so the ScrollView prepends headerHeight worth of top padding.
@@ -291,13 +302,20 @@ export default function ProfileHeader({
 
       {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}
       <View style={styles.idBlock} pointerEvents="box-none">
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={36} color="#9CA3AF" />
-          </View>
-        )}
+        <View style={styles.avatarWrap}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person" size={36} color="#9CA3AF" />
+            </View>
+          )}
+          {hasStaff ? (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>
@@ -309,6 +327,7 @@ export default function ProfileHeader({
             {bioText}
           </Text>
         ) : null}
+        <ProfileAffiliations affiliations={affiliations ?? []} />
         <View style={styles.countsRow}>
           <Pressable
             accessibilityRole="button"
@@ -433,6 +452,23 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderRadius: 38,
       backgroundColor: "#FFFFFF",
       marginBottom: 10,
+    },
+    avatarWrap: {
+      position: "relative",
+      alignSelf: "flex-start",
+    },
+    verifiedBadge: {
+      position: "absolute",
+      top: 54,
+      left: 54,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: "#FFFFFF",
     },
     avatarPlaceholder: {
       alignItems: "center",

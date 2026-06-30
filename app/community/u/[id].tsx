@@ -32,6 +32,7 @@ import CollapsingHeaderTitle from "../../../src/features/profile/components/Coll
 import PublicStatsSection from "../../../src/features/profile/components/PublicStatsSection";
 import ProfileListsWrapper from "../../../src/features/profile/components/ProfileListsWrapper";
 import ProfileChromeRoot from "../../../src/features/profile/components/ProfileChromeRoot";
+import { useAffiliations } from "../../../src/features/orgs/hooks";
 import type {
   ProfileChromeTab,
   ProfileChromePageHandle,
@@ -89,6 +90,7 @@ const HERO_HEIGHT = PROFILE_COVER_HEIGHT_FULL - PROFILE_COVER_OVERLAP_PT;
 
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { affiliations } = useAffiliations(id);
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -303,6 +305,7 @@ export default function PublicProfileScreen() {
             onFollowingPress={() => router.push(`/profile/following?userId=${id}` as any)}
             scrollY={activeScrollY}
             bleedUnderHeader={false}
+            affiliations={affiliations}
             boulderGrade={profile.boulderMax || "—"}
             routeGrade={profile.routeMax || "—"}
             totalSends={profile.totalSends}
