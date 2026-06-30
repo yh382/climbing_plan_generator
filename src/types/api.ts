@@ -1903,6 +1903,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/competitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Competitions
+         * @description Discovery — non-draft comps. Scoped to a gym when ?gym_id given, else the
+         *     global "活动" feed (all visible comps).
+         */
+        get: operations["list_competitions_competitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/competitions/{comp_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Competition */
+        get: operations["get_competition_competitions__comp_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/competitions/{comp_id}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enroll */
+        post: operations["enroll_competitions__comp_id__enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/competitions/{comp_id}/scorecards/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Self Score */
+        put: operations["self_score_competitions__comp_id__scorecards_me_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/competitions/{comp_id}/spectator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Spectator
+         * @description No-login standings read (shareable spectator link).
+         */
+        get: operations["spectator_competitions__comp_id__spectator_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/competitions/{comp_id}/standings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Standings */
+        get: operations["standings_competitions__comp_id__standings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/csm/state": {
         parameters: {
             query?: never;
@@ -2925,6 +3034,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gyms/{gym_id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gym Staff
+         * @description Official staff of the gym's org — owner + setters (P2-C). Distinct from
+         *     /members (favorited community users). Shown in the gym People tab.
+         *
+         *     D12 per-gym professional override (staff_display_name/avatar) is deferred —
+         *     this returns each staff member's personal profile for now.
+         */
+        get: operations["get_gym_staff_gyms__gym_id__staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gyms/{gym_id}/stats": {
         parameters: {
             query?: never;
@@ -3414,6 +3547,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orgs/invites/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Invites
+         * @description Pending org invites for the current user (status='invited'), with the
+         *     membership_id needed to accept/decline + org/gym context. P2-B.
+         */
+        get: operations["my_invites_orgs_invites_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orgs/invites/{membership_id}/accept": {
         parameters: {
             query?: never;
@@ -3425,6 +3579,27 @@ export interface paths {
         put?: never;
         /** Accept Invite */
         post: operations["accept_invite_orgs_invites__membership_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/invites/{membership_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Invite
+         * @description Decline a pending invite (server-authoritative — avoids the multi-device
+         *     local-suppress desync). P2-B.
+         */
+        post: operations["decline_invite_orgs_invites__membership_id__decline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8172,16 +8347,6 @@ export interface components {
             /** Width */
             width: number;
         };
-        /** EnrollIn */
-        EnrollIn: {
-            /** Division Id */
-            division_id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-        };
         /** EventCreateIn */
         EventCreateIn: {
             /** Category */
@@ -11293,6 +11458,36 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** SelfScoreIn */
+        SelfScoreIn: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /** Client Id */
+            client_id?: string | null;
+            /**
+             * Comp Problem Id
+             * Format: uuid
+             */
+            comp_problem_id: string;
+            /**
+             * Flashed
+             * @default false
+             */
+            flashed: boolean;
+            /**
+             * Top
+             * @default false
+             */
+            top: boolean;
+            /**
+             * Zone
+             * @default false
+             */
+            zone: boolean;
+        };
         /** SessionBank */
         SessionBank: {
             /** Climb Sessions */
@@ -12540,6 +12735,26 @@ export interface components {
             title?: string | null;
             /** Visibility */
             visibility?: ("private" | "public") | null;
+        };
+        /** EnrollIn */
+        routers__comp_app__EnrollIn: {
+            /** Division Id */
+            division_id: string;
+            /**
+             * Waiver Accepted
+             * @default false
+             */
+            waiver_accepted: boolean;
+        };
+        /** EnrollIn */
+        routers__competitions__EnrollIn: {
+            /** Division Id */
+            division_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /** PlanCreateIn */
         routers__org_route_setting__PlanCreateIn: {
@@ -16580,6 +16795,200 @@ export interface operations {
             };
         };
     };
+    list_competitions_competitions_get: {
+        parameters: {
+            query?: {
+                gym_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_competition_competitions__comp_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enroll_competitions__comp_id__enroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["routers__comp_app__EnrollIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    self_score_competitions__comp_id__scorecards_me_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelfScoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectator_competitions__comp_id__spectator_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    standings_competitions__comp_id__standings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_csm_state_csm_state_get: {
         parameters: {
             query?: never;
@@ -18652,6 +19061,37 @@ export interface operations {
             };
         };
     };
+    get_gym_staff_gyms__gym_id__staff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gym_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_gym_stats_gyms__gym_id__stats_get: {
         parameters: {
             query?: never;
@@ -19704,6 +20144,26 @@ export interface operations {
             };
         };
     };
+    my_invites_orgs_invites_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     accept_invite_orgs_invites__membership_id__accept_post: {
         parameters: {
             query?: never;
@@ -19722,6 +20182,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrgMembershipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_invite_orgs_invites__membership_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -20196,7 +20687,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnrollIn"];
+                "application/json": components["schemas"]["routers__competitions__EnrollIn"];
             };
         };
         responses: {
