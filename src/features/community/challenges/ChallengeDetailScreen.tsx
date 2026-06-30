@@ -25,6 +25,7 @@ import Animated, {
 import SegmentedTabs from "./component/SegmentedTabs";
 import LeaderboardFilters from "./component/LeaderboardFilters";
 import RankingRowCard from "./component/RankingRowCard";
+import ChallengeTiers from "./component/ChallengeTiers";
 import { HeaderButton } from "@/components/ui/HeaderButton";
 
 import { useChallengeDetailData } from "./data/useChallengeDetailData";
@@ -290,6 +291,12 @@ export default function ChallengeDetailScreen() {
             </InfoRow>
           </View>
         </View>
+
+        {/* === Goal tiers (W3 structured rule_payload) === */}
+        <ChallengeTiers
+          ruleType={challenge.ruleType}
+          tiers={challenge.rulePayload?.tiers}
+        />
 
         {/* === Leaderboard (hidden for lifetime/skill challenges) === */}
         {challenge.category !== "lifetime" && challenge.category !== "skill" && (
