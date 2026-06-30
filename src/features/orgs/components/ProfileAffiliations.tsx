@@ -5,17 +5,20 @@ import React, { useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../lib/theme";
+import { useSettings } from "../../../contexts/SettingsContext";
 import type { Affiliation } from "../types";
+
+type Tr = (zh: string, en: string) => string;
 
 /** A "staff-worthy" affiliation = the kind that earns a verified badge. */
 export function isStaff(a: Affiliation): boolean {
   return a.is_setter || a.is_head_setter || a.role === "owner";
 }
 
-function roleLabel(a: Affiliation): string {
-  if (a.is_head_setter) return "Head setter";
-  if (a.is_setter) return "Setter";
-  if (a.role === "owner") return "Owner";
+function roleLabel(a: Affiliation, tr: Tr): string {
+  if (a.is_head_setter) return tr("主力定线员", "Head setter");
+  if (a.is_setter) return tr("定线员", "Setter");
+  if (a.role === "owner") return tr("馆主", "Owner");
   return a.role;
 }
 
@@ -28,6 +31,7 @@ export default function ProfileAffiliations({
 }: {
   affiliations: Affiliation[];
 }) {
+  const { tr } = useSettings();
   const staff = useMemo(() => affiliations.filter(isStaff), [affiliations]);
   const [expanded, setExpanded] = useState(false);
 
@@ -35,8 +39,8 @@ export default function ProfileAffiliations({
 
   const single = staff.length === 1;
   const summary = single
-    ? `${roleLabel(staff[0])} @ ${place(staff[0])}`
-    : `Verified setter · ${staff.length} gyms`;
+    ? `${roleLabel(staff[0], tr)} @ ${place(staff[0])}`
+    : `${tr("认证定线员", "Verified setter")} · ${staff.length} ${tr("个岩馆", "gyms")}`;
 
   return (
     <View style={styles.wrap}>
@@ -63,7 +67,7 @@ export default function ProfileAffiliations({
         <View style={styles.list}>
           {staff.map((a) => (
             <Text key={a.org_id} style={styles.item} numberOfLines={1}>
-              {roleLabel(a)} @ {place(a)}
+              {roleLabel(a, tr)} @ {place(a)}
             </Text>
           ))}
         </View>

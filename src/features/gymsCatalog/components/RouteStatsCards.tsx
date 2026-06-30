@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "../../../lib/useThemeColors";
+import { useSettings } from "../../../contexts/SettingsContext";
 import { gymsCatalogApi } from "../api";
 import type { GymRoute, GymRouteAscent } from "../types";
 
@@ -30,6 +31,7 @@ export default function RouteStatsCards({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const { tr } = useSettings();
 
   const { attempts, sends } = useMemo(() => {
     const mine = currentUserId
@@ -84,13 +86,13 @@ export default function RouteStatsCards({
   return (
     <View style={styles.row}>
       <View style={[styles.card, styles.hist]}>
-        <Text style={styles.histTitle}>History</Text>
+        <Text style={styles.histTitle}>{tr("历史", "History")}</Text>
         <View style={styles.histRow}>
-          <Text style={styles.histLabel}>Attempts</Text>
+          <Text style={styles.histLabel}>{tr("尝试", "Attempts")}</Text>
           <Text style={styles.histVal}>{attempts}</Text>
         </View>
         <View style={styles.histRow}>
-          <Text style={styles.histLabel}>Sends</Text>
+          <Text style={styles.histLabel}>{tr("完攀", "Sends")}</Text>
           <Text style={styles.histVal}>{sends}</Text>
         </View>
       </View>
@@ -100,7 +102,7 @@ export default function RouteStatsCards({
           style={[styles.card, styles.mapCard]}
           onPress={() => router.push(`/gym/${route.gym_id}` as any)}
           accessibilityRole="button"
-          accessibilityLabel="View on floor plan"
+          accessibilityLabel={tr("在楼层图查看", "View on floor plan")}
         >
           <Image
             source={{ uri: floorUrl! }}
