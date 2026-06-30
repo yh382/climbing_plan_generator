@@ -70,6 +70,16 @@ export interface RecentGym {
 
 // ---- API ----
 
+export interface GymStaffMember {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: string;
+  is_setter: boolean;
+  is_head_setter: boolean;
+}
+
 export const gymCommunityApi = {
   getActivity: async (gymId: string, limit = 20, offset = 0) => {
     const res = await api.get<{ items: GymSessionItem[]; total: number }>(
@@ -88,6 +98,12 @@ export const gymCommunityApi = {
     );
     res.items.forEach(m => { m.avatar_url = sanitizeImageUrl(m.avatar_url) ?? undefined; });
     return res;
+  },
+
+  /** Official staff of the gym's org (owner + setters). P2-C. */
+  getStaff: async (gymId: string): Promise<GymStaffMember[]> => {
+    const res = await api.get<{ items: GymStaffMember[] }>(`/gyms/${gymId}/staff`);
+    return (res.items ?? []).map((s) => ({ ...s, avatar_url: sanitizeImageUrl(s.avatar_url) ?? null }));
   },
 
   /** Ensure gym exists in DB, returns gym_id */

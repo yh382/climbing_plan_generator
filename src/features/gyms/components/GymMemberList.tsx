@@ -12,8 +12,9 @@ import { router } from 'expo-router';
 
 import { theme } from '../../../lib/theme';
 import { useThemeColors } from '@/lib/useThemeColors';
-import { gymCommunityApi, GymMember } from '../api';
+import { gymCommunityApi, GymMember, GymStaffMember } from '../api';
 import { useLeaderboard } from '../../community/hooks';
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface Props {
   gymId: string;
@@ -30,10 +31,24 @@ const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 export default function GymMemberList({ gymId, onPressUser }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { tr } = useSettings();
 
   const [members, setMembers] = useState<GymMember[]>([]);
   const [total, setTotal] = useState(0);
   const [membersLoading, setMembersLoading] = useState(true);
+  const [staff, setStaff] = useState<GymStaffMember[]>([]);
+  const [staffExpanded, setStaffExpanded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    gymCommunityApi.getStaff(gymId).then((s) => alive && setStaff(s)).catch(() => {});
+    return () => { alive = false; };
+  }, [gymId]);
+
+  const staffLabel = (s: GymStaffMember) =>
+    s.is_head_setter ? tr('主力定线员', 'Head setter')
+    : s.is_setter ? tr('定线员', 'Setter')
+    : s.role === 'owner' ? tr('馆主', 'Owner') : s.role;
 
   const { items: rankItems, loading: rankLoading } = useLeaderboard('total', 'gym', gymId, 10);
 
@@ -66,6 +81,53 @@ export default function GymMemberList({ gymId, onPressUser }: Props) {
 
   return (
     <View style={styles.container}>
+      {/* Staff Section (P2-C) — official owner + setters, collapsed by default */}
+      {staff.length > 0 && (
+        <View style={{ marginBottom: 20 }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.sectionHeader}
+            onPress={() => setStaffExpanded((e) => !e)}
+          >
+            <Text style={styles.sectionTitle}>
+              {tr('官方团队', 'Staff')} ({staff.length})
+            </Text>
+            <Ionicons
+              name={staffExpanded ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+          {staffExpanded && (
+            <View style={styles.rankCard}>
+              {staff.map((s) => (
+                <TouchableOpacity
+                  key={s.user_id}
+                  style={styles.rankRow}
+                  activeOpacity={0.7}
+                  onPress={() => onPressUser?.(s.user_id)}
+                >
+                  {s.avatar_url ? (
+                    <Image source={{ uri: s.avatar_url }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                      <Ionicons name="person" size={16} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <Text style={[styles.username, { flex: 1, marginLeft: 10 }]} numberOfLines={1}>
+                    {s.display_name || s.username || tr('攀岩者', 'Climber')}
+                  </Text>
+                  <View style={styles.staffBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color={colors.accent} />
+                    <Text style={styles.staffBadgeText}>{staffLabel(s)}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Rankings Section */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Gym Rankings</Text>
@@ -297,6 +359,20 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontFamily: theme.fonts.bold,
     color: colors.textSecondary,
     marginLeft: 8,
+  },
+  staffBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(48,110,111,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  staffBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.fonts.bold,
+    color: '#1D4E4E',
   },
 
   // Member row
