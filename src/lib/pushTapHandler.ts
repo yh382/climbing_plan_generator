@@ -48,6 +48,8 @@ function routeForPushData(data: Record<string, any> | undefined | null): string 
       const ev = data.event_id;
       return ev ? `/community/events/${ev}` : "/inbox?section=activity";
     }
+    case "org_invite":
+      return "/org-invites";
     default:
       return "/inbox?section=activity";
   }

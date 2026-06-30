@@ -140,6 +140,19 @@ function RootStack() {
         }}
       />
       <Stack.Screen
+        name="org-invites"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 0.9],
+          sheetGrabberVisible: true,
+          title: "Gym invites",
+          headerShown: true,
+          headerLeft: () => (
+            <HeaderButton icon="xmark" onPress={() => router.back()} />
+          ),
+        }}
+      />
+      <Stack.Screen
         name="body-info"
         options={{
           presentation: "formSheet",

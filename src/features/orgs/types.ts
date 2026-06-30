@@ -18,3 +18,19 @@ export interface Affiliation {
 export interface AffiliationsResponse {
   items: Affiliation[];
 }
+
+/** A pending org invite for the current user (P2-B / BE-1). */
+export interface OrgInvite {
+  membership_id: string;
+  org_id: string;
+  org_name: string;
+  org_handle?: string | null;
+  org_logo_url?: string | null;
+  role: string;
+  is_setter: boolean;
+  gym: { id: string; name: string } | null;
+}
+
+export interface MyInvitesResponse {
+  items: OrgInvite[];
+}

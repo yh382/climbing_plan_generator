@@ -125,6 +125,9 @@ export default function ActivityFeed({ listHeader }: Props = {}) {
         case "event_started":
           if (item.target_id) router.push(`/community/events/${item.target_id}` as any);
           break;
+        case "org_invite":
+          router.push("/org-invites" as any);
+          break;
         default:
           break;
       }
