@@ -7,6 +7,9 @@ export const compApi = {
   listForGym: (gymId: string) =>
     api.get<{ items: CompBrief[] }>(`/competitions?gym_id=${gymId}`),
 
+  /** Discovery — all visible comps (global 活动 feed). */
+  listAll: () => api.get<{ items: CompBrief[] }>(`/competitions`),
+
   /** Comp detail + problems + my enrollment + my scorecards. */
   getComp: (compId: string) => api.get<CompDetail>(`/competitions/${compId}`),
 
