@@ -196,6 +196,24 @@ export default function EventDetailScreen() {
   const showLocation = event.display?.showLocation !== false;
   const showRewards = event.display?.showRewards === true;
 
+  // W2 registration details (from the raw EventOut.details + spots_left).
+  const det = eventRaw?.details ?? null;
+  const cap = det?.capacity ?? null;
+  const spots = eventRaw?.spots_left ?? null;
+  const fmtPrice = (cents?: number | null) =>
+    cents == null ? null : cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`;
+  const memberP = fmtPrice(det?.member_price_cents);
+  const nonMemberP = fmtPrice(det?.nonmember_price_cents);
+  const priceLine =
+    memberP || nonMemberP
+      ? [
+          memberP ? `Members ${memberP}` : null,
+          nonMemberP ? `Non-members ${nonMemberP}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -322,6 +340,23 @@ export default function EventDetailScreen() {
                     </Text>
                   ) : null}
                 </View>
+              </InfoRow>
+            ) : null}
+
+            {/* Capacity / spots (W2) */}
+            {cap != null ? (
+              <InfoRow icon="people-outline" isLast={false}>
+                <Text style={styles.infoValue}>
+                  {(spots ?? 0) <= 0 ? "Full" : `${spots} spots left`}
+                  {` · cap ${cap}`}
+                </Text>
+              </InfoRow>
+            ) : null}
+
+            {/* Price (W2) */}
+            {priceLine ? (
+              <InfoRow icon="pricetag-outline" isLast={false}>
+                <Text style={styles.infoValue}>{priceLine}</Text>
               </InfoRow>
             ) : null}
 

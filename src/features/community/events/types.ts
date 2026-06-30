@@ -14,6 +14,17 @@ export interface EventPublisher {
   verified: boolean;
 }
 
+/** W2 — registration details (events.details JSONB). Prices in cents. */
+export interface EventDetails {
+  registration_mode?: string | null; // self | external | none
+  capacity?: number | null;
+  member_price_cents?: number | null;
+  nonmember_price_cents?: number | null;
+  age_min?: number | null;
+  age_max?: number | null;
+  skill_prereq?: string | null;
+}
+
 export interface EventOut {
   id: string;
   publisher_org_id: string;
@@ -45,6 +56,9 @@ export interface EventOut {
   engagement_score: number;
   registration_count: number;
   is_registered: boolean;
+  is_featured?: boolean | null;
+  spots_left?: number | null;
+  details?: EventDetails | null;
 }
 
 /** Convert EventOut → EventDetailModel for detail screen UI layer */

@@ -18,13 +18,14 @@ import type { EventOut } from "@/features/community/events/types";
 import EventCardRow from "@/features/community/events/EventCardRow";
 import MineEventChip from "@/features/community/events/MineEventChip";
 
-type EventFilter = "all" | "competition" | "meetup" | "workshop" | "other";
+type EventFilter = "all" | "featured" | "competition" | "meetup" | "workshop" | "other";
 
 const WORKSHOP_CATS = ["workshop", "training", "clinic"];
 const OTHER_CATS = ["festival", "route_setting", "other"];
 
 const FILTER_CHIPS: { key: EventFilter; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "featured", label: "Featured" },
   { key: "competition", label: "Competition" },
   { key: "meetup", label: "Meetup" },
   { key: "workshop", label: "Workshop" },
@@ -68,6 +69,7 @@ export default function EventsScreen() {
   const filtered = useMemo(() => {
     return events.filter((e) => {
       if (filter === "all") return true;
+      if (filter === "featured") return !!e.is_featured;
       if (filter === "workshop") return WORKSHOP_CATS.includes(e.category);
       if (filter === "other") return OTHER_CATS.includes(e.category);
       return e.category === filter;

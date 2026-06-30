@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "@/contexts/SettingsContext";
 import type { EventOut } from "./types";
 import EventTypeIcons from "./EventTypeIcons";
 
@@ -25,7 +26,10 @@ export default function EventCardRow({
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { tr } = useSettings();
   const publisherLine = item.publisher.name + (item.location_text ? ` · ${item.location_text}` : "");
+  const hasCapacity = item.details?.capacity != null;
+  const full = hasCapacity && (item.spots_left ?? 0) <= 0;
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
@@ -34,9 +38,14 @@ export default function EventCardRow({
 
       {/* Right content */}
       <View style={{ flex: 1 }}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.title}
-        </Text>
+        <View style={styles.titleRow}>
+          {item.is_featured ? (
+            <Ionicons name="star" size={13} color="#E8A93C" />
+          ) : null}
+          <Text style={styles.title} numberOfLines={1}>
+            {item.title}
+          </Text>
+        </View>
 
         <View style={styles.metaRow}>
           <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
@@ -55,6 +64,17 @@ export default function EventCardRow({
             </View>
           ) : null}
         </View>
+
+        {hasCapacity ? (
+          <View style={styles.metaRow}>
+            <Ionicons name="people-outline" size={14} color={full ? "#C0392B" : colors.textSecondary} />
+            <Text style={[styles.metaText, full && { color: "#C0392B" }]}>
+              {full
+                ? tr("已满", "Full")
+                : `${item.spots_left ?? 0} ${tr("剩余名额", "spots left")}`}
+            </Text>
+          </View>
+        ) : null}
 
         <EventTypeIcons type={item.category} venue={item.venue_type} discipline={item.discipline} />
       </View>
@@ -85,7 +105,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginTop: 2,
   },
 
-  title: { fontSize: 15, fontFamily: theme.fonts.black, color: colors.textPrimary },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  title: { fontSize: 15, fontFamily: theme.fonts.black, color: colors.textPrimary, flexShrink: 1 },
 
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
   metaText: { fontSize: 12, color: colors.textTertiary, fontFamily: theme.fonts.bold, flexShrink: 1 },
