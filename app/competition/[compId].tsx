@@ -29,6 +29,7 @@ import Animated, {
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
+import { CoverFadeOverlay } from "@/components/shared/CoverFadeOverlay";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -214,6 +215,7 @@ export default function CompetitionScreen() {
           <Animated.View style={[coverParallax, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.cover, { height: COVER_H }]}>
               <ProfileCoverArt coverUrl={null} />
+              <CoverFadeOverlay />
             </View>
           </Animated.View>
 

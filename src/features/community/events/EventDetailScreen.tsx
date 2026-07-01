@@ -26,6 +26,7 @@ import Animated, {
 
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
+import { CoverFadeOverlay } from "@/components/shared/CoverFadeOverlay";
 import CategoryChip from "./component/CategoryChip";
 import EventDynamicCards from "./component/EventDynamicCards";
 import EventDetailsModal from "./EventDetailsModal";
@@ -231,6 +232,7 @@ export default function EventDetailScreen() {
           <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.coverWrap, { height: COVER_H }]}>
               <ProfileCoverArt coverUrl={eventRaw?.cover_url ?? null} />
+              <CoverFadeOverlay />
             </View>
           </Animated.View>
 
