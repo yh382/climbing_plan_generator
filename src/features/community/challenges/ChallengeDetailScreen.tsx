@@ -26,8 +26,7 @@ import LeaderboardFilters from "./component/LeaderboardFilters";
 import RankingRowCard from "./component/RankingRowCard";
 import ChallengeTiers from "./component/ChallengeTiers";
 import { HeaderButton } from "@/components/ui/HeaderButton";
-import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
-import { CoverFadeOverlay } from "@/components/shared/CoverFadeOverlay";
+import { HeroCover } from "@/components/shared/HeroCover";
 
 import { useChallengeDetailData } from "./data/useChallengeDetailData";
 import { useUserStore } from "@/store/useUserStore";
@@ -203,8 +202,7 @@ export default function ChallengeDetailScreen() {
         <View style={styles.heroWrap}>
           <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.coverWrap, { height: COVER_H }]}>
-              <ProfileCoverArt coverUrl={challenge.coverUrl ?? null} />
-              <CoverFadeOverlay />
+              <HeroCover coverUrl={challenge.coverUrl ?? null} />
 
               <View style={styles.coverChips}>
                 {chipTexts.map((c) => (
