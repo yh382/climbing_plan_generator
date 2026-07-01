@@ -25,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { HeaderButton } from "@/components/ui/HeaderButton";
+import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
 import CategoryChip from "./component/CategoryChip";
 import EventDynamicCards from "./component/EventDynamicCards";
 import EventDetailsModal from "./EventDetailsModal";
@@ -137,7 +138,8 @@ export default function EventDetailScreen() {
     const absScroll = -adjustedScrollY;
     return {
       transform: [
-        { scale: 1 + absScroll / COVER_H },
+        // Clamp pull-to-zoom so a hard drag can't blow the cover past bounds.
+        { scale: Math.min(1 + absScroll / COVER_H, 1.4) },
         { translateY: adjustedScrollY / 2 },
       ],
     };
@@ -228,30 +230,21 @@ export default function EventDetailScreen() {
         <View style={styles.heroWrap}>
           <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.coverWrap, { height: COVER_H }]}>
-              {event.coverImage ? (
-                <Image
-                  source={event.coverImage}
-                  style={styles.coverImg}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={[styles.coverImg, { backgroundColor: "#0B1220" }]}
-                />
-              )}
-              {/* Dark Scrim */}
-              <View style={styles.coverScrim} />
-
-              {/* Chips (Bottom Right) */}
-              <View style={styles.coverChipsRow}>
-                {event.tags?.slice(0, 3).map((t) => (
-                  <View key={t} style={styles.chipShadow}>
-                    <CategoryChip text={t} />
-                  </View>
-                ))}
-              </View>
+              <ProfileCoverArt coverUrl={eventRaw?.cover_url ?? null} />
             </View>
           </Animated.View>
+
+          {/* Chips — pinned to the cover's resting bottom, OUTSIDE the parallax
+              layer, so pull-to-zoom can't push them off-screen. */}
+          {event.tags && event.tags.length > 0 ? (
+            <View style={[styles.coverChipsRow, { top: COVER_H - headerHeight - 40 }]} pointerEvents="none">
+              {event.tags.slice(0, 3).map((t) => (
+                <View key={t} style={styles.chipShadow}>
+                  <CategoryChip text={t} />
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           {/* Organizer Bar (Text next to floating thumb) */}
           <View style={styles.organizerBar}>
@@ -414,15 +407,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   // === Hero ===
   heroWrap: { position: "relative" },
   coverWrap: { width: "100%" },
-  coverImg: { width: "100%", height: "100%" },
-  coverScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
   coverChipsRow: {
     position: "absolute",
     right: SIDE_PADDING,
-    bottom: 12,
+    zIndex: 40,
     flexDirection: "row",
     gap: 8,
   },

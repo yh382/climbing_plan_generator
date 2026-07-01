@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Pressable,
   ViewStyle,
   TextStyle,
@@ -27,6 +26,7 @@ import LeaderboardFilters from "./component/LeaderboardFilters";
 import RankingRowCard from "./component/RankingRowCard";
 import ChallengeTiers from "./component/ChallengeTiers";
 import { HeaderButton } from "@/components/ui/HeaderButton";
+import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
 
 import { useChallengeDetailData } from "./data/useChallengeDetailData";
 import { useUserStore } from "@/store/useUserStore";
@@ -201,9 +201,8 @@ export default function ChallengeDetailScreen() {
         {/* === Hero === */}
         <View style={styles.heroWrap}>
           <Animated.View style={[coverParallaxStyle, { marginTop: -headerHeight, overflow: "hidden" }]}>
-            <View style={[styles.coverWrap, { height: COVER_H, backgroundColor: "#0F0E0C" }]}>
-              {challenge.coverUrl ? <Image source={{ uri: challenge.coverUrl }} style={styles.coverImg} /> : null}
-              <View style={styles.coverScrim} />
+            <View style={[styles.coverWrap, { height: COVER_H }]}>
+              <ProfileCoverArt coverUrl={challenge.coverUrl ?? null} />
 
               <View style={styles.coverChips}>
                 {chipTexts.map((c) => (
@@ -378,11 +377,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
 
   heroWrap: { position: "relative" },
   coverWrap: { width: "100%" },
-  coverImg: { width: "100%", height: "100%" },
-  coverScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15,14,12,0.35)",
-  },
 
   coverChips: {
     position: "absolute",

@@ -27,6 +27,8 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { HeaderButton } from "@/components/ui/HeaderButton";
+import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
+import { ProfileCoverArt } from "@/components/shared/ProfileHeader";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -38,7 +40,6 @@ import CompScoreSheet, {
 } from "@/features/community/competitions/CompScoreSheet";
 import {
   divisionsOf,
-  divisionLabel,
   formatSummary,
 } from "@/features/community/competitions/types";
 
@@ -119,7 +120,8 @@ export default function CompetitionScreen() {
     const adj = scrollY.value + headerHeight;
     if (adj >= 0) return {};
     const abs = -adj;
-    return { transform: [{ scale: 1 + abs / COVER_H }, { translateY: adj / 2 }] };
+    // Clamp the pull-to-zoom so a hard drag can't blow the cover past bounds.
+    return { transform: [{ scale: Math.min(1 + abs / COVER_H, 1.4) }, { translateY: adj / 2 }] };
   });
 
   const dateLabel = useMemo(() => {
@@ -136,6 +138,7 @@ export default function CompetitionScreen() {
   // Header: static (no async title) → back button never relayouts / jitters.
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerShown: true,
       headerTransparent: HEADER_TRANSPARENT,
       headerTitle: "",
       headerLeft: () => (
@@ -166,9 +169,6 @@ export default function CompetitionScreen() {
   const myDiv = enrolled?.division_id ?? null;
   const shownDiv = viewDiv ?? myDiv ?? divOptions[0].id;
   const rows = standings?.divisions?.[shownDiv] ?? [];
-  const myRow = rows.find((r) => r.user_id === myId);
-  const rawDivLabel = divisionLabel(comp.config, myDiv);
-  const myDivLabel = rawDivLabel && rawDivLabel !== "open" ? rawDivLabel : tr("公开组", "Open");
 
   async function register() {
     const div = division ?? divOptions[0].id;
@@ -213,13 +213,16 @@ export default function CompetitionScreen() {
         <View style={styles.heroWrap}>
           <Animated.View style={[coverParallax, { marginTop: -headerHeight, overflow: "hidden" }]}>
             <View style={[styles.cover, { height: COVER_H }]}>
-              <View style={styles.coverScrim} />
-              <View style={styles.coverChip}>
-                <View style={[styles.statusDot, { backgroundColor: active ? "#22A06B" : "rgba(255,255,255,0.7)" }]} />
-                <Text style={styles.coverChipText}>{statusText}</Text>
-              </View>
+              <ProfileCoverArt coverUrl={null} />
             </View>
           </Animated.View>
+
+          {/* Status pin — pinned to the cover's resting bottom, NOT inside the
+              parallax layer, so pull-to-zoom can't push it off-screen. */}
+          <View style={[styles.coverChip, { top: COVER_H - headerHeight - 40 }]} pointerEvents="none">
+            <View style={[styles.statusDot, { backgroundColor: active ? "#22A06B" : "rgba(255,255,255,0.7)" }]} />
+            <Text style={styles.coverChipText}>{statusText}</Text>
+          </View>
 
           <View style={styles.organizerBar}>
             <Text style={styles.organizerLine} numberOfLines={1}>
@@ -308,48 +311,20 @@ export default function CompetitionScreen() {
                 )}
               </Pressable>
             </View>
-          ) : (
-            <>
-              <View style={styles.darkCard}>
-                <Text style={styles.darkLabel}>
-                  {myDivLabel} · {tr("我的成绩", "My standing")}
-                </Text>
-                <View style={styles.tiles}>
-                  <View style={styles.tile}>
-                    <Text style={styles.tileV}>{myRow ? `#${myRow.rank}` : "—"}</Text>
-                    <Text style={styles.tileL}>{tr("名次", "rank")}</Text>
-                  </View>
-                  <View style={styles.tile}>
-                    <Text style={styles.tileV}>{myRow ? myRow.score : 0}</Text>
-                    <Text style={styles.tileL}>{tr("积分", "points")}</Text>
-                  </View>
-                  <View style={styles.tile}>
-                    <Text style={styles.tileV}>
-                      {comp.my_scorecards.filter((s) => s.top).length}/{comp.problem_count}
-                    </Text>
-                    <Text style={styles.tileL}>{tr("完攀", "tops")}</Text>
-                  </View>
-                </View>
-              </View>
-              {active ? (
-                <Pressable style={styles.scoreCta} onPress={() => scoreSheet.current?.present()}>
-                  <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.scoreCtaText}>{tr("记录成绩", "Log my scores")}</Text>
-                </Pressable>
-              ) : null}
-            </>
-          )}
+          ) : active ? (
+            <Pressable style={styles.scoreCta} onPress={() => scoreSheet.current?.present()}>
+              <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.scoreCtaText}>{tr("记录成绩", "Log my scores")}</Text>
+            </Pressable>
+          ) : null}
 
           {/* ===== Standings / Gallery ===== */}
-          <View style={styles.seg}>
-            {(["standings", "gallery"] as const).map((t) => (
-              <Pressable key={t} style={[styles.segItem, tab === t && styles.segOn]} onPress={() => setTab(t)}>
-                <Text style={[styles.segText, tab === t && styles.segTextOn]}>
-                  {t === "standings" ? tr("排行榜", "Standings") : tr("视频集", "Gallery")}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <NativeSegmentedControl
+            options={[tr("排行榜", "Standings"), tr("视频集", "Gallery")]}
+            selectedIndex={tab === "standings" ? 0 : 1}
+            onSelect={(i) => setTab(i === 0 ? "standings" : "gallery")}
+            style={styles.segNative}
+          />
 
           {tab === "standings" ? (
             <View style={styles.sectionCard}>
@@ -441,11 +416,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     // Hero
     heroWrap: { position: "relative" },
     cover: { width: "100%", backgroundColor: "#0B1220" },
-    coverScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.2)" },
     coverChip: {
       position: "absolute",
       right: SIDE,
-      bottom: 12,
+      zIndex: 40,
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
@@ -536,12 +510,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     ctaText: { fontFamily: theme.fonts.bold, fontSize: 15, color: "#FFFFFF" },
 
     // My-rank dark card + score CTA
-    darkCard: { backgroundColor: colors.cardDark, borderRadius: theme.borderRadius.card, padding: 14, marginBottom: 10 },
-    darkLabel: { fontFamily: theme.fonts.bold, fontSize: 13, color: "#FFFFFF", marginBottom: 10 },
-    tiles: { flexDirection: "row", gap: 8 },
-    tile: { flex: 1, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-    tileV: { fontFamily: theme.fonts.black, fontSize: 19, color: "#FFFFFF" },
-    tileL: { fontFamily: theme.fonts.regular, fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 },
     scoreCta: {
       flexDirection: "row",
       alignItems: "center",
@@ -555,11 +523,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     scoreCtaText: { fontFamily: theme.fonts.bold, fontSize: 15, color: "#FFFFFF" },
 
     // Segmented tabs
-    seg: { flexDirection: "row", backgroundColor: colors.backgroundSecondary, borderRadius: 11, padding: 3, marginBottom: 12 },
-    segItem: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
-    segOn: { backgroundColor: colors.cardBackground },
-    segText: { fontFamily: theme.fonts.bold, fontSize: 13, color: colors.textSecondary },
-    segTextOn: { color: colors.textPrimary },
+    segNative: { marginBottom: 12 },
 
     // Section card (leaderboard / gallery)
     sectionCard: {
