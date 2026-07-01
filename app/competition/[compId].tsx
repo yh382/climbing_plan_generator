@@ -1,6 +1,6 @@
 // P2-F — competition hub (register · self-score · live standings). Reached from
 // the gym Dashboard / feed (P2-H) or a deep link. Backed by routers/comp_app.py.
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,15 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import {
+  NATIVE_HEADER_BASE,
+  withHeaderTheme,
+  HEADER_TRANSPARENT,
+} from "@/lib/nativeHeaderOptions";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useUserStore } from "@/store/useUserStore";
 import { useComp, useStandings } from "@/features/community/competitions/hooks";
@@ -31,6 +37,7 @@ export default function CompetitionScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { tr } = useSettings();
   const router = useRouter();
+  const navigation = useNavigation();
   const myId = useUserStore((s) => s.user?.id);
 
   const { comp, loading, refetch } = useComp(compId);
@@ -51,6 +58,17 @@ export default function CompetitionScreen() {
     return null;
   }, [comp, tr]);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      ...NATIVE_HEADER_BASE,
+      ...withHeaderTheme(colors),
+      headerShown: true,
+      headerTransparent: HEADER_TRANSPARENT,
+      scrollEdgeEffects: { top: "soft" },
+      title: comp?.title ?? tr("比赛", "Competition"),
+    });
+  }, [navigation, colors, comp?.title, tr]);
+
   const [tab, setTab] = useState<"problems" | "standings">("problems");
   const [division, setDivision] = useState<string | null>(null);
   const [waiver, setWaiver] = useState(false);
@@ -59,7 +77,6 @@ export default function CompetitionScreen() {
   if (loading) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: tr("比赛", "Competition"), headerShown: true }} />
         <ActivityIndicator color={colors.textSecondary} />
       </View>
     );
@@ -67,7 +84,6 @@ export default function CompetitionScreen() {
   if (!comp) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: tr("比赛", "Competition"), headerShown: true }} />
         <Text style={styles.muted}>{tr("找不到比赛", "Competition not found")}</Text>
       </View>
     );
@@ -110,8 +126,7 @@ export default function CompetitionScreen() {
   }
 
   return (
-    <ScrollView style={styles.fill} contentContainerStyle={{ padding: 16 }}>
-      <Stack.Screen options={{ title: comp.title, headerShown: true }} />
+    <ScrollView style={styles.fill} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16 }}>
 
       {/* Status banner */}
       <View style={styles.statusRow}>
@@ -138,7 +153,6 @@ export default function CompetitionScreen() {
             {comp.organizer?.name ?? tr("主办方", "Organizer")}
           </Text>
         </View>
-        <Text style={styles.compTitle}>{comp.title}</Text>
         <View style={styles.metaChips}>
           <View style={styles.chipTeal}>
             <Text style={styles.chipTealText}>{formatSummary(comp.config)}</Text>

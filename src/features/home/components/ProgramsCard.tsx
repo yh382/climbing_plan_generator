@@ -72,12 +72,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 18,
+      borderRadius: theme.borderRadius.card,
       borderWidth: 1,
       borderColor: colors.cardBorder,
       padding: 16,
-      marginHorizontal: theme.spacing.screenPadding,
-      marginTop: 12,
+      marginHorizontal: 16,
+      marginBottom: theme.spacing.sectionGap,
     },
     headerRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
     label: { fontFamily: theme.fonts.black, fontSize: 16, color: colors.textPrimary, letterSpacing: -0.3 },

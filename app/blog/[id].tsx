@@ -1,6 +1,6 @@
 // P2-G — blog post reader (cover + markdown + like/save). Reached from the
 // 活动 list (a "资讯/News" card).
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,15 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import {
+  NATIVE_HEADER_BASE,
+  withHeaderTheme,
+  HEADER_TRANSPARENT,
+} from "@/lib/nativeHeaderOptions";
 import { useSettings } from "@/contexts/SettingsContext";
 import { blogApi } from "@/features/community/blog/api";
 import type { BlogDetail } from "@/features/community/blog/types";
@@ -25,6 +31,18 @@ export default function BlogScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const mdStyles = useMemo(() => markdownStyles(colors), [colors]);
   const { tr } = useSettings();
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      ...NATIVE_HEADER_BASE,
+      ...withHeaderTheme(colors),
+      headerShown: true,
+      headerTransparent: HEADER_TRANSPARENT,
+      scrollEdgeEffects: { top: "soft" },
+      title: "",
+    });
+  }, [navigation, colors]);
 
   const [post, setPost] = useState<BlogDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +81,6 @@ export default function BlogScreen() {
   if (loading) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: "" }} />
         <ActivityIndicator color={colors.textSecondary} />
       </View>
     );
@@ -71,7 +88,6 @@ export default function BlogScreen() {
   if (!post) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: "" }} />
         <Text style={styles.muted}>{tr("找不到文章", "Post not found")}</Text>
       </View>
     );
@@ -79,7 +95,6 @@ export default function BlogScreen() {
 
   return (
     <View style={styles.fill}>
-      <Stack.Screen options={{ title: "", headerShown: true, headerTransparent: true }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         {post.cover_url ? (
           <Image source={{ uri: post.cover_url }} style={styles.cover} contentFit="cover" />
