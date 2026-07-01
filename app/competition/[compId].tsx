@@ -28,6 +28,7 @@ import Animated, {
 
 import { HeaderButton } from "@/components/ui/HeaderButton";
 import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
+import { MenuPill } from "@/components/ui/MenuPill";
 import { HeroCover } from "@/components/shared/HeroCover";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -46,6 +47,9 @@ import {
 const COVER_H = 260;
 const THUMB_SIZE = 52;
 const SIDE = 16;
+
+// Podium colors for the top-3 rank badges (gold / silver / bronze).
+const RANK_COLORS: Record<number, string> = { 1: "#E8B923", 2: "#AEB4BE", 3: "#CB8A54" };
 
 type GalleryItem = { id: string; uri: string; type: "image" | "video" };
 
@@ -169,6 +173,7 @@ export default function CompetitionScreen() {
   const myDiv = enrolled?.division_id ?? null;
   const shownDiv = viewDiv ?? myDiv ?? divOptions[0].id;
   const rows = standings?.divisions?.[shownDiv] ?? [];
+  const shownDivLabel = divOptions.find((d) => d.id === shownDiv)?.label ?? "Open";
 
   async function register() {
     const div = division ?? divOptions[0].id;
@@ -333,46 +338,46 @@ export default function CompetitionScreen() {
           {tab === "standings" ? (
             <View style={styles.sectionCard}>
               {divOptions.length > 1 ? (
-                <View style={[styles.chips, { marginBottom: 8 }]}>
-                  {divOptions.map((d) => {
-                    const sel = shownDiv === d.id;
-                    return (
-                      <Pressable
-                        key={d.id}
-                        style={[styles.chipSm, sel && styles.chipOn]}
-                        onPress={() => setViewDiv(d.id)}
-                      >
-                        <Text style={[styles.chipText, sel && styles.chipTextOn]}>{d.label}</Text>
-                      </Pressable>
-                    );
-                  })}
+                <View style={styles.lbHeader}>
+                  <Text style={styles.lbHeaderTitle}>{tr("排行榜", "Standings")}</Text>
+                  <MenuPill
+                    variant="labeled"
+                    label={shownDivLabel}
+                    accessibilityLabel={tr("选择组别", "Division")}
+                    options={divOptions.map((d) => ({ label: d.label, onPress: () => setViewDiv(d.id) }))}
+                  />
                 </View>
               ) : null}
               {rows.length === 0 ? (
                 <Text style={[styles.muted, { padding: 8 }]}>{tr("暂无排名", "No standings yet")}</Text>
               ) : (
-                rows.map((r, i) => (
-                  <View
-                    key={r.user_id}
-                    style={[
-                      styles.lbRow,
-                      i === rows.length - 1 && { borderBottomWidth: 0 },
-                      r.user_id === myId && styles.lbRowMe,
-                    ]}
-                  >
-                    <Text style={styles.lbRank}>{r.rank}</Text>
-                    <View style={styles.lbAvatar}>
-                      <Ionicons name="person" size={15} color={colors.textTertiary} />
+                rows.map((r) => {
+                  const me = r.user_id === myId;
+                  const medal = RANK_COLORS[r.rank];
+                  return (
+                    <View key={r.user_id} style={[styles.lbRow, me && styles.lbRowMe]}>
+                      {medal ? (
+                        <View style={[styles.lbMedal, { backgroundColor: medal }]}>
+                          <Text style={styles.lbMedalText}>{r.rank}</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.lbRank}>{r.rank}</Text>
+                      )}
+                      <View style={[styles.lbAvatar, me && styles.lbAvatarMe]}>
+                        <Text style={[styles.lbAvatarText, me && styles.lbAvatarTextMe]}>
+                          {(r.display_name || "?").slice(0, 1).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.lbNameWrap}>
+                        <Text style={[styles.lbName, me && styles.lbNameMe]} numberOfLines={1}>
+                          {r.display_name || tr("攀岩者", "Climber")}
+                        </Text>
+                        {me ? <Text style={styles.lbYou}>{tr("你", "You")}</Text> : null}
+                      </View>
+                      <Text style={[styles.lbScore, me && styles.lbScoreMe]}>{r.score}</Text>
                     </View>
-                    <Text style={styles.lbName} numberOfLines={1}>
-                      {r.display_name || tr("攀岩者", "Climber")}
-                    </Text>
-                    <View style={styles.lbRight}>
-                      <Text style={styles.lbPts}>{r.score}</Text>
-                      <Text style={styles.lbPtsL}>{tr("分", "pts")}</Text>
-                    </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           ) : (
@@ -504,14 +509,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderWidth: 1,
       borderColor: colors.cardBorder,
     },
-    chipSm: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: colors.backgroundSecondary,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-    },
     chipOn: { backgroundColor: colors.pillBackground, borderColor: colors.pillBackground },
     chipText: { fontFamily: theme.fonts.bold, fontSize: 13, color: colors.textSecondary },
     chipTextOn: { color: colors.pillText },
@@ -546,29 +543,61 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       padding: 14,
     },
 
-    // Leaderboard rows
+    // Leaderboard
+    lbHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6,
+    },
+    lbHeaderTitle: { fontFamily: theme.fonts.black, fontSize: 15, color: colors.textPrimary },
     lbRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      paddingVertical: 9,
       gap: 12,
     },
-    lbRowMe: { backgroundColor: "rgba(48,110,111,0.08)", marginHorizontal: -14, paddingHorizontal: 14, borderRadius: 10 },
-    lbRank: { width: 24, textAlign: "center", fontFamily: theme.fonts.black, fontSize: 15, color: colors.textPrimary },
+    lbRowMe: {
+      backgroundColor: "rgba(48,110,111,0.09)",
+      marginHorizontal: -14,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+    },
+    lbMedal: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    lbMedalText: { fontFamily: theme.fonts.black, fontSize: 13, color: "#FFFFFF" },
+    lbRank: { width: 26, textAlign: "center", fontFamily: theme.fonts.black, fontSize: 14, color: colors.textTertiary },
     lbAvatar: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: colors.backgroundSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
-    lbName: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14, color: colors.textPrimary },
-    lbRight: { alignItems: "flex-end" },
-    lbPts: { fontFamily: theme.fonts.black, fontSize: 16, color: colors.textPrimary },
-    lbPtsL: { fontFamily: theme.fonts.regular, fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+    lbAvatarMe: { backgroundColor: colors.accent },
+    lbAvatarText: { fontFamily: theme.fonts.bold, fontSize: 15, color: colors.textSecondary },
+    lbAvatarTextMe: { color: "#FFFFFF" },
+    lbNameWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
+    lbName: { fontFamily: theme.fonts.bold, fontSize: 15, color: colors.textPrimary, flexShrink: 1 },
+    lbNameMe: { color: colors.accent },
+    lbYou: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 10,
+      color: "#FFFFFF",
+      backgroundColor: colors.accent,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 6,
+      overflow: "hidden",
+    },
+    lbScore: { fontFamily: theme.fonts.monoMedium, fontSize: 16, color: colors.textPrimary },
+    lbScoreMe: { color: colors.accent },
 
     // Gallery
     galleryEmpty: { alignItems: "center", paddingVertical: 28, paddingHorizontal: 24, gap: 10 },
