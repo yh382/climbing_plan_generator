@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
+import { HeaderButton } from "@/components/ui/HeaderButton";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import {
@@ -71,8 +72,11 @@ export default function ProgramsScreen() {
       headerTransparent: HEADER_TRANSPARENT,
       scrollEdgeEffects: { top: "soft" },
       title: tr("活动", "Programs"),
+      headerLeft: () => (
+        <HeaderButton icon="chevron.backward" onPress={() => router.back()} />
+      ),
     });
-  }, [navigation, colors, tr]);
+  }, [navigation, colors, tr, router]);
 
   useEffect(() => {
     let alive = true;
