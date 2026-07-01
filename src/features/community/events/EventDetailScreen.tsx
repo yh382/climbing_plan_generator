@@ -234,49 +234,39 @@ export default function EventDetailScreen() {
             </View>
           </Animated.View>
 
-          {/* Chips — pinned to the cover's resting bottom, OUTSIDE the parallax
-              layer, so pull-to-zoom can't push them off-screen. */}
-          {event.tags && event.tags.length > 0 ? (
-            <View style={[styles.coverChipsRow, { top: COVER_H - headerHeight - 40 }]} pointerEvents="none">
-              {event.tags.slice(0, 3).map((t) => (
-                <View key={t} style={styles.chipShadow}>
-                  <CategoryChip text={t} />
-                </View>
-              ))}
-            </View>
-          ) : null}
+          {/* Reserve layout height below the cover for the floating row. */}
+          <View style={styles.organizerSpacer} />
 
-          {/* Organizer Bar (Text next to floating thumb) */}
-          <View style={styles.organizerBar}>
-            <Text style={styles.organizerOneLine} numberOfLines={1}>
-              <Text style={styles.organizerPrefix}>Hosted by </Text>
-              {event.organizerName}
-            </Text>
-          </View>
-
-          {/* Floating Thumbnail (Challenge Style) */}
-          <View style={[styles.thumbFloating, { top: COVER_H - THUMB_SIZE / 2 - headerHeight }]}>
+          {/* Floating organizer row — avatar + a two-line column (Hosted by /
+              category chip), both vertically centered on the avatar, straddling
+              the cover's resting bottom. */}
+          <View style={[styles.organizerRow, { top: COVER_H - THUMB_SIZE / 2 - headerHeight }]}>
             <View style={styles.thumbOuter}>
               {thumb ? (
-                <Image
-                  source={thumb}
-                  style={styles.thumbImg}
-                  resizeMode="cover"
-                />
+                <Image source={thumb} style={styles.thumbImg} resizeMode="cover" />
               ) : (
                 <View
                   style={[
                     styles.thumbImg,
-                    {
-                      backgroundColor: "#111827",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    },
+                    { backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
                   ]}
                 >
                   <Ionicons name="home" size={32} color="#FFFFFF" />
                 </View>
               )}
+            </View>
+            <View style={styles.organizerCol}>
+              <Text style={styles.organizerOneLine} numberOfLines={1}>
+                <Text style={styles.organizerPrefix}>Hosted by </Text>
+                {event.organizerName}
+              </Text>
+              {event.tags && event.tags.length > 0 ? (
+                <View style={styles.organizerChips}>
+                  {event.tags.slice(0, 3).map((t) => (
+                    <CategoryChip key={t} text={t} />
+                  ))}
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
@@ -407,35 +397,26 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   // === Hero ===
   heroWrap: { position: "relative" },
   coverWrap: { width: "100%" },
-  coverChipsRow: {
-    position: "absolute",
-    right: SIDE_PADDING,
-    zIndex: 40,
-    flexDirection: "row",
-    gap: 8,
-  },
-  chipShadow: {
-    backgroundColor: "transparent",
-  },
+  // Spacer reserving room below the cover for the floating organizer row
+  // (avatar bottom half + a little breathing room).
+  organizerSpacer: { height: THUMB_SIZE / 2 + 16, backgroundColor: colors.background },
 
-  // Organizer Bar
-  organizerBar: {
-    height: 72,
-    paddingTop: 16,
-    paddingLeft: SIDE_PADDING + THUMB_SIZE + 10,
-    paddingRight: SIDE_PADDING,
-    backgroundColor: colors.background,
-  },
-  organizerOneLine: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary },
-  organizerPrefix: { fontWeight: "400", color: colors.textSecondary },
-
-  // Floating Thumbnail
-  thumbFloating: {
+  // Floating organizer row: avatar + (Hosted by / chip) column, centered so the
+  // two text lines' combined height aligns with the avatar.
+  organizerRow: {
     position: "absolute",
     left: SIDE_PADDING,
-    top: COVER_H - THUMB_SIZE / 2,
+    right: SIDE_PADDING,
     zIndex: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
+  organizerCol: { flex: 1, justifyContent: "center", gap: 6 },
+  organizerOneLine: { fontSize: 17, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+  organizerPrefix: { fontFamily: theme.fonts.regular, color: colors.textSecondary },
+  organizerChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+
   thumbOuter: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
