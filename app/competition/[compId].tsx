@@ -48,9 +48,6 @@ const COVER_H = 260;
 const THUMB_SIZE = 52;
 const SIDE = 16;
 
-// Podium colors for the top-3 rank badges (gold / silver / bronze).
-const RANK_COLORS: Record<number, string> = { 1: "#E8B923", 2: "#AEB4BE", 3: "#CB8A54" };
-
 type GalleryItem = { id: string; uri: string; type: "image" | "video" };
 
 // Lightweight info row (mirrors EventDetailScreen InfoRow).
@@ -353,16 +350,9 @@ export default function CompetitionScreen() {
               ) : (
                 rows.map((r) => {
                   const me = r.user_id === myId;
-                  const medal = RANK_COLORS[r.rank];
                   return (
                     <View key={r.user_id} style={[styles.lbRow, me && styles.lbRowMe]}>
-                      {medal ? (
-                        <View style={[styles.lbMedal, { backgroundColor: medal }]}>
-                          <Text style={styles.lbMedalText}>{r.rank}</Text>
-                        </View>
-                      ) : (
-                        <Text style={styles.lbRank}>{r.rank}</Text>
-                      )}
+                      <Text style={[styles.lbRank, me && styles.lbRankMe]}>{r.rank}</Text>
                       <View style={[styles.lbAvatar, me && styles.lbAvatarMe]}>
                         <Text style={[styles.lbAvatarText, me && styles.lbAvatarTextMe]}>
                           {(r.display_name || "?").slice(0, 1).toUpperCase()}
@@ -563,15 +553,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 14,
       borderRadius: 12,
     },
-    lbMedal: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    lbMedalText: { fontFamily: theme.fonts.black, fontSize: 13, color: "#FFFFFF" },
     lbRank: { width: 26, textAlign: "center", fontFamily: theme.fonts.black, fontSize: 14, color: colors.textTertiary },
+    lbRankMe: { color: colors.accent },
     lbAvatar: {
       width: 36,
       height: 36,
