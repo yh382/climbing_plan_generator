@@ -3,13 +3,14 @@ import { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useThemeColors } from "@/lib/useThemeColors";
 
-export default function CategoryChip({ text }: { text: string }) {
+export default function CategoryChip({ text, size = "md" }: { text: string; size?: "md" | "sm" }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const sm = size === "sm";
 
   return (
-    <View style={styles.chip}>
-      <Text style={styles.text}>{text}</Text>
+    <View style={[styles.chip, sm && styles.chipSm]}>
+      <Text style={[styles.text, sm && styles.textSm]}>{text}</Text>
     </View>
   );
 }
@@ -25,5 +26,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderWidth: 1,
     borderColor: colors.border,
   },
+  chipSm: { paddingHorizontal: 10, height: 26 },
   text: { fontSize: 13, fontWeight: "900", color: colors.textPrimary },
+  textSm: { fontSize: 11 },
 });

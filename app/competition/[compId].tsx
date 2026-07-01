@@ -44,7 +44,7 @@ import {
 } from "@/features/community/competitions/types";
 
 const COVER_H = 260;
-const THUMB_SIZE = 64;
+const THUMB_SIZE = 52;
 const SIDE = 16;
 
 type GalleryItem = { id: string; uri: string; type: "image" | "video" };
@@ -427,14 +427,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: 5,
       backgroundColor: colors.cardDark,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 12,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 11,
     },
-    statusDot: { width: 7, height: 7, borderRadius: 4 },
-    coverChipText: { fontFamily: theme.fonts.bold, fontSize: 12, color: "#FFFFFF" },
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    coverChipText: { fontFamily: theme.fonts.bold, fontSize: 11, color: "#FFFFFF" },
 
     // Spacer reserving room below the cover for the floating organizer row.
     organizerSpacer: { height: THUMB_SIZE / 2 + 16, backgroundColor: colors.background },
@@ -449,33 +449,33 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
       gap: 12,
     },
-    organizerCol: { flex: 1, justifyContent: "center", gap: 6 },
-    organizerLine: { fontSize: 17, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+    organizerCol: { flex: 1, justifyContent: "center", gap: 5 },
+    organizerLine: { fontSize: 14, fontFamily: theme.fonts.bold, color: colors.textPrimary },
     organizerPrefix: { fontFamily: theme.fonts.regular, color: colors.textSecondary },
     organizerChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
     thumbOuter: {
       width: THUMB_SIZE,
       height: THUMB_SIZE,
-      borderRadius: 18,
+      borderRadius: 15,
       backgroundColor: colors.cardBackground,
       justifyContent: "center",
       alignItems: "center",
       borderWidth: 1,
       borderColor: colors.cardBorder,
     },
-    thumbImg: { width: THUMB_SIZE - 6, height: THUMB_SIZE - 6, borderRadius: 15 },
+    thumbImg: { width: THUMB_SIZE - 5, height: THUMB_SIZE - 5, borderRadius: 12 },
     thumbPlaceholder: { backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-    thumbInitial: { fontFamily: theme.fonts.black, fontSize: 22, color: "#FFFFFF" },
+    thumbInitial: { fontFamily: theme.fonts.black, fontSize: 18, color: "#FFFFFF" },
 
     // Main
     mainBlock: { paddingHorizontal: SIDE, paddingBottom: 8 },
     title: {
-      fontSize: 28,
+      fontSize: 32,
       fontFamily: theme.fonts.black,
       color: colors.textPrimary,
-      letterSpacing: -0.5,
-      lineHeight: 33,
+      letterSpacing: -0.6,
+      lineHeight: 37,
       marginTop: -6,
       marginBottom: 10,
     },

@@ -35,7 +35,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 // === Constants (Align with Challenge) ===
 const COVER_H = 280;
-const THUMB_SIZE = 64;
+const THUMB_SIZE = 52;
 const SIDE_PADDING = 12;
 
 // === Helper Functions ===
@@ -251,7 +251,7 @@ export default function EventDetailScreen() {
                     { backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
                   ]}
                 >
-                  <Ionicons name="home" size={26} color="#FFFFFF" />
+                  <Ionicons name="home" size={20} color="#FFFFFF" />
                 </View>
               )}
             </View>
@@ -263,7 +263,7 @@ export default function EventDetailScreen() {
               {event.tags && event.tags.length > 0 ? (
                 <View style={styles.organizerChips}>
                   {event.tags.slice(0, 3).map((t) => (
-                    <CategoryChip key={t} text={t} />
+                    <CategoryChip key={t} text={t} size="sm" />
                   ))}
                 </View>
               ) : null}
@@ -412,15 +412,15 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: "center",
     gap: 12,
   },
-  organizerCol: { flex: 1, justifyContent: "center", gap: 6 },
-  organizerOneLine: { fontSize: 17, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+  organizerCol: { flex: 1, justifyContent: "center", gap: 5 },
+  organizerOneLine: { fontSize: 14, fontFamily: theme.fonts.bold, color: colors.textPrimary },
   organizerPrefix: { fontFamily: theme.fonts.regular, color: colors.textSecondary },
   organizerChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
   thumbOuter: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    borderRadius: 18,
+    borderRadius: 15,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
@@ -428,9 +428,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderColor: colors.border,
   },
   thumbImg: {
-    width: THUMB_SIZE - 6,
-    height: THUMB_SIZE - 6,
-    borderRadius: 15,
+    width: THUMB_SIZE - 5,
+    height: THUMB_SIZE - 5,
+    borderRadius: 12,
     backgroundColor: colors.backgroundSecondary,
   },
 
@@ -440,13 +440,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingBottom: 8,
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontFamily: theme.fonts.black,
     color: colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
     marginBottom: 20,
     marginTop: -10,
-    lineHeight: 34,
+    lineHeight: 38,
   },
 
   // Join Button
