@@ -72,6 +72,13 @@ function dateRange(start?: string | null, end?: string | null, single?: string |
   if (s) return s;
   return md(single);
 }
+function compStatus(status: string, tr: (zh: string, en: string) => string): string {
+  return status === "active"
+    ? tr("进行中", "Live")
+    : status === "finished"
+      ? tr("已结束", "Ended")
+      : tr("报名中", "Open");
+}
 
 export default function ProgramsScreen() {
   const colors = useThemeColors();
@@ -120,7 +127,7 @@ export default function ProgramsScreen() {
               hostName: c.organizer?.name ?? null,
               hostLogo: c.organizer?.logo_url ?? null,
               cover: null,
-              dateLabel: dateRange(c.start_at, c.end_at),
+              dateLabel: dateRange(c.start_at, c.end_at) ?? compStatus(c.status, tr),
               ts: c.start_at ? new Date(c.start_at).getTime() || 0 : 0,
             });
           }
