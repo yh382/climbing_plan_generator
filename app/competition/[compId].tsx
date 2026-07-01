@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
@@ -20,6 +21,7 @@ import { compApi } from "@/features/community/competitions/api";
 import {
   divisionsOf,
   divisionLabel,
+  formatSummary,
   type CompProblem,
 } from "@/features/community/competitions/types";
 
@@ -38,6 +40,17 @@ export default function CompetitionScreen() {
     active ? 8000 : undefined,
   );
 
+  const dateLabel = useMemo(() => {
+    const fmt = (s?: string | null) => (s ? s.slice(0, 10) : null);
+    const st = fmt(comp?.start_at);
+    const en = fmt(comp?.end_at);
+    if (comp?.status === "finished" && en) return `${tr("结束于", "Ended")} ${en}`;
+    if (st && en) return `${st} – ${en}`;
+    if (en) return `${tr("截止", "Ends")} ${en}`;
+    if (st) return `${tr("开始", "From")} ${st}`;
+    return null;
+  }, [comp, tr]);
+
   const [tab, setTab] = useState<"problems" | "standings">("problems");
   const [division, setDivision] = useState<string | null>(null);
   const [waiver, setWaiver] = useState(false);
@@ -46,7 +59,7 @@ export default function CompetitionScreen() {
   if (loading) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: tr("比赛", "Competition") }} />
+        <Stack.Screen options={{ title: tr("比赛", "Competition"), headerShown: true }} />
         <ActivityIndicator color={colors.textSecondary} />
       </View>
     );
@@ -54,7 +67,7 @@ export default function CompetitionScreen() {
   if (!comp) {
     return (
       <View style={[styles.fill, styles.center]}>
-        <Stack.Screen options={{ title: tr("比赛", "Competition") }} />
+        <Stack.Screen options={{ title: tr("比赛", "Competition"), headerShown: true }} />
         <Text style={styles.muted}>{tr("找不到比赛", "Competition not found")}</Text>
       </View>
     );
@@ -98,7 +111,7 @@ export default function CompetitionScreen() {
 
   return (
     <ScrollView style={styles.fill} contentContainerStyle={{ padding: 16 }}>
-      <Stack.Screen options={{ title: comp.title }} />
+      <Stack.Screen options={{ title: comp.title, headerShown: true }} />
 
       {/* Status banner */}
       <View style={styles.statusRow}>
@@ -107,6 +120,36 @@ export default function CompetitionScreen() {
           {active ? tr("进行中", "Live") : comp.status === "finished" ? tr("已结束", "Ended") : tr("报名中", "Open")}
         </Text>
         <Text style={styles.muted}>· {comp.problem_count} {tr("条线", "problems")}</Text>
+      </View>
+
+      {/* Info — organizer / title / dates / format / description */}
+      <View style={styles.card}>
+        <View style={styles.orgRow}>
+          {comp.organizer?.logo_url ? (
+            <Image source={{ uri: comp.organizer.logo_url }} style={styles.orgLogo} />
+          ) : (
+            <View style={[styles.orgLogo, styles.orgLogoPlaceholder]}>
+              <Text style={styles.orgLogoText}>
+                {(comp.organizer?.name ?? "?").slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.orgName} numberOfLines={1}>
+            {comp.organizer?.name ?? tr("主办方", "Organizer")}
+          </Text>
+        </View>
+        <Text style={styles.compTitle}>{comp.title}</Text>
+        <View style={styles.metaChips}>
+          <View style={styles.chipTeal}>
+            <Text style={styles.chipTealText}>{formatSummary(comp.config)}</Text>
+          </View>
+          {dateLabel ? (
+            <Text style={styles.metaText}>
+              <Ionicons name="calendar-outline" size={12} /> {dateLabel}
+            </Text>
+          ) : null}
+        </View>
+        {comp.description ? <Text style={styles.desc}>{comp.description}</Text> : null}
       </View>
 
       {!enrolled ? (
@@ -250,6 +293,17 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     center: { alignItems: "center", justifyContent: "center" },
     muted: { fontFamily: theme.fonts.regular, fontSize: 13, color: colors.textSecondary },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+    orgRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+    orgLogo: { width: 26, height: 26, borderRadius: 7 },
+    orgLogoPlaceholder: { backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+    orgLogoText: { fontFamily: theme.fonts.black, fontSize: 13, color: "#FFFFFF" },
+    orgName: { fontFamily: theme.fonts.bold, fontSize: 13, color: colors.textSecondary, flex: 1 },
+    compTitle: { fontFamily: theme.fonts.black, fontSize: 22, color: colors.textPrimary, letterSpacing: -0.5, lineHeight: 27 },
+    metaChips: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
+    chipTeal: { backgroundColor: "rgba(48,110,111,0.1)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 16 },
+    chipTealText: { fontFamily: theme.fonts.bold, fontSize: 12, color: "#1D4E4E" },
+    metaText: { fontFamily: theme.fonts.regular, fontSize: 13, color: colors.textSecondary },
+    desc: { fontFamily: theme.fonts.regular, fontSize: 14, color: colors.textPrimary, lineHeight: 21, marginTop: 10 },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
     statusText: { fontFamily: theme.fonts.bold, fontSize: 13, color: colors.textPrimary },
     card: {

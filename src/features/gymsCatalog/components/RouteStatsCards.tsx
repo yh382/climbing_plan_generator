@@ -16,7 +16,6 @@ import { useSettings } from "../../../contexts/SettingsContext";
 import { gymsCatalogApi } from "../api";
 import type { GymRoute, GymRouteAscent } from "../types";
 
-const MAP = 96; // map card square side (px)
 const CROP = 0.42; // fraction of the floor plan shown around the pin
 
 export default function RouteStatsCards({
@@ -32,6 +31,7 @@ export default function RouteStatsCards({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { tr } = useSettings();
+  const [mapW, setMapW] = useState(0); // measured map-card width (50/50 split)
 
   const { attempts, sends } = useMemo(() => {
     const mine = currentUserId
@@ -72,13 +72,14 @@ export default function RouteStatsCards({
   let imgStyle: { width: number; height: number; left: number; top: number } | null =
     null;
   let dot: { left: number; top: number } | null = null;
-  if (showMap && dims && px != null && py != null) {
-    const displayW = MAP / CROP;
+  if (showMap && dims && mapW > 0 && px != null && py != null) {
+    const W = mapW; // card is square (aspectRatio 1)
+    const displayW = W / CROP;
     const displayH = displayW * (dims.h / dims.w);
     const clamp = (v: number, min: number, max: number) =>
       Math.max(min, Math.min(max, v));
-    const left = clamp(MAP / 2 - px * displayW, MAP - displayW, 0);
-    const top = clamp(MAP / 2 - py * displayH, MAP - displayH, 0);
+    const left = clamp(W / 2 - px * displayW, W - displayW, 0);
+    const top = clamp(W / 2 - py * displayH, W - displayH, 0);
     imgStyle = { width: displayW, height: displayH, left, top };
     dot = { left: left + px * displayW - 5, top: top + py * displayH - 5 };
   }
@@ -100,6 +101,7 @@ export default function RouteStatsCards({
       {showMap ? (
         <Pressable
           style={[styles.card, styles.mapCard]}
+          onLayout={(e) => setMapW(e.nativeEvent.layout.width)}
           onPress={() => router.push(`/gym/${route.gym_id}` as any)}
           accessibilityRole="button"
           accessibilityLabel={tr("在楼层图查看", "View on floor plan")}
@@ -152,7 +154,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontSize: 16,
       color: colors.textPrimary,
     },
-    mapCard: { width: MAP, height: MAP, overflow: "hidden" },
+    mapCard: { flex: 1, aspectRatio: 1, overflow: "hidden" },
     dot: {
       position: "absolute",
       width: 10,

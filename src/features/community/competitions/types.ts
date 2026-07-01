@@ -21,14 +21,33 @@ export interface CompScorecardEntry {
   flashed: boolean;
 }
 
+export interface CompOrganizer {
+  id: string;
+  name: string | null;
+  logo_url: string | null;
+}
+
 export interface CompBrief {
   id: string;
   title: string;
+  description?: string | null;
   status: string; // published | active | finished
   gym_id: string | null;
+  organizer?: CompOrganizer | null;
+  start_at?: string | null;
+  end_at?: string | null;
   config: any;
   problem_count: number;
   enrollment_count: number;
+}
+
+/** Human format summary from the scoring config (e.g. "Zone + Top · best 5"). */
+export function formatSummary(config: any): string {
+  const s = config?.scoring ?? {};
+  const mode =
+    s.mode === "zone_top" ? "Zone + Top" : s.mode === "volume" ? "Volume" : "Points";
+  const bestN = config?.aggregation?.best_n;
+  return bestN ? `${mode} · best ${bestN}` : mode;
 }
 
 export interface CompDetail extends CompBrief {

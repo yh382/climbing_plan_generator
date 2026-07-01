@@ -291,10 +291,6 @@ export default function CommunityScreen() {
           rank → home RankCard；inbox → home toolbar；compose → /community/create. */}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          icon="trophy"
-          onPress={() => router.push('/programs' as any)}
-        />
-        <Stack.Toolbar.Button
           icon="plus"
           onPress={() => router.push('/community/create' as any)}
         />

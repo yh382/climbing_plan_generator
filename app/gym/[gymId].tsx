@@ -43,6 +43,8 @@ import GymMenuSheet, {
   type GymMenuSheetHandle,
 } from '../../src/features/mapscreen/components/GymMenuSheet';
 import MapSessionPill from '../../src/features/journal/MapSessionPill';
+import { compApi } from '../../src/features/community/competitions/api';
+import type { CompBrief } from '../../src/features/community/competitions/types';
 import { useTodaySendsButton } from '../../src/features/dailysummary/useTodaySendsButton';
 
 // Mock-only floor plan asset. The screen layer wires this into
@@ -64,6 +66,19 @@ export default function GymMapScreen() {
 
   const { gym, wallSections, loading, error } = useGymWithSections(gymId);
   const { routes: allActiveRoutes } = useRoutesInGym(gymId, { status: 'active' });
+
+  // P2-F — comps at this gym (entry from the floor plan → comp page)
+  const [comps, setComps] = useState<CompBrief[]>([]);
+  useEffect(() => {
+    if (!gymId) return;
+    let alive = true;
+    compApi.listForGym(gymId).then((r) => alive && setComps(r.items ?? [])).catch(() => {});
+    return () => { alive = false; };
+  }, [gymId]);
+  const openComps = () => {
+    if (comps.length === 1) router.push(`/competition/${comps[0].id}` as any);
+    else router.push('/programs' as any);
+  };
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
     null,
   );
@@ -328,9 +343,26 @@ export default function GymMapScreen() {
               size={44}
               iconSize={19}
               iconWeight="light"
-              onPress={() => router.push('/gym-community' as any)}
+              onPress={() =>
+                router.push({
+                  pathname: '/gym-community',
+                  params: { gymId, gymName: gym?.name ?? '' },
+                } as any)
+              }
             />
           </View>
+          {comps.length > 0 ? (
+            <View style={{ width: 44, height: 44, marginLeft: 8 }}>
+              <HeaderButton
+                icon="trophy"
+                variant="glass"
+                size={44}
+                iconSize={19}
+                iconWeight="light"
+                onPress={openComps}
+              />
+            </View>
+          ) : null}
           <View style={{ flex: 1 }} />
           <View style={{ width: 44, height: 44 }}>
             <HeaderButton

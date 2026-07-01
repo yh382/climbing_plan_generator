@@ -19,9 +19,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
-import ProfileAffiliations, {
-  isStaff,
-} from "@/features/orgs/components/ProfileAffiliations";
+import { useSettings } from "@/contexts/SettingsContext";
 import type { Affiliation } from "@/features/orgs/types";
 import type { SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -192,10 +190,16 @@ export default function ProfileHeader({
   const colors = useThemeColors();
   const isDark = useColorScheme() === "dark";
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const hasStaff = useMemo(
-    () => (affiliations ?? []).some(isStaff),
-    [affiliations],
-  );
+  const { tr } = useSettings();
+  const staffLabel = useMemo(() => {
+    const staff = (affiliations ?? []).filter(
+      (a) => a.is_setter || a.is_head_setter || a.role === "owner",
+    );
+    if (!staff.length) return null;
+    if (staff.some((a) => a.is_head_setter)) return tr("主力定线员", "Head setter");
+    if (staff.some((a) => a.is_setter)) return tr("定线员", "Setter");
+    return tr("馆主", "Owner");
+  }, [affiliations, tr]);
 
   // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
   // "automatic"`, so the ScrollView prepends headerHeight worth of top padding.
@@ -302,23 +306,24 @@ export default function ProfileHeader({
 
       {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}
       <View style={styles.idBlock} pointerEvents="box-none">
-        <View style={styles.avatarWrap}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={36} color="#9CA3AF" />
-            </View>
-          )}
-          {hasStaff ? (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarPlaceholder]}>
+            <Ionicons name="person" size={36} color="#9CA3AF" />
+          </View>
+        )}
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {name}
+          </Text>
+          {staffLabel ? (
+            <View style={styles.setterTag}>
+              <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
+              <Text style={styles.setterTagText}>{staffLabel}</Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.name} numberOfLines={1}>
-          {name}
-        </Text>
         <Text style={styles.subtitle} numberOfLines={1}>
           {subtitle}
         </Text>
@@ -327,7 +332,6 @@ export default function ProfileHeader({
             {bioText}
           </Text>
         ) : null}
-        <ProfileAffiliations affiliations={affiliations ?? []} />
         <View style={styles.countsRow}>
           <Pressable
             accessibilityRole="button"
@@ -453,22 +457,24 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       backgroundColor: "#FFFFFF",
       marginBottom: 10,
     },
-    avatarWrap: {
-      position: "relative",
-      alignSelf: "flex-start",
-    },
-    verifiedBadge: {
-      position: "absolute",
-      top: 54,
-      left: 54,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: colors.accent,
+    nameRow: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: "#FFFFFF",
+      gap: 8,
+    },
+    setterTag: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      backgroundColor: colors.accent,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 12,
+    },
+    setterTagText: {
+      fontFamily: theme.fonts.bold,
+      fontSize: 11,
+      color: "#FFFFFF",
     },
     avatarPlaceholder: {
       alignItems: "center",
@@ -476,6 +482,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       backgroundColor: "rgba(255,255,255,0.85)",
     },
     name: {
+      flexShrink: 1,
       fontSize: 22,
       fontWeight: "700",
       fontFamily: theme.fonts.bold,

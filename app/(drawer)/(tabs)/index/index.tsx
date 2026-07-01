@@ -17,6 +17,7 @@ import SetupClimmateCard from "@/features/home/components/SetupClimmateCard";
 import { ThisMonthSection } from "@/features/home/components/ThisMonthSection";
 import { CoachPromptCard } from "@/features/home/components/CoachPromptCard";
 import { MyGymsCard } from "@/features/home/components/MyGymsCard";
+import ProgramsCard from "@/features/home/components/ProgramsCard";
 import { RankCard } from "@/features/home/components/RankCard";
 import { SavedSpotsCarousel } from "@/features/home/components/SavedSpotsCarousel";
 
@@ -70,6 +71,8 @@ export default function HomeScreen() {
         <CoachPromptCard />
 
         <MyGymsCard />
+
+        <ProgramsCard />
 
         <RankCard />
 
