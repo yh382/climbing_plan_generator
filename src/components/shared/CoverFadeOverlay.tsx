@@ -24,22 +24,25 @@ function hexToRgb(hex: string): string {
 export function CoverFadeOverlay() {
   const colors = useThemeColors();
   const bgRgb = useMemo(() => hexToRgb(colors.background), [colors.background]);
+  // EXACT Profile recipe: a mild dark wash up top, then a CLEAN, EVEN bg-alpha
+  // ramp 0 → 1 in equal 0.25 steps over equally-spaced stops. Uneven steps or a
+  // black→bg color flip mid-gradient produce a muddy grey band + a "sudden
+  // coverage" jump (visible banding) — keep this linear.
   const fadeColors = useMemo(
     () =>
       [
         "rgba(0,0,0,0.10)",
         "rgba(0,0,0,0.10)",
         `rgba(${bgRgb},0)`,
-        `rgba(${bgRgb},0.35)`,
-        `rgba(${bgRgb},0.7)`,
+        `rgba(${bgRgb},0.25)`,
+        `rgba(${bgRgb},0.5)`,
+        `rgba(${bgRgb},0.75)`,
         colors.background,
         colors.background,
       ] as const,
     [bgRgb, colors.background],
   );
-  // Full-height cover (no hero clip), so keep the image crisp for most of the
-  // frame and land solid bg only in the bottom ~12% seam band.
-  const locations = [0, 0.5, 0.66, 0.78, 0.88, 0.96, 1] as const;
+  const locations = [0, 0.3, 0.48, 0.58, 0.68, 0.78, 0.88, 1] as const;
   return (
     <LinearGradient
       pointerEvents="none"
