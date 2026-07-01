@@ -35,7 +35,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 // === Constants (Align with Challenge) ===
 const COVER_H = 280;
-const THUMB_SIZE = 80;
+const THUMB_SIZE = 64;
 const SIDE_PADDING = 12;
 
 // === Helper Functions ===
@@ -251,7 +251,7 @@ export default function EventDetailScreen() {
                     { backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
                   ]}
                 >
-                  <Ionicons name="home" size={32} color="#FFFFFF" />
+                  <Ionicons name="home" size={26} color="#FFFFFF" />
                 </View>
               )}
             </View>
@@ -420,7 +420,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   thumbOuter: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    borderRadius: 24,
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
@@ -430,7 +430,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   thumbImg: {
     width: THUMB_SIZE - 6,
     height: THUMB_SIZE - 6,
-    borderRadius: 21,
+    borderRadius: 15,
     backgroundColor: colors.backgroundSecondary,
   },
 

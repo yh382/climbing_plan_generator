@@ -44,7 +44,7 @@ import {
 } from "@/features/community/competitions/types";
 
 const COVER_H = 260;
-const THUMB_SIZE = 76;
+const THUMB_SIZE = 64;
 const SIDE = 16;
 
 type GalleryItem = { id: string; uri: string; type: "image" | "video" };
@@ -217,21 +217,13 @@ export default function CompetitionScreen() {
             </View>
           </Animated.View>
 
-          {/* Status pin — pinned to the cover's resting bottom, NOT inside the
-              parallax layer, so pull-to-zoom can't push it off-screen. */}
-          <View style={[styles.coverChip, { top: COVER_H - headerHeight - 40 }]} pointerEvents="none">
-            <View style={[styles.statusDot, { backgroundColor: active ? "#22A06B" : "rgba(255,255,255,0.7)" }]} />
-            <Text style={styles.coverChipText}>{statusText}</Text>
-          </View>
+          {/* Reserve layout height below the cover for the floating row. */}
+          <View style={styles.organizerSpacer} />
 
-          <View style={styles.organizerBar}>
-            <Text style={styles.organizerLine} numberOfLines={1}>
-              <Text style={styles.organizerPrefix}>{tr("主办 ", "Hosted by ")}</Text>
-              {orgName}
-            </Text>
-          </View>
-
-          <View style={[styles.thumbFloating, { top: COVER_H - THUMB_SIZE / 2 - headerHeight }]}>
+          {/* Floating organizer row — avatar + a two-line column (主办 <org> /
+              status pin), both vertically centered on the avatar, straddling the
+              cover's resting bottom. */}
+          <View style={[styles.organizerRow, { top: COVER_H - THUMB_SIZE / 2 - headerHeight }]}>
             <View style={styles.thumbOuter}>
               {comp.organizer?.logo_url ? (
                 <Image source={{ uri: comp.organizer.logo_url }} style={styles.thumbImg} resizeMode="cover" />
@@ -240,6 +232,18 @@ export default function CompetitionScreen() {
                   <Text style={styles.thumbInitial}>{orgName.slice(0, 1).toUpperCase()}</Text>
                 </View>
               )}
+            </View>
+            <View style={styles.organizerCol}>
+              <Text style={styles.organizerLine} numberOfLines={1}>
+                <Text style={styles.organizerPrefix}>{tr("主办 ", "Hosted by ")}</Text>
+                {orgName}
+              </Text>
+              <View style={styles.organizerChips}>
+                <View style={styles.coverChip}>
+                  <View style={[styles.statusDot, { backgroundColor: active ? "#22A06B" : "rgba(255,255,255,0.55)" }]} />
+                  <Text style={styles.coverChipText}>{statusText}</Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
@@ -416,45 +420,53 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     // Hero
     heroWrap: { position: "relative" },
     cover: { width: "100%", backgroundColor: "#0B1220" },
+    // Status pill — a solid dark badge sitting on the page bg (second line of
+    // the organizer column), so a self-sized dark pill, not a translucent
+    // over-cover overlay.
     coverChip: {
-      position: "absolute",
-      right: SIDE,
-      zIndex: 40,
+      alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
-      backgroundColor: "rgba(0,0,0,0.45)",
+      backgroundColor: colors.cardDark,
       paddingHorizontal: 10,
       paddingVertical: 5,
-      borderRadius: 14,
+      borderRadius: 12,
     },
     statusDot: { width: 7, height: 7, borderRadius: 4 },
     coverChipText: { fontFamily: theme.fonts.bold, fontSize: 12, color: "#FFFFFF" },
 
-    organizerBar: {
-      height: 68,
-      paddingTop: 14,
-      paddingLeft: SIDE + THUMB_SIZE + 10,
-      paddingRight: SIDE,
-      backgroundColor: colors.background,
+    // Spacer reserving room below the cover for the floating organizer row.
+    organizerSpacer: { height: THUMB_SIZE / 2 + 16, backgroundColor: colors.background },
+    // Floating organizer row: avatar + (主办 / status pill) column, centered so
+    // the two lines' combined height aligns with the avatar.
+    organizerRow: {
+      position: "absolute",
+      left: SIDE,
+      right: SIDE,
+      zIndex: 50,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
     },
-    organizerLine: { fontSize: 15, fontFamily: theme.fonts.bold, color: colors.textPrimary },
+    organizerCol: { flex: 1, justifyContent: "center", gap: 6 },
+    organizerLine: { fontSize: 17, fontFamily: theme.fonts.bold, color: colors.textPrimary },
     organizerPrefix: { fontFamily: theme.fonts.regular, color: colors.textSecondary },
+    organizerChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
-    thumbFloating: { position: "absolute", left: SIDE, zIndex: 50 },
     thumbOuter: {
       width: THUMB_SIZE,
       height: THUMB_SIZE,
-      borderRadius: 22,
+      borderRadius: 18,
       backgroundColor: colors.cardBackground,
       justifyContent: "center",
       alignItems: "center",
       borderWidth: 1,
       borderColor: colors.cardBorder,
     },
-    thumbImg: { width: THUMB_SIZE - 6, height: THUMB_SIZE - 6, borderRadius: 19 },
+    thumbImg: { width: THUMB_SIZE - 6, height: THUMB_SIZE - 6, borderRadius: 15 },
     thumbPlaceholder: { backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-    thumbInitial: { fontFamily: theme.fonts.black, fontSize: 26, color: "#FFFFFF" },
+    thumbInitial: { fontFamily: theme.fonts.black, fontSize: 22, color: "#FFFFFF" },
 
     // Main
     mainBlock: { paddingHorizontal: SIDE, paddingBottom: 8 },
