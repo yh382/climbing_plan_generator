@@ -6,12 +6,13 @@
 // /community/post/[postId] detail screen.
 
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
+import PressableScale from "@/components/ui/PressableScale";
 import type { FeedPost } from "@/types/community";
 
 type Props = {
@@ -76,12 +77,14 @@ export default function MiniSessionCard({ post, onPress }: Props) {
   const locationLabel = isOutdoor ? tr("户外", "Outdoor") : tr("室内", "Indoor");
   const timeAgo = formatTimeAgo(post.timestamp, tr);
 
+  // DL v1 §2.1 — a session is an object → white card, hairline border,
+  // one-notch shadow; KPI numerals in DM Mono ("Instrument voice").
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={tr(`${gymName} session`, `${gymName} session`)}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={styles.card}
     >
       <View style={styles.titleRow}>
         <Ionicons
@@ -101,31 +104,33 @@ export default function MiniSessionCard({ post, onPress }: Props) {
         </View>
       </View>
 
-      <Text style={styles.kpiRow} numberOfLines={1}>
-        <Text style={styles.kpiNum}>{attempts}</Text>
-        {tr(" 次尝试 · ", " attempts · ")}
-        <Text style={styles.kpiNum}>{sends}</Text>
-        {tr(" 次完攀 · ", " sends · ")}
-        {tr("最高 ", "best ")}
-        <Text style={styles.kpiNum}>{bestGrade}</Text>
-      </Text>
-    </Pressable>
+      <View style={styles.kpiRowWrap}>
+        <Text style={styles.kpiRow} numberOfLines={1}>
+          <Text style={styles.kpiNum}>{attempts}</Text>
+          {tr(" 次尝试 · ", " attempts · ")}
+          <Text style={styles.kpiNum}>{sends}</Text>
+          {tr(" 次完攀 · ", " sends · ")}
+          {tr("最高 ", "best ")}
+          <Text style={styles.kpiNum}>{bestGrade}</Text>
+        </Text>
+      </View>
+    </PressableScale>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     card: {
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      marginHorizontal: 12,
-      marginBottom: 8,
-      borderRadius: 14,
-      backgroundColor: colors.backgroundSecondary,
-      gap: 8,
-    },
-    cardPressed: {
-      opacity: 0.7,
+      paddingHorizontal: 15,
+      paddingTop: 13,
+      paddingBottom: 11,
+      marginHorizontal: 16,
+      marginBottom: 10,
+      borderRadius: theme.borderRadius.card,
+      backgroundColor: colors.cardBackground,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      ...theme.shadow.card,
     },
     titleRow: {
       flexDirection: "row",
@@ -147,13 +152,21 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.regular,
       color: colors.textSecondary,
     },
+    // Hairline-separated data row (DL §2.3 inside an object card).
+    kpiRowWrap: {
+      marginTop: 11,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
     kpiRow: {
-      fontSize: 13,
+      fontSize: 12.5,
       fontFamily: theme.fonts.regular,
       color: colors.textSecondary,
     },
     kpiNum: {
-      fontFamily: theme.fonts.bold,
+      fontFamily: theme.fonts.monoMedium,
+      fontSize: 13,
       color: colors.textPrimary,
     },
   });

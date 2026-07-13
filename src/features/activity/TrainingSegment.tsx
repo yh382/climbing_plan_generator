@@ -628,17 +628,15 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
       justifyContent: "space-between",
     },
+    // DL v1 — section headers speak in the micro-label voice.
     sectionTitle: {
-      fontSize: 20,
-      fontWeight: "800",
-      fontFamily: theme.fonts.black,
-      color: colors.textPrimary,
+      ...theme.textStyles.microLabel,
+      color: colors.textSecondary,
     },
     viewAllLink: {
-      color: colors.textSecondary,
-      fontFamily: theme.fonts.bold,
-      fontWeight: "700",
-      fontSize: 14,
+      color: colors.accent,
+      fontFamily: theme.fonts.medium,
+      fontSize: 13,
     },
     emptyHint: {
       paddingHorizontal: 16,
@@ -652,26 +650,27 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       textAlign: "center",
     },
 
-    // Today
+    // Today — today's planned session is an object → white card (DL §2.1).
     todayCard: {
       marginHorizontal: 16,
       marginTop: 4,
       marginBottom: 4,
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: colors.cardBackground,
       borderRadius: theme.borderRadius.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       padding: 16,
+      ...theme.shadow.card,
     },
     todayKicker: {
-      fontSize: 12,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
+      ...theme.textStyles.microLabel,
       color: colors.textTertiary,
-      fontFamily: theme.fonts.bold,
       marginBottom: 6,
     },
     todayTitle: {
-      fontSize: 18,
-      fontFamily: theme.fonts.black,
+      fontSize: 17,
+      fontFamily: theme.fonts.bold,
+      letterSpacing: -0.3,
       color: colors.textPrimary,
     },
     todaySub: {
@@ -681,11 +680,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       fontFamily: theme.fonts.regular,
       lineHeight: 18,
     },
+    // The Training view's single primary capsule (DL §2.4).
     todayCta: {
       marginTop: 14,
       alignSelf: "flex-start",
-      backgroundColor: colors.cardDark,
-      borderRadius: 999,
+      backgroundColor: colors.pillBackground,
+      borderRadius: theme.borderRadius.pill,
       paddingHorizontal: 18,
       paddingVertical: 10,
       flexDirection: "row",
@@ -693,9 +693,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       gap: 6,
     },
     todayCtaText: {
-      color: "#FFF",
+      color: colors.pillText,
       fontFamily: theme.fonts.bold,
-      fontWeight: "800",
       fontSize: 14,
     },
     todayLink: {
@@ -714,12 +713,17 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 16,
       gap: 12,
     },
+    // Template cards are objects → white cards (DL §2.1).
     bigCard: {
       width: 220,
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: colors.cardBackground,
       borderRadius: theme.borderRadius.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       overflow: "hidden",
+      ...theme.shadow.card,
     },
+
     bigCardImg: {
       width: "100%",
       height: 160,
@@ -735,7 +739,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     bigCardTitle: {
       fontSize: 14,
       fontFamily: theme.fonts.bold,
-      fontWeight: "800",
       color: colors.textPrimary,
     },
     bigCardMetaRow: {

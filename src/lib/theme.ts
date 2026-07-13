@@ -1,6 +1,9 @@
 export const theme = {
   colors: {
     accent: '#306E6F',
+    // Text/icon color on accent-filled surfaces — white in BOTH modes (accent
+    // stays #306E6F in dark, so its pair must not flip like pillText does).
+    textOnAccent: '#FFFFFF',
     // Light-mode palette — minimally warm pearl page bg + pure white
     // cards / inputs / tags.
     //
@@ -49,6 +52,9 @@ export const theme = {
     progressTrack: '#ECEBEA',
     pillBackground: '#1C1C1E',
     pillText: '#FFFFFF',
+    // Design Language v1 (docs/DESIGN_LANGUAGE.md §2.11) — dark blur toast
+    // surface (BadgeUnlockToast / UploadToastOverlay / send-moment toast).
+    toastBackground: 'rgba(17,17,17,0.92)',
     emptyBarColor: '#E5E2D8',
     borderTertiary: '#E5E2D8',
     trail: '#A08060',
@@ -101,8 +107,10 @@ export const theme = {
     gymLabelHalo: 'rgba(245, 255, 253, 0.88)',
   },
   typography: {
+    // DL v1 §1 字重语法 — 900 is reserved for the ONE hero title per screen.
     hero: { fontSize: 33, fontWeight: '900' as const, letterSpacing: -1.5 },
-    sectionTitle: { fontSize: 18, fontWeight: '900' as const, letterSpacing: -0.5 },
+    // DL v1 — section titles step down 900 → 700 (900 is hero-only).
+    sectionTitle: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.5 },
     cardTitle: { fontSize: 13, fontWeight: '700' as const },
     body: { fontSize: 14, fontWeight: '400' as const },
     caption: { fontSize: 11, fontWeight: '400' as const },
@@ -123,9 +131,43 @@ export const theme = {
     cardPadding: 12,
   },
   borderRadius: {
-    card: 14,
+    // DL v1 §1 圆角三档 — card 16 / cardSmall 12 / pill 999 (pill: ≤1 per
+    // screen, primary CTA + transient floats only).
+    card: 16,
     cardSmall: 12,
     pill: 999,
+  },
+  // DL v1 §1 阴影一档 — the only shadow object cards may use (drag states may
+  // temporarily deepen). Spread into StyleSheet: `...theme.shadow.card`.
+  shadow: {
+    card: {
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 2,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
+    },
+  },
+  // DL v1 §1 — shared text-style constants ("Instrument voice"): every
+  // numeral (grade / duration / count / rank) renders monoValue; section /
+  // annotation micro-labels render microLabel (+ a theme text color).
+  textStyles: {
+    monoValue: {
+      fontFamily: 'DMMono_500Medium',
+      fontSize: 20,
+      letterSpacing: -0.5,
+    },
+    monoValueLarge: {
+      fontFamily: 'DMMono_500Medium',
+      fontSize: 26,
+      letterSpacing: -0.5,
+    },
+    microLabel: {
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 10,
+      letterSpacing: 1.4,
+      textTransform: 'uppercase' as const,
+    },
   },
 } as const
 

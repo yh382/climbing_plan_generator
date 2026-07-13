@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
+import PressableScale from "@/components/ui/PressableScale";
 import useLogsStore from "@/store/useLogsStore";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -95,7 +96,7 @@ export function ThisMonthSection() {
     <View style={styles.section}>
       <Text style={styles.label}>{tr("本月", "This Month")}</Text>
 
-      <Pressable style={styles.statsRow} onPress={goToActivity}>
+      <PressableScale style={styles.statsRow} onPress={goToActivity}>
         <View style={styles.statCol}>
           <Text style={styles.statValue} numberOfLines={1}>
             {stats.sessions}
@@ -114,7 +115,7 @@ export function ThisMonthSection() {
           </Text>
           <Text style={styles.statLabel}>{tr("最高级别", "Best")}</Text>
         </View>
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }
@@ -125,11 +126,10 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 16,
       marginBottom: theme.spacing.sectionGap,
     },
+    // DL v1 — micro label ("topo annotation" voice).
     label: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 14,
+      ...theme.textStyles.microLabel,
       color: c.textSecondary,
-      letterSpacing: 0.3,
       marginBottom: 14,
     },
     statsRow: {
@@ -141,16 +141,13 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
     },
     statValue: {
-      fontFamily: theme.fonts.monoMedium,
-      fontSize: 30,
+      ...theme.textStyles.monoValueLarge,
       color: c.textPrimary,
-      letterSpacing: -1,
       marginBottom: 4,
       textAlign: "center",
     },
     statLabel: {
-      fontFamily: theme.fonts.regular,
-      fontSize: 12,
+      ...theme.textStyles.microLabel,
       color: c.textTertiary,
       textAlign: "center",
     },

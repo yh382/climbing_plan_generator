@@ -5,6 +5,7 @@ import type { ThemeColors } from './theme';
 
 export const darkColors: ThemeColors = {
   accent: '#306E6F',              // unchanged — brand color
+  textOnAccent: '#FFFFFF',        // accent stays teal in dark → pair stays white
   // Window BY — dark base lifted off pure black to a dark grey (mirrors the
   // light off-white bg). The whole elevation ladder shifts up one notch so
   // cards still separate: bg #161618 → card #242426 → elevated #2C2C2E →
@@ -43,6 +44,9 @@ export const darkColors: ThemeColors = {
   progressTrack: '#2C2C2E',
   pillBackground: '#FFFFFF',
   pillText: '#1C1C1E',
+  // DL v1 §2.11 — toast lifts to the dark elevation ladder (~#2C) so it still
+  // reads as a floating layer over the #161618 base.
+  toastBackground: 'rgba(44,44,48,0.96)',
   emptyBarColor: '#38383A',
   borderTertiary: '#38383A',
   trail: '#C9A78A',

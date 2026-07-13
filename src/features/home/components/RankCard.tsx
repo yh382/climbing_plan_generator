@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import PressableScale from "@/components/ui/PressableScale";
 import { communityApi } from "@/features/community/api";
 import type { RankOut } from "@/features/community/types";
 import { useUserStore } from "@/store/useUserStore";
@@ -60,79 +60,67 @@ export function RankCard() {
 
   const handlePress = () => router.push("/community/rank" as any);
 
+  // DL v1 §2.3 — data is typography: mono values + micro labels on paper,
+  // no dark card container.
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>{tr("我的排名", "My Rank")}</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
-      </View>
+    <View style={styles.section}>
+      <Text style={styles.microLabel}>{tr("我的排名", "My Rank")}</Text>
 
       {loading ? (
-        <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" style={{ marginVertical: 18 }} />
+        <ActivityIndicator
+          size="small"
+          color={colors.textTertiary}
+          style={{ marginVertical: 18 }}
+        />
       ) : (
-        <View style={styles.cellsRow}>
+        <PressableScale style={styles.cellsRow} onPress={handlePress}>
           <View style={styles.cell}>
-            <Text style={styles.cellLabel}>{tr("全球", "Global")}</Text>
-            <Text style={styles.cellValue}>
+            <Text style={styles.cellValue} numberOfLines={1}>
               {globalRank?.rank_position ? `#${globalRank.rank_position}` : "—"}
             </Text>
+            <Text style={styles.cellLabel}>{tr("全球", "Global")}</Text>
           </View>
-          <View style={styles.divider} />
           <View style={styles.cell}>
-            <Text style={styles.cellLabel}>{tr("好友", "Friends")}</Text>
-            <Text style={styles.cellValue}>
+            <Text style={styles.cellValue} numberOfLines={1}>
               {friendsRank ? `#${friendsRank.rank} / ${friendsRank.total}` : "—"}
             </Text>
+            <Text style={styles.cellLabel}>{tr("好友", "Friends")}</Text>
           </View>
-        </View>
+        </PressableScale>
       )}
-    </Pressable>
+    </View>
   );
 }
 
 const createStyles = (c: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    card: {
+    section: {
       marginHorizontal: 16,
       marginBottom: theme.spacing.sectionGap,
-      backgroundColor: c.cardDark,
-      borderRadius: theme.borderRadius.card,
-      padding: 18,
     },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+    microLabel: {
+      ...theme.textStyles.microLabel,
+      color: c.textSecondary,
       marginBottom: 14,
-    },
-    title: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 15,
-      color: "#FFFFFF",
     },
     cellsRow: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-end",
     },
     cell: {
       flex: 1,
+      alignItems: "center",
     },
     cellLabel: {
-      fontFamily: theme.fonts.regular,
-      fontSize: 12,
-      color: "rgba(255,255,255,0.6)",
-      marginBottom: 6,
+      ...theme.textStyles.microLabel,
+      color: c.textTertiary,
+      marginTop: 5,
+      textAlign: "center",
     },
     cellValue: {
-      fontFamily: theme.fonts.monoMedium,
+      ...theme.textStyles.monoValue,
       fontSize: 22,
-      color: "#FFFFFF",
-      letterSpacing: -0.5,
-    },
-    divider: {
-      width: StyleSheet.hairlineWidth,
-      height: 36,
-      backgroundColor: "rgba(255,255,255,0.18)",
-      marginHorizontal: 18,
+      color: c.textPrimary,
+      textAlign: "center",
     },
   });

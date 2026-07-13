@@ -19,7 +19,9 @@ type Props = {
   viewMode: "self" | "other";
 };
 
-const MAX_PREVIEW = 3;
+// 决策 2026-07-01 — preview shows only the LATEST session; the rest live
+// behind "View all".
+const MAX_PREVIEW = 1;
 
 export default function ProfileSessionList({ userId, viewMode }: Props) {
   const colors = useThemeColors();

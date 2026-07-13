@@ -220,6 +220,9 @@ export default function ProfileChromeRoot({
     };
   });
 
+  // Overscroll (negative scrollY) is intentionally ignored — the header is
+  // fixed; pull-down only bounces the content region (决策 2026-07-01, the
+  // elastic-header variant jittered on device).
   const tabBarStyle = useAnimatedStyle(() => {
     const sy = Math.max(0, activeScrollY.value);
     return { transform: [{ translateY: heroHeight - Math.min(sy, collapse) }] };
@@ -317,13 +320,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   pager: { flex: 1, zIndex: 0 },
   page: { flex: 1 },
+  // No overflow clip: the legacy 35pt cover-overlap slice this clipped is
+  // gone (DL v1 hero = exact height; the photo box self-clips and the paper
+  // group is bounded), so the clip had nothing left to do.
   hero: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     zIndex: 5,
-    overflow: "hidden",
   },
   tabBar: {
     position: "absolute",

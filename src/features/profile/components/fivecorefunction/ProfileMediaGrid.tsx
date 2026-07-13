@@ -1,17 +1,13 @@
 // src/features/profile/components/fivecorefunction/ProfileMediaGrid.tsx
 // Window BG — Profile Activity: Media sub-section.
-// 3×2 grid of post-media thumbnails (up to 6). Pulled from the shared
-// userActivityByUserId cache; FE-side filter `media.length > 0`. Cell
-// tap → /community/user-posts?initialPostId=… (mirrors SendsSection).
+// DL v1 (决策 2026-07-01) — editorial highlights: latest media = large tile
+// on the LEFT, next two stacked small on the right; everything else lives
+// behind "View all". Pulled from the shared userActivityByUserId cache;
+// FE-side filter `media.length > 0`. Cell tap →
+// /community/user-posts?initialPostId=… (mirrors SendsSection).
 
 import React, { useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Dimensions,
-} from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -20,6 +16,7 @@ import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useCommunityStore } from "@/store/useCommunityStore";
+import PressableScale from "@/components/ui/PressableScale";
 import type { FeedPost } from "@/types/community";
 
 type Props = {
@@ -27,10 +24,11 @@ type Props = {
   viewMode: "self" | "other";
 };
 
-const COLS = 3;
-const GAP = 4;
+const GAP = 8;
 const SIDE_PADDING = 16;
-const MAX_PREVIEW = 6;
+const MAX_PREVIEW = 3;
+// Row height — tune here (设计旋钮: 编辑式 highlights 的整体尺寸).
+const HIGHLIGHT_H = 170;
 
 const GRADE_RE = /(V\d+|5\.\d+[a-d+\-]?|[Ff]\d+[a-c+]?)/i;
 
@@ -108,61 +106,88 @@ export default function ProfileMediaGrid({ userId, viewMode }: Props) {
     );
   }
 
+  const renderTile = (post: FeedPost, tileStyle: object, playSize: number) => {
+    const thumb = pickThumb(post);
+    const grade = extractGrade(post);
+    return (
+      <PressableScale
+        key={post.id}
+        accessibilityRole="button"
+        accessibilityLabel={tr("查看媒体", "View media")}
+        onPress={() => onCellPress(post)}
+        style={tileStyle}
+      >
+        {thumb ? (
+          <Image
+            source={{ uri: thumb.uri }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.cellEmpty]} />
+        )}
+        {thumb?.isVideo ? (
+          <View style={styles.playBadge}>
+            <Ionicons name="play" size={playSize} color="#FFFFFF" />
+          </View>
+        ) : null}
+        {grade ? (
+          <View style={styles.gradePill}>
+            <Text style={styles.gradeText}>{grade}</Text>
+          </View>
+        ) : null}
+      </PressableScale>
+    );
+  };
+
+  const [heroPost, ...sidePosts] = items;
+
   return (
-    <View style={styles.grid}>
-      {items.map((post) => {
-        const thumb = pickThumb(post);
-        const grade = extractGrade(post);
-        return (
-          <Pressable
-            key={post.id}
-            accessibilityRole="button"
-            accessibilityLabel={tr("查看媒体", "View media")}
-            onPress={() => onCellPress(post)}
-            style={styles.cell}
-          >
-            {thumb ? (
-              <Image
-                source={{ uri: thumb.uri }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, styles.cellEmpty]} />
-            )}
-            {thumb?.isVideo ? (
-              <View style={styles.playBadge}>
-                <Ionicons name="play" size={9} color="#FFFFFF" />
-              </View>
-            ) : null}
-            {grade ? (
-              <View style={styles.gradePill}>
-                <Text style={styles.gradeText}>{grade}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        );
-      })}
+    <View style={styles.row}>
+      {renderTile(
+        heroPost!,
+        sidePosts.length > 0 ? styles.heroCell : styles.heroCellFull,
+        12,
+      )}
+      {sidePosts.length > 0 ? (
+        <View style={styles.sideCol}>
+          {sidePosts.map((p) => renderTile(p, styles.sideCell, 9))}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => {
-  const screenWidth = Dimensions.get("window").width;
-  const cellSize = Math.floor(
-    (screenWidth - SIDE_PADDING * 2 - GAP * (COLS - 1)) / COLS,
-  );
   return StyleSheet.create({
-    grid: {
+    row: {
       flexDirection: "row",
-      flexWrap: "wrap",
       paddingHorizontal: SIDE_PADDING,
       gap: GAP,
+      height: HIGHLIGHT_H,
     },
-    cell: {
-      width: cellSize,
-      height: cellSize,
-      borderRadius: 8,
+    // Latest media — the editorial lead (~58% width).
+    heroCell: {
+      flex: 1.4,
+      borderRadius: theme.borderRadius.cardSmall,
+      overflow: "hidden",
+      backgroundColor: colors.backgroundSecondary,
+      position: "relative",
+    },
+    heroCellFull: {
+      flex: 1,
+      borderRadius: theme.borderRadius.cardSmall,
+      overflow: "hidden",
+      backgroundColor: colors.backgroundSecondary,
+      position: "relative",
+    },
+    sideCol: {
+      flex: 1,
+      gap: GAP,
+    },
+    sideCell: {
+      flex: 1,
+      borderRadius: theme.borderRadius.cardSmall,
       overflow: "hidden",
       backgroundColor: colors.backgroundSecondary,
       position: "relative",

@@ -16,6 +16,7 @@ import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { haptic } from "@/lib/haptics";
 import { pickMediaFromLibrary } from "@/lib/mediaPicker";
 import { toFileUri, uploadLogMedia } from "@/features/journal/api";
 import {
@@ -135,6 +136,10 @@ export default function LogSendModal({ visible, title, onClose, onDone, tr }: Pr
   const handleDone = async () => {
     if (submitting) return;
     setSubmitting(true);
+    // DL v1 §4.3 Send moment — Success haptic fires at t0 (the press), not
+    // after media upload / onDone settle (a video upload would delay it by
+    // seconds).
+    haptic.sendSuccess();
     try {
       const finalAttempts = style === "redpoint" ? attempts : 1;
 

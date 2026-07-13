@@ -10,12 +10,13 @@
 // 1 short label + 1 large value + optional sparkline-slot.
 
 import React from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import PressableScale from "@/components/ui/PressableScale";
 
 import type { AnalysisFocusKey } from "../analysis/AnalysisScreen";
 
@@ -59,7 +60,7 @@ export default function QuickInsightsRibbon({ cards }: Props) {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
-      ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
       renderItem={({ item }) => {
         const handle = () => {
           if (item.onPress) {
@@ -71,11 +72,12 @@ export default function QuickInsightsRibbon({ cards }: Props) {
           }
         };
         const accent = item.accent ?? colors.textPrimary;
+        // DL v1 §2.3 — data is typography: no grey card shells; mono values,
+        // micro labels, vertical hairlines between entries.
         return (
-          <TouchableOpacity
+          <PressableScale
             style={styles.card}
             onPress={handle}
-            activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel={`${item.label} ${item.value}${item.sub ? " " + item.sub : ""}`}
           >
@@ -83,7 +85,7 @@ export default function QuickInsightsRibbon({ cards }: Props) {
               {item.icon ? (
                 <Ionicons
                   name={item.icon}
-                  size={14}
+                  size={12}
                   color={colors.textTertiary}
                   style={{ marginRight: 4 }}
                 />
@@ -100,7 +102,7 @@ export default function QuickInsightsRibbon({ cards }: Props) {
                 {item.sub}
               </Text>
             ) : null}
-          </TouchableOpacity>
+          </PressableScale>
         );
       }}
     />
@@ -111,36 +113,36 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     row: {
       paddingHorizontal: 16,
-      paddingBottom: 12,
+      paddingTop: 6,
+      paddingBottom: 14,
     },
     card: {
-      width: 160,
-      minHeight: 96,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: theme.borderRadius.cardSmall,
-      padding: 12,
-      justifyContent: "space-between",
+      minWidth: 104,
+      justifyContent: "flex-start",
+    },
+    separator: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+      marginHorizontal: 16,
+      marginVertical: 4,
     },
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
+      marginBottom: 7,
     },
     cardLabel: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
+      ...theme.textStyles.microLabel,
       color: colors.textTertiary,
-      fontFamily: theme.fonts.bold,
     },
     cardValue: {
-      fontSize: 24,
-      fontFamily: theme.fonts.black,
-      fontWeight: "900",
-      letterSpacing: -0.5,
+      ...theme.textStyles.monoValue,
+      fontSize: 22,
     },
     cardSub: {
       fontSize: 11,
+      marginTop: 4,
       color: colors.textSecondary,
-      fontFamily: theme.fonts.medium,
+      fontFamily: theme.fonts.regular,
     },
   });

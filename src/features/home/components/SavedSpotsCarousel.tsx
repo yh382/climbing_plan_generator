@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
 import { useRouter } from "expo-router";
+import PressableScale from "@/components/ui/PressableScale";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { theme } from "@/lib/theme";
@@ -58,7 +59,7 @@ export function SavedSpotsCarousel() {
         {areas.map((area) => {
           const cover = area.cover_url ?? null;
           return (
-            <Pressable
+            <PressableScale
               key={area.id}
               style={styles.card}
               onPress={() => {
@@ -82,7 +83,7 @@ export function SavedSpotsCarousel() {
                 {/* Weather pill placeholder — hidden until weather hook lands. */}
               </View>
               <Text style={styles.name} numberOfLines={1}>{area.name}</Text>
-            </Pressable>
+            </PressableScale>
           );
         })}
       </ScrollView>
@@ -100,10 +101,8 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
       marginBottom: 12,
     },
     title: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 16,
-      color: c.textPrimary,
-      letterSpacing: -0.3,
+      ...theme.textStyles.microLabel,
+      color: c.textSecondary,
     },
     scroll: {
       paddingHorizontal: 16,
@@ -115,7 +114,7 @@ const createStyles = (c: ReturnType<typeof useThemeColors>) =>
     cover: {
       width: 120,
       height: 80,
-      borderRadius: 10,
+      borderRadius: theme.borderRadius.cardSmall,
       overflow: "hidden",
       marginBottom: 6,
     },

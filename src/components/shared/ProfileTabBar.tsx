@@ -24,6 +24,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { haptic } from "@/lib/haptics";
 
 // Public bar height — the fixed-chrome host (ProfileChromeRoot) positions the
 // PagerView content beneath the bar's resting position using this exact value.
@@ -71,7 +72,10 @@ export default function ProfileTabBar({
     (e: { nativeEvent: { selectedSegmentIndex: number } }) => {
       const idx = e.nativeEvent.selectedSegmentIndex;
       const key = tabs[idx]?.key;
-      if (key) onTabPress(key);
+      if (key) {
+        haptic.selection(); // DL v1 §4.2 — segmented change
+        onTabPress(key);
+      }
     },
     [tabs, onTabPress],
   );
@@ -113,8 +117,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       zIndex: 20,
       elevation: 20,
     },
+    // 16pt — align with the stat strip margins; also narrows the iOS 26
+    // Liquid Glass capsule a notch (its visual weight is OS-drawn, width is
+    // our only lever).
     inner: {
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
     },
     // Full-width hairline at the bar's bottom edge; opacity scroll-driven.
     separator: {
@@ -124,7 +131,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       bottom: 0,
       height: StyleSheet.hairlineWidth,
     },
+    // DL v1 §2.5 — small native segmented (was 40).
     segmented: {
-      height: 40,
+      height: 34,
     },
   });

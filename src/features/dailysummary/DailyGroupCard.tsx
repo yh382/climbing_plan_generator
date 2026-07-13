@@ -145,12 +145,16 @@ export default function DailyGroupCard({
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
+    // DL v1 §2.1 — a day's session group is an object → white card.
     card: {
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: colors.cardBackground,
       marginHorizontal: 16,
       marginBottom: 12,
       borderRadius: theme.borderRadius.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       padding: 16,
+      ...theme.shadow.card,
     },
     header: {
       flexDirection: "row",

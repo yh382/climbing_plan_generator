@@ -150,8 +150,31 @@ export default function ActivityFeedSection({ userId, viewMode, pageHandle }: Pr
   const isLoading =
     !minTimeElapsed || !cache || (cache.loading && cache.items.length === 0);
 
+  // DL v1 §3 (决策 2026-07-01) — sessions-first: the profile's Activity tab
+  // opens on "where did this climber go, what did they do"; media follows as
+  // highlights.
   const content = (
     <>
+      <SubSection
+        title={tr("最近 Session", "Recent Sessions")}
+        viewAllLabel={sessionCountLabel ? `${tr("查看全部", "View all")} (${sessionCountLabel})` : null}
+        onViewAll={
+          sessionCountLabel
+            ? () =>
+                router.push({
+                  pathname: "/users/[userId]/sessions",
+                  params: { userId },
+                } as any)
+            : undefined
+        }
+      >
+        {isLoading ? (
+          <SessionListSkeleton />
+        ) : (
+          <ProfileSessionList userId={userId} viewMode={viewMode} />
+        )}
+      </SubSection>
+
       <SubSection
         title={tr("媒体", "Media")}
         viewAllLabel={mediaCountLabel ? `${tr("查看全部", "View all")} (${mediaCountLabel})` : null}
@@ -169,26 +192,6 @@ export default function ActivityFeedSection({ userId, viewMode, pageHandle }: Pr
           <MediaGridSkeleton />
         ) : (
           <ProfileMediaGrid userId={userId} viewMode={viewMode} />
-        )}
-      </SubSection>
-
-      <SubSection
-        title={tr("训练 Session", "Sessions")}
-        viewAllLabel={sessionCountLabel ? `${tr("查看全部", "View all")} (${sessionCountLabel})` : null}
-        onViewAll={
-          sessionCountLabel
-            ? () =>
-                router.push({
-                  pathname: "/users/[userId]/sessions",
-                  params: { userId },
-                } as any)
-            : undefined
-        }
-      >
-        {isLoading ? (
-          <SessionListSkeleton />
-        ) : (
-          <ProfileSessionList userId={userId} viewMode={viewMode} />
         )}
       </SubSection>
 
@@ -239,8 +242,10 @@ const styles = StyleSheet.create({
 
 const createSubSectionStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
+    // 22pt — air below the segmented bar / between sub-sections (device
+    // feedback 2026-07-01: middle zone read as too tightly stacked).
     wrap: {
-      marginTop: 16,
+      marginTop: 22,
     },
     header: {
       flexDirection: "row",
@@ -249,12 +254,10 @@ const createSubSectionStyles = (colors: ReturnType<typeof useThemeColors>) =>
       paddingHorizontal: 16,
       paddingBottom: 8,
     },
+    // DL v1 — micro label ("topo annotation" voice).
     title: {
-      fontSize: 13,
-      fontFamily: theme.fonts.bold,
+      ...theme.textStyles.microLabel,
       color: colors.textSecondary,
-      letterSpacing: 0.6,
-      textTransform: "uppercase",
     },
     viewAllBtn: {
       flexDirection: "row",

@@ -1,10 +1,11 @@
 // src/features/activity/SessionsSegment.tsx
-// Sessions segment of the Activity tab. Hosts the month calendar + filter
-// dropdown + session list. Extracted from the original calendar/index.tsx
-// so the parent Activity screen can swap in Training / Analysis segments.
+// Sessions segment of the Activity tab. Hosts the month calendar + time
+// filter (MenuPill) + session list. Extracted from the original
+// calendar/index.tsx so the parent Activity screen can swap in Training /
+// Analysis segments.
 
 import React, { useState, useCallback, useMemo, useRef } from "react";
-import { View, TouchableOpacity, StyleSheet, RefreshControl, Text, ScrollView } from "react-native";
+import { View, StyleSheet, RefreshControl, Text, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,8 @@ import { subDays, format, startOfMonth, subMonths } from "date-fns";
 
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "../../lib/useThemeColors";
+import { MenuPill } from "../../components/ui/MenuPill";
+import PressableScale from "../../components/ui/PressableScale";
 import MonthCalendar from "./MonthCalendar";
 import ActivitySegmentBar from "./ActivitySegmentBar";
 import ActivitySubtitle from "./ActivitySubtitle";
@@ -40,7 +43,6 @@ export default function SessionsSegment() {
   const [refreshing, setRefreshing] = useState(false);
   type TimeFilter = "week" | "month" | "last_month" | "3_months" | "6_months";
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("month");
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   // Sessions is the climbing journal. Pure training sessions live on
@@ -138,38 +140,29 @@ export default function SessionsSegment() {
       <QuickInsightsRibbon cards={insightCards} />
 
       <View style={styles.logSectionHeader}>
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-        >
-          <Text style={styles.sectionTitle}>{activeFilterLabel}</Text>
-          <Ionicons name={showFilterDropdown ? "chevron-up" : "chevron-down"} size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
-        </TouchableOpacity>
+        {/* Time filter — native UIMenu via MenuPill (codebase hard rule:
+            tap-to-pick-one goes through MenuPill, not a hand-drawn
+            dropdown). Chromeless: text + chevron only, no capsule. */}
+        <MenuPill
+          variant="labeled"
+          chromeless
+          label={activeFilterLabel}
+          accessibilityLabel={tr("筛选时间范围", "Filter time range")}
+          options={filterOptions.map((opt) => ({
+            label: opt.label,
+            onPress: () => setTimeFilter(opt.key),
+          }))}
+        />
 
         {activeSession ? (
           <ActiveSessionFloat variant="inline" />
         ) : (
-          <TouchableOpacity style={styles.startLogBtn} onPress={() => setShowPrompt(true)}>
-            <Ionicons name="add" size={18} color="#FFF" />
-            <Text style={styles.startLogText}>Start Log</Text>
-          </TouchableOpacity>
+          <PressableScale style={styles.startLogBtn} onPress={() => setShowPrompt(true)}>
+            <Ionicons name="add" size={18} color={colors.pillText} />
+            <Text style={styles.startLogText}>{tr("开始记录", "Start Log")}</Text>
+          </PressableScale>
         )}
       </View>
-
-      {showFilterDropdown && (
-        <View style={styles.dropdown}>
-          {filterOptions.map(opt => (
-            <TouchableOpacity
-              key={opt.key}
-              onPress={() => { setTimeFilter(opt.key); setShowFilterDropdown(false); }}
-              style={[styles.dropdownItem, timeFilter === opt.key && styles.dropdownItemActive]}
-            >
-              <Text style={[styles.dropdownText, timeFilter === opt.key && styles.dropdownTextActive]}>{opt.label}</Text>
-              {timeFilter === opt.key && <Ionicons name="checkmark" size={16} color={colors.textPrimary} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
 
       {dayGroups.length > 0 ? (
@@ -211,7 +204,6 @@ export default function SessionsSegment() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    sectionTitle: { fontSize: 20, fontWeight: "800", fontFamily: theme.fonts.black, color: colors.textPrimary },
     logSectionHeader: {
       paddingHorizontal: 16,
       paddingTop: 18,
@@ -220,42 +212,19 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       alignItems: "center",
       justifyContent: "space-between",
     },
-    filterBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
+    // DL v1 §2.4 — the screen's single primary capsule.
     startLogBtn: {
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      backgroundColor: colors.cardDark,
+      backgroundColor: colors.pillBackground,
       borderRadius: theme.borderRadius.pill,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-    },
-    startLogText: { color: "#FFF", fontWeight: "800", fontFamily: theme.fonts.bold },
-    dropdown: {
-      marginHorizontal: 16,
-      backgroundColor: colors.background,
-      borderRadius: theme.borderRadius.cardSmall,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: "hidden",
-    },
-    dropdownItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingVertical: 11,
     },
-    dropdownItemActive: { backgroundColor: colors.backgroundSecondary },
-    dropdownText: {
-      fontSize: 15,
-      fontWeight: "600",
-      fontFamily: theme.fonts.medium,
-      color: colors.textSecondary,
-    },
-    dropdownTextActive: {
-      color: colors.textPrimary,
-      fontWeight: "800",
+    startLogText: {
+      color: colors.pillText,
+      fontSize: 14.5,
       fontFamily: theme.fonts.bold,
     },
   });

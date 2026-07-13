@@ -1,7 +1,20 @@
 // src/components/shared/ProfileHeader.tsx
-// Window β — Profile KAYA: cover + id-block 左下 + action FAB 右下。
-// floating pills (⚙ ↗ ⋯) + back-pill 由 screen 的 Stack.Toolbar / Stack.Screen 处理，
-// 不在 ProfileHeader 内。
+// Design Language v1 (W-DL4, docs/DESIGN_LANGUAGE.md) — Field Journal hero.
+//
+// Layout is a vertical composition INSIDE the fixed-chrome hero box
+// (ProfileChromeRoot renders this via renderHero; shared by the self profile
+// and app/community/u/[id].tsx):
+//
+//   photo region (fixed — no pull-down/parallax; S-curve fade-to-bg band)
+//   → identity block on paper (ink text — no more white-on-photo)
+//   → typographic stat row (mono values; replaces the Window-BY glass
+//     floating stats card)
+//
+// Seam invariant (Window BY): the hero's bottom band is solid
+// colors.background BY CONSTRUCTION (identity + strip sit on paper), so the
+// opaque sub-tab bar below connects seamlessly without gradient tuning.
+// ⚠️ Do NOT reintroduce scroll-driven pinning / measure() here — fixed
+// geometry only (Window BX 拖影 root cause).
 
 import React, { useMemo } from "react";
 import {
@@ -9,8 +22,8 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  TouchableOpacity,
   ActivityIndicator,
+  TouchableOpacity,
   useColorScheme,
 } from "react-native";
 import { Image } from "expo-image";
@@ -18,47 +31,54 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { Affiliation } from "@/features/orgs/types";
-import type { SharedValue } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "@react-navigation/elements";
-import ProfileStatsFloatingCard from "@/components/shared/ProfileStatsFloatingCard";
-import GlassFill from "@/components/ui/GlassFill";
+import PressableScale from "@/components/ui/PressableScale";
 
-// Window BY — visible cover height bumped 300 → 370 (+70) to host the 4-up
-// stats glass card at the cover's bottom, above the sub tab bar, fully inside
-// the fixed-chrome hero's visible bounds (no clip, no tab-bar overlap).
-const PROFILE_COVER_VISIBLE = 370;
-// Content-shell overlaps cover by 24pt with rounded top corners. The cut-out
-// corners need to reveal cover *image* (not the ScrollView's white bg behind
-// the sibling shell), so the cover container is taller than its visible area
-// — bg fills the full extended height; id-block / FABs are anchored relative
-// to the visible bottom, so we offset by COVER_OVERLAP.
-const COVER_OVERLAP = 35;
-const PROFILE_COVER_H = PROFILE_COVER_VISIBLE + COVER_OVERLAP;
-// Window BY — stats card sits ~14pt above the visible cover bottom (= sub tab
-// bar's rest line); id-block + Edit pill ride the band above the card.
-const STATS_CARD_HEIGHT = 60;
-// +8 (was +14) — tighter gap to the sub tab bar so the rest-state band reads
-// as one field (BY seam polish).
-const STATS_CARD_BOTTOM = COVER_OVERLAP + 8;
-const ID_BLOCK_BOTTOM = STATS_CARD_BOTTOM + STATS_CARD_HEIGHT + 14;
-const ACTION_FAB_BOTTOM = ID_BLOCK_BOTTOM;
+// ── Fixed hero geometry (DL v1) ────────────────────────────────────────────
+// Photo region includes the status-bar / nav-bar bleed (transparent header).
+// 290 ≈ 34% of an 852pt screen (device feedback 2026-07-01: 250 read short).
+const PHOTO_REGION_H = 300;
+// Photo→paper dissolve = a single eased alpha ramp (决策 2026-07-01: blur
+// variants — stacked BlurViews AND true CAFilter variableBlur — both read
+// wrong on device; the plain "white mist" won, softened via an S-curve
+// instead of a linear ramp). Full bg lands exactly AT the photo bottom edge
+// (paper starts there by construction). Band height is a device-tuned knob —
+// current 110/300 ≈ 37%, deliberately beyond the DL §1 15–22% guideline
+// (user preference; see BACKLOG DL-FADE-SPEC).
+const FADE_BAND_H = 110;
+const AVATAR_SIZE = 76;
+// Avatar position — device-tuned 2026-07-01 across four rounds (1/3 → 45% →
+// 70% → fully inside): OVERLAP 80 > AVATAR_SIZE 76, so the avatar now sits
+// entirely within the photo region, its bottom edge 4pt above the
+// photo→paper boundary.
+const AVATAR_OVERLAP = 80;
+const SCREEN_PAD = 20;
+// Horizontal identity lockup (决策 2026-07-01): name + @handle sit BESIDE the
+// avatar (reclaims ~32pt of header height); gym / bio / counts run full-width
+// below the avatar row.
+const NAME_COL_TOP = PHOTO_REGION_H - 73; // 227 — name col overlays the photo's fade band
+// 对调 2026-07-01 — stats row sits directly under the name column; the
+// gym/bio info block follows below it. (+82: extra air below the avatar row.)
+const STRIP_TOP = NAME_COL_TOP + 82;
+const STRIP_H = 40;
+const INFO_TOP = STRIP_TOP + STRIP_H + 12;
+// gym + bio only (counts live in the name column).
+const INFO_H = 44;
+// 12pt of air between the info block and the segmented bar.
+const PROFILE_HERO_H = INFO_TOP + INFO_H + 12;
 
-// Exported so the sticky tab bar spacer (in profile screens) can replicate
-// the cover's bottom slice — see ProfileCoverArt below.
-export const PROFILE_COVER_HEIGHT_FULL = PROFILE_COVER_H;
-export const PROFILE_COVER_OVERLAP_PT = COVER_OVERLAP;
+// Legacy-shaped exports — both profile screens compute
+// `HERO_HEIGHT = FULL - OVERLAP`. The paper composition has no hidden
+// overlap slice anymore, so OVERLAP is 0 and FULL is the hero height itself.
+export const PROFILE_COVER_HEIGHT_FULL = PROFILE_HERO_H;
+export const PROFILE_COVER_OVERLAP_PT = 0;
 
-// BY-spike Item 1 — convert theme bg hex (#F4F3F2 / #000000) to "r,g,b" so the
-// cover-fade gradient can land on the exact background color at its bottom stop
-// (渐白 in light, 渐黑 in dark — never a hardcoded white).
+// Convert theme bg hex to "r,g,b" for the fade band's alpha stops (渐白 in
+// light / 渐黑 in dark — never a hardcoded white).
 function hexToRgb(hex: string): string {
   const h = hex.replace("#", "");
-  const full =
-    h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
@@ -78,15 +98,9 @@ const DEFAULT_GRADIENT_DARK: [string, string, string] = [
 ];
 
 /**
- * Standalone cover background renderer — Image + gradient overlay when
+ * Standalone cover background renderer — Image + soft darkening overlay when
  * `coverUrl` is provided, default diagonal gradient otherwise. Fills its
- * parent via `StyleSheet.absoluteFill`, so the caller controls the box.
- *
- * Used in two places: (1) the parallax-transformed cover inside this
- * component; (2) a 35pt-tall "fake cover slice" rendered inside the
- * sticky-tab-bar spacer in profile screens, so the spacer's overlap
- * area visually matches the real cover even when the absolute-overlay
- * bar lags against native scroll.
+ * parent via `StyleSheet.absoluteFill`.
  */
 export function ProfileCoverArt({ coverUrl }: { coverUrl: string | null }) {
   const isDark = useColorScheme() === "dark";
@@ -98,11 +112,6 @@ export function ProfileCoverArt({ coverUrl }: { coverUrl: string | null }) {
           source={{ uri: coverUrl }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-        />
-        <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]}
-          locations={[0.3, 1]}
-          style={StyleSheet.absoluteFill}
         />
       </View>
     );
@@ -137,26 +146,15 @@ export interface ProfileHeaderProps {
   onMessagePress?: () => void;
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
-  scrollY?: SharedValue<number>;
-  /** Window BY — 4-up stats glass card (B Best / R Best / Sends / Sessions).
-   *  Formerly a 2-up pill fed a joined `gradeText`; now split so the card can
-   *  render each grade in its own cell. */
+  /** Typographic stat strip (B Best / R Best / Sends / Sessions). */
   boulderGrade?: string;
   routeGrade?: string;
   totalSends?: number;
-  /** Window BY — session count (kpis.sessionCount). Other-user omits → "—". */
+  /** Session count (kpis.sessionCount). Other-user omits → "—". */
   totalSessions?: number;
-  /** Window BY — tap callback for the stats card (→ ascents history). */
+  /** Tap callback for the stat strip (→ ascents history). */
   onKPIPress?: () => void;
-  /**
-   * Window BX — when true (default, legacy ScrollView-child usage) the cover
-   * pulls itself up by headerHeight to cancel the ScrollView's automatic
-   * content inset and the parallax baseline is offset by headerHeight. When
-   * false (mounted inside ProfileChromeRoot's absolute hero overlay, which
-   * already sits at screen top with no content inset) neither offset applies.
-   */
-  bleedUnderHeader?: boolean;
-  /** P2-A — verified gym affiliations (avatar check + collapsible row). */
+  /** P2-A — verified gym affiliations (setter badge). */
   affiliations?: Affiliation[];
 }
 
@@ -178,17 +176,14 @@ export default function ProfileHeader({
   onMessagePress,
   onFollowersPress,
   onFollowingPress,
-  scrollY,
   boulderGrade,
   routeGrade,
   totalSends,
   totalSessions,
   onKPIPress,
-  bleedUnderHeader = true,
   affiliations,
 }: ProfileHeaderProps) {
   const colors = useThemeColors();
-  const isDark = useColorScheme() === "dark";
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { tr } = useSettings();
   const staffLabel = useMemo(() => {
@@ -201,137 +196,179 @@ export default function ProfileHeader({
     return tr("馆主", "Owner");
   }, [affiliations, tr]);
 
-  // The screen sets `headerTransparent: true` + `contentInsetAdjustmentBehavior:
-  // "automatic"`, so the ScrollView prepends headerHeight worth of top padding.
-  // Pull the cover back up by that amount so it actually extends edge-to-edge
-  // behind the status bar / nav bar (mockup shows status bar overlaying cover).
-  const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight() || (insets.top + 44);
-  // BX — inside ProfileChromeRoot's hero overlay there is no automatic
-  // content inset, so the parallax rest position is 0 (not -headerHeight).
-  const parallaxOffset = bleedUnderHeader ? headerHeight : 0;
+  // No pull-down behavior on the hero (决策 2026-07-01): the elastic/stretch
+  // variants both read wrong on device (photo-only parallax = detached
+  // middle; whole-header elastic = per-frame layout jitter). The header is
+  // simply FIXED — overscroll only bounces the content region below it.
 
-  // Parallax: scroll up enlarges + translates the cover background.
-  // scrollY is reported relative to the ScrollView's content origin; with
-  // `contentInsetAdjustmentBehavior="automatic"` the rest position is
-  // `-headerHeight`, not 0. Add headerHeight back so transform = identity
-  // at rest (otherwise cover image gets zoomed in by ~30% on first paint —
-  // visible as "放大裁切").
-  const bgParallaxStyle = useAnimatedStyle(() => {
-    if (!scrollY) return {};
-    const adjusted = scrollY.value + parallaxOffset;
-    if (adjusted >= 0) return {};
-    const absScroll = -adjusted;
-    return {
-      transform: [
-        { scale: 1 + absScroll / PROFILE_COVER_H },
-        { translateY: adjusted / 2 },
-      ],
-    };
-  });
-
-  // BY-spike Item 1 — cover fade-to-bg overlay. Fixed (non-parallax) so the
-  // bottom stop stays anchored to the content seam while the image scrolls
-  // underneath. Bottom stop = exact theme bg so cover dissolves into content.
   const bgRgb = useMemo(() => hexToRgb(colors.background), [colors.background]);
-  // Window BY — the gradient must reach FULL bg before the hero's clip point so
-  // the *visible* cover bottom is pure bg and connects seamlessly with the
-  // (opaque-bg) sub tab bar below it. The hero clips at heroHeight/cover ≈
-  // 370/405 ≈ 0.914, so a full-bg stop at 1.0 would leave the visible bottom at
-  // ~0.97 bg (≈3% photo bleeding through → the seam). Land full bg at 0.88
-  // instead → the last visible band is solid bg = exact bar color. No layers,
-  // no architecture change; this is the whole "seam" fix.
-  // Even, linear fade-to-bg: a mild dark wash up top (white id-block text), then
-  // a CLEAN bg-alpha ramp 0 → 1 in equal steps (0.25 each) from 0.48 → 0.88.
-  // No black→bg color flip mid-gradient (that produced a muddy grey band + the
-  // "sudden coverage" jump); full bg lands at 0.88, before the hero clip
-  // (~0.914), so the visible bottom is solid bg and joins the bar seamlessly.
-  const coverFadeColors = useMemo(
+  // Eased S-curve stops (slow head, fast tail) — a linear ramp read as a
+  // "hard" mist edge on device; full bg lands exactly at the band's end.
+  const fadeColors = useMemo(
     () =>
       [
-        "rgba(0,0,0,0.10)",
-        "rgba(0,0,0,0.10)",
         `rgba(${bgRgb},0)`,
-        `rgba(${bgRgb},0.25)`,
-        `rgba(${bgRgb},0.5)`,
-        `rgba(${bgRgb},0.75)`,
-        colors.background,
+        `rgba(${bgRgb},0.35)`,
+        `rgba(${bgRgb},0.85)`,
         colors.background,
       ] as const,
     [bgRgb, colors.background],
   );
-  const coverFadeLocations = [0, 0.3, 0.48, 0.58, 0.68, 0.78, 0.88, 1] as const;
+  const fadeLocations = [0, 0.30, 0.70, 1] as const;
 
   const bioText = bio?.trim() || "";
   const homeGymText = homeGym?.trim() || "";
-  const subtitle = homeGymText
-    ? `@${username} · 📍 ${homeGymText}`
-    : `@${username}`;
   const showBio = bioText.length > 0;
+
+  const stripCells = useMemo(
+    () => [
+      { key: "b", label: tr("抱石最高", "B Best"), value: boulderGrade ?? "—" },
+      { key: "r", label: tr("难度最高", "R Best"), value: routeGrade ?? "—" },
+      {
+        key: "s",
+        label: tr("send 数", "Sends"),
+        value: totalSends != null ? String(totalSends) : "—",
+      },
+      {
+        key: "n",
+        label: tr("场次", "Sessions"),
+        value: totalSessions != null ? String(totalSessions) : "—",
+      },
+    ],
+    [boulderGrade, routeGrade, totalSends, totalSessions, tr],
+  );
 
   return (
     <View
-      // BX — as an absolute hero overlay (ProfileChromeRoot) the cover sits
-      // OVER the page scroller. box-none lets vertical drags fall through to
-      // the scroll view (so you can scroll by dragging the cover) while the
-      // Edit / Follow / KPI buttons below still receive taps.
+      // box-none: vertical drags fall through to the per-tab scroll view;
+      // the interactive children below still receive taps.
       pointerEvents="box-none"
-      style={[
-        styles.cover,
-        // Lift cover under nav bar + status bar so background bleeds to top
-        // edge. Total cover height stays PROFILE_COVER_H — id-block / FAB at
-        // bottom: 22 are anchored to visible bottom (not far off the screen).
-        // BX — skipped when rendered inside the hero overlay (already at top).
-        bleedUnderHeader ? { marginTop: -headerHeight } : null,
-      ]}
+      style={styles.hero}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, bgParallaxStyle, { overflow: "hidden" }]}
+      {/* Photo region — fixed; top scrim (toolbar legibility) + frosted
+          dissolve. */}
+      <View pointerEvents="none" style={styles.photoBox}>
+        <View style={StyleSheet.absoluteFill}>
+          <ProfileCoverArt coverUrl={coverUrl} />
+        </View>
+        <LinearGradient
+          colors={["rgba(0,0,0,0.28)", "rgba(0,0,0,0)"]}
+          style={styles.topScrim}
+        />
+        <LinearGradient
+          colors={fadeColors}
+          locations={fadeLocations}
+          style={styles.fadeBand}
+        />
+      </View>
+
+      {/* Paper group — identity + strip on paper below the photo. */}
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {/* Paper backing under identity + strip — the hero overlays the
+          PagerView, so this band must be opaque bg. */}
+      <View pointerEvents="none" style={styles.paperBacking} />
+
+      {/* Avatar — straddles the photo→paper boundary by ~1/3 diameter.
+          Self profile: the avatar IS the edit entry, no extra affordance
+          (决策 2026-07-01: users expect a tappable avatar; a pencil badge
+          reads as clutter). */}
+      {viewMode === "self" ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={tr("编辑资料", "Edit profile")}
+          onPress={onEditPress}
+          style={styles.avatarWrap}
+        >
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person" size={34} color={colors.textTertiary} />
+            </View>
+          )}
+        </PressableScale>
+      ) : (
+        <View style={styles.avatarWrap} pointerEvents="none">
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person" size={34} color={colors.textTertiary} />
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Other-user actions — Follow pill (the screen's single capsule) +
+          message ghost, aligned with the name row. */}
+      {viewMode === "self" ? null : (
+        <View style={[styles.actionAnchor, styles.actionRow]}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={isFollowing ? "Unfollow" : "Follow"}
+            onPress={onFollowPress}
+            disabled={followLoading}
+            activeOpacity={0.85}
+            style={[styles.followBtn, isFollowing ? styles.followBtnActive : null]}
+          >
+            {followLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={isFollowing ? colors.textPrimary : colors.textOnAccent}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.followBtnText,
+                  isFollowing ? styles.followBtnTextActive : null,
+                ]}
+              >
+                {isFollowing ? tr("已关注", "Following") : tr("+ 关注", "+ Follow")}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Message"
+            onPress={onMessagePress}
+            disabled={msgLoading}
+            activeOpacity={0.85}
+            style={styles.chatBtn}
+          >
+            {msgLoading ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <Ionicons
+                name="chatbubble-outline"
+                size={17}
+                color={colors.textPrimary}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Name column — beside the avatar: name + Setter tag / @handle /
+          followers · following (决策 2026-07-01: counts live under the
+          handle, not in the full-width info block). */}
+      <View
+        style={[styles.nameCol, viewMode === "other" ? styles.nameColOther : null]}
+        pointerEvents="box-none"
       >
-        <ProfileCoverArt coverUrl={coverUrl} />
-      </Animated.View>
-
-      {/* Window BY — cover fade-to-bg overlay (even linear LinearGradient).
-          Sits above the parallax cover, below id-block. Reaches full bg before
-          the hero clip so the visible bottom is solid bg and joins the sub tab
-          bar seamlessly. (BY-spike blur variant dropped — on-device it showed
-          no visible gain over the gradient.) */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={coverFadeColors}
-        locations={coverFadeLocations}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Identity block: avatar + name + handle + bio + counts (bottom-left) */}
-      <View style={styles.idBlock} pointerEvents="box-none">
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={36} color="#9CA3AF" />
-          </View>
-        )}
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {name}
           </Text>
           {staffLabel ? (
             <View style={styles.setterTag}>
-              <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
+              <Ionicons name="checkmark-circle" size={12} color={colors.accent} />
               <Text style={styles.setterTagText}>{staffLabel}</Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {subtitle}
+        <Text style={styles.handle} numberOfLines={1}>
+          @{username}
         </Text>
-        {showBio ? (
-          <Text style={styles.bio} numberOfLines={1}>
-            {bioText}
-          </Text>
-        ) : null}
         <View style={styles.countsRow}>
           <Pressable
             accessibilityRole="button"
@@ -342,7 +379,7 @@ export default function ProfileHeader({
           >
             <Text style={styles.counts}>
               <Text style={styles.countsNum}>{followersCount}</Text>
-              {" followers"}
+              {` ${tr("粉丝", "followers")}`}
             </Text>
           </Pressable>
           <Text style={styles.countsSep}>·</Text>
@@ -355,258 +392,275 @@ export default function ProfileHeader({
           >
             <Text style={styles.counts}>
               <Text style={styles.countsNum}>{followingCount}</Text>
-              {" following"}
+              {` ${tr("关注", "following")}`}
             </Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Window BY — 4-up stats glass card, anchored at the cover bottom above
-          the sub tab bar. Child of the cover (within the visible region, so
-          not clipped by overflow:hidden); floats over the 渐白 fade band. */}
-      <ProfileStatsFloatingCard
-        style={styles.statsCard}
-        boulderGrade={boulderGrade}
-        routeGrade={routeGrade}
-        totalSends={totalSends}
-        totalSessions={totalSessions}
+      {/* Info block — full width below the avatar row: gym / bio. */}
+      <View style={styles.infoBlock} pointerEvents="box-none">
+        {homeGymText ? (
+          <Text style={styles.gymLine} numberOfLines={1}>
+            {tr("主场岩馆", "Home gym")}
+            {" · "}
+            <Text style={styles.gymName}>{homeGymText}</Text>
+          </Text>
+        ) : null}
+        {showBio ? (
+          <Text style={styles.bio} numberOfLines={1}>
+            {bioText}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Stat row — quiet, left-aligned typography flowing with the identity
+          block above (决策 2026-07-01: the bordered/centered strip read as a
+          table slab dropped into the page). Still tappable → ascents. */}
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="View ascents history"
         onPress={onKPIPress}
-      />
-
-      {/* Action FAB (bottom-right) — Edit glass ghost pill (BY: theme-tokened
-          via GlassFill; black icon/text on light, white on dark). */}
-      {viewMode === "self" ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Edit profile"
-          onPress={onEditPress}
-          activeOpacity={0.85}
-          style={styles.editPillWrap}
-        >
-          <GlassFill style={styles.editPill} intensity={28}>
-            <Ionicons name="pencil" size={15} color={colors.textPrimary} />
-            <Text style={[styles.editPillText, { color: colors.textPrimary }]}>
-              Edit
+        disabled={!onKPIPress}
+        style={styles.strip}
+      >
+        {stripCells.map((c) => (
+          <View key={c.key} style={styles.cell}>
+            <Text style={styles.cellValue} numberOfLines={1}>
+              {c.value}
             </Text>
-          </GlassFill>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={isFollowing ? "Unfollow" : "Follow"}
-            onPress={onFollowPress}
-            disabled={followLoading}
-            activeOpacity={0.85}
-            style={[
-              styles.followBtn,
-              isFollowing ? styles.followBtnActive : null,
-            ]}
-          >
-            {followLoading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text
-                style={[
-                  styles.followBtnText,
-                  isFollowing ? styles.followBtnTextActive : null,
-                ]}
-              >
-                {isFollowing ? "Following" : "+ Follow"}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Message"
-            onPress={onMessagePress}
-            disabled={msgLoading}
-            activeOpacity={0.85}
-            style={styles.chatBtn}
-          >
-            {msgLoading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Ionicons name="chatbubble-outline" size={18} color="#FFF" />
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+            <Text style={styles.cellLabel} numberOfLines={1}>
+              {c.label}
+            </Text>
+          </View>
+        ))}
+      </PressableScale>
+      </View>
     </View>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    cover: {
-      height: PROFILE_COVER_H,
+    hero: {
+      height: PROFILE_HERO_H,
       position: "relative",
+    },
+    paperBacking: {
+      position: "absolute",
+      top: PHOTO_REGION_H,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background,
+    },
+    photoBox: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: PHOTO_REGION_H,
       overflow: "hidden",
     },
-    idBlock: {
+    topScrim: {
       position: "absolute",
-      left: 20,
-      right: 110, // leave room for action FAB
-      bottom: ID_BLOCK_BOTTOM,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 110,
+    },
+    fadeBand: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: FADE_BAND_H,
+    },
+    avatarWrap: {
+      position: "absolute",
+      left: SCREEN_PAD,
+      top: PHOTO_REGION_H - AVATAR_OVERLAP,
+      zIndex: 2,
     },
     avatar: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
-      backgroundColor: "#FFFFFF",
-      marginBottom: 10,
+      width: AVATAR_SIZE,
+      height: AVATAR_SIZE,
+      borderRadius: AVATAR_SIZE / 2,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 3,
+      borderColor: colors.background,
+    },
+    avatarPlaceholder: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    // Aligned with the name row baseline — name / Setter tag / action form one
+    // visual line (device feedback 2026-07-01: anchored at the photo bottom it
+    // floated in empty space with nothing to attach to).
+    actionAnchor: {
+      position: "absolute",
+      right: SCREEN_PAD,
+      top: NAME_COL_TOP,
+      zIndex: 2,
+    },
+    // Follow/message buttons are 38pt vs the 27pt name line — pull up to
+    // center against it.
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: -6,
+    },
+    followBtn: {
+      height: 38,
+      paddingHorizontal: 18,
+      borderRadius: theme.borderRadius.pill,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    followBtnActive: {
+      backgroundColor: colors.background,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    followBtnText: {
+      fontSize: 14,
+      fontFamily: theme.fonts.bold,
+      color: colors.textOnAccent,
+    },
+    followBtnTextActive: {
+      color: colors.textPrimary,
+    },
+    chatBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.cardBackground,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    // Name column beside the avatar. Self profile has no same-line action
+    // (avatar = edit entry) so it runs to the screen edge; other-user
+    // reserves 148 for the Follow pill + chat ghost on the name line.
+    nameCol: {
+      position: "absolute",
+      left: SCREEN_PAD + AVATAR_SIZE + 12,
+      right: SCREEN_PAD,
+      top: NAME_COL_TOP,
+    },
+    nameColOther: {
+      right: 148,
+    },
+    // Full-width info block below the avatar row.
+    infoBlock: {
+      position: "absolute",
+      left: SCREEN_PAD,
+      right: SCREEN_PAD,
+      top: INFO_TOP,
+      height: INFO_H,
     },
     nameRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
     },
+    name: {
+      flexShrink: 1,
+      fontSize: 23,
+      fontFamily: theme.fonts.bold,
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+      lineHeight: 27,
+    },
+    // DL §2.6 — identity badge: mono outline tag, not a solid capsule.
     setterTag: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 3,
-      backgroundColor: colors.accent,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 12,
+      gap: 4,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2.5,
     },
     setterTagText: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 11,
-      color: "#FFFFFF",
+      fontFamily: theme.fonts.monoMedium,
+      fontSize: 10,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+      color: colors.accent,
     },
-    avatarPlaceholder: {
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.85)",
-    },
-    name: {
-      flexShrink: 1,
-      fontSize: 22,
-      fontWeight: "700",
-      fontFamily: theme.fonts.bold,
-      color: "#FFFFFF",
-      lineHeight: 26,
-      textShadowColor: "rgba(0,0,0,0.5)",
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 4,
-    },
-    subtitle: {
-      fontSize: 12,
+    handle: {
+      fontSize: 13,
       fontFamily: theme.fonts.regular,
-      color: "rgba(255,255,255,0.85)",
-      marginTop: 2,
-      textShadowColor: "rgba(0,0,0,0.4)",
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 3,
+      color: colors.textSecondary,
+      marginTop: 3,
+    },
+    gymLine: {
+      fontSize: 13,
+      fontFamily: theme.fonts.regular,
+      color: colors.textSecondary,
+      marginBottom: 5,
+    },
+    gymName: {
+      fontFamily: theme.fonts.medium,
+      color: colors.textPrimary,
     },
     bio: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontFamily: theme.fonts.regular,
-      color: "rgba(255,255,255,0.85)",
-      marginTop: 4,
-      lineHeight: 16,
-      textShadowColor: "rgba(0,0,0,0.4)",
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 3,
+      color: colors.textPrimary,
+      marginBottom: 5,
+      lineHeight: 18,
     },
     countsRow: {
-      marginTop: 4,
+      marginTop: 5,
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
     },
-    // Window BY — stats glass card anchor: full-width band at the cover bottom,
-    // above the sub tab bar (positioning only; visual lives in
-    // ProfileStatsFloatingCard / GlassFill).
-    statsCard: {
-      position: "absolute",
-      left: 16,
-      right: 16,
-      bottom: STATS_CARD_BOTTOM,
-    },
     counts: {
-      fontSize: 12,
+      fontSize: 13,
       fontFamily: theme.fonts.regular,
-      color: "rgba(255,255,255,0.85)",
-      textShadowColor: "rgba(0,0,0,0.4)",
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 3,
+      color: colors.textSecondary,
     },
     countsNum: {
-      fontWeight: "700",
-      color: "#FFFFFF",
+      fontFamily: theme.fonts.monoMedium,
+      color: colors.textPrimary,
     },
     countsSep: {
-      fontSize: 12,
-      color: "rgba(255,255,255,0.55)",
+      fontSize: 13,
+      color: colors.textTertiary,
     },
-    // Window BY — Edit glass ghost pill. Wrap = absolute positioning; inner
-    // editPill = GlassFill container layout (glass fill + hairline border +
-    // pill radius come from GlassFill / theme tokens).
-    editPillWrap: {
+    // Aligned with the identity block (SCREEN_PAD, left-aligned columns) —
+    // no borders/dividers, it reads as one more line of the profile, not a
+    // separate module.
+    strip: {
       position: "absolute",
-      right: 18,
-      bottom: ACTION_FAB_BOTTOM,
-    },
-    editPill: {
+      // Tighter side margins than SCREEN_PAD — the centered 平铺 columns
+      // already carry visual padding of their own.
+      left: 10,
+      right: 10,
+      top: STRIP_TOP,
+      height: STRIP_H,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 5,
-      height: 36,
-      paddingHorizontal: 14,
-      borderRadius: 999,
     },
-    editPillText: {
-      fontSize: 14,
-      fontWeight: "700",
-      fontFamily: theme.fonts.bold,
-    },
-    actionRow: {
-      position: "absolute",
-      right: 18,
-      bottom: ACTION_FAB_BOTTOM,
-      flexDirection: "row",
+    // 平铺 — four equal columns filling the row, content centered per column.
+    cell: {
+      flex: 1,
       alignItems: "center",
-      gap: 8,
     },
-    chatBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.18)",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: "rgba(255,255,255,0.4)",
+    cellValue: {
+      ...theme.textStyles.monoValue,
+      color: colors.textPrimary,
     },
-    followBtn: {
-      height: 40,
-      paddingHorizontal: 18,
-      borderRadius: 24,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOpacity: 0.2,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 5,
-    },
-    followBtnActive: {
-      backgroundColor: "rgba(255,255,255,0.18)",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: "rgba(255,255,255,0.4)",
-    },
-    followBtnText: {
-      fontSize: 14,
-      fontWeight: "700",
-      fontFamily: theme.fonts.bold,
-      color: "#FFFFFF",
-    },
-    followBtnTextActive: {
-      color: "#FFFFFF",
+    cellLabel: {
+      ...theme.textStyles.microLabel,
+      color: colors.textTertiary,
+      marginTop: 3,
     },
   });

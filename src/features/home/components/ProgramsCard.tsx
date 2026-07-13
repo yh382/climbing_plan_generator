@@ -3,7 +3,8 @@
 // each with its cover, host gym avatar and dates. Tap a tile → its detail; tap
 // the header → the unified /programs list. (P2-H entry point.)
 import { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import PressableScale from "@/components/ui/PressableScale";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -121,18 +122,20 @@ export default function ProgramsCard() {
 
   const top = items.slice(0, 3);
 
+  // DL v1 §3 — the section shell card is gone; the program tiles themselves
+  // are the object cards. Header = micro label + accent action.
   return (
-    <View style={styles.card}>
-      <Pressable style={styles.headerRow} onPress={() => router.push("/programs" as any)}>
+    <View style={styles.section}>
+      <PressableScale style={styles.headerRow} onPress={() => router.push("/programs" as any)}>
         <Text style={styles.label}>{tr("活动", "Programs")}</Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.seeAll}>{tr("全部", "All")}</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-      </Pressable>
+        <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+      </PressableScale>
 
       <View style={styles.row}>
         {top.map((it) => (
-          <Pressable key={`${it.kind}-${it.id}`} style={styles.cell} onPress={() => open(it)}>
+          <PressableScale key={`${it.kind}-${it.id}`} style={styles.cell} onPress={() => open(it)}>
             <View style={styles.coverWrap}>
               {it.cover ? (
                 <Image source={{ uri: it.cover }} style={styles.cover} contentFit="cover" />
@@ -158,7 +161,7 @@ export default function ProgramsCard() {
                 <Text style={styles.cellDate} numberOfLines={1}>{it.dateLabel}</Text>
               </View>
             ) : null}
-          </Pressable>
+          </PressableScale>
         ))}
       </View>
     </View>
@@ -167,22 +170,17 @@ export default function ProgramsCard() {
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    card: {
-      backgroundColor: colors.cardBackground,
-      borderRadius: theme.borderRadius.card,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      padding: 14,
+    section: {
       marginHorizontal: 16,
       marginBottom: theme.spacing.sectionGap,
     },
     headerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12 },
-    label: { fontFamily: theme.fonts.black, fontSize: 16, color: colors.textPrimary, letterSpacing: -0.3 },
-    seeAll: { fontFamily: theme.fonts.medium, fontSize: 13, color: colors.textTertiary },
+    label: { ...theme.textStyles.microLabel, color: colors.textSecondary },
+    seeAll: { fontFamily: theme.fonts.medium, fontSize: 13, color: colors.accent },
 
     row: { flexDirection: "row", gap: 10 },
     cell: { flex: 1, gap: 6 },
-    coverWrap: { width: "100%", aspectRatio: 1, borderRadius: 10, overflow: "hidden", position: "relative" },
+    coverWrap: { width: "100%", aspectRatio: 1, borderRadius: theme.borderRadius.cardSmall, overflow: "hidden", position: "relative" },
     cover: { width: "100%", height: "100%" },
     coverPh: { alignItems: "center", justifyContent: "center" },
     // Host avatar — white ring; placeholder is a NEUTRAL dark chip (not the kind

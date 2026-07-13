@@ -119,7 +119,10 @@ export default function ExpandableCalendar({
   // we hand it. We compute the palette once per render (cheap — useThemeColors
   // is referentially stable) and spread it into every cell.
   const dayRingColors = useMemo(() => {
-    const isDark = colors.background === "#000000";
+    // Dark detection via textPrimary (white in dark) — the old
+    // `background === "#000000"` check silently broke when Window BY lifted
+    // the dark base to #161618, leaving the ring palette stuck on light.
+    const isDark = colors.textPrimary === "#FFFFFF";
     return {
       outerBaseColor: "#A08060",
       innerBaseColor: colors.accent,
@@ -316,8 +319,9 @@ export default function ExpandableCalendar({
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  // DL v1 (W-DL2, 2026-07-01) — the calendar is chrome, not an object: it
+  // sits directly on paper, no grey container shell.
   container: {
-    backgroundColor: colors.backgroundSecondary,
     margin: theme.spacing.screenPadding,
     borderRadius: theme.borderRadius.card,
     padding: theme.spacing.cardPadding,

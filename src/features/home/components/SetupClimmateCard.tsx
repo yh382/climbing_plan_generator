@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import PressableScale from "@/components/ui/PressableScale";
 import { useSetupChecklist, type SetupTask } from "../hooks/useSetupChecklist";
 import PostGuideModal from "./PostGuideModal";
 
@@ -58,9 +59,9 @@ export default function SetupClimmateCard() {
 
 function SetupTaskRow({ task, colors, styles }: { task: SetupTask; colors: ReturnType<typeof useThemeColors>; styles: any }) {
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={task.locked ? undefined : task.onPress}
-      activeOpacity={task.locked ? 1 : 0.7}
+      disabled={task.locked}
       style={[styles.taskRow, task.locked && { opacity: 0.45 }]}
     >
       {/* Status icon */}
@@ -100,19 +101,22 @@ function SetupTaskRow({ task, colors, styles }: { task: SetupTask; colors: Retur
           color={colors.textTertiary}
         />
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
+  // DL v1 §2.1 — setup checklist is an actionable object card: white +
+  // hairline (was a grey block).
   container: {
-    marginHorizontal: 22,
+    marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
+    backgroundColor: colors.cardBackground,
+    borderRadius: theme.borderRadius.card,
     overflow: "hidden",
-    borderWidth: 0.5,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    ...theme.shadow.card,
   },
   titleRow: {
     flexDirection: "row",
@@ -124,7 +128,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   title: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "700",
     fontFamily: theme.fonts.bold,
     color: colors.textPrimary,
     letterSpacing: -0.3,
@@ -136,14 +140,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   progressTrack: {
     height: 3,
-    backgroundColor: colors.border,
+    backgroundColor: colors.progressTrack,
     marginHorizontal: 16,
     borderRadius: 2,
     marginBottom: 12,
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#306E6F",
+    backgroundColor: colors.accent,
     borderRadius: 2,
   },
   taskRow: {

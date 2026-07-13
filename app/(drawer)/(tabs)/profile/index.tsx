@@ -302,7 +302,7 @@ export default function ProfileScreen() {
         heroHeight={HERO_HEIGHT}
         pinFadeProgress={pinFadeProgress}
         initialTabKey={initialTabKey}
-        renderHero={(activeScrollY) => (
+        renderHero={() => (
           <ProfileHeader
             name={user.name}
             username={user.username}
@@ -317,8 +317,6 @@ export default function ProfileScreen() {
             onFollowersPress={() => router.push("/profile/followers" as any)}
             onFollowingPress={() => router.push("/profile/following" as any)}
             affiliations={affiliations}
-            scrollY={activeScrollY}
-            bleedUnderHeader={false}
             boulderGrade={user.stats.boulderGrade}
             routeGrade={user.stats.routeGrade}
             totalSends={user.stats.totalSends}
