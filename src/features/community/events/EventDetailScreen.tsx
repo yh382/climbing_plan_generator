@@ -33,6 +33,7 @@ import EventDetailsModal from "./EventDetailsModal";
 import { useEventDetailData } from "./data/useEventDetailData";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "@/contexts/SettingsContext";
 // === Constants (Align with Challenge) ===
 const COVER_H = 280;
 const THUMB_SIZE = 52;
@@ -58,6 +59,8 @@ function formatTimeHM(iso?: string) {
   return `${hh}:${mm}`;
 }
 
+// Signed day diff — negative means the event is over (★2: ended events must
+// say "Ended", not "0 days left").
 function daysLeft(endISO?: string) {
   if (!endISO) return null;
   const end = new Date(endISO);
@@ -66,8 +69,7 @@ function daysLeft(endISO?: string) {
   const now = new Date();
   const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
   const nowUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.ceil((endUTC - nowUTC) / (1000 * 60 * 60 * 24));
-  return Math.max(0, diff);
+  return Math.ceil((endUTC - nowUTC) / (1000 * 60 * 60 * 24));
 }
 
 // === Components (Align with Challenge Style) ===
@@ -124,6 +126,7 @@ export default function EventDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const { event, eventRaw, onToggleJoin, joined, loading } = useEventDetailData();
+  const { tr } = useSettings();
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   // ===== Scroll Animation — hooks must be before early return =====
@@ -296,7 +299,11 @@ export default function EventDetailScreen() {
                 isLast={!showTime && !showLocation && !showRewards && !event.description}
                 right={
                   left !== null ? (
-                    <Text style={styles.pillText}>{left} days left</Text>
+                    <Text style={styles.pillText}>
+                      {left < 0
+                        ? tr("已结束", "Ended")
+                        : tr(`剩 ${left} 天`, `${left} days left`)}
+                    </Text>
                   ) : null
                 }
               >

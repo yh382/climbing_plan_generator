@@ -34,6 +34,7 @@ import { useUserStore } from "@/store/useUserStore";
 import ChallengeDetailsModal from "./ChallengeDetailsModal";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "@/contexts/SettingsContext";
 const COVER_H = 280;
 const SIDE_PADDING = 12;
 
@@ -47,6 +48,8 @@ function formatYMD(iso?: string) {
   return `${y}/${m}/${day}`;
 }
 
+// Signed day diff — negative means the challenge is over (★2: ended
+// challenges must say "Ended", not "0 days left").
 function daysLeft(endISO?: string) {
   if (!endISO) return null;
   const end = new Date(endISO);
@@ -55,8 +58,7 @@ function daysLeft(endISO?: string) {
   const now = new Date();
   const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
   const nowUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.ceil((endUTC - nowUTC) / (1000 * 60 * 60 * 24));
-  return Math.max(0, diff);
+  return Math.ceil((endUTC - nowUTC) / (1000 * 60 * 60 * 24));
 }
 
 // Category chip
@@ -111,6 +113,7 @@ function InfoRow({
 export default function ChallengeDetailScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { tr } = useSettings();
   const router = useRouter();
   const navigation = useNavigation();
   const headerHeight = useHeaderHeight();
@@ -217,7 +220,7 @@ export default function ChallengeDetailScreen() {
             <View style={styles.badgeCircle}>
               <Ionicons name="trophy" size={36} color="#F59E0B" />
             </View>
-            <Text style={styles.badgeSubtext}>Complete to earn this badge</Text>
+            <Text style={styles.badgeSubtext}>{tr("完成挑战解锁徽章", "Complete to earn this badge")}</Text>
           </View>
         </View>
 
@@ -231,14 +234,16 @@ export default function ChallengeDetailScreen() {
               <View style={styles.joinedRow}>
                 <View style={styles.joinedStat}>
                   <Text style={styles.joinedStatValue}>{myEntry?.score ?? 0}</Text>
-                  <Text style={styles.joinedStatLabel}>My Points</Text>
+                  <Text style={styles.joinedStatLabel}>{tr("我的积分", "My Points")}</Text>
                 </View>
                 {left !== null && (
                   <>
                     <View style={styles.joinedDivider} />
                     <View style={styles.joinedStat}>
-                      <Text style={styles.joinedStatValue}>{left}</Text>
-                      <Text style={styles.joinedStatLabel}>Days Left</Text>
+                      <Text style={styles.joinedStatValue}>{left < 0 ? "—" : left}</Text>
+                      <Text style={styles.joinedStatLabel}>
+                        {left < 0 ? tr("已结束", "Ended") : tr("剩余天数", "Days Left")}
+                      </Text>
                     </View>
                   </>
                 )}
@@ -261,7 +266,15 @@ export default function ChallengeDetailScreen() {
 
             <InfoRow
               icon="calendar-clear-outline"
-              right={left !== null ? <Text style={styles.daysLeftPill}>{left} days left</Text> : null}
+              right={
+                left !== null ? (
+                  <Text style={styles.daysLeftPill}>
+                    {left < 0
+                      ? tr("已结束", "Ended")
+                      : tr(`剩 ${left} 天`, `${left} days left`)}
+                  </Text>
+                ) : null
+              }
             >
               <Text style={styles.infoValue}>
                 {startText && endText ? `${startText} - ${endText}` : startText || "—"}
@@ -292,9 +305,13 @@ export default function ChallengeDetailScreen() {
         </View>
 
         {/* === Goal tiers (W3 structured rule_payload) === */}
+        {/* myScore caveat: leaderboard is capped (api getLeaderboard limit=50),
+            so a joined user ranked below the cap has no myEntry and reads as 0
+            here — needs a backend "my entry" field (BACKLOG SETUX-tier-myscore). */}
         <ChallengeTiers
           ruleType={challenge.ruleType}
           tiers={challenge.rulePayload?.tiers}
+          myScore={joined ? myEntry?.score ?? 0 : null}
         />
 
         {/* === Leaderboard (hidden for lifetime/skill challenges) === */}

@@ -15,10 +15,12 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { HeaderButton } from "@/components/ui/HeaderButton";
-import { theme } from "@/lib/theme";
+import { theme, PROGRAM_KIND_COLORS } from "@/lib/theme";
+import { formatProgramDate, formatProgramDateRange } from "@/lib/formatProgramDate";
 import { useThemeColors } from "@/lib/useThemeColors";
 import {
   NATIVE_HEADER_LARGE,
@@ -32,6 +34,7 @@ import { compApi } from "@/features/community/competitions/api";
 import { blogApi } from "@/features/community/blog/api";
 
 type Kind = "comp" | "event" | "challenge" | "news";
+type ProgramStatus = "ongoing" | "upcoming" | "ended" | "none";
 interface Item {
   kind: Kind;
   id: string;
@@ -39,9 +42,12 @@ interface Item {
   hostName: string | null;
   hostLogo: string | null;
   cover: string | null;
-  dateLabel: string | null;
+  start: string | null; // raw ISO — formatted per-language at render
+  end: string | null;
+  single: string | null; // news published_at
+  compStatus?: string | null; // raw backend lifecycle — translated at render
   featured?: boolean;
-  ts: number; // sort key (desc)
+  ts: number; // recency key within a status bucket
 }
 
 const KINDS: { key: Kind | "all"; icon: any; zh: string; en: string }[] = [
@@ -53,25 +59,19 @@ const KINDS: { key: Kind | "all"; icon: any; zh: string; en: string }[] = [
 ];
 
 const META: Record<Kind, { icon: any; tint: string; zh: string; en: string }> = {
-  comp: { icon: "trophy", tint: "#B5834F", zh: "比赛", en: "Comp" },
-  event: { icon: "calendar", tint: "#2E6F8E", zh: "活动", en: "Event" },
-  challenge: { icon: "flame", tint: "#C27C40", zh: "挑战", en: "Challenge" },
-  news: { icon: "newspaper", tint: "#5F5E5A", zh: "资讯", en: "News" },
+  comp: { icon: "trophy", tint: PROGRAM_KIND_COLORS.comp, zh: "比赛", en: "Comp" },
+  event: { icon: "calendar", tint: PROGRAM_KIND_COLORS.event, zh: "活动", en: "Event" },
+  challenge: { icon: "flame", tint: PROGRAM_KIND_COLORS.challenge, zh: "挑战", en: "Challenge" },
+  news: { icon: "newspaper", tint: PROGRAM_KIND_COLORS.news, zh: "资讯", en: "News" },
 };
 
-function md(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+/** Darken a #RRGGBB hex for the fallback-cover gradient end stop. */
+function shade(hex: string, factor: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v: number) => Math.round(v * factor).toString(16).padStart(2, "0");
+  return `#${ch((n >> 16) & 0xff)}${ch((n >> 8) & 0xff)}${ch(n & 0xff)}`;
 }
-function dateRange(start?: string | null, end?: string | null, single?: string | null): string | null {
-  const s = md(start);
-  const e = md(end);
-  if (s && e && s !== e) return `${s} – ${e}`;
-  if (s) return s;
-  return md(single);
-}
+
 function compStatus(status: string, tr: (zh: string, en: string) => string): string {
   return status === "active"
     ? tr("进行中", "Live")
@@ -80,10 +80,25 @@ function compStatus(status: string, tr: (zh: string, en: string) => string): str
       : tr("报名中", "Open");
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** 进行中 > 未开始 > (无日期内容) > 已结束 — ended items must not sort first (★2). */
+function programStatus(start: string | null, end: string | null): ProgramStatus {
+  const s = start ? new Date(start).getTime() : NaN;
+  // Date-only ends (admin date pickers) mean "through that day" — pad a day.
+  const e = end ? new Date(end).getTime() + DAY_MS : Number.isNaN(s) ? NaN : s + DAY_MS;
+  if (Number.isNaN(s) && Number.isNaN(e)) return "none";
+  const now = Date.now();
+  if (!Number.isNaN(s) && now < s) return "upcoming";
+  if (!Number.isNaN(e) && now > e) return "ended";
+  return "ongoing";
+}
+
+const STATUS_RANK: Record<ProgramStatus, number> = { ongoing: 0, upcoming: 1, none: 2, ended: 3 };
+
 export default function ProgramsScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { tr } = useSettings();
+  const { tr, lang } = useSettings();
   const router = useRouter();
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
@@ -127,7 +142,10 @@ export default function ProgramsScreen() {
               hostName: c.organizer?.name ?? null,
               hostLogo: c.organizer?.logo_url ?? null,
               cover: null,
-              dateLabel: dateRange(c.start_at, c.end_at) ?? compStatus(c.status, tr),
+              start: c.start_at ?? null,
+              end: c.end_at ?? null,
+              single: null,
+              compStatus: c.status ?? null,
               ts: c.start_at ? new Date(c.start_at).getTime() || 0 : 0,
             });
           }
@@ -141,7 +159,9 @@ export default function ProgramsScreen() {
               hostName: e.publisher?.name ?? null,
               hostLogo: e.publisher?.logoUrl ?? null,
               cover: e.cover_url ?? null,
-              dateLabel: dateRange(e.start_at, e.end_at),
+              start: e.start_at ?? null,
+              end: e.end_at ?? null,
+              single: null,
               featured: !!e.is_featured,
               ts: e.start_at ? new Date(e.start_at).getTime() || 0 : 0,
             });
@@ -156,7 +176,9 @@ export default function ProgramsScreen() {
               hostName: c.publisher?.name ?? null,
               hostLogo: null,
               cover: c.coverUrl ?? null,
-              dateLabel: dateRange(c.startAt, c.endAt),
+              start: c.startAt ?? null,
+              end: c.endAt ?? null,
+              single: null,
               ts: c.startAt ? new Date(c.startAt).getTime() || 0 : 0,
             });
           }
@@ -170,12 +192,33 @@ export default function ProgramsScreen() {
               hostName: b.publisher?.name ?? null,
               hostLogo: null,
               cover: b.cover_url ?? null,
-              dateLabel: dateRange(null, null, b.published_at),
+              start: null,
+              end: null,
+              single: b.published_at ?? null,
               ts: b.published_at ? new Date(b.published_at).getTime() || 0 : 0,
             });
           }
         }
-        out.sort((a, b) => b.ts - a.ts);
+        // ★2 — status buckets first (进行中 > 未开始 > 资讯 > 已结束), recency inside.
+        // Upcoming sorts soonest-first; every other bucket newest-first.
+        // Bucket is precomputed per item: comparator stays consistent even if
+        // Date.now() crosses a status boundary mid-sort. Dateless comps fall
+        // back to their backend lifecycle so a finished comp can't rank as
+        // undated content above live programs.
+        const bucketOf = (i: Item): ProgramStatus => {
+          const s = i.kind === "news" ? "none" : programStatus(i.start, i.end);
+          if (s !== "none" || i.kind !== "comp") return s;
+          if (i.compStatus === "active") return "ongoing";
+          if (i.compStatus === "finished") return "ended";
+          return "upcoming"; // registration/open — not yet running
+        };
+        const buckets = new Map(out.map((i) => [i, bucketOf(i)]));
+        out.sort((a, b) => {
+          const sa = buckets.get(a)!;
+          const sb = buckets.get(b)!;
+          if (STATUS_RANK[sa] !== STATUS_RANK[sb]) return STATUS_RANK[sa] - STATUS_RANK[sb];
+          return sa === "upcoming" ? a.ts - b.ts : b.ts - a.ts;
+        });
         setItems(out);
       })
       .finally(() => alive && setLoading(false));
@@ -234,15 +277,33 @@ export default function ProgramsScreen() {
         <View style={styles.grid}>
           {shown.map((i) => {
             const m = META[i.kind];
+            const dateLabel =
+              i.kind === "news"
+                ? formatProgramDate(i.single, lang)
+                : formatProgramDateRange(i.start, i.end, lang) ??
+                  (i.compStatus ? compStatus(i.compStatus, tr) : null);
             return (
               <Pressable key={`${i.kind}-${i.id}`} style={[styles.card, { width: cardW }]} onPress={() => open(i)}>
                 <View style={styles.coverWrap}>
                   {i.cover ? (
                     <Image source={{ uri: i.cover }} style={styles.cover} contentFit="cover" />
                   ) : (
-                    <View style={[styles.cover, styles.coverPh, { backgroundColor: m.tint }]}>
+                    // ★1 — no-cover fallback: kind-tint gradient + ghosted icon
+                    // pattern (DESIGN_LANGUAGE 封面 fallback 规范; flat blocks banned).
+                    <LinearGradient
+                      colors={[m.tint, shade(m.tint, 0.66)]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.cover, styles.coverPh]}
+                    >
+                      <Ionicons
+                        name={m.icon}
+                        size={96}
+                        color="rgba(255,255,255,0.14)"
+                        style={styles.coverGhostIcon}
+                      />
                       <Ionicons name={m.icon} size={30} color="rgba(255,255,255,0.9)" />
-                    </View>
+                    </LinearGradient>
                   )}
                   <View style={styles.kindBadge}>
                     <Text style={styles.kindBadgeText}>{tr(m.zh, m.en)}</Text>
@@ -268,10 +329,10 @@ export default function ProgramsScreen() {
                       {i.hostName ?? tr("岩馆", "Gym")}
                     </Text>
                   </View>
-                  {i.dateLabel ? (
+                  {dateLabel ? (
                     <View style={styles.dateRow}>
                       <Ionicons name="calendar-outline" size={11} color={colors.textTertiary} />
-                      <Text style={styles.dateText}>{i.dateLabel}</Text>
+                      <Text style={styles.dateText}>{dateLabel}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -325,7 +386,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     },
     coverWrap: { width: "100%", aspectRatio: 1.35, position: "relative" },
     cover: { width: "100%", height: "100%" },
-    coverPh: { alignItems: "center", justifyContent: "center" },
+    coverPh: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
+    coverGhostIcon: {
+      position: "absolute",
+      right: -18,
+      bottom: -20,
+      transform: [{ rotate: "-12deg" }],
+    },
     kindBadge: {
       position: "absolute",
       top: 8,

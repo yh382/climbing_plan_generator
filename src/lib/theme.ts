@@ -220,6 +220,16 @@ export const ROPE_GRADE_COLORS: Record<string, string> = {
   '5.15':  '#100602',
 } as const
 
+/** Program-kind 分类色 (DESIGN_LANGUAGE §封面 fallback 规范, CE window)
+ *  仅限 Programs 发现面: fallback 封面渐变 / kind icon 占位。
+ *  不是表达色 — grade ramp 依旧是唯一的"成就/难度"色谱 (§0)。 */
+export const PROGRAM_KIND_COLORS = {
+  comp:      '#B5834F',
+  event:     '#2E6F8E',
+  challenge: '#C27C40',
+  news:      '#5F5E5A',
+} as const
+
 /** CSM 训练状态颜色 (v2 spec §14) */
 export const CSM_STATE_COLORS = {
   push:      '#306E6F',  // accent — 稳定+推进高

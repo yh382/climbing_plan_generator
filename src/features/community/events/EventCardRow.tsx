@@ -5,16 +5,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
 import { useSettings } from "@/contexts/SettingsContext";
+import { formatProgramDate, type ProgramDateLang } from "@/lib/formatProgramDate";
 import type { EventOut } from "./types";
 import EventTypeIcons from "./EventTypeIcons";
 
-function formatDateShort(iso: string): string {
+function formatDateShort(iso: string, lang: ProgramDateLang): string {
+  const date = formatProgramDate(iso, lang);
+  if (!date) return iso;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${months[d.getMonth()]} ${d.getDate()} · ${hh}:${mm}`;
+  return `${date} · ${hh}:${mm}`;
 }
 
 export default function EventCardRow({
@@ -26,7 +27,7 @@ export default function EventCardRow({
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { tr } = useSettings();
+  const { tr, lang } = useSettings();
   const publisherLine = item.publisher.name + (item.location_text ? ` · ${item.location_text}` : "");
   const hasCapacity = item.details?.capacity != null;
   const full = hasCapacity && (item.spots_left ?? 0) <= 0;
@@ -49,7 +50,7 @@ export default function EventCardRow({
 
         <View style={styles.metaRow}>
           <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-          <Text style={styles.metaText}>{formatDateShort(item.start_at)}</Text>
+          <Text style={styles.metaText}>{formatDateShort(item.start_at, lang)}</Text>
         </View>
 
         <View style={styles.metaRow}>

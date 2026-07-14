@@ -3,14 +3,9 @@ import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
+import { useSettings } from "@/contexts/SettingsContext";
+import { formatProgramDate } from "@/lib/formatProgramDate";
 import type { EventOut } from "./types";
-
-function formatDateShort(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[d.getMonth()]} ${d.getDate()}`;
-}
 
 export default function MineEventChip({
   item,
@@ -21,6 +16,7 @@ export default function MineEventChip({
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { lang } = useSettings();
 
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.85} onPress={onPress}>
@@ -30,7 +26,7 @@ export default function MineEventChip({
           {item.title}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {formatDateShort(item.start_at)} · {item.publisher.name}
+          {formatProgramDate(item.start_at, lang) ?? item.start_at} · {item.publisher.name}
         </Text>
       </View>
     </TouchableOpacity>
