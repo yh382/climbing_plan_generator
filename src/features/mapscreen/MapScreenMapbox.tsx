@@ -79,6 +79,7 @@ import MapPinCluster from '../outdoor/components/MapPinCluster';
 // CD Phase 2 — geometric CragOverviewCluster replaced by the tree-clustered
 // AreaNodeCluster on the explore-mode source.
 import AreaNodeCluster from '../outdoor/components/AreaNodeCluster';
+import { clampZoomBucket } from '../outdoor/areaNodeSelection';
 import { type ViewportBbox } from '../outdoor/useViewportPins';
 import { outdoorApi } from '../outdoor/api';
 // CD Phase 2 — whole-tree all-node preload (~43k) for AreaNodeCluster.
@@ -376,6 +377,10 @@ export default function MapScreenMapbox({
   // CD Phase 2 — whole-tree node source for the explore-mode AreaNodeCluster
   // (replaces the geometric crag supercluster).
   const areaNodes = useAllAreaNodes();
+  // Integer zoom bucket driving the deterministic node selection
+  // (areaNodeSelection.ts). State (not ref): crossing a bucket must re-render
+  // the cluster; same-bucket camera churn bails out in the setter.
+  const [areaZoomBucket, setAreaZoomBucket] = useState(() => clampZoomBucket(3));
   const areaId = mode.kind === 'area' ? mode.areaId : undefined;
   const areaData = useAreaData(areaId);
   // CA-FU-1 — full area detail (carries trail_geojson for TrailLayer; the
@@ -796,6 +801,7 @@ export default function MapScreenMapbox({
       const currentLng = Number(c[0]);
       mapCenterRef.current = { lat: currentLat, lng: currentLng };
       lastCameraSnapshotRef.current = { center: [currentLng, currentLat], zoom };
+      setAreaZoomBucket(clampZoomBucket(zoom));
       observeCamera({ center: [currentLng, currentLat], zoom });
 
       // Programmatic flyTo — don't let it poison the lat-delta tracking.
@@ -1369,6 +1375,7 @@ export default function MapScreenMapbox({
               <AreaNodeCluster
                 nodes={areaNodes.nodes}
                 styleReady={styleReady}
+                zoomBucket={areaZoomBucket}
                 onNodePress={onNodeTap}
               />
             )}

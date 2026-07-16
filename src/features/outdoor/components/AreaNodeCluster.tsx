@@ -5,14 +5,17 @@
  * Mountain-Project / onX **tree** model: every area-tree node (country →
  * crag) is a single ratio-ring pin, preloaded once via useAllAreaNodes
  * (~43k nodes, stable source, M3). There is NO geometric clustering — the
- * tree layering is done by Mapbox symbol COLLISION:
+ * tree layering is a DETERMINISTIC JS selection (areaNodeSelection.ts):
  *
- *   - one SymbolLayer, `iconAllowOverlap:false` + `textAllowOverlap:false`
- *   - `symbolSortKey = -subtree_route_count` → high-importance nodes are
- *     placed FIRST and win collisions; overlapping low-importance nodes are
- *     hidden, surfacing as you zoom in (space opens up).
- *   - a zoom→importance filter trims the collision candidate set at low
- *     zoom so Mapbox isn't running collision over the whole tree (perf, M3).
+ *   - per integer zoom bucket, a grid-greedy pass keeps the highest-
+ *     importance node per neighborhood → the visible set is a pure function
+ *     of (nodes, zoomBucket), independent of viewport. Panning can never
+ *     change what's shown (Mapbox collision placement is viewport-relative
+ *     and made rings flicker in/out mid-pan — device find 2026-07-16).
+ *   - selected symbols render with allowOverlap:true, so Mapbox's own
+ *     collision engine never hides them (and never runs over 43k nodes).
+ *   - name labels still collide (textAllowOverlap:false): label flicker is
+ *     standard map behavior and piling them up reads worse.
  *
  * Tap any node → onNodePress(node) → caller `enterArea(node.id)` → the tabbed
  * area page (same drill model as crag-pin tap / breadcrumb / saved-spot).
@@ -26,6 +29,7 @@ import MapboxGL from '@rnmapbox/maps';
 import Svg, { Circle } from 'react-native-svg';
 
 import { useThemeColors } from '../../../lib/useThemeColors';
+import { selectNodesForBucket } from '../areaNodeSelection';
 import { STYLE_COLORS } from '../disciplineColors';
 import type { AreaNode } from '../types';
 
@@ -118,18 +122,8 @@ const TEXT_SIZE_EXPR = [
   10000, 17,
 ] as const;
 
-// zoom→importance floor: trim the collision candidate set at low zoom so
-// Mapbox isn't colliding the whole tree. Mirrors the legacy
-// getMinRoutesForZoom tiers. At zoom ≥12 the floor is 0 (collision alone
-// governs density). Expressed inline so it's a Mapbox filter, not JS.
-const IMPORTANCE_FILTER: any = [
-  '>=',
-  ['get', 'subtree_route_count'],
-  ['step', ['zoom'], 200, 6, 60, 8, 20, 10, 5, 12, 0],
-];
-
-// high subtree_route_count placed first → wins collision (Mapbox places
-// lower sort keys first).
+// high subtree_route_count placed first (kept for label collision priority
+// and stable draw order among the selected set).
 const SORT_KEY: any = ['-', 0, ['get', 'subtree_route_count']];
 
 function toGeoJSON(nodes: AreaNode[]): GeoJSON.FeatureCollection {
@@ -158,6 +152,9 @@ function toGeoJSON(nodes: AreaNode[]): GeoJSON.FeatureCollection {
 export type AreaNodeClusterProps = {
   nodes: AreaNode[];
   styleReady: boolean;
+  /** Integer zoom bucket (clampZoomBucket) — picks the deterministic
+   *  per-tier visible set. Owned by MapScreenMapbox's onCameraChanged. */
+  zoomBucket: number;
   /** Tap a node → caller enters its area page (enterArea). */
   onNodePress: (node: AreaNode) => void;
 };
@@ -165,16 +162,21 @@ export type AreaNodeClusterProps = {
 export default function AreaNodeCluster({
   nodes,
   styleReady,
+  zoomBucket,
   onNodePress,
 }: AreaNodeClusterProps) {
   const colors = useThemeColors();
 
-  const shape = useMemo(() => toGeoJSON(nodes), [nodes]);
+  const visible = useMemo(
+    () => selectNodesForBucket(nodes, zoomBucket),
+    [nodes, zoomBucket],
+  );
+  const shape = useMemo(() => toGeoJSON(visible), [visible]);
   const lookup = useMemo(() => {
     const map = new Map<string, AreaNode>();
-    for (const n of nodes) map.set(n.id, n);
+    for (const n of visible) map.set(n.id, n);
     return map;
-  }, [nodes]);
+  }, [visible]);
 
   const handlePress = useCallback(
     (e: { features: GeoJSON.Feature[] }) => {
@@ -198,32 +200,31 @@ export default function AreaNodeCluster({
         ))}
       </MapboxGL.Images>
       <MapboxGL.ShapeSource id="area-node-src" shape={shape} onPress={handlePress}>
-        {/* Ring + count are ONE symbol (icon + textField) so they collide as a
-            unit. iconAllowOverlap:false + sortKey = importance → Mapbox hides
-            overlapping low-importance nodes; high-importance win → tree layering
-            without geometric clustering. */}
+        {/* The shape already IS the deterministic per-bucket visible set, so
+            ring + count render unconditionally (allowOverlap) — Mapbox's
+            viewport-relative collision must never re-hide a selected node
+            (that's the pan-flicker this replaces). */}
         <MapboxGL.SymbolLayer
           id="area-node-ring"
-          filter={IMPORTANCE_FILTER}
           style={{
             iconImage: RING_IMAGE_EXPR,
             iconSize: RING_SIZE_EXPR as any,
-            iconAllowOverlap: false,
-            iconOptional: false,
+            iconAllowOverlap: true,
             textField: ['get', 'count_label'] as any,
             textSize: TEXT_SIZE_EXPR as any,
             textColor: colors.textPrimary,
             textHaloColor: '#FFFFFF',
             textHaloWidth: 1.2,
-            textAllowOverlap: false,
+            textAllowOverlap: true,
             symbolSortKey: SORT_KEY,
           }}
         />
         {/* Name label below the pin, gated above an importance floor so dense
-            areas don't pile labels. Collides independently (textOptional). */}
+            areas don't pile labels. Labels still collide — label flicker is
+            normal map behavior; rings must not. */}
         <MapboxGL.SymbolLayer
           id="area-node-labels"
-          filter={['all', IMPORTANCE_FILTER, ['>', ['get', 'subtree_route_count'], 5]] as any}
+          filter={['>', ['get', 'subtree_route_count'], 5] as any}
           style={{
             textField: ['get', 'node_name'] as any,
             textSize: ['interpolate', ['linear'], ['zoom'], 8, 11, 11, 12, 14, 13.5] as any,
