@@ -358,7 +358,11 @@ export default function MapScreenMapbox({
   useEffect(() => {
     let prev: AppStateStatus = AppState.currentState;
     const sub = AppState.addEventListener('change', (next) => {
-      if (prev !== 'active' && next === 'active') {
+      // Only a REAL background trip can release the GL context — brief
+      // `inactive` blips (screenshot, Control Center, Face ID, notification
+      // pulls) never leave the foreground, and remounting on them shows the
+      // white flash for no protective benefit (2026-07-16 device find).
+      if (prev === 'background' && next === 'active') {
         setMapMountKey((k) => k + 1);
       }
       prev = next;
