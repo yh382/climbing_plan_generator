@@ -219,11 +219,13 @@ export default function AreaNodeCluster({
             symbolSortKey: SORT_KEY,
           }}
         />
-        {/* Name label below the pin, gated above an importance floor so dense
-            areas don't pile labels. Collides independently (textOptional). */}
+        {/* Name label below the pin — only state/region-scale nodes (≥2000)
+            get a name; smaller rings stay number-only. 2026-07-16 style pass:
+            the old >5 gate labeled nearly every ring, which stacked a second
+            naming system on top of the basemap's city names (text soup). */}
         <MapboxGL.SymbolLayer
           id="area-node-labels"
-          filter={['all', IMPORTANCE_FILTER, ['>', ['get', 'subtree_route_count'], 5]] as any}
+          filter={['all', IMPORTANCE_FILTER, ['>=', ['get', 'subtree_route_count'], 2000]] as any}
           style={{
             textField: ['get', 'node_name'] as any,
             textSize: ['interpolate', ['linear'], ['zoom'], 8, 11, 11, 12, 14, 13.5] as any,
