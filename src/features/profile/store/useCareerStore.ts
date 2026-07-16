@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api } from "@/lib/apiClient";
+import { getCareerSummary } from "@/features/profile/api";
 
 export type CareerSummary = {
   count_total: number;
@@ -27,7 +27,7 @@ export const useCareerStore = create<State & Actions>((set) => ({
     const filters: Filters = { range: "30d", type: "all", scope: "all", ...(f ?? {}) };
     Object.entries(filters).forEach(([k, v]) => v && params.append(k, String(v)));
     try {
-      const data = await api.get<CareerSummary>(`/career/summary?${params.toString()}`);
+      const data = await getCareerSummary<CareerSummary>(params.toString());
       set({ summary: data, loading: false, filters });
     } catch (e: any) {
       set({ error: e.message, loading: false });

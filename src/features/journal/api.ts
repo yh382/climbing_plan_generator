@@ -118,3 +118,12 @@ export async function uploadLogMediaBatch(
   }
   return results;
 }
+
+/** PATCH /climb-logs/{id} — partial climb-log update (e.g. media list sync
+ *  after edit-log-media saves locally; caller treats it fire-and-forget). */
+export function updateClimbLog<T = unknown>(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<T> {
+  return api.patch<T>(`/climb-logs/${id}`, patch);
+}

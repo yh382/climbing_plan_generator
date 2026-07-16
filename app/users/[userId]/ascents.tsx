@@ -34,7 +34,7 @@ import type {
   AscentsLocationFilter,
   AscentsWallFilter,
 } from "../../../src/features/profile/types";
-import { api } from "../../../src/lib/apiClient";
+import { getProfile } from "../../../src/features/profile/api";
 
 const LOCATION_OPTIONS: AscentsLocationFilter[] = ["all", "outdoor", "gym"];
 const WALL_OPTIONS: AscentsWallFilter[] = ["all", "boulder", "rope"];
@@ -84,8 +84,8 @@ export default function UserAscentsScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api.get<{ username?: string; display_name?: string }>(
-          `/profiles/${targetUserId}`,
+        const data = await getProfile<{ username?: string; display_name?: string }>(
+          targetUserId,
         );
         if (!cancelled) {
           setResolvedUsername(data.display_name || data.username);

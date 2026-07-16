@@ -4,7 +4,7 @@ import { FeedPost } from '../types/community';
 import { communityApi } from '../features/community/api';
 import type { UserPostOut, UserPostCreateIn } from '../features/community/types';
 import { mapRawPost, toFeedPost } from '../features/community/utils';
-import { handleAwardedBadges } from './useBadgeUnlockStore';
+import { handleAwardedBadges } from '../services/badgeAward';
 
 type FeedMode = 'all' | 'following';
 

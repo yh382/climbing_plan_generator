@@ -1,9 +1,18 @@
 import { create } from "zustand";
-import { api } from "@/lib/apiClient";
+import {
+  getMyProfile,
+  updateMyProfile,
+  upsertMyPerformance,
+  getProfileByUserId,
+  getFollowCounts,
+  type FollowCounts,
+} from "@/features/profile/api";
 import {
   mapUserProfileToHeaderVM,
   type HeaderViewModel,
 } from "@/features/profile/mappers/mapUserProfileToHeaderVM";
+
+export type { FollowCounts };
 
 export type PerfDatum = {
   value: any;
@@ -115,8 +124,6 @@ export type Profile = {
   updated_at?: string;
 };
 
-export type FollowCounts = { followers: number; following: number };
-
 type State = {
   // me
   profile?: Profile;
@@ -162,45 +169,6 @@ function normalizeForHeaderVM(p: any) {
   };
 }
 
-async function safeGetProfileByUserId(userId: string): Promise<Profile> {
-  // 你后端目前大概率是 /profiles/{userId}
-  // 做一个轻量 fallback，避免你后端 path 命名不同
-  try {
-    return await api.get<Profile>(`/profiles/${userId}`);
-  } catch {
-    // 备用：有些项目会是 /profiles/by_user/{id}
-    return await api.get<Profile>(`/profiles/by_user/${userId}`);
-  }
-}
-
-async function safeGetFollowCounts(userId?: string): Promise<FollowCounts> {
-  // me
-  if (!userId) {
-    const res = await api.get<FollowCounts>("/profiles/me/follow_counts");
-    return {
-      followers: Number(res?.followers ?? 0),
-      following: Number(res?.following ?? 0),
-    };
-  }
-
-  // other user
-  // 建议后端加：GET /profiles/{userId}/follow_counts
-  try {
-    const res = await api.get<FollowCounts>(`/profiles/${userId}/follow_counts`);
-    return {
-      followers: Number(res?.followers ?? 0),
-      following: Number(res?.following ?? 0),
-    };
-  } catch {
-    // 如果你后端未来用 /profiles/{id}/follow_counts（id=profile_id），这里再加一层 fallback：
-    const res = await api.get<FollowCounts>(`/profiles/${userId}/follow_counts`);
-    return {
-      followers: Number(res?.followers ?? 0),
-      following: Number(res?.following ?? 0),
-    };
-  }
-}
-
 export const useProfileStore = create<State & Actions>((set, get) => ({
   headerVM: null,
   profilesById: {},
@@ -213,7 +181,7 @@ export const useProfileStore = create<State & Actions>((set, get) => ({
   async fetchMe() {
     set({ loading: true, error: undefined });
     try {
-      const data = await api.get<Profile>("/profiles/me");
+      const data = await getMyProfile<Profile>();
       set({
         profile: data,
         headerVM: mapUserProfileToHeaderVM(data),
@@ -227,7 +195,7 @@ export const useProfileStore = create<State & Actions>((set, get) => ({
   async fetchByUserId(userId) {
     set({ loading: true, error: undefined });
     try {
-      const data = await safeGetProfileByUserId(userId);
+      const data = await getProfileByUserId<Profile>(userId);
       const normalized = normalizeForHeaderVM(data);
       const vm = mapUserProfileToHeaderVM(normalized);
 
@@ -246,7 +214,7 @@ export const useProfileStore = create<State & Actions>((set, get) => ({
 
   async fetchFollowCounts(userId) {
     try {
-      const counts = await safeGetFollowCounts(userId);
+      const counts = await getFollowCounts(userId);
       if (userId) {
         set((s) => ({
           followCountsById: { ...s.followCountsById, [userId]: counts },
@@ -278,7 +246,7 @@ export const useProfileStore = create<State & Actions>((set, get) => ({
     }
 
     try {
-      const data = await api.put<Profile>("/profiles/me", partial);
+      const data = await updateMyProfile<Profile>(partial);
       set({
         profile: data,
         headerVM: mapUserProfileToHeaderVM(data),
@@ -293,7 +261,7 @@ export const useProfileStore = create<State & Actions>((set, get) => ({
   async upsertPerformance(perfPatch) {
     set({ saving: true });
     try {
-      const data = await api.post<Profile>("/profiles/me/performance", perfPatch);
+      const data = await upsertMyPerformance<Profile>(perfPatch);
       set({
         profile: data,
         headerVM: mapUserProfileToHeaderVM(data),

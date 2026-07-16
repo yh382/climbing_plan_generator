@@ -21,7 +21,7 @@ import { useThemeColors } from "../../src/lib/useThemeColors";
 import { withHeaderTheme } from "../../src/lib/nativeHeaderOptions";
 import { useSettings } from "../../src/contexts/SettingsContext";
 import { plansApi } from "../../src/features/plans/api";
-import { handleAwardedBadges } from "../../src/store/useBadgeUnlockStore";
+import { handleAwardedBadges } from "../../src/services/badgeAward";
 import { SessionAccordion } from "../../src/features/plans/components/SessionAccordion";
 import { WeekSelector } from "../../src/features/plans/components/WeekSelector";
 import { ExercisePickerModal } from "../../src/features/plans/components/ExercisePickerModal";

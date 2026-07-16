@@ -2,7 +2,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiCreateLog, apiRepeatLog, apiDeleteLog } from "../../../../src/lib/logsApi";
 import { getSessionServerId } from "./sessionServerIdMap";
-import { handleAwardedBadges } from "../../../../src/store/useBadgeUnlockStore";
+import { handleAwardedBadges } from "../../../services/badgeAward";
 
 export type LocalLogId = string;
 

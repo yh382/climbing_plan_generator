@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api } from "@/lib/apiClient";
+import { listClimbs } from "@/features/profile/api";
 
 export type ClimbItem = {
   id: string;
@@ -77,7 +77,7 @@ export const useClimbsStore = create<State & Actions>((set, get) => ({
 
     try {
       // 后端 /climbs GET 返回的是 List[ClimbOut]（数组），不是 {items,next_cursor}
-      const data = await api.get<ClimbItem[]>(`/climbs?${qs.toString()}`);
+      const data = await listClimbs<ClimbItem[]>(qs.toString());
 
       // 用“是否满 limit”来判断还有没有更多；nextCursor 存 offset string
       const nextCursor = data.length >= limit ? String(limit) : null;
@@ -102,7 +102,7 @@ export const useClimbsStore = create<State & Actions>((set, get) => ({
 
     const { qs, limit } = buildQuery(filters, offset);
 
-    const data = await api.get<ClimbItem[]>(`/climbs?${qs.toString()}`);
+    const data = await listClimbs<ClimbItem[]>(qs.toString());
 
     const newOffset = offset + data.length;
     const newNextCursor = data.length >= limit ? String(newOffset) : null;

@@ -9,7 +9,7 @@ import { useSharedValue } from "react-native-reanimated";
 import * as Clipboard from 'expo-clipboard';
 import { theme } from "@/lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { api } from "../../../../src/lib/apiClient";
+import { getUserMe, getFollowCounts } from "../../../../src/features/profile/api";
 
 import ActivityFeedSection from "../../../../src/features/profile/components/fivecorefunction/ActivityFeedSection";
 import StatsAndBadgesSection from "../../../../src/features/profile/components/fivecorefunction/StatsAndBadgesSection";
@@ -137,7 +137,7 @@ export default function ProfileScreen() {
   // --------------------- data loads ---------------------
   const loadHeader = useCallback(async () => {
     try {
-      const [u] = await Promise.all([api.get<UserMe>("/users/me"), fetchMeProfile()]);
+      const [u] = await Promise.all([getUserMe<UserMe>(), fetchMeProfile()]);
       setMe(u);
       didInitialLoad.current = true;
     } catch (e) {
@@ -147,11 +147,8 @@ export default function ProfileScreen() {
 
   const loadFollowCounts = useCallback(async () => {
     try {
-      const res = await api.get<FollowCounts>("/profiles/me/follow_counts");
-      setFollowCounts({
-        followers: Number(res?.followers ?? 0),
-        following: Number(res?.following ?? 0),
-      });
+      const res = await getFollowCounts();
+      setFollowCounts(res);
     } catch {
       setFollowCounts({ followers: 0, following: 0 });
     }

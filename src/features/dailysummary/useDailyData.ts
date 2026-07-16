@@ -33,7 +33,7 @@ type PublicSessionItem = components["schemas"]["PublicSessionItem"];
 type PublicDailyResponse = components["schemas"]["PublicDailyOut"];
 import { computeDailyIntensity } from "../../services/stats/intensityCalculator";
 import { aggregateByRoute } from "../../lib/aggregateClimbItems";
-import { api } from "../../lib/apiClient";
+import { getUserDaily } from "./api";
 import { localDateString } from "../../lib/localDate";
 import { foldActiveSessionMinutes } from "./foldActiveSession";
 
@@ -558,9 +558,7 @@ function useRemoteDailyData(
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get<PublicDailyResponse>(
-          `/users/${userId}/daily/${date}`,
-        );
+        const res = await getUserDaily<PublicDailyResponse>(userId, date);
         if (cancelled) return;
         const {
           daySessions,

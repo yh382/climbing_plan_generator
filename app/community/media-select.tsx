@@ -18,7 +18,7 @@ import { HeaderPillButton } from "../../src/components/ui/HeaderPillButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../../src/lib/theme";
 import { useThemeColors } from "../../src/lib/useThemeColors";
-import { api } from "../../src/lib/apiClient";
+import { getUserDaily } from "../../src/features/dailysummary/api";
 import { useUserStore } from "../../src/store/useUserStore";
 
 type MediaItem = {
@@ -74,7 +74,7 @@ export default function MediaSelectScreen() {
         setLoading(false);
         return;
       }
-      const daily = await api.get<any>(`/users/${userId}/daily/${date}`);
+      const daily = await getUserDaily<any>(userId, date);
       const session = (daily.sessions || []).find(
         (s: any) => String(s.id) === String(sessionId),
       );

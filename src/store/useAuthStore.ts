@@ -1,7 +1,12 @@
 // src/store/useAuthStore.ts
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
-import { setApiAuthToken, api } from "src/lib/apiClient";
+// Layering exemption (CF Phase 2, documented in CLAUDE.md): useAuthStore IS
+// the token plumbing for apiClient — it must push tokens into the client
+// synchronously on hydrate/set/logout, so importing setApiAuthToken here is
+// sanctioned. All other stores go through feature api.ts.
+import { setApiAuthToken } from "src/lib/apiClient";
+import { deleteAccountRequest } from "@/features/account/api";
 import { setSentryUserFromToken, clearSentryUser, addAuthBreadcrumb } from "src/lib/sentry";
 
 const ACCESS_TOKEN_KEY = "climmate_access_token";
@@ -75,7 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   deleteAccount: async () => {
-    await api.del("/users/me");
+    await deleteAccountRequest();
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),

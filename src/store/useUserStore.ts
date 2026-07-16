@@ -1,6 +1,6 @@
 // src/store/useUserStore.ts
 import { create } from "zustand";
-import { api } from "@/lib/apiClient";
+import { getUserMe, updateUserMe } from "@/features/profile/api";
 import { sanitizeImageUrl } from "@/lib/imageUtils";
 
 export type UserLite = {
@@ -56,7 +56,7 @@ export const useUserStore = create<State & Actions>((set, get) => ({
   async fetchMe() {
     set({ loading: true, error: undefined });
     try {
-      const raw = await api.get<any>("/users/me");
+      const raw = await getUserMe<any>();
       const user = normalizeUser(raw);
       // 可在真机调试时看一下实际拿到的字段
       if (__DEV__) console.log("[/users/me]", { raw, user });
@@ -69,7 +69,7 @@ export const useUserStore = create<State & Actions>((set, get) => ({
   async updateMe(patch) {
     const prev = get().user;
     if (prev) set({ user: { ...prev, ...patch } }); // 乐观
-    const raw = await api.put<any>("/users/me", patch);
+    const raw = await updateUserMe<any>(patch);
     const user = normalizeUser(raw);
     set({ user });
   },

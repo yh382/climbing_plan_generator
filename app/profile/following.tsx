@@ -16,7 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderButton } from "../../src/components/ui/HeaderButton";
 import { communityApi } from "../../src/features/community/api";
-import { api } from "../../src/lib/apiClient";
+import { getUserMe } from "../../src/features/profile/api";
 import { useThemeColors } from "../../src/lib/useThemeColors";
 
 interface FollowUser {
@@ -52,7 +52,7 @@ export default function FollowingScreen() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const targetId = userId ?? (await api.get<{ id: string }>("/users/me")).id;
+      const targetId = userId ?? (await getUserMe<{ id: string }>()).id;
       const data = await communityApi.getFollowing(targetId);
       setUsers(Array.isArray(data) ? data : []);
     } catch (_e) {

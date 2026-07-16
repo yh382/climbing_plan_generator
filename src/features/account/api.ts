@@ -99,3 +99,9 @@ export async function confirmDeviceAuth(reason: string): Promise<boolean> {
     return true;
   }
 }
+
+/** DELETE /users/me — permanent account deletion (GDPR). Token teardown and
+ *  local-state reset stay in useAuthStore.deleteAccount, which calls this. */
+export function deleteAccountRequest(): Promise<void> {
+  return api.del<void>("/users/me");
+}

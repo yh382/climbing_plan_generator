@@ -24,6 +24,82 @@ export const profileApi = {
     api.patch<PrivacySettingsData>("/profiles/me/privacy", data),
 };
 
+// ---------------------------------------------------------------------------
+// /users/me + /profiles/* plumbing (CF Phase 2 — routes/stores stop calling
+// apiClient directly). Payload shapes live with their consumers (screen view
+// types, store types), so these take a type parameter instead of pinning one.
+// ---------------------------------------------------------------------------
+
+export type FollowCounts = { followers: number; following: number };
+
+/** GET /users/me — raw current-user payload. */
+export function getUserMe<T = unknown>(): Promise<T> {
+  return api.get<T>("/users/me");
+}
+
+/** PUT /users/me — partial user update. */
+export function updateUserMe<T = unknown>(patch: unknown): Promise<T> {
+  return api.put<T>("/users/me", patch);
+}
+
+/** GET /profiles/me — my full profile. */
+export function getMyProfile<T = unknown>(): Promise<T> {
+  return api.get<T>("/profiles/me");
+}
+
+/** PUT /profiles/me — partial profile update. */
+export function updateMyProfile<T = unknown>(partial: unknown): Promise<T> {
+  return api.put<T>("/profiles/me", partial);
+}
+
+/** POST /profiles/me/performance — upsert performance metrics. */
+export function upsertMyPerformance<T = unknown>(
+  perfPatch: Record<string, any>,
+): Promise<T> {
+  return api.post<T>("/profiles/me/performance", perfPatch);
+}
+
+/** GET /profiles/{userId} — another user's profile (single request). */
+export function getProfile<T = unknown>(userId: string): Promise<T> {
+  return api.get<T>(`/profiles/${userId}`);
+}
+
+/** GET /profiles/{userId} with a legacy `/profiles/by_user/{id}` fallback —
+ *  preserved verbatim from useProfileStore's defensive path handling. */
+export async function getProfileByUserId<T = unknown>(
+  userId: string,
+): Promise<T> {
+  try {
+    return await getProfile<T>(userId);
+  } catch {
+    return await api.get<T>(`/profiles/by_user/${userId}`);
+  }
+}
+
+/** GET follow counts — mine when `userId` is omitted, otherwise theirs.
+ *  Always returns coerced numbers. */
+export async function getFollowCounts(userId?: string): Promise<FollowCounts> {
+  const path = userId
+    ? `/profiles/${userId}/follow_counts`
+    : "/profiles/me/follow_counts";
+  const res = await api.get<FollowCounts>(path);
+  return {
+    followers: Number(res?.followers ?? 0),
+    following: Number(res?.following ?? 0),
+  };
+}
+
+/** GET /climbs — climb list with pre-built query string (see useClimbsStore
+ *  for filter → query mapping). */
+export function listClimbs<T = unknown>(query: string): Promise<T> {
+  return api.get<T>(`/climbs?${query}`);
+}
+
+/** GET /career/summary — aggregated career stats. */
+export function getCareerSummary<T = unknown>(query: string): Promise<T> {
+  return api.get<T>(`/career/summary?${query}`);
+}
+
 import type { AscentsFilter, UserAscentsResponse } from "./types";
 
 /** GET /users/{userId}/ascents — historical aggregated ascents for the

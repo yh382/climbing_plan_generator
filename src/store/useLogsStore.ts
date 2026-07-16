@@ -34,7 +34,7 @@ import {
   readAllServerIds,
   setServerId,
 } from "../features/journal/sync/serverIdMap";
-import { useAuthStore } from "./useAuthStore";
+import { getAccessToken } from "../services/authSession";
 import {
   writeBackupSnapshot,
   clearBackupSnapshot,
@@ -390,7 +390,7 @@ const useLogsStore = createWithEqualityFn<LogsState>()(
           //
           // Order matters: sessions before logs, so that log create events
           // can resolve their session_id from the freshly-populated map.
-          const token = useAuthStore.getState().accessToken;
+          const token = getAccessToken();
           if (token) {
             try {
               const sMap = await readAllSessionServerIds();

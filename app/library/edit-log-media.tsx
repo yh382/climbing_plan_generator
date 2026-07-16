@@ -20,7 +20,7 @@ import {
   updateSessionItem,
 } from "@/features/journal/loglist/storage";
 import { uploadLogMediaBatch, toFileUri } from "@/features/journal/api";
-import { api } from "@/lib/apiClient";
+import { updateClimbLog } from "@/features/journal/api";
 import {
   startUpload,
   updateUpload,
@@ -203,7 +203,7 @@ export default function EditLogMediaScreen() {
     }
 
     // 3. Sync media to backend (fire-and-forget)
-    api.patch(`/climb-logs/${item.id}`, {
+    updateClimbLog(item.id, {
       media: finalMedia.map((m) => ({
         type: m.type,
         url: m.uri,
