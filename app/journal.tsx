@@ -23,8 +23,8 @@ import { usePlanStore, toDateString } from "../src/store/usePlanStore";
 import { useSettings } from "src/contexts/SettingsContext";
 
 // Components
-import CollapsibleCalendarOverlay from "../components/CollapsibleCalendarOverlay";
-import DualMiniRings from "../components/DualMiniRings";
+import CollapsibleCalendarOverlay from "../src/features/journal/CollapsibleCalendarOverlay";
+import DualMiniRings from "../src/features/journal/DualMiniRings";
 import LogSendModal, { LogSendDraft } from "../src/features/journal/LogSendModal";
 import QuickLogCard from "../src/features/journal/QuickLogCard";
 import { TodayDetailsList } from "../src/features/journal/loglist";

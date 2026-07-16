@@ -16,9 +16,6 @@
       "@/*": [
         "app/*"
       ],
-      "@components/*": [
-        "components/*"
-      ],
       "@contexts/*": [
         "src/contexts/*"
       ],
@@ -49,8 +46,7 @@
     "expo-env.d.ts",
     ".expo/types/**/*.ts",
     "app.config.ts",
-    "lib",                             // ← 加上
-    "components"
-, "src/features", "src/store", "src/lib", "src/contexts", "src/components"  ],
+    "lib",
+    "src/features", "src/store", "src/lib", "src/contexts", "src/components"  ],
   "extends": "expo/tsconfig.base.json"
 }

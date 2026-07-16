@@ -13,7 +13,6 @@ import { useNavigation } from "@react-navigation/native";
 import { authApi } from "../api";
 import { theme } from "../../../lib/theme";
 import { useThemeColors } from "@/lib/useThemeColors";
-import { Card } from "@components/ui/Card";
 import { useSettings } from "../../../contexts/SettingsContext";
 
 export default function ChangePasswordScreen() {
@@ -81,7 +80,7 @@ export default function ChangePasswordScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
-        <Card style={styles.card}>
+        <View style={styles.card}>
           <View style={styles.fieldWrap}>
             <Text style={styles.label}>{tr("当前密码", "Current password")}</Text>
             <TextInput
@@ -131,7 +130,7 @@ export default function ChangePasswordScreen() {
               <Text style={styles.errorText}>{tr("密码不一致", "Passwords don't match")}</Text>
             ) : null}
           </View>
-        </Card>
+        </View>
 
         <Pressable
           disabled={!canSubmit}
@@ -160,7 +159,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     padding: 0,
     overflow: "hidden",
     backgroundColor: colors.cardBackground,
+    borderWidth: 1,
     borderColor: colors.cardBorder,
+    ...theme.shadow.card,
   },
   fieldWrap: {
     paddingHorizontal: 16,
