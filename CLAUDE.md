@@ -51,6 +51,7 @@ FormSheet route 跨在 caller JSX 树之外 → 经典 `visible/onApply` prop ca
 - TS types 走 codegen：`npm run codegen`（openapi → `src/types/api.ts`）+ `npm run codegen:check` 防 drift。存量手写 wire types 迁移见 BACKLOG `BA-SWEEP`
 - **ESLint 机器强制**（CF 窗，[eslint.config.js](eslint.config.js)）：跨 store import + apiClient 直调 = **error**；feature 交叉 import + color literals = **warn**（挡新增，存量分批收敛）。ship 前 `npm run lint:errors` 必须 0 error
 - **Layering 豁免（明示）**：`useAuthStore` 可 import `setApiAuthToken`（token plumbing 与 apiClient 同层）；`useLogsStore` 的 api 直调临时豁免至 BACKLOG `LOGS-SPLIT` 落地
+- **Correctness 规则降级封口**：correctness 类 lint 规则（rules-of-hooks 等）降级必须同时满足 per-file scope + 配置内写理由 + BACKLOG 退出条件 + 用户 sign-off，缺一不可。现存唯一豁免：`app/outdoor/crag-map.tsx`（CN-only 遗留屏，`isCN` 设备恒定运行时安全，退出条件见 BACKLOG `CRAG-MAP-HOOKS`，2026-07-16 已 sign-off）
 - **谁碰谁拆**：窗口触到 >800 行文件必须先抽 hook / 子组件再改（16 个 >500 行文件不专窗拆，规则化自然消化）
 
 ### i18n
