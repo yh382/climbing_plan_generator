@@ -46,9 +46,12 @@ FormSheet route 跨在 caller JSX 树之外 → 经典 `visible/onApply` prop ca
 
 ### State / API
 
-- Zustand stores **不可跨 store import**；跨 store 组合走 hooks 或 service
-- API 走 `src/features/<name>/api.ts`，**禁止** inline fetch / axios 直调
-- TS types 与 backend Pydantic schema 对齐再 commit（手维护）
+- Zustand stores **不可跨 store import**；跨 store 组合走 hooks 或 `src/services/*`（例：[badgeAward.ts](src/services/badgeAward.ts) / [authSession.ts](src/services/authSession.ts)）
+- API 走 `src/features/<name>/api.ts`，**禁止** inline fetch / axios 直调，routes (`app/**`) 与 stores **禁止**直 import `src/lib/apiClient`
+- TS types 走 codegen：`npm run codegen`（openapi → `src/types/api.ts`）+ `npm run codegen:check` 防 drift。存量手写 wire types 迁移见 BACKLOG `BA-SWEEP`
+- **ESLint 机器强制**（CF 窗，[eslint.config.js](eslint.config.js)）：跨 store import + apiClient 直调 = **error**；feature 交叉 import + color literals = **warn**（挡新增，存量分批收敛）。ship 前 `npm run lint:errors` 必须 0 error
+- **Layering 豁免（明示）**：`useAuthStore` 可 import `setApiAuthToken`（token plumbing 与 apiClient 同层）；`useLogsStore` 的 api 直调临时豁免至 BACKLOG `LOGS-SPLIT` 落地
+- **谁碰谁拆**：窗口触到 >800 行文件必须先抽 hook / 子组件再改（16 个 >500 行文件不专窗拆，规则化自然消化）
 
 ### i18n
 
@@ -76,8 +79,9 @@ FormSheet route 跨在 caller JSX 树之外 → 经典 `visible/onApply` prop ca
 # Dev server
 npx expo start
 
-# 类型检查
+# 类型检查 + lint（ship 前两者都必须 0 error）
 npx tsc --noEmit
+npm run lint:errors
 
 # 真机 build（改 native module 必跑）
 npx expo run:ios --device
@@ -93,10 +97,10 @@ cd ios && pod install
 | 路径 | 角色 |
 |---|---|
 | `app/` | Expo Router file-based routing（live `app/_layout.tsx` + `app/(drawer)/(tabs)/_layout.tsx`） |
-| `src/features/<name>/` | 21 feature 模块（每个含 `api.ts` / `hooks.ts` / `types.ts` / `components/`） |
-| `src/store/use*Store.ts` | 11 个 zustand store（3 persist：logs / plans / settings） |
-| `src/components/{ui,layout,shared}/` | 跨 feature 组件（atoms / layout / business） |
-| `src/lib/` | 19 utils（apiClient / theme / darkTheme / gradeSystem / nativeHeaderOptions / etc） |
+| `src/features/<name>/` | 24 feature 模块（18 个含 `api.ts`；`hooks` / `types` / `components/` 按需） |
+| `src/store/use*Store.ts` + feature 层 store | 26 个 zustand store（src/store 21 + feature 层 5；3 persist：logs / plans / settings） |
+| `src/components/{ui,shared,drawer,plancard,tabbar}/` | 跨 feature 组件（atoms / business / drawer / plan 卡 / tabbar） |
+| `src/lib/` | 28 utils（apiClient / theme / darkTheme / gradeSystem / nativeHeaderOptions / etc） |
 | `src/services/stats/` | stats 集中（不要散在 feature 里） |
 | `modules/` | 11 个本地 Expo modules（全 iOS-only） |
 | `ios/` | Pod / Info.plist / widget extension target |
