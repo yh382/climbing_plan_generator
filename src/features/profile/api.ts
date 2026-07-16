@@ -7,6 +7,7 @@ import {
   startUpload,
   finishUpload,
 } from "../../lib/uploadActivityBridge";
+import type { AscentsFilter, UserAscentsResponse } from "./types";
 
 export type PrivacySettingsData = {
   posts_public: boolean;
@@ -99,8 +100,6 @@ export function listClimbs<T = unknown>(query: string): Promise<T> {
 export function getCareerSummary<T = unknown>(query: string): Promise<T> {
   return api.get<T>(`/career/summary?${query}`);
 }
-
-import type { AscentsFilter, UserAscentsResponse } from "./types";
 
 /** GET /users/{userId}/ascents — historical aggregated ascents for the
  *  user, filtered by privacy + visibility on the backend. */

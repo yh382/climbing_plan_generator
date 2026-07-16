@@ -58,7 +58,7 @@ const CROSS_FEATURE_ZONES = FEATURES.map((f) => ({
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', 'scripts/*', 'widgets/*'],
+    ignores: ['dist/*', 'scripts/*'],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -102,7 +102,7 @@ module.exports = defineConfig([
     },
   },
   {
-    // 存量降级（CF 窗实测）：CN-only 遗留屏在 ~60 个 hooks 之上有 `if (!isCN)
+    // 存量降级（CF 窗实测）：CN-only 遗留屏在 50+ hooks 之上有 `if (!isCN)
     // return null` 提前 return。运行时安全（isCN 设备恒定），真正修复 = 组件拆分，
     // 归 Map 重构窗（BACKLOG CRAG-MAP-HOOKS）。新文件不受此豁免。
     files: ['app/outdoor/crag-map.tsx'],

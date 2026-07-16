@@ -5,7 +5,7 @@
 # 用法：./scripts/hex-report.sh [N]
 #
 # 说明：
-# - 匹配 #RGB / #RRGGBB / #RRGGBBAA 形式的字符串字面量
+# - 匹配 #RGB / #RGBA / #RRGGBB / #RRGGBBAA 形式的字符串字面量
 # - src/lib/theme.ts / darkTheme.ts 是 token 定义处（sanctioned），列出但标注
 # - 迁移时优先处理 top 文件；warn 级 eslint react-native/no-color-literals 挡新增
 
@@ -15,12 +15,13 @@ cd "$(dirname "$0")/.."
 TOP_N="${1:-30}"
 
 echo "== hex literal report ($(date +%F)) =="
-TOTAL=$(grep -rEoh "#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b" src/ app/ --include="*.ts" --include="*.tsx" | wc -l | tr -d ' ')
-FILES=$(grep -rEl "#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b" src/ app/ --include="*.ts" --include="*.tsx" | wc -l | tr -d ' ')
+HEX_RE="#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{3}\b"
+TOTAL=$(grep -rEoh "$HEX_RE" src/ app/ --include="*.ts" --include="*.tsx" | wc -l | tr -d ' ')
+FILES=$(grep -rEl "$HEX_RE" src/ app/ --include="*.ts" --include="*.tsx" | wc -l | tr -d ' ')
 echo "total: ${TOTAL} hits / ${FILES} files"
 echo
 echo "-- top ${TOP_N} files --"
-grep -rEc "#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b" src/ app/ --include="*.ts" --include="*.tsx" 2>/dev/null \
+grep -rEc "$HEX_RE" src/ app/ --include="*.ts" --include="*.tsx" 2>/dev/null \
   | awk -F: '$2 > 0 { print $2 "\t" $1 }' \
   | sort -rn \
   | head -"${TOP_N}" \
