@@ -12,6 +12,9 @@ import { useAuthStore } from "@/store/useAuthStore";
 import usePreviousTabStore, { type TabKey } from "@/store/usePreviousTabStore";
 
 const TRACKED_TAB_KEYS: readonly TabKey[] = ["index", "activity", "community", "profile"];
+// All real tabs incl. map — used to decide when segments are "on a tab" (vs a
+// pushed route) so the sticky tabbar-visibility state below may update.
+const ALL_TAB_KEYS: readonly string[] = [...TRACKED_TAB_KEYS, "map"];
 
 const isIOS = Platform.OS === "ios";
 // iOS<26: NativeTabs default goes transparent when content scrolls to the
@@ -38,16 +41,23 @@ export default function TabsLayout() {
   // / Profile) instead of hard-coding Home.
   const tabsIdx = segments.indexOf("(tabs)" as never);
   const currentTab = tabsIdx >= 0 ? (segments[tabsIdx + 1] as string | undefined) : undefined;
-  // Show the tab bar ONLY when we're on a confirmed visible-tabbar tab.
-  // `currentTab !== 'map'` alone would briefly flash the bar during a push
-  // OUT of /map (segments switch the instant `router.push` fires; the push
-  // animation hasn't finished covering the screen yet, so the user sees
-  // tabbar pop in just before the new screen covers it). Whitelisting the
-  // visible tabs collapses that window — non-map non-tabs routes also keep
-  // the bar hidden, which is harmless because the push covers it anyway.
-  const tabBarHidden = !(
-    currentTab && (TRACKED_TAB_KEYS as readonly string[]).includes(currentTab)
-  );
+  // Tabbar visibility is STICKY: it only changes when segments land on a real
+  // tab (map → hide, others → show) and holds its last value while a pushed
+  // route is on top. Deriving it from instantaneous segments can't work in
+  // both directions, because `useSegments` updates at push START but only at
+  // pop COMMIT:
+  //  - `hidden = currentTab === 'map'` → bar flashes in when pushing OUT of
+  //    /map (segments flip before the incoming screen covers it);
+  //  - hiding on every non-tab route (old whitelist) → bar is absent from the
+  //    tab screen revealed during back-swipe and pops in ~0.5s after landing.
+  // Sticky keeps the bar under fullscreen pushes / formSheets from visible
+  // tabs (they cover or overlay it anyway) so it's already there on swipe-back,
+  // and keeps it hidden through map's own pushed routes.
+  const lastConfirmedTabRef = useRef<string>("index");
+  if (currentTab && ALL_TAB_KEYS.includes(currentTab)) {
+    lastConfirmedTabRef.current = currentTab;
+  }
+  const tabBarHidden = lastConfirmedTabRef.current === "map";
 
   useEffect(() => {
     if (!currentTab || currentTab === "map") return;
