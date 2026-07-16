@@ -51,6 +51,7 @@ export const darkColors: ThemeColors = {
   borderTertiary: '#38383A',
   trail: '#C9A78A',
   attempt: '#FFB95C',
+  unreadDot: '#FF453A',
   // BS-P1-η dark variants — markers' rgba fills work on both light and
   // dark Mapbox styles, but text labels must invert for contrast
   // against the dark map background. Halos invert from light → dark.

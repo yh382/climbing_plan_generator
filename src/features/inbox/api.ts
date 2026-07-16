@@ -28,4 +28,6 @@ export const inboxApi = {
 
   markRead: (ids: string[]) =>
     api.post<{ updated: number }>("/notifications/read_batch", { ids }),
+
+  getUnreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
 };

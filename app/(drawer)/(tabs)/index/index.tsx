@@ -19,6 +19,7 @@ import { MyGymsCard } from "@/features/home/components/MyGymsCard";
 import ProgramsCard from "@/features/home/components/ProgramsCard";
 import { RankCard } from "@/features/home/components/RankCard";
 import { SavedSpotsCarousel } from "@/features/home/components/SavedSpotsCarousel";
+import { useInboxUnreadCount } from "@/features/inbox/hooks";
 
 export default function HomeScreen() {
   const colors = useThemeColors();
@@ -26,6 +27,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const bootstrap = useAuthStore((s) => s.bootstrap);
   const { tr } = useSettings();
+  const inboxUnread = useInboxUnreadCount();
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -51,7 +53,18 @@ export default function HomeScreen() {
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search" as any)} />
-        <Stack.Toolbar.Button icon="tray" onPress={() => router.push("/inbox" as any)} />
+        <Stack.Toolbar.Button icon="tray" onPress={() => router.push("/inbox" as any)}>
+          {inboxUnread > 0 ? (
+            // IG-style unread dot: glyph color == background color at a tiny
+            // font size renders the native badge as a small solid circle at
+            // the icon's top-right instead of a numbered pill.
+            <Stack.Toolbar.Badge
+              style={{ backgroundColor: colors.unreadDot, color: colors.unreadDot, fontSize: 5 }}
+            >
+              •
+            </Stack.Toolbar.Badge>
+          ) : null}
+        </Stack.Toolbar.Button>
       </Stack.Toolbar>
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.background }}

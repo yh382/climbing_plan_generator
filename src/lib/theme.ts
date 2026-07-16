@@ -60,6 +60,9 @@ export const theme = {
     trail: '#A08060',
     // Window DAILY_GROUP — "Attempted" badge tint (no send yet on a route).
     attempt: '#D97706',
+    // Chrome unread dot (inbox tray etc.) — iOS semantic red; the single
+    // sanctioned non-accent chrome color (DL §2.6 unread-dot exemption).
+    unreadDot: '#FF3B30',
     // BS-P1-η + BS-Track-A/B/D-FU-theme-tokens (2026-06-06) — softer
     // outdoor/gym map marker palette + label style. Replaces Track A/D
     // hardcoded `#F97316` (outdoor) + `#306E6F` (gym pin via accent).

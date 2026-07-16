@@ -1,8 +1,10 @@
-// P2-F — competition hub (register · self-score · live standings · gallery).
+// P2-F — competition hub (register · live standings · gallery).
 // Reached from the 活动/Programs list (P2-H), the gym page, or a deep link.
 // Layout mirrors the Event detail screen: parallax cover → floating organizer
 // avatar → title + info rows → standings / gallery. Backed by routers/comp_app.py.
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+// Scoring does NOT happen here (2026-07-14 拍板): all logging lives in the
+// gym floor-plan (map mode) — the problems row deep-links there.
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -27,6 +29,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { HeaderButton } from "@/components/ui/HeaderButton";
+import PressableScale from "@/components/ui/PressableScale";
 import { NativeSegmentedControl } from "@/components/ui/NativeSegmentedControl";
 import { MenuPill } from "@/components/ui/MenuPill";
 import { HeroCover } from "@/components/shared/HeroCover";
@@ -36,9 +39,6 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useUserStore } from "@/store/useUserStore";
 import { useComp, useStandings } from "@/features/community/competitions/hooks";
 import { compApi } from "@/features/community/competitions/api";
-import CompScoreSheet, {
-  type CompScoreSheetHandle,
-} from "@/features/community/competitions/CompScoreSheet";
 import {
   divisionsOf,
   formatSummary,
@@ -56,13 +56,17 @@ function InfoRow({
   children,
   isLast = false,
   colors,
+  onPress,
+  right,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   children: React.ReactNode;
   isLast?: boolean;
   colors: ReturnType<typeof useThemeColors>;
+  onPress?: () => void;
+  right?: React.ReactNode;
 }) {
-  return (
+  const content = (
     <View
       style={[
         {
@@ -79,8 +83,13 @@ function InfoRow({
         <Ionicons name={icon} size={21} color={colors.textSecondary} />
       </View>
       <View style={{ flex: 1 }}>{children}</View>
+      {right ? <View style={{ marginLeft: 8 }}>{right}</View> : null}
     </View>
   );
+  if (onPress) {
+    return <PressableScale onPress={onPress}>{content}</PressableScale>;
+  }
+  return content;
 }
 
 export default function CompetitionScreen() {
@@ -93,7 +102,6 @@ export default function CompetitionScreen() {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const myId = useUserStore((s) => s.user?.id);
-  const scoreSheet = useRef<CompScoreSheetHandle>(null);
 
   const { comp, loading, refetch } = useComp(compId);
   const active = comp?.status === "active";
@@ -189,11 +197,6 @@ export default function CompetitionScreen() {
     }
   }
 
-  const onScored = () => {
-    refetch();
-    refetchStandings();
-  };
-
   const orgName = comp.organizer?.name ?? tr("主办方", "Organizer");
   const statusText = active
     ? tr("进行中", "Live")
@@ -256,7 +259,25 @@ export default function CompetitionScreen() {
 
           {/* Info rows */}
           <View style={styles.infoList}>
-            <InfoRow icon="podium-outline" colors={colors}>
+            <InfoRow
+              icon="podium-outline"
+              colors={colors}
+              // Deep-link to the gym floor plan (俯视图) — that's where the
+              // comp problems live and where all logging happens.
+              onPress={
+                comp.gym_id
+                  ? () => router.push(`/gym/${comp.gym_id}` as any)
+                  : undefined
+              }
+              right={
+                comp.gym_id ? (
+                  <View style={styles.floorPlanLink}>
+                    <Text style={styles.floorPlanLinkText}>{tr("俯视图", "Floor plan")}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                  </View>
+                ) : undefined
+              }
+            >
               <Text style={styles.infoValue}>{formatSummary(comp.config)}</Text>
               <Text style={styles.infoSub}>{comp.problem_count} {tr("条线", "problems")}</Text>
             </InfoRow>
@@ -272,7 +293,7 @@ export default function CompetitionScreen() {
             ) : null}
           </View>
 
-          {/* Register (not enrolled) or My standing (enrolled) */}
+          {/* Register (not enrolled) or inert Registered state (enrolled) */}
           {!enrolled ? (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{tr("报名", "Register")}</Text>
@@ -317,12 +338,13 @@ export default function CompetitionScreen() {
                 )}
               </Pressable>
             </View>
-          ) : active ? (
-            <Pressable style={styles.scoreCta} onPress={() => scoreSheet.current?.present()}>
-              <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.scoreCtaText}>{tr("记录成绩", "Log my scores")}</Text>
-            </Pressable>
-          ) : null}
+          ) : (
+            // Enrolled — inert gray state; scoring happens in the floor plan.
+            <View style={styles.registeredBtn}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.textSecondary} />
+              <Text style={styles.registeredText}>{tr("已注册", "Registered")}</Text>
+            </View>
+          )}
 
           {/* ===== Standings / Gallery ===== */}
           <NativeSegmentedControl
@@ -400,8 +422,6 @@ export default function CompetitionScreen() {
           )}
         </View>
       </Animated.ScrollView>
-
-      {enrolled ? <CompScoreSheet ref={scoreSheet} comp={comp} onScored={onScored} /> : null}
     </View>
   );
 }
@@ -508,18 +528,22 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     ctaDisabled: { opacity: 0.4 },
     ctaText: { fontFamily: theme.fonts.bold, fontSize: 15, color: "#FFFFFF" },
 
-    // My-rank dark card + score CTA
-    scoreCta: {
+    // Enrolled state — inert gray "Registered" pill-button lookalike.
+    registeredBtn: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
-      backgroundColor: colors.accent,
+      gap: 7,
+      backgroundColor: colors.backgroundSecondary,
       borderRadius: 14,
       paddingVertical: 13,
       marginBottom: 16,
     },
-    scoreCtaText: { fontFamily: theme.fonts.bold, fontSize: 15, color: "#FFFFFF" },
+    registeredText: { fontFamily: theme.fonts.bold, fontSize: 15, color: colors.textSecondary },
+
+    // Problems row → floor-plan deep link affordance.
+    floorPlanLink: { flexDirection: "row", alignItems: "center", gap: 2 },
+    floorPlanLinkText: { fontFamily: theme.fonts.bold, fontSize: 13, color: colors.accent },
 
     // Segmented tabs
     segNative: { marginBottom: 12 },

@@ -40,12 +40,21 @@ export function useMyInvites() {
   const [invites, setInvites] = useState<OrgInvite[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const refetch = useCallback(() => {
+  // Resolves with the fresh list so callers can act on server truth (e.g.
+  // close the invites sheet only when nothing is actually left pending).
+  const refetch = useCallback((): Promise<OrgInvite[]> => {
     setLoading(true);
     return orgsApi
       .getMyInvites()
-      .then((r) => setInvites(r.items ?? []))
-      .catch(() => setInvites([]))
+      .then((r) => {
+        const items = r.items ?? [];
+        setInvites(items);
+        return items;
+      })
+      .catch(() => {
+        setInvites([]);
+        return [] as OrgInvite[];
+      })
       .finally(() => setLoading(false));
   }, []);
 
