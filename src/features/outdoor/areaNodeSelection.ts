@@ -23,20 +23,22 @@ import type { AreaNode } from './types';
 const MIN_BUCKET = 3;
 const MAX_BUCKET = 15;
 
-// Importance floors — mirrors the zoom-stepped Mapbox filter this replaces.
+// Candidate floor. The old zoom-stepped importance floors (200/60/20/5) were
+// a collision-engine perf guard and starved overview zooms of small-but-only
+// nodes; the grid doesn't need them (43k pass is ms-level) and cell greediness
+// already lets a giant beat a neighbor. Floor 1 at overview zooms only skips
+// zero-route admin shells; ≥12 shows everything (parity with the old filter).
+// Device-tuned 2026-07-16: user wants small local rings visible nationally.
 function importanceFloor(bucket: number): number {
-  if (bucket < 6) return 200;
-  if (bucket < 8) return 60;
-  if (bucket < 10) return 20;
-  if (bucket < 12) return 5;
-  return 0;
+  return bucket < 12 ? 1 : 0;
 }
 
 // Minimum on-screen spacing between kept nodes, in px at the bucket's
 // midpoint zoom. Icon disc is ≤48px (iconSize ≤ 24/23) + text halo; within a
 // bucket the true on-screen spacing drifts by ±√2 (zoom continuous, grid
-// fixed). Device-tunable.
-const SPACING_PX = 64;
+// fixed). Device-tuned 2026-07-16: 64 read too sparse; 48 ≈ the old
+// collision-packed density (prod sim: b3 38 / b5 297 / b8 2,380 kept).
+const SPACING_PX = 48;
 
 // Mapbox world = one 512px tile at zoom 0; mercator coords normalized [0,1).
 function cellSizeMercator(bucket: number): number {
