@@ -1,4 +1,4 @@
-// src/components/DualMiniRings.tsx
+// src/features/journal/DualMiniRings.tsx
 import React from "react";
 import { View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";

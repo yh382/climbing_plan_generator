@@ -41,7 +41,7 @@ type Props = {
   onSelect: (d: Date) => void;      // 选择回调
   lang?: "zh" | "en";               // 默认 zh
   firstDay?: 0 | 1;                 // 周日/周一，默认 1
-  topOffset?: number;               // 距顶部偏移，默认 56（TopDateHeader 高度）
+  topOffset?: number;               // 距顶部偏移，默认 56
   renderDayExtra?: (date: Date) => React.ReactNode;  // ✅ 新增
   onMonthChange?: (anyDayInMonth: Date) => void;  
 };
