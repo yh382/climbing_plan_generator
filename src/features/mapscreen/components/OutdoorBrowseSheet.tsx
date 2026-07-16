@@ -206,7 +206,7 @@ export function OutdoorBrowseSheet({
       {header}
       {hasSubareas ? (
         <AreaChildrenList
-          children={children}
+          childAreas={children}
           loading={childrenLoading}
           onChildTap={onPressChildArea}
           maxRows={500}

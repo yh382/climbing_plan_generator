@@ -21,7 +21,7 @@ import { PlanV3Session, PlanV3SessionItem } from "../../types/plan";
 import { ExerciseItemCard } from "../../components/shared/ExerciseItemCard";
 
 // --- Header: minimize + title + timer + progress ---
-const PlanHeader = React.memo(({
+const PlanHeader = React.memo(function PlanHeader({
   dayCompletion = 0,
   isZH,
   paddingTop,
@@ -33,7 +33,7 @@ const PlanHeader = React.memo(({
   paddingTop: number;
   onMinimize: () => void;
   timerValue: string;
-}) => {
+}) {
   const percent = Math.round((isNaN(dayCompletion) ? 0 : dayCompletion) * 100);
 
   return (

@@ -254,7 +254,7 @@ const OutdoorAreaInfoSheet = forwardRef<
             {/* Children-first ordering: subareas before routes */}
             {display.has_subareas ? (
               <AreaChildrenList
-                children={children}
+                childAreas={children}
                 loading={childrenLoading}
                 onChildTap={(child) => onChildTap?.(child)}
               />

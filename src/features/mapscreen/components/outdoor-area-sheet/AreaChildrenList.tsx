@@ -17,7 +17,7 @@ import {
 } from './shared';
 
 type Props = {
-  children: OutdoorAreaListItem[] | null;
+  childAreas: OutdoorAreaListItem[] | null;
   loading: boolean;
   /** Called when user taps a child row. */
   onChildTap: (child: OutdoorAreaListItem) => void;
@@ -26,13 +26,13 @@ type Props = {
 };
 
 export function AreaChildrenList({
-  children, loading, onChildTap, maxRows = 8,
+  childAreas, loading, onChildTap, maxRows = 8,
 }: Props) {
   const colors = useThemeColors();
   const { tr } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  if (loading && !children) {
+  if (loading && !childAreas) {
     return (
       <View style={styles.section}>
         <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -40,12 +40,12 @@ export function AreaChildrenList({
     );
   }
 
-  if (!children || children.length === 0) {
+  if (!childAreas || childAreas.length === 0) {
     return null;
   }
 
-  const visible = children.slice(0, maxRows);
-  const hidden = children.length - visible.length;
+  const visible = childAreas.slice(0, maxRows);
+  const hidden = childAreas.length - visible.length;
 
   return (
     <View style={styles.section}>

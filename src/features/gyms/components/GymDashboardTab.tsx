@@ -22,7 +22,7 @@ export default function GymDashboardTab({ isFavorited, onToggleFavorite }: Props
           <View style={styles.favoriteIconWrap}>
             <Ionicons name="star-outline" size={28} color="#F59E0B" />
           </View>
-          <Text style={styles.favoriteTitle}>Join this gym's community</Text>
+          <Text style={styles.favoriteTitle}>Join this gym&apos;s community</Text>
           <Text style={styles.favoriteSub}>
             Favorite to become a member and see your gym in Community.
           </Text>

@@ -330,7 +330,7 @@ export default function LoginScreen() {
 
         {/* 注册入口 */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
-          <Text style={{ fontSize: 13, color: colors.textTertiary }}>Don't have an account? </Text>
+          <Text style={{ fontSize: 13, color: colors.textTertiary }}>Don&apos;t have an account? </Text>
           <Pressable onPress={onSignup}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Sign up</Text>
           </Pressable>

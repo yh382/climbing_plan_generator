@@ -149,7 +149,7 @@ export default function ForgotPasswordScreen() {
           fontSize: 14, color: colors.textSecondary,
           textAlign: 'center', lineHeight: 22, marginBottom: 32,
         }}>
-          Enter your email and we'll send you a reset link
+          Enter your email and we&apos;ll send you a reset link
         </Text>
 
         {/* 输入框 (无边框填充) */}
