@@ -117,9 +117,14 @@ function formatColor({ h, s, l, a }) {
   return a === 1 ? `hsl(${H}, ${S}%, ${L}%)` : `hsla(${H}, ${S}%, ${L}%, ${Math.round(a * 100) / 100})`;
 }
 
+let unparsedColors = new Set(); // visibility: formats parseColor skips pass through UNMUTED
+
 function muteColor(str, satMul, lightAdd) {
   const c = parseColor(str);
-  if (!c) return str;
+  if (!c) {
+    unparsedColors.add(str);
+    return str;
+  }
   c.s = Math.max(0, Math.min(1, c.s * satMul));
   c.l = Math.max(0, Math.min(1, c.l + lightAdd));
   return formatColor(c);
@@ -191,8 +196,21 @@ function transformStyle(style, p) {
 fs.mkdirSync(OUT_DIR, { recursive: true });
 for (const b of BUILDS) {
   const src = JSON.parse(fs.readFileSync(path.join(HERE, 'snapshots', b.snapshot), 'utf8'));
+  unparsedColors = new Set();
   const out = transformStyle(src, b.params);
+  // INVARIANT: the transform only touches `layers`/`name`. sources/sprite/
+  // glyphs must stay byte-identical to the snapshot — offline packs are
+  // created against the STOCK styleURL (offlineManager.ts STYLE_URL_MAP) and
+  // only serve the paper style because both request the same resources.
+  for (const key of ['sources', 'sprite', 'glyphs']) {
+    if (JSON.stringify(out[key]) !== JSON.stringify(src[key])) {
+      throw new Error(`transform touched style.${key} — this breaks offline pack coverage; see offlineManager.ts`);
+    }
+  }
   const dest = path.join(OUT_DIR, b.out);
   fs.writeFileSync(dest, JSON.stringify(out));
-  console.log(`${b.snapshot} (${src.layers.length} layers) → ${path.relative(process.cwd(), dest)} (${out.layers.length} layers)`);
+  const skipped = unparsedColors.size
+    ? ` · unparsed colors passed through unmuted: ${[...unparsedColors].join(', ')}`
+    : '';
+  console.log(`${b.snapshot} (${src.layers.length} layers) → ${path.relative(process.cwd(), dest)} (${out.layers.length} layers)${skipped}`);
 }

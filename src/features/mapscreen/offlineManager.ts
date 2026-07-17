@@ -11,7 +11,11 @@ export type StyleId = 'outdoors' | 'satellite';
 
 // Raw URLs — @rnmapbox/maps 10.1.45's StyleURL enum points at v10/v11
 // (e.g. outdoors-v11), out of sync with MapScreenMapbox which uses v12.
-// Keep literals here so offline tiles match what the screen renders.
+// NOTE (2026-07-16 paper basemap): the screen now renders a bundled paper
+// styleJSON DERIVED from outdoors-v12, but packs still download against the
+// stock URL. This works only because the transform never touches sources/
+// sprite/glyphs — enforced by an assertion in scripts/mapstyle/build.mjs.
+// If the snapshot is ever upgraded (v13+), bump this URL in the same commit.
 export const STYLE_URL_MAP: Record<StyleId, string> = {
   outdoors: 'mapbox://styles/mapbox/outdoors-v12',
   satellite: 'mapbox://styles/mapbox/satellite-streets-v12',

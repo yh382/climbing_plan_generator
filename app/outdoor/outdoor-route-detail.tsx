@@ -15,6 +15,7 @@ import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-rou
 import { Ionicons } from '@expo/vector-icons';
 
 import { HeaderButton } from '../../src/components/ui/HeaderButton';
+import { OUTDOORS_PAPER_JSON } from '../../src/features/mapscreen/mapstyles';
 import { useThemeColors } from '../../src/lib/useThemeColors';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { useUserStore } from '../../src/store/useUserStore';
@@ -976,7 +977,9 @@ function RouteLocationCard({
     <View style={[locationCardStyles.card, { backgroundColor: colors.cardBackground }]}>
       <MapboxGL.MapView
         style={locationCardStyles.miniMap}
-        styleURL={'mapbox://styles/mapbox/outdoors-v12'}
+        // Same paper basemap as the main map (was stock outdoors-v12 —
+        // two basemap looks side by side, frontend-reviewer 2026-07-16).
+        styleJSON={OUTDOORS_PAPER_JSON}
         // Lock all gestures so swipe/zoom never fight ScrollView.
         pitchEnabled={false}
         rotateEnabled={false}
