@@ -22,15 +22,23 @@ const OUT_DIR = path.join(HERE, '../../src/features/mapscreen/mapstyles');
 const PARAMS = {
   light: {
     name: 'ClimMate Paper Light',
-    // land fills / lines / background: pull saturation toward paper
-    landSatMul: 0.55,
-    landLightAdd: 0.03,
+    // Non-vegetation land (bare land, buildings, structures): quietest tier.
+    landSatMul: 0.45,
+    landLightAdd: 0.04,
+    // Vegetation (landcover / landuse / national-park / wetland): keep a
+    // breath of living green — uniform desat read as "死气沉沉" on device
+    // (2026-07-16), so plants sit a full tier above bare land.
+    vegSatMul: 0.78,
+    vegLightAdd: 0.02,
     // roads: near-grayscale, slightly lifted so they read as hairlines
     roadSatMul: 0.15,
     roadLightAdd: 0.08,
-    // water: muted blue-gray (keep hue, drain the "Google blue")
-    waterSatMul: 0.4,
-    waterLightAdd: 0.05,
+    // water: muted but present — water is where a quiet map affords color
+    waterSatMul: 0.58,
+    waterLightAdd: 0.03,
+    // background: warm paper tint, same family as app `background #F4F3F2`
+    // (upstream is hsl(60,20%,85%) — cooler and darker than our paper)
+    backgroundColor: 'hsl(45, 22%, 93%)',
     // text labels keep contrast; halos keep as-is (readability)
     minorSettlementMinzoom: 11, // Kelso/Kent tier: only when zoomed in
     subdivisionMinzoom: 13, // neighborhood names: later still
@@ -40,12 +48,15 @@ const PARAMS = {
   },
   dark: {
     name: 'ClimMate Paper Dark',
-    landSatMul: 0.6,
+    landSatMul: 0.5,
     landLightAdd: 0, // dark style is already muted; don't lift lightness
+    vegSatMul: 0.75,
+    vegLightAdd: 0,
     roadSatMul: 0.2,
     roadLightAdd: 0,
-    waterSatMul: 0.5,
+    waterSatMul: 0.6,
     waterLightAdd: 0,
+    backgroundColor: null, // dark base is fine as-is
     minorSettlementMinzoom: 11,
     subdivisionMinzoom: 13,
     deleteLayers: ['poi-label', 'road-number-shield', 'road-exit-shield'],
@@ -131,13 +142,18 @@ function mapColors(value, fn) {
 
 // ─── Layer classification ────────────────────────────────────────────────
 const ROAD_RE = /road|motorway|trunk|primary|secondary|tertiary|street|bridge|tunnel|turning|aeroway|ferry/;
-const WATER_RE = /water|waterway|wetland/;
+const WATER_RE = /water|waterway/;
+// Living green tier (fill ids verified against the frozen outdoors-v12
+// snapshot): landcover, landuse, national-park, wetland*, plus vegetation
+// lines (tree rows). Hillshade stays 'land' (terrain depth ≠ vegetation).
+const VEG_RE = /landcover|landuse|national-park|wetland|grass|wood|forest|scrub|pitch|golf/;
 
 function classify(layer) {
   if (layer.type === 'symbol') return 'symbol'; // text/icons: leave colors alone
+  if (VEG_RE.test(layer.id)) return 'vegetation';
   if (WATER_RE.test(layer.id)) return 'water';
   if (ROAD_RE.test(layer.id)) return 'road';
-  return 'land'; // background, landcover, landuse, hillshade, contours, buildings
+  return 'land'; // background, hillshade, contours, buildings, structures
 }
 
 function transformStyle(style, p) {
@@ -158,8 +174,13 @@ function transformStyle(style, p) {
           ? [p.roadSatMul, p.roadLightAdd]
           : cls === 'water'
             ? [p.waterSatMul, p.waterLightAdd]
-            : [p.landSatMul, p.landLightAdd];
+            : cls === 'vegetation'
+              ? [p.vegSatMul, p.vegLightAdd]
+              : [p.landSatMul, p.landLightAdd];
       out.paint = mapColors(layer.paint, (c) => muteColor(c, satMul, lightAdd));
+    }
+    if (layer.type === 'background' && p.backgroundColor) {
+      out.paint = { ...out.paint, 'background-color': p.backgroundColor };
     }
     layers.push(out);
   }
